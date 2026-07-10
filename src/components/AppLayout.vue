@@ -16,8 +16,12 @@ import SearchPalette from '@/components/SearchPalette.vue'
 import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
 import BacklinksPanel from '@/components/BacklinksPanel.vue'
+import ImageViewer from '@/components/viewers/ImageViewer.vue'
+import PdfViewer from '@/components/viewers/PdfViewer.vue'
+import EpubViewer from '@/components/viewers/EpubViewer.vue'
 import { captureFiles } from '@/lib/capture'
 import { baseName } from '@/lib/wiki'
+import { fileKind } from '@/lib/filetypes'
 
 const kb = useKbStore()
 const files = useFilesStore()
@@ -39,7 +43,8 @@ async function onDrop(e: DragEvent): Promise<void> {
 }
 
 const fileName = computed(() => (files.currentPath ? baseName(files.currentPath) : null))
-const isMarkdown = computed(() => files.currentPath?.endsWith('.md') ?? false)
+const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
+const isMarkdown = computed(() => kind.value === 'markdown')
 
 const saveLabel = computed(
   () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
@@ -137,9 +142,18 @@ function closeKb(): void {
       <main class="flex-1 min-w-0 bg-bg-0">
         <GraphView v-if="ui.view === 'graph'" />
         <template v-else-if="files.currentPath">
-          <MarkdownEditor v-if="files.mode === 'edit' && isMarkdown" />
+          <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
           <MarkdownPreview v-else-if="isMarkdown" />
-          <MarkdownEditor v-else />
+          <MarkdownEditor v-else-if="kind === 'text'" />
+          <ImageViewer v-else-if="kind === 'image'" />
+          <PdfViewer v-else-if="kind === 'pdf'" />
+          <EpubViewer v-else-if="kind === 'epub'" />
+          <div v-else class="h-full flex items-center justify-center text-fg-3">
+            <div class="text-center">
+              <span class="codicon codicon-lg codicon-file-binary block mb-2" />
+              Binary file — no preview
+            </div>
+          </div>
         </template>
         <div v-else class="h-full flex items-center justify-center text-fg-3">
           <div class="text-center">

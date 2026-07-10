@@ -45,13 +45,21 @@ const listFiles = defineTool({
 
 const readFile = defineTool({
   name: 'read_file',
-  description: 'Read a text file from the knowledge base. Path is relative to the KB root.',
+  description:
+    'Read a file from the knowledge base. Path is relative to the KB root. PDF files are returned as extracted text with [page N] markers.',
   schema: z.object({
     path: z.string().describe('KB-relative path, e.g. "wiki/index.md"'),
   }),
   describeCall: (a) => `read ${a.path}`,
   run: async ({ path }) => {
-    const content = await fs.tryReadFile(path)
+    let content: string | null
+    if (/\.pdf$/i.test(path)) {
+      // Lazy import keeps pdf.js out of the main bundle until a PDF is read.
+      const { extractPdfText } = await import('@/lib/pdf')
+      content = await extractPdfText(path).catch(() => null)
+    } else {
+      content = await fs.tryReadFile(path)
+    }
     if (content === null) return `Error: file not found: ${path}`
     if (content.length > MAX_READ_CHARS) {
       return content.slice(0, MAX_READ_CHARS) + `\n\n[truncated: file is ${content.length} chars]`

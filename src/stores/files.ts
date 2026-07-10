@@ -2,7 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { fileStem } from '@/lib/wiki'
+import { fileKind } from '@/lib/filetypes'
 import type { TreeNode } from '@/lib/fs'
+
+function isTextual(path: string): boolean {
+  const kind = fileKind(path)
+  return kind === 'markdown' || kind === 'text'
+}
 
 export type SaveState = 'saved' | 'dirty' | 'saving'
 
@@ -50,11 +56,18 @@ export const useFilesStore = defineStore('files', () => {
   async function openFile(path: string): Promise<void> {
     if (currentPath.value === path) return
     await flush()
-    const text = await fs.tryReadFile(path)
-    if (text === null) return
-    currentPath.value = path
-    content.value = text
-    loadedMtime = await fs.statMtime(path)
+    if (isTextual(path)) {
+      const text = await fs.tryReadFile(path)
+      if (text === null) return
+      currentPath.value = path
+      content.value = text
+      loadedMtime = await fs.statMtime(path)
+    } else {
+      // Binary formats (image/pdf/epub) are loaded by their viewer components.
+      currentPath.value = path
+      content.value = ''
+      loadedMtime = null
+    }
     saveState.value = 'saved'
   }
 
@@ -92,7 +105,7 @@ export const useFilesStore = defineStore('files', () => {
   async function refreshOnFocus(): Promise<void> {
     if (!fs.hasRoot()) return
     await refreshTree()
-    if (!currentPath.value || saveState.value !== 'saved') return
+    if (!currentPath.value || saveState.value !== 'saved' || !isTextual(currentPath.value)) return
     const mtime = await fs.statMtime(currentPath.value)
     if (mtime !== null && loadedMtime !== null && mtime > loadedMtime) {
       const text = await fs.tryReadFile(currentPath.value)
@@ -110,7 +123,7 @@ export const useFilesStore = defineStore('files', () => {
   /** Reload the buffer when `path` is the open file and there are no unsaved
    *  edits — used after agent writes and review discards. */
   async function reloadIfClean(path: string): Promise<void> {
-    if (currentPath.value !== path || saveState.value !== 'saved') return
+    if (currentPath.value !== path || saveState.value !== 'saved' || !isTextual(path)) return
     const text = await fs.tryReadFile(path)
     if (text === null) {
       closeCurrent()
