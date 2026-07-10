@@ -17,6 +17,9 @@ const AUTOSAVE_MS = 800
 export const useFilesStore = defineStore('files', () => {
   const tree = ref<TreeNode[]>([])
   const currentPath = ref<string | null>(null)
+  /** Open file tabs, in opening order. Buffers always flush on switch, so a
+   *  tab is just a path — content loads when it becomes current. */
+  const openTabs = ref<string[]>([])
   const content = ref('')
   const saveState = ref<SaveState>('saved')
   const mode = ref<'edit' | 'preview'>('preview')
@@ -70,6 +73,7 @@ export const useFilesStore = defineStore('files', () => {
   }
 
   async function openFile(path: string): Promise<void> {
+    if (!openTabs.value.includes(path)) openTabs.value.push(path)
     if (currentPath.value === path) return
     await flush()
     if (isTextual(path)) {
@@ -157,19 +161,46 @@ export const useFilesStore = defineStore('files', () => {
   }
 
   function closeCurrent(): void {
+    if (currentPath.value) {
+      openTabs.value = openTabs.value.filter((p) => p !== currentPath.value)
+    }
     currentPath.value = null
     content.value = ''
     saveState.value = 'saved'
   }
 
+  /** Close a tab; when it is the current file, switch to a neighbor. */
+  async function closeTab(path: string): Promise<void> {
+    const idx = openTabs.value.indexOf(path)
+    if (idx < 0) return
+    if (currentPath.value !== path) {
+      openTabs.value.splice(idx, 1)
+      return
+    }
+    await flush()
+    openTabs.value.splice(idx, 1)
+    const neighbor = openTabs.value[Math.min(idx, openTabs.value.length - 1)]
+    if (neighbor) {
+      currentPath.value = null // force reload even if neighbor === old current
+      await openFile(neighbor)
+    } else {
+      currentPath.value = null
+      content.value = ''
+      saveState.value = 'saved'
+    }
+  }
+
   function reset(): void {
     tree.value = []
+    openTabs.value = []
     closeCurrent()
   }
 
   return {
     tree,
     currentPath,
+    openTabs,
+    closeTab,
     content,
     saveState,
     mode,

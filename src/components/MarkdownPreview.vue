@@ -1,15 +1,41 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { renderMarkdown } from '@/lib/markdown'
 import { splitFrontmatter } from '@/lib/wiki'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
+import { previewScroll } from '@/lib/viewMemory'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
 
 const root = ref<HTMLElement | null>(null)
+const scroller = ref<HTMLElement | null>(null)
+
+let shownPath: string | null = null
+
+function saveScroll(): void {
+  if (shownPath && scroller.value) previewScroll.set(shownPath, scroller.value.scrollTop)
+}
+
+async function restoreScroll(): Promise<void> {
+  await nextTick()
+  if (scroller.value) {
+    scroller.value.scrollTop = files.currentPath ? (previewScroll.get(files.currentPath) ?? 0) : 0
+  }
+  shownPath = files.currentPath
+}
+
+watch(
+  () => files.currentPath,
+  () => {
+    saveScroll()
+    void restoreScroll()
+  },
+)
+onMounted(() => void restoreScroll())
+onBeforeUnmount(saveScroll)
 
 const html = computed(() =>
   renderMarkdown(files.content, { resolve: (t) => files.resolveWikilink(t) }),
@@ -81,7 +107,7 @@ watch(
 </script>
 
 <template>
-  <div class="h-full panel-scroll">
+  <div ref="scroller" class="h-full panel-scroll">
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div ref="root" class="md-preview max-w-3xl mx-auto px-8 py-6" v-html="html" @click="onClick" />
   </div>

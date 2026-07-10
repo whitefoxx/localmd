@@ -6,8 +6,7 @@
  */
 
 const DB_NAME = 'browser-md'
-const STORE = 'recents'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 export interface RecentKb {
   /** Folder name — also the store key. Same-name folders collide; acceptable for now. */
@@ -16,12 +15,30 @@ export interface RecentKb {
   lastOpened: number
 }
 
+/** A persisted chat session. Histories are plain-JSON provider payloads. */
+export interface StoredSession {
+  id: string
+  /** KB folder name the session belongs to. */
+  kb: string
+  title: string
+  provider: string
+  uiMessages: unknown[]
+  anthropicHistory: unknown[]
+  openaiHistory: unknown[]
+  createdAt: number
+  updatedAt: number
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) {
-        req.result.createObjectStore(STORE, { keyPath: 'name' })
+      const db = req.result
+      if (!db.objectStoreNames.contains('recents')) {
+        db.createObjectStore('recents', { keyPath: 'name' })
+      }
+      if (!db.objectStoreNames.contains('sessions')) {
+        db.createObjectStore('sessions', { keyPath: 'id' })
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -29,12 +46,16 @@ function openDb(): Promise<IDBDatabase> {
   })
 }
 
-function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+function tx<T>(
+  store: string,
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
   return openDb().then(
     (db) =>
       new Promise<T>((resolve, reject) => {
-        const t = db.transaction(STORE, mode)
-        const req = run(t.objectStore(STORE))
+        const t = db.transaction(store, mode)
+        const req = run(t.objectStore(store))
         req.onsuccess = () => resolve(req.result)
         req.onerror = () => reject(req.error)
         t.oncomplete = () => db.close()
@@ -44,14 +65,36 @@ function tx<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequ
 
 export async function saveRecent(handle: FileSystemDirectoryHandle): Promise<void> {
   const entry: RecentKb = { name: handle.name, handle, lastOpened: Date.now() }
-  await tx('readwrite', (s) => s.put(entry))
+  await tx('recents', 'readwrite', (s) => s.put(entry))
 }
 
 export async function listRecents(): Promise<RecentKb[]> {
-  const all = await tx<RecentKb[]>('readonly', (s) => s.getAll() as IDBRequest<RecentKb[]>)
+  const all = await tx<RecentKb[]>('recents', 'readonly', (s) => s.getAll() as IDBRequest<RecentKb[]>)
   return all.sort((a, b) => b.lastOpened - a.lastOpened)
 }
 
 export async function removeRecent(name: string): Promise<void> {
-  await tx('readwrite', (s) => s.delete(name))
+  await tx('recents', 'readwrite', (s) => s.delete(name))
+}
+
+export async function saveSession(session: StoredSession): Promise<void> {
+  await tx('sessions', 'readwrite', (s) => s.put(session))
+}
+
+export async function getSession(id: string): Promise<StoredSession | null> {
+  const r = await tx<StoredSession | undefined>('sessions', 'readonly', (s) => s.get(id))
+  return r ?? null
+}
+
+export async function listSessions(kb: string): Promise<StoredSession[]> {
+  const all = await tx<StoredSession[]>(
+    'sessions',
+    'readonly',
+    (s) => s.getAll() as IDBRequest<StoredSession[]>,
+  )
+  return all.filter((s) => s.kb === kb).sort((a, b) => b.updatedAt - a.updatedAt)
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await tx('sessions', 'readwrite', (s) => s.delete(id))
 }

@@ -7,6 +7,7 @@ import { useReviewStore } from '@/stores/review'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import FileTree from '@/components/FileTree.vue'
+import EditorTabs from '@/components/EditorTabs.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
@@ -139,28 +140,33 @@ function closeKb(): void {
       </aside>
 
       <!-- Main content -->
-      <main class="flex-1 min-w-0 bg-bg-0">
-        <GraphView v-if="ui.view === 'graph'" />
-        <template v-else-if="files.currentPath">
-          <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
-          <MarkdownPreview v-else-if="isMarkdown" />
-          <MarkdownEditor v-else-if="kind === 'text'" />
-          <ImageViewer v-else-if="kind === 'image'" />
-          <PdfViewer v-else-if="kind === 'pdf'" />
-          <EpubViewer v-else-if="kind === 'epub'" />
-          <div v-else class="h-full flex items-center justify-center text-fg-3">
-            <div class="text-center">
-              <span class="codicon codicon-lg codicon-file-binary block mb-2" />
-              Binary file — no preview
+      <main class="flex-1 min-w-0 bg-bg-0 flex flex-col">
+        <GraphView v-if="ui.view === 'graph'" class="flex-1 min-h-0" />
+        <template v-else>
+          <EditorTabs />
+          <div class="flex-1 min-h-0">
+            <template v-if="files.currentPath">
+              <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
+              <MarkdownPreview v-else-if="isMarkdown" />
+              <MarkdownEditor v-else-if="kind === 'text'" />
+              <ImageViewer v-else-if="kind === 'image'" />
+              <PdfViewer v-else-if="kind === 'pdf'" />
+              <EpubViewer v-else-if="kind === 'epub'" />
+              <div v-else class="h-full flex items-center justify-center text-fg-3">
+                <div class="text-center">
+                  <span class="codicon codicon-lg codicon-file-binary block mb-2" />
+                  Binary file — no preview
+                </div>
+              </div>
+            </template>
+            <div v-else class="h-full flex items-center justify-center text-fg-3">
+              <div class="text-center">
+                <span class="codicon codicon-lg codicon-markdown block mb-2" />
+                Select a file to start
+              </div>
             </div>
           </div>
         </template>
-        <div v-else class="h-full flex items-center justify-center text-fg-3">
-          <div class="text-center">
-            <span class="codicon codicon-lg codicon-markdown block mb-2" />
-            Select a file to start
-          </div>
-        </div>
       </main>
 
       <!-- Agent panel -->

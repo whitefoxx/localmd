@@ -12,6 +12,7 @@ import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadPdfLocations } from '@/lib/docindex/pdf'
+import { pdfScroll } from '@/lib/viewMemory'
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
@@ -31,6 +32,7 @@ let renderScale = 1.5
 let docPath: string | null = null
 
 async function destroy(): Promise<void> {
+  if (docPath && container.value) pdfScroll.set(docPath, container.value.scrollTop)
   observer?.disconnect()
   observer = null
   renderedPages.clear()
@@ -76,6 +78,8 @@ async function load(path: string | null): Promise<void> {
     pageEls.push(wrap)
     observer.observe(wrap)
   }
+  const saved = pdfScroll.get(path)
+  if (saved != null) container.value.scrollTop = saved
   await maybeJump()
 }
 

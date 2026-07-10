@@ -76,7 +76,7 @@ watch(
     chat.messages
       .map((m) => {
         const last = m.parts[m.parts.length - 1]
-        return m.parts.length + (last?.type === 'text' ? last.text.length : 0)
+        return m.parts.length + (last?.type !== 'tool' ? (last?.text.length ?? 0) : 0)
       })
       .join(),
   async () => {
@@ -87,28 +87,64 @@ watch(
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-bg-1">
+  <div class="h-full flex flex-col bg-bg-1 relative">
     <!-- Header -->
     <div class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
       <span class="codicon codicon-sm codicon-sparkle text-accent" />
       <span class="text-xs uppercase tracking-wide text-fg-3 flex-1">Agent</span>
-      <button class="text-fg-3 hover:text-fg-0" title="Clear conversation" @click="chat.clear()">
-        <span class="codicon codicon-sm codicon-clear-all" />
+      <button class="text-fg-3 hover:text-fg-0" title="New chat" @click="chat.newSession()">
+        <span class="codicon codicon-sm codicon-add" />
+      </button>
+      <button
+        class="text-fg-3 hover:text-fg-0"
+        :class="{ '!text-accent': chat.historyOpen }"
+        title="Chat history"
+        @click="chat.historyOpen = !chat.historyOpen"
+      >
+        <span class="codicon codicon-sm codicon-history" />
       </button>
       <button class="text-fg-3 hover:text-fg-0" title="Settings" @click="emit('openSettings')">
         <span class="codicon codicon-sm codicon-gear" />
       </button>
     </div>
 
+    <!-- Session history overlay -->
+    <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll">
+      <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
+      <div
+        v-for="s in chat.sessions"
+        :key="s.id"
+        class="group flex items-center gap-2 px-3 py-2 hover:bg-bg-2 cursor-pointer border-b border-border/50"
+        :class="{ 'bg-bg-2': s.id === chat.currentSessionId }"
+        @click="chat.openSession(s.id)"
+      >
+        <span class="codicon codicon-sm codicon-comment-discussion text-fg-3 shrink-0" />
+        <span class="flex-1 truncate text-sm text-fg-1">{{ s.title }}</span>
+        <span class="text-xs text-fg-3 shrink-0">
+          {{ new Date(s.updatedAt).toLocaleDateString() }}
+        </span>
+        <button
+          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100"
+          title="Delete"
+          @click.stop="chat.removeSession(s.id)"
+        >
+          <span class="codicon codicon-sm codicon-trash" />
+        </button>
+      </div>
+    </div>
+
     <!-- Transcript -->
     <div ref="scroller" class="flex-1 panel-scroll px-3 py-3 space-y-4">
       <div v-if="!chat.messages.length" class="text-xs text-fg-3 leading-relaxed">
         Ask questions about your knowledge base, or let the agent maintain it. It can list, read,
-        search and write files in the opened folder — writes appear in the review panel.
+        search, index and write files in the opened folder — writes appear in the review panel.
       </div>
 
       <div v-for="m in chat.messages" :key="m.id">
-        <div v-if="m.role === 'user'" class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable whitespace-pre-wrap text-fg-0">
+        <div
+          v-if="m.role === 'user'"
+          class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable whitespace-pre-wrap text-fg-0"
+        >
           {{ userText(m) }}
         </div>
         <div v-else class="space-y-1">
@@ -120,11 +156,22 @@ watch(
               <span class="codicon codicon-sm codicon-tools" />
               <span class="truncate">{{ part.detail }}</span>
             </div>
+            <details v-else-if="part.type === 'thinking'" class="text-xs text-fg-3">
+              <summary class="cursor-pointer select-none hover:text-fg-2">
+                <span class="codicon codicon-sm codicon-lightbulb mr-1" />Thinking
+              </summary>
+              <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">
+                {{ part.text }}
+              </div>
+            </details>
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div v-else class="md-preview text-sm" v-html="renderPart(part)" @click="onPreviewClick" />
           </template>
           <div v-if="m.error" class="text-xs text-removed">{{ m.error }}</div>
-          <div v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length" class="text-xs text-fg-3">
+          <div
+            v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length"
+            class="text-xs text-fg-3"
+          >
             Thinking…
           </div>
         </div>

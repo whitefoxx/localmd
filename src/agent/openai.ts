@@ -60,6 +60,10 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta
       if (!delta) continue
+      // Reasoning models (DeepSeek etc.) stream their chain of thought in a
+      // vendor field — surface it, but never send it back in history.
+      const reasoning = (delta as { reasoning_content?: string | null }).reasoning_content
+      if (reasoning) opts.onEvent({ type: 'thinking', delta: reasoning })
       if (delta.content) {
         text += delta.content
         opts.onEvent({ type: 'text', delta: delta.content })

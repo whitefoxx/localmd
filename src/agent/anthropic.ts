@@ -57,8 +57,11 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
 
   for await (const stream of runner) {
     for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      if (event.type !== 'content_block_delta') continue
+      if (event.delta.type === 'text_delta') {
         opts.onEvent({ type: 'text', delta: event.delta.text })
+      } else if (event.delta.type === 'thinking_delta' && event.delta.thinking) {
+        opts.onEvent({ type: 'thinking', delta: event.delta.thinking })
       }
     }
   }

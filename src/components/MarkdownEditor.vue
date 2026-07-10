@@ -9,6 +9,7 @@ import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
+import { editorScroll } from '@/lib/viewMemory'
 
 const files = useFilesStore()
 const theme = useThemeStore()
@@ -42,20 +43,39 @@ function createView(): void {
   })
 }
 
-onMounted(createView)
+onMounted(() => {
+  createView()
+  shownPath = files.currentPath
+  const saved = shownPath ? (editorScroll.get(shownPath) ?? 0) : 0
+  requestAnimationFrame(() => {
+    if (view) view.scrollDOM.scrollTop = saved
+  })
+})
 
 onBeforeUnmount(() => {
+  if (shownPath && view) editorScroll.set(shownPath, view.scrollDOM.scrollTop)
   view?.destroy()
   view = null
 })
 
+let shownPath: string | null = null
+
 // Replace the document when a different file is opened (or reloaded from disk).
 watch(
   () => [files.currentPath, files.content] as const,
-  ([, content]) => {
+  ([path, content]) => {
     if (!view) return
-    if (view.state.doc.toString() === content) return
+    if (view.state.doc.toString() === content) {
+      shownPath = path
+      return
+    }
+    if (shownPath) editorScroll.set(shownPath, view.scrollDOM.scrollTop)
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: content } })
+    const saved = path ? (editorScroll.get(path) ?? 0) : 0
+    requestAnimationFrame(() => {
+      if (view) view.scrollDOM.scrollTop = saved
+    })
+    shownPath = path
   },
 )
 

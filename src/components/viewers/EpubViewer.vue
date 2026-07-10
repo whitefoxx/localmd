@@ -6,6 +6,7 @@ import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
+import { epubLocation } from '@/lib/viewMemory'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
@@ -20,6 +21,14 @@ let docPath: string | null = null
 let lastHighlight: string | null = null
 
 function destroy(): void {
+  if (docPath && rendition) {
+    try {
+      const loc = rendition.currentLocation() as unknown as { start?: { cfi?: string } }
+      if (loc?.start?.cfi) epubLocation.set(docPath, loc.start.cfi)
+    } catch {
+      /* not displayed yet */
+    }
+  }
   rendition?.destroy()
   book?.destroy()
   rendition = null
@@ -36,7 +45,7 @@ async function load(path: string | null): Promise<void> {
   const buf = await fs.readBinary(path)
   book = ePub(buf)
   rendition = book.renderTo(host.value, { width: '100%', height: '100%' })
-  await rendition.display()
+  await rendition.display(epubLocation.get(path))
   await maybeJump()
 }
 
