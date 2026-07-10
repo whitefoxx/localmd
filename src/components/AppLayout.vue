@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
+import { useReviewStore } from '@/stores/review'
 import FileTree from '@/components/FileTree.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
+import ReviewPanel from '@/components/review/ReviewPanel.vue'
+import SettingsModal from '@/components/SettingsModal.vue'
 import { baseName } from '@/lib/wiki'
 
 const kb = useKbStore()
 const files = useFilesStore()
 const theme = useThemeStore()
+const review = useReviewStore()
+
+const chatOpen = ref(true)
+const settingsOpen = ref(false)
 
 const fileName = computed(() => (files.currentPath ? baseName(files.currentPath) : null))
 const isMarkdown = computed(() => files.currentPath?.endsWith('.md') ?? false)
@@ -44,6 +52,14 @@ function closeKb(): void {
         {{ saveLabel }}
       </span>
       <button
+        v-if="review.count"
+        class="btn text-xs !border-accent !text-accent"
+        title="Review agent changes"
+        @click="review.panelOpen = true"
+      >
+        <span class="codicon codicon-sm codicon-diff mr-1" />{{ review.count }}
+      </button>
+      <button
         v-if="isMarkdown"
         class="btn text-xs"
         @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
@@ -53,6 +69,14 @@ function closeKb(): void {
           :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
         />
         {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
+      </button>
+      <button
+        class="btn text-xs"
+        :class="{ '!text-accent': chatOpen }"
+        title="Toggle agent panel"
+        @click="chatOpen = !chatOpen"
+      >
+        <span class="codicon codicon-sm codicon-sparkle" />
       </button>
       <button class="btn text-xs" :title="`Theme: ${theme.pref}`" @click="theme.cycle()">
         <span class="codicon codicon-sm" :class="themeIcon" />
@@ -82,6 +106,14 @@ function closeKb(): void {
           </div>
         </div>
       </main>
+
+      <!-- Agent panel -->
+      <aside v-if="chatOpen" class="w-96 shrink-0 border-l border-border">
+        <ChatPanel @open-settings="settingsOpen = true" />
+      </aside>
     </div>
+
+    <ReviewPanel />
+    <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
   </div>
 </template>

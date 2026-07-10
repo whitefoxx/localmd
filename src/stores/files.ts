@@ -107,6 +107,19 @@ export const useFilesStore = defineStore('files', () => {
     }
   }
 
+  /** Reload the buffer when `path` is the open file and there are no unsaved
+   *  edits — used after agent writes and review discards. */
+  async function reloadIfClean(path: string): Promise<void> {
+    if (currentPath.value !== path || saveState.value !== 'saved') return
+    const text = await fs.tryReadFile(path)
+    if (text === null) {
+      closeCurrent()
+      return
+    }
+    content.value = text
+    loadedMtime = await fs.statMtime(path)
+  }
+
   async function createFile(path: string, initial = ''): Promise<void> {
     await fs.writeFile(path, initial)
     await refreshTree()
@@ -138,6 +151,7 @@ export const useFilesStore = defineStore('files', () => {
     onEdited,
     flush,
     refreshOnFocus,
+    reloadIfClean,
     createFile,
     closeCurrent,
     reset,
