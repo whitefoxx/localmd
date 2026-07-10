@@ -33,13 +33,20 @@ function defineTool<S extends z.ZodType>(spec: ToolSpec<S>): ToolSpec<S> {
 const listFiles = defineTool({
   name: 'list_files',
   description:
-    'List every file in the knowledge base as newline-separated paths relative to the KB root. Call this first to understand the KB structure.',
-  schema: z.object({}),
-  describeCall: () => 'list files',
-  run: async () => {
-    const tree = await fs.readTree()
-    const paths = fs.collectFiles(tree)
-    return paths.length ? paths.join('\n') : '(empty folder)'
+    'List files as newline-separated paths relative to the KB root. Call with no arguments first to understand the KB structure. Pass "dir" to list inside a specific directory — including app-generated index directories under .trace/ (e.g. ".trace/pdf-index"), which the default listing hides.',
+  schema: z.object({
+    dir: z.string().optional().describe('Directory to list, e.g. ".trace/pdf-index"'),
+  }),
+  describeCall: (a) => (a.dir ? `list ${a.dir}` : 'list files'),
+  run: async ({ dir }) => {
+    try {
+      const tree = dir ? await fs.readTreeFrom(dir) : await fs.readTree()
+      const paths = fs.collectFiles(tree)
+      return paths.length ? paths.join('\n') : '(empty directory)'
+    } catch (err) {
+      if ((err as DOMException).name === 'NotFoundError') return `Error: no such directory: ${dir}`
+      throw err
+    }
   },
 })
 
@@ -53,10 +60,15 @@ const readFile = defineTool({
   describeCall: (a) => `read ${a.path}`,
   run: async ({ path }) => {
     let content: string | null
-    if (/\.pdf$/i.test(path)) {
-      // Lazy import keeps pdf.js out of the main bundle until a PDF is read.
-      const { extractPdfText } = await import('@/lib/pdf')
-      content = await extractPdfText(path).catch(() => null)
+    if (/\.(pdf|epub)$/i.test(path)) {
+      // Binary documents go through the structured index (block ids, citeable).
+      const { hasIndex, indexDirFor, indexableKind } = await import('@/lib/docindex')
+      const kind = indexableKind(path)!
+      if (await hasIndex(path)) {
+        const dir = indexDirFor(kind, path)
+        return `This document has a structured index at ${dir}/ — read ${dir}/_README.md and ${dir}/toc.md, then the relevant sections/*.md files (they carry citeable [[block-id]] tags). Use list_files/search_files with dir="${dir}".`
+      }
+      return `Error: ${path} is a ${kind.toUpperCase()} without an AI index yet. Call index_document with this path first, then read the generated index.`
     } else {
       content = await fs.tryReadFile(path)
     }
@@ -91,13 +103,14 @@ const writeFile = defineTool({
 const searchFiles = defineTool({
   name: 'search_files',
   description:
-    'Case-insensitive substring search across all markdown/text files. Returns "path:line: text" matches.',
+    'Case-insensitive substring search across markdown/text files. Returns "path:line: text" matches. Pass "dir" to search inside a specific directory — including index directories under .trace/.',
   schema: z.object({
     query: z.string().describe('Substring to search for'),
+    dir: z.string().optional().describe('Directory to search in, e.g. ".trace/pdf-index/foo-123"'),
   }),
-  describeCall: (a) => `search "${a.query}"`,
-  run: async ({ query }) => {
-    const tree = await fs.readTree()
+  describeCall: (a) => (a.dir ? `search "${a.query}" in ${a.dir}` : `search "${a.query}"`),
+  run: async ({ query, dir }) => {
+    const tree = dir ? await fs.readTreeFrom(dir) : await fs.readTree()
     const paths = fs.collectFiles(tree).filter((p) => /\.(md|txt|json|ya?ml|csv)$/i.test(p))
     const needle = query.toLowerCase()
     const out: string[] = []
@@ -118,4 +131,23 @@ const searchFiles = defineTool({
   },
 })
 
-export const TOOLS: ToolSpec[] = [listFiles, readFile, writeFile, searchFiles]
+const indexDocument = defineTool({
+  name: 'index_document',
+  description:
+    'Generate (or refresh) the structured AI index for a PDF, EPUB, or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a fresh index already exists.',
+  schema: z.object({
+    path: z.string().describe('KB-relative source path, e.g. "raw/papers/x.pdf"'),
+  }),
+  describeCall: (a) => `index ${a.path}`,
+  run: async ({ path }) => {
+    const { indexDocument: run } = await import('@/lib/docindex')
+    const s = await run(path)
+    return (
+      `${s.cached ? 'Index already fresh' : 'Index generated'} at ${s.indexDir}/ — ` +
+      `"${s.title}", ${s.sectionCount} sections, ${s.blockCount} blocks. ` +
+      `Read ${s.indexDir}/_README.md first, then ${s.indexDir}/toc.md.`
+    )
+  },
+})
+
+export const TOOLS: ToolSpec[] = [listFiles, readFile, writeFile, searchFiles, indexDocument]

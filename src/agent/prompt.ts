@@ -12,7 +12,11 @@ Guidelines:
 - Always read a file before overwriting it, and write complete file contents.
 - Use [[wikilinks]] to connect pages; link targets are file names without the .md extension.
 - Keep edits minimal and focused on what the user asked.
-- Answer in the user's language.`
+- Answer in the user's language.
+
+Documents (PDF/EPUB) and citation workflow:
+- PDFs and EPUBs are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).
+- Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
 
 export async function buildSystemPrompt(): Promise<string> {
   const kbSchema = await fs.tryReadFile('CLAUDE.md')

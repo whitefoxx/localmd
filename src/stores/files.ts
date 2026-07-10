@@ -45,7 +45,23 @@ export const useFilesStore = defineStore('files', () => {
   })
 
   function resolveWikilink(target: string): string | null {
-    return stemIndex.value.get(target.trim().toLowerCase()) ?? null
+    const t = target.trim()
+    // Path-style targets ([[wiki/entities/foo]]) resolve as KB paths directly.
+    if (t.includes('/')) {
+      const withExt = t.endsWith('.md') ? t : `${t}.md`
+      if (mdFiles.value.includes(withExt)) return withExt
+      if (allFiles.value.includes(t)) return t
+    }
+    return stemIndex.value.get(t.toLowerCase()) ?? null
+  }
+
+  /** Resolve a relative markdown-link href to an existing KB file, if any. */
+  function resolveRelativeLink(href: string): string | null {
+    const rel = decodeURIComponent(href).replace(/^\.\//, '').replace(/^\//, '')
+    if (!rel || rel.startsWith('#')) return null
+    if (allFiles.value.includes(rel)) return rel
+    const withExt = `${rel}.md`
+    return mdFiles.value.includes(withExt) ? withExt : null
   }
 
   async function refreshTree(): Promise<void> {
@@ -159,6 +175,7 @@ export const useFilesStore = defineStore('files', () => {
     mode,
     mdFiles,
     resolveWikilink,
+    resolveRelativeLink,
     refreshTree,
     openFile,
     onEdited,

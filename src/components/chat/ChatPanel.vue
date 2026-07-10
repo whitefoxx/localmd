@@ -3,6 +3,7 @@ import { ref, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
+import { useCitationsStore } from '@/stores/citations'
 import { renderMarkdown } from '@/lib/markdown'
 import type { MessagePart } from '@/stores/chat'
 
@@ -11,6 +12,7 @@ const emit = defineEmits<{ openSettings: [] }>()
 const chat = useChatStore()
 const settingsStore = useSettingsStore()
 const files = useFilesStore()
+const citations = useCitationsStore()
 
 const input = ref('')
 const scroller = ref<HTMLElement | null>(null)
@@ -49,12 +51,23 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   e.preventDefault()
+  if (a.classList.contains('citation') || a.classList.contains('cite-source')) {
+    const path = a.dataset.citePath
+    if (path) await citations.openCitation(path, a.dataset.block ?? null)
+    return
+  }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {
     await files.openFile(a.dataset.target)
     return
   }
   const href = a.getAttribute('href') ?? ''
-  if (/^https?:\/\//.test(href)) window.open(href, '_blank', 'noopener')
+  if (/^https?:\/\//.test(href)) {
+    window.open(href, '_blank', 'noopener')
+    return
+  }
+  // Relative markdown links ([label](wiki/entities/foo.md)) open the KB file.
+  const rel = files.resolveRelativeLink(href)
+  if (rel) await files.openFile(rel)
 }
 
 // Keep the transcript pinned to the bottom while streaming.

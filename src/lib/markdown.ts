@@ -6,6 +6,7 @@
  */
 import { Marked } from 'marked'
 import { splitLink, escapeHtml, splitFrontmatter } from './wiki'
+import { renderCitationTokens } from './citations'
 
 export interface WikilinkResolver {
   /** Returns the KB-relative path for a wikilink target, or null if missing. */
@@ -19,7 +20,10 @@ interface WikilinkToken {
 }
 
 export function renderMarkdown(content: string, resolver: WikilinkResolver): string {
-  const { body } = splitFrontmatter(content)
+  const { body: raw } = splitFrontmatter(content)
+  // Citation tokens ([[pdf1:…]], [[1:b14-3]]) share the [[…]] syntax but are
+  // not wikilinks — consume them first, before the wikilink tokenizer runs.
+  const body = renderCitationTokens(raw)
 
   const marked = new Marked({
     gfm: true,

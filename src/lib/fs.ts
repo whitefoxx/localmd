@@ -165,20 +165,34 @@ export async function renameFile(oldPath: string, newPath: string): Promise<void
 }
 
 export async function readTree(): Promise<TreeNode[]> {
-  return readDirRecursive(getRoot(), '')
+  return readDirRecursive(getRoot(), '', true)
 }
 
-async function readDirRecursive(dir: FileSystemDirectoryHandle, prefix: string): Promise<TreeNode[]> {
+/**
+ * Recursive listing rooted at `dirPath` — used by the agent to browse
+ * app-generated directories like `.trace/pdf-index/` that the UI tree hides.
+ */
+export async function readTreeFrom(dirPath: string): Promise<TreeNode[]> {
+  const dir = await getDirHandle(dirPath)
+  return readDirRecursive(dir, dirPath.replace(/\/+$/, ''), false)
+}
+
+async function readDirRecursive(
+  dir: FileSystemDirectoryHandle,
+  prefix: string,
+  applyIgnore: boolean,
+): Promise<TreeNode[]> {
   const nodes: TreeNode[] = []
   for await (const entry of dir.values()) {
-    if (IGNORED.has(entry.name)) continue
+    if (entry.name === '.git') continue
+    if (applyIgnore && IGNORED.has(entry.name)) continue
     const path = prefix ? `${prefix}/${entry.name}` : entry.name
     if (entry.kind === 'directory') {
       nodes.push({
         name: entry.name,
         path,
         kind: 'dir',
-        children: await readDirRecursive(entry as FileSystemDirectoryHandle, path),
+        children: await readDirRecursive(entry as FileSystemDirectoryHandle, path, applyIgnore),
       })
     } else {
       nodes.push({ name: entry.name, path, kind: 'file' })
