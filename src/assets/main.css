@@ -1,0 +1,177 @@
+@import '@vscode/codicons/dist/codicon.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme palettes — RGB triplets consumed by tailwind.config.ts via
+   rgb(var(--c-…) / alpha). `data-theme` on <html> picks the set; the theme
+   store keeps it in sync with the light/dark/system preference.
+   Ported from trace-app. */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --c-bg-0: 13 17 23;
+  --c-bg-1: 22 27 34;
+  --c-bg-2: 31 36 44;
+  --c-bg-3: 38 44 54;
+  --c-fg-0: 230 237 243;
+  --c-fg-1: 201 209 217;
+  --c-fg-2: 139 148 158;
+  --c-fg-3: 110 118 129;
+  --c-accent: 88 166 255;
+  --c-border: 48 54 61;
+  --c-added: 63 185 80;
+  --c-removed: 248 81 73;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --c-bg-0: 255 255 255;
+  --c-bg-1: 246 248 250;
+  --c-bg-2: 234 238 242;
+  --c-bg-3: 221 225 230;
+  --c-fg-0: 31 35 40;
+  --c-fg-1: 57 63 70;
+  --c-fg-2: 87 96 106;
+  --c-fg-3: 110 119 129;
+  --c-accent: 9 105 218;
+  --c-border: 208 215 222;
+  --c-added: 26 127 55;
+  --c-removed: 207 34 46;
+}
+
+.codicon {
+  font-size: 16px;
+  line-height: 1;
+  vertical-align: -2px;
+}
+.codicon-lg {
+  font-size: 20px;
+}
+.codicon-sm {
+  font-size: 14px;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+  }
+  body {
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      Helvetica,
+      Arial,
+      sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+  .selectable {
+    user-select: text;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-2 py-1 text-sm rounded border border-border bg-bg-2 hover:bg-bg-3 active:bg-bg-3 text-fg-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+  }
+  .btn-primary {
+    @apply px-2 py-1 text-sm rounded border border-accent bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50;
+  }
+  .input {
+    @apply w-full px-2 py-1 text-sm rounded border border-border bg-bg-1 text-fg-0 placeholder-fg-3 focus:outline-none focus:border-accent;
+  }
+  .panel-scroll {
+    @apply overflow-auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--c-border)) transparent;
+  }
+}
+
+/* Markdown preview styles (ported from trace-app) */
+.md-preview {
+  @apply text-fg-1 leading-relaxed;
+  user-select: text;
+}
+.md-preview h1 {
+  @apply text-2xl font-bold text-fg-0 mt-4 mb-3 pb-2 border-b border-border;
+}
+.md-preview h2 {
+  @apply text-xl font-bold text-fg-0 mt-6 mb-2 pb-1 border-b border-border;
+}
+.md-preview h3 {
+  @apply text-lg font-bold text-fg-0 mt-5 mb-2;
+}
+.md-preview h4 {
+  @apply text-base font-bold text-fg-0 mt-4 mb-2;
+}
+.md-preview p {
+  @apply my-3;
+}
+.md-preview ul {
+  @apply list-disc pl-6 my-3;
+}
+.md-preview ol {
+  @apply list-decimal pl-6 my-3;
+}
+.md-preview li {
+  @apply my-1;
+}
+.md-preview code {
+  @apply px-1 py-0.5 rounded bg-bg-2 text-accent text-[0.9em] font-mono;
+}
+.md-preview pre {
+  @apply p-3 rounded bg-bg-1 border border-border my-3 overflow-x-auto;
+}
+.md-preview pre code {
+  @apply p-0 bg-transparent text-fg-1;
+}
+.md-preview a {
+  @apply text-accent hover:underline;
+}
+.md-preview a.wikilink {
+  @apply text-accent hover:underline cursor-pointer;
+}
+.md-preview a.wikilink-broken {
+  @apply text-removed hover:underline cursor-pointer;
+}
+.md-preview blockquote {
+  @apply pl-3 border-l-2 border-border text-fg-2 my-3;
+}
+.md-preview table {
+  @apply border-collapse my-3;
+}
+.md-preview th,
+.md-preview td {
+  @apply px-3 py-1 border border-border;
+}
+.md-preview th {
+  @apply bg-bg-2 font-semibold;
+}
+.md-preview hr {
+  @apply my-4 border-border;
+}
+.md-preview img {
+  @apply max-w-full rounded;
+}
+
+/* CodeMirror */
+.cm-editor {
+  height: 100%;
+  background-color: transparent !important;
+}
+.cm-editor .cm-scroller {
+  font-family: 'Menlo', 'Monaco', 'ui-monospace', monospace;
+  font-size: 13px;
+}
+.cm-editor.cm-focused {
+  outline: none !important;
+}
