@@ -19,6 +19,10 @@
     "@codemirror/view": "^6.26.3",
     "@vscode/codicons": "^0.0.45",
     "codemirror": "^6.0.1",
+    "d3-drag": "^3.0.0",
+    "d3-force": "^3.0.0",
+    "d3-selection": "^3.0.0",
+    "d3-zoom": "^3.0.0",
     "marked": "^12.0.2",
     "openai": "^6.46.0",
     "pinia": "^2.1.7",
@@ -26,6 +30,10 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/d3-drag": "^3.0.7",
+    "@types/d3-force": "^3.0.10",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-zoom": "^3.0.8",
     "@types/wicg-file-system-access": "^2023.10.5",
     "@vitejs/plugin-vue": "^5.0.5",
     "autoprefixer": "^10.4.19",

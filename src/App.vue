@@ -3,11 +3,13 @@ import { onMounted, onBeforeUnmount } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
+import { useUiStore } from '@/stores/ui'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 
 const kb = useKbStore()
 const files = useFilesStore()
+const ui = useUiStore()
 useThemeStore() // instantiate so the html[data-theme] effect runs
 
 function onFocus(): void {
@@ -18,6 +20,9 @@ function onKeydown(e: KeyboardEvent): void {
   if ((e.metaKey || e.ctrlKey) && e.key === 's') {
     e.preventDefault()
     void files.flush()
+  } else if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
+    e.preventDefault()
+    if (kb.isOpen) ui.searchOpen = !ui.searchOpen
   }
 }
 
