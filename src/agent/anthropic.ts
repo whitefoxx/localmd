@@ -9,12 +9,16 @@
  */
 import Anthropic from '@anthropic-ai/sdk'
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod'
+// NB: explicit .mjs — Rollup fails to resolve the bare subpath through the
+// package's `./helpers/*` export pattern (the zod helper resolves, this one
+// doesn't); the `./helpers/*.mjs` entry works for both dev and build.
+import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema.mjs'
 import { z } from 'zod'
 import type {
   BetaMessageParam,
   BetaToolResultContentBlockParam,
 } from '@anthropic-ai/sdk/resources/beta'
-import { TOOLS } from './tools'
+import { TOOLS, externalToolSpecs } from './tools'
 import { loadKbImage } from './vision'
 import { mapLimit } from '@/lib/async'
 import type { AgentEventHandler } from './types'
@@ -98,6 +102,22 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       },
     }),
   )
+
+  // Remote MCP tools (raw JSON schemas — betaTool skips the zod round trip).
+  for (const ext of externalToolSpecs()) {
+    tools.push(
+      betaTool({
+        name: ext.name,
+        description: ext.description,
+        inputSchema: ext.jsonSchema as never,
+        run: async (args) => {
+          const a = (args ?? {}) as Record<string, unknown>
+          opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a) })
+          return await ext.run(a)
+        },
+      }) as never,
+    )
+  }
 
   if (opts.allowSubagent) {
     tools.push(

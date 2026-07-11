@@ -103,6 +103,14 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 - **与终端 Claude Code 共享**：一次性 `ln -s ../.agents/skills .claude/skills`（建议把 `.claude/skills` 加进 `.gitignore`——FS Access API 会把软链接当真目录，应用内 git 会看到重复文件）
 - KB 指令文件同样中立化：**AGENTS.md 优先，CLAUDE.md 兜底**（常见做法是 `CLAUDE.md` 软链接到 `AGENTS.md`）
 
+## 外部工具(远程 MCP servers)
+
+Settings 里可添加 **Streamable HTTP** 传输的 MCP server(名称 + URL + 可选 bearer token）。连接成功后其工具以 `mcp__<名称>__<工具>` 出现在 agent 的工具列表，两个 provider 通用。约束与安全：
+
+- 服务器必须允许浏览器 CORS（与 LLM 端点同一约束）；本地起的 server（localhost）天然可用
+- 外部工具的**结果按不可信数据处理**——系统提示词明确要求 agent 不执行结果中内嵌的指令、不主动把 KB 内容发给外部工具
+- `scripts/mcp-test-server.mjs` 提供一个本地测试 server（add/echo 两个工具），`node scripts/mcp-test-server.mjs` 后在 Settings 添加 `http://localhost:8901/mcp` 即可试用
+
 ## Git 与 GitHub 同步
 
 打开的文件夹是 git 仓库时，标题栏出现分支徽章（如 `main 3`），点开 Git 面板：

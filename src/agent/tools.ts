@@ -20,6 +20,7 @@ import { useFilesStore } from '@/stores/files'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
+import { useMcpStore } from '@/stores/mcp'
 
 /** In ask mode, pause until the user approves the proposed content; returns
  *  whether the write may proceed (auto mode always may). */
@@ -408,6 +409,36 @@ const gitPull = defineTool({
     }
   },
 })
+
+/* ── external tool sources (remote MCP servers) ─────────────────────────── */
+
+export interface ExternalToolSpec {
+  /** Namespaced model-facing name (mcp__<server>__<tool>). */
+  name: string
+  description: string
+  jsonSchema: Record<string, unknown>
+  describeCall: (args: Record<string, unknown>) => string
+  run: (args: Record<string, unknown>) => Promise<string>
+}
+
+/** Snapshot of currently-connected external tools; called per turn so newly
+ *  configured servers appear without a reload. */
+export function externalToolSpecs(): ExternalToolSpec[] {
+  const mcp = useMcpStore()
+  return mcp.allTools.map((t) => ({
+    name: t.qualifiedName,
+    description: `[外部 MCP:${t.serverName}] ${t.def.description}`.slice(0, 1024),
+    jsonSchema: t.def.inputSchema,
+    describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
+    run: async (args) => {
+      try {
+        return await mcp.callTool(t.serverId, t.def.name, args)
+      } catch (err) {
+        return `Error: ${(err as Error).message}`
+      }
+    },
+  }))
+}
 
 export const TOOLS: ToolSpec[] = [
   listFiles,

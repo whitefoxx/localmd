@@ -1,15 +1,46 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
+import { useMcpStore } from '@/stores/mcp'
 import { ALL_PROVIDERS } from '@/lib/providers'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const store = useSettingsStore()
+const mcp = useMcpStore()
 
 /** Working copy under edit (null = list view). */
 const editing = ref<LlmProfile | null>(null)
+
+/* MCP server add form */
+const mcpName = ref('')
+const mcpUrl = ref('')
+const mcpToken = ref('')
+
+function addMcpServer(): void {
+  if (!mcpUrl.value.trim()) return
+  store.state.mcpServers.push({
+    id: newProfileId(),
+    name: mcpName.value.trim() || 'server',
+    url: mcpUrl.value.trim(),
+    ...(mcpToken.value.trim() ? { token: mcpToken.value.trim() } : {}),
+  })
+  mcpName.value = ''
+  mcpUrl.value = ''
+  mcpToken.value = ''
+}
+
+function removeMcpServer(id: string): void {
+  store.state.mcpServers = store.state.mcpServers.filter((s) => s.id !== id)
+}
+
+function mcpStatus(id: string): { label: string; ok: boolean } {
+  const s = mcp.servers.find((x) => x.config.id === id)
+  if (!s || s.status === 'connecting') return { label: '连接中…', ok: false }
+  if (s.status === 'error') return { label: s.error?.slice(0, 60) ?? '连接失败', ok: false }
+  return { label: `${s.tools.length} 个工具`, ok: true }
+}
 
 function addProfile(): void {
   editing.value = {
@@ -190,6 +221,36 @@ function slotBadges(p: LlmProfile): string[] {
           <p class="text-xs text-fg-3 mb-4">
             先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
             Approve 或 Reject。
+          </p>
+
+          <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1 mt-1">
+            外部工具(MCP servers)
+            <button class="ml-1 normal-case text-accent hover:underline" @click="mcp.refresh()">重连</button>
+          </label>
+          <div
+            v-for="s in store.state.mcpServers"
+            :key="s.id"
+            class="flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-2 text-xs"
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full shrink-0"
+              :class="mcpStatus(s.id).ok ? 'bg-added' : 'bg-removed'"
+            />
+            <span class="text-fg-1 shrink-0">{{ s.name }}</span>
+            <span class="text-fg-3 truncate flex-1" :title="s.url">{{ mcpStatus(s.id).label }}</span>
+            <button class="text-fg-3 hover:text-removed shrink-0" title="删除" @click="removeMcpServer(s.id)">
+              <span class="codicon codicon-sm codicon-trash" />
+            </button>
+          </div>
+          <div class="grid grid-cols-[100px_1fr_100px_auto] gap-2 mt-1 mb-1">
+            <input v-model="mcpName" class="input text-xs" placeholder="名称" />
+            <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp(Streamable HTTP)" />
+            <input v-model="mcpToken" type="password" class="input text-xs" placeholder="token(可选)" autocomplete="off" />
+            <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="addMcpServer">添加</button>
+          </div>
+          <p class="text-xs text-fg-3 mb-4">
+            服务器必须允许浏览器 CORS。连接成功后其工具以 mcp__名称__工具 出现在 agent
+            工具列表;外部工具的结果按不可信数据处理。
           </p>
 
           <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1 mt-1">Git & GitHub</label>

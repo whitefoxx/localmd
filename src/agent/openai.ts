@@ -11,7 +11,7 @@
  */
 import OpenAI from 'openai'
 import { z } from 'zod'
-import { TOOLS } from './tools'
+import { TOOLS, externalToolSpecs } from './tools'
 import { mapLimit } from '@/lib/async'
 import { loadKbImage, toDataUrl, imageUrlForProvider, visionDescribe, type KbImage } from './vision'
 import type { LlmProfile } from '@/stores/settings'
@@ -80,6 +80,15 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       },
     })
   }
+  // Remote MCP tools — raw JSON schemas pass straight through.
+  const external = externalToolSpecs()
+  for (const ext of external) {
+    tools.push({
+      type: 'function',
+      function: { name: ext.name, description: ext.description, parameters: ext.jsonSchema },
+    })
+  }
+
   if (opts.allowSubagent) {
     tools.push({
       type: 'function',
@@ -177,7 +186,16 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
 
     for (const call of calls) {
       let result: string
-      if (call.name === 'view_image' && opts.vision) {
+      const ext = external.find((t) => t.name === call.name)
+      if (ext) {
+        try {
+          const args = JSON.parse(call.args || '{}') as Record<string, unknown>
+          opts.onEvent({ type: 'tool', name: call.name, detail: ext.describeCall(args) })
+          result = await ext.run(args)
+        } catch (err) {
+          result = `Error: ${(err as Error).message}`
+        }
+      } else if (call.name === 'view_image' && opts.vision) {
         result = await handleViewImage(call.args, opts.vision, inlineImages, opts)
       } else if (call.name === 'run_subagent' && opts.allowSubagent) {
         result = await handleSubagent(call.args, opts)
