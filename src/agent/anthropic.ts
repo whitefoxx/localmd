@@ -148,7 +148,13 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
     {
       model: opts.model,
       max_tokens: opts.maxTokens ?? 8192,
-      system: opts.system,
+      // A cache breakpoint on the system block caches the whole prefix —
+      // tool definitions included (they precede system in the prompt). The
+      // system prompt embeds AGENTS.md/CLAUDE.md, so this is the bulk of
+      // every request; reads show up as cacheRead in the usage display.
+      system: [
+        { type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } },
+      ],
       messages: opts.messages,
       tools,
       stream: true,
