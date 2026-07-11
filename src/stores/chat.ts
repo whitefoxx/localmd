@@ -10,7 +10,18 @@ import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
 import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
-import { trimAnthropicHistory, trimOpenAIHistory } from '@/lib/history'
+import {
+  trimAnthropicHistory,
+  trimOpenAIHistory,
+  estimateChars,
+  COMPACT_AT_CHARS,
+  splitAnthropicForCompaction,
+  splitOpenAIForCompaction,
+  renderAnthropicTranscript,
+  renderOpenAITranscript,
+  compactedPrefix,
+} from '@/lib/history'
+import { summarize as summarizeHistory } from '@/agent/summarize'
 import { loadSkill } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
@@ -290,6 +301,28 @@ export const useChatStore = defineStore('chat', () => {
       if (providerKind === 'anthropic') {
         // Old turns' large tool results/images become stubs before replay.
         session.anthropicHistory = trimAnthropicHistory(session.anthropicHistory)
+        // Still huge after trimming → replace the old prefix with a summary.
+        if (estimateChars(session.anthropicHistory) > COMPACT_AT_CHARS) {
+          const split = splitAnthropicForCompaction(session.anthropicHistory)
+          if (split) {
+            onEvent({ type: 'tool', name: 'compact', detail: '历史过长,压缩上下文…' })
+            try {
+              const summary = await summarizeHistory(
+                primary,
+                renderAnthropicTranscript(split.old),
+                controller.signal,
+              )
+              const prefix = compactedPrefix(summary)
+              session.anthropicHistory = [
+                { role: 'user', content: prefix.user },
+                { role: 'assistant', content: prefix.assistant },
+                ...split.recent,
+              ]
+            } catch {
+              /* summarizer failed — carry on with the full history */
+            }
+          }
+        }
         const content: BetaContentBlockParam[] = [{ type: 'text', text: modelText }]
         for (const img of inlineImages) {
           content.push({
@@ -316,6 +349,27 @@ export const useChatStore = defineStore('chat', () => {
         })
       } else {
         session.openaiHistory = trimOpenAIHistory(session.openaiHistory)
+        if (estimateChars(session.openaiHistory) > COMPACT_AT_CHARS) {
+          const split = splitOpenAIForCompaction(session.openaiHistory)
+          if (split) {
+            onEvent({ type: 'tool', name: 'compact', detail: '历史过长,压缩上下文…' })
+            try {
+              const summary = await summarizeHistory(
+                primary,
+                renderOpenAITranscript(split.old),
+                controller.signal,
+              )
+              const prefix = compactedPrefix(summary)
+              session.openaiHistory = [
+                { role: 'user', content: prefix.user },
+                { role: 'assistant', content: prefix.assistant },
+                ...split.recent,
+              ]
+            } catch {
+              /* summarizer failed — carry on with the full history */
+            }
+          }
+        }
         const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
           { type: 'text', text: modelText },
         ]

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { trimAnthropicHistory, trimOpenAIHistory, estimateChars } from './history'
+import {
+  trimAnthropicHistory,
+  trimOpenAIHistory,
+  estimateChars,
+  splitAnthropicForCompaction,
+  renderOpenAITranscript,
+  compactedPrefix,
+} from './history'
 import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta'
 import type OpenAI from 'openai'
 
@@ -109,5 +116,44 @@ describe('trimOpenAIHistory', () => {
 describe('estimateChars', () => {
   it('measures serialized size', () => {
     expect(estimateChars([{ a: 'xx' }])).toBeGreaterThan(8)
+  })
+})
+
+describe('compaction helpers', () => {
+  it('splits at the keep-turns boundary and refuses when nothing is old', () => {
+    const h = [
+      { role: 'user' as const, content: 'a' },
+      { role: 'assistant' as const, content: 'b' },
+      { role: 'user' as const, content: 'c' },
+      { role: 'assistant' as const, content: 'd' },
+      { role: 'user' as const, content: 'e' },
+    ]
+    const split = splitAnthropicForCompaction(h, 2)!
+    expect(split.old.map((m) => m.content)).toEqual(['a', 'b'])
+    expect(split.recent.map((m) => m.content)).toEqual(['c', 'd', 'e'])
+    expect(splitAnthropicForCompaction(h.slice(2), 2)).toBeNull()
+  })
+
+  it('renders transcripts with tool calls clipped', () => {
+    const t = renderOpenAITranscript([
+      { role: 'user', content: '找 bug' },
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          { id: '1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.md"}' } },
+        ],
+      },
+      { role: 'tool', tool_call_id: '1', content: 'y'.repeat(500) },
+    ])
+    expect(t).toContain('用户: 找 bug')
+    expect(t).toContain('[调用 read_file')
+    expect(t).toContain('…') // clipped tool result
+  })
+
+  it('keeps role alternation valid in the compacted prefix', () => {
+    const p = compactedPrefix('摘要内容')
+    expect(p.user).toContain('摘要内容')
+    expect(p.assistant.length).toBeGreaterThan(0)
   })
 })
