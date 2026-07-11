@@ -1,9 +1,12 @@
 /**
- * System prompt for the KB agent. The KB's own CLAUDE.md (its schema, in the
- * trace-app "LLM Wiki" pattern) is appended verbatim when present, so KBs
- * created with trace-app keep their workflows.
+ * System prompt for the KB agent. The KB's own instructions file is appended
+ * verbatim when present — AGENTS.md (the tool-neutral standard) preferred,
+ * CLAUDE.md as fallback — so KBs created with trace-app keep their workflows.
+ * Skills get a name+description listing only (progressive disclosure); the
+ * agent loads full instructions via use_skill.
  */
 import * as fs from '@/lib/fs'
+import { listSkills } from '@/lib/skills'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools (list_files, read_file, write_file, search_files). All paths are relative to the KB root.
 
@@ -13,6 +16,7 @@ Guidelines:
 - For tasks with 3+ steps, maintain a checklist with update_plan: create it up front, keep exactly one item in_progress, mark items done as you finish them.
 - For bulk subtasks that would flood your context (surveying many files, summarizing a long source), delegate to run_subagent when available and work from its answer.
 - Git: when the user asks to commit or push, run git_status first, review anything unclear with git_diff, then git_commit with a concise message describing the change, then git_push if asked. Never bundle unrelated changes silently — say what you committed. Binary files commit normally; only >100MB files and .trace/ are terminal-only.
+- Skills: reusable workflows live in .agents/skills/<name>/SKILL.md (markdown with a frontmatter block: name + description). When the user asks you to save a workflow as a skill, write that file — keep the description one line (it's what future sessions see) and the body self-contained.
 - If a write is declined by the user, don't retry it — ask what they want instead.
 - Use [[wikilinks]] to connect pages; link targets are file names without the .md extension.
 - Keep edits minimal and focused on what the user asked.
@@ -28,9 +32,18 @@ Documents (PDF/EPUB) and citation workflow:
 - Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
 
 export async function buildSystemPrompt(): Promise<string> {
-  const kbSchema = await fs.tryReadFile('CLAUDE.md')
-  if (kbSchema) {
-    return `${BASE}\n\nThis knowledge base has its own schema and workflows, defined below. Follow them when reading and editing:\n\n<kb_schema>\n${kbSchema}\n</kb_schema>`
+  let prompt = BASE
+
+  const skills = await listSkills()
+  if (skills.length) {
+    prompt +=
+      `\n\nSkills available in this knowledge base (reusable workflows). When a task matches one, call use_skill with its name and follow the loaded instructions. The user can also invoke one directly with /name:\n` +
+      skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
   }
-  return BASE
+
+  const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))
+  if (kbSchema) {
+    prompt += `\n\nThis knowledge base has its own schema and workflows, defined below. Follow them when reading and editing:\n\n<kb_schema>\n${kbSchema}\n</kb_schema>`
+  }
+  return prompt
 }

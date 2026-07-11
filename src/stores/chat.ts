@@ -10,6 +10,7 @@ import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
 import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
+import { loadSkill } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
@@ -130,6 +131,22 @@ export const useChatStore = defineStore('chat', () => {
     useReviewStore().rejectAwaiting()
   }
 
+  /** A leading /skill-name invocation forces that skill: the full SKILL.md
+   *  is inlined so the model executes it without a use_skill round trip. */
+  async function expandSlashSkill(trimmed: string): Promise<string> {
+    const m = /^\/([\w-]+)(?:\s+([\s\S]*))?$/.exec(trimmed)
+    if (!m) return trimmed
+    const skill = await loadSkill(m[1])
+    if (!skill) return trimmed // unknown /token — send as-is
+    const resources = skill.resources.length
+      ? `\nBundled resources (read with read_file when referenced): ${skill.resources.join(', ')}`
+      : ''
+    return (
+      `Execute the "${skill.name}" skill now. Skill instructions:\n\n${skill.body}${resources}\n\n` +
+      (m[2]?.trim() ? `User input for this run: ${m[2].trim()}` : 'No additional user input.')
+    )
+  }
+
   /** Model-facing message text: user text + notes about attachments and
    *  @-mentioned files (small text files inlined; documents pointed at their
    *  index workflow; images listed — they travel separately as image parts
@@ -223,7 +240,7 @@ export const useChatStore = defineStore('chat', () => {
 
     const inline = settings.visionInline
     const modelText = await buildModelText(
-      trimmed,
+      await expandSlashSkill(trimmed),
       attachments,
       mentioned,
       imagePaths,

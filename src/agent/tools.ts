@@ -14,6 +14,7 @@ import * as g from '@/lib/git'
 import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { diffLines, collapseContext } from '@/lib/diff'
+import { loadSkill, listSkills } from '@/lib/skills'
 import { useReviewStore } from '@/stores/review'
 import { useFilesStore } from '@/stores/files'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
@@ -221,6 +222,27 @@ const indexDocument = defineTool({
   },
 })
 
+const useSkill = defineTool({
+  name: 'use_skill',
+  description:
+    'Load the full instructions of a skill listed in the system prompt. Call this BEFORE following a skill — the listing only has the summary. Then execute the loaded instructions.',
+  schema: z.object({
+    name: z.string().describe('Skill name from the system-prompt listing'),
+  }),
+  describeCall: (a) => `skill: ${a.name}`,
+  run: async ({ name }) => {
+    const skill = await loadSkill(name)
+    if (!skill) {
+      const available = (await listSkills()).map((s) => s.name)
+      return `Error: no skill named "${name}". Available: ${available.join(', ') || '(none)'}`
+    }
+    const resources = skill.resources.length
+      ? `\n\nBundled resources (read with read_file when the instructions reference them):\n${skill.resources.map((r) => `- ${r}`).join('\n')}`
+      : ''
+    return `# Skill: ${skill.name}\n\n${skill.body}${resources}`
+  },
+})
+
 /* ── git tools ───────────────────────────────────────────────────────────── */
 
 async function githubContext(): Promise<
@@ -395,6 +417,7 @@ export const TOOLS: ToolSpec[] = [
   searchFiles,
   indexDocument,
   updatePlan,
+  useSkill,
   gitStatus,
   gitDiff,
   gitLog,

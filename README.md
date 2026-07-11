@@ -84,6 +84,25 @@ src/
 | EmbedPDF 查看器 + 提取引擎 | EmbedPDF 查看器（同款）；索引提取用 pdf.js 自研提取器 |
 | macOS Vision OCR | 暂缺（扫描件产出 0 块） |
 
+## Skills（可复用工作流）
+
+技能是存在知识库里的工作流说明书，采用开放的 SKILL.md 格式（markdown + `name`/`description` frontmatter），**规范目录为工具中立的 `.agents/skills/<name>/SKILL.md`**（同时兼容读取 `.claude/skills/`，同名时规范目录优先）：
+
+```markdown
+---
+name: ingest
+description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并链接索引
+---
+
+# 具体步骤……（正文随 use_skill 按需加载,不占常驻上下文）
+```
+
+- **渐进披露**：系统提示词只带 name+description 清单；agent 判断任务匹配时调 `use_skill` 加载全文
+- **用户直接触发**：输入框敲 `/` 弹出技能补全，`/lint` 回车即强制执行；无消息时的预设按钮也来自技能列表
+- **沉淀新技能**：对 agent 说「把刚才的流程存成 skill」，它会写入 `.agents/skills/`——git 版本管理、review 面板审查都天然适用
+- **与终端 Claude Code 共享**：一次性 `ln -s ../.agents/skills .claude/skills`（建议把 `.claude/skills` 加进 `.gitignore`——FS Access API 会把软链接当真目录，应用内 git 会看到重复文件）
+- KB 指令文件同样中立化：**AGENTS.md 优先，CLAUDE.md 兜底**（常见做法是 `CLAUDE.md` 软链接到 `AGENTS.md`）
+
 ## Git 与 GitHub 同步
 
 打开的文件夹是 git 仓库时，标题栏出现分支徽章（如 `main 3`），点开 Git 面板：

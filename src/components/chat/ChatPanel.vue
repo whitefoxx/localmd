@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { usePlanStore } from '@/stores/plan'
+import { useSkillsStore } from '@/stores/skillsStore'
 import { renderMarkdown } from '@/lib/markdown'
 import { importFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
@@ -18,6 +19,7 @@ const settingsStore = useSettingsStore()
 const files = useFilesStore()
 const citations = useCitationsStore()
 const plan = usePlanStore()
+const skills = useSkillsStore()
 
 const PLAN_ICONS = {
   pending: 'codicon-circle-large-outline text-fg-3',
@@ -125,6 +127,37 @@ function pickMention(path: string): void {
   })
 }
 
+/* ── /skill autocomplete (input must START with the slash token) ─────────── */
+
+const slashSel = ref(0)
+
+const slashQuery = computed(() => {
+  const upto = input.value.slice(0, caret.value)
+  const m = /^\/([\w-]*)$/.exec(upto)
+  return m ? m[1] : null
+})
+const slashMatches = computed(() =>
+  slashQuery.value === null
+    ? []
+    : skills.all.filter((s) => s.name.toLowerCase().startsWith(slashQuery.value!.toLowerCase())),
+)
+
+watch(slashQuery, (q) => {
+  slashSel.value = 0
+  if (q !== null) void skills.refresh() // lazy re-scan when the menu opens
+})
+
+function pickSkill(name: string): void {
+  const after = input.value.slice(caret.value)
+  input.value = `/${name} ${after}`
+  void nextTick(() => {
+    const pos = name.length + 2
+    textarea.value?.focus()
+    textarea.value?.setSelectionRange(pos, pos)
+    caret.value = pos
+  })
+}
+
 /* ── sending ─────────────────────────────────────────────────────────────── */
 
 function renderPart(part: MessagePart & { type: 'text' }): string {
@@ -150,6 +183,23 @@ async function send(): Promise<void> {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  if (slashMatches.value.length) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      slashSel.value = (slashSel.value + 1) % slashMatches.value.length
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      slashSel.value = (slashSel.value - 1 + slashMatches.value.length) % slashMatches.value.length
+      return
+    }
+    if (e.key === 'Tab' || (e.key === 'Enter' && slashQuery.value !== slashMatches.value[slashSel.value].name)) {
+      e.preventDefault()
+      pickSkill(slashMatches.value[slashSel.value].name)
+      return
+    }
+  }
   if (mentionOpen.value && mentionMatches.value.length) {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -352,20 +402,33 @@ watch(
       </div>
     </div>
 
-    <!-- Presets -->
-    <div v-if="!chat.messages.length" class="px-3 pb-2 flex gap-2 shrink-0">
-      <button
-        class="btn text-xs"
-        @click="preset('Ingest the un-processed sources under raw/: read each one, then create or update wiki pages for them following the KB schema. Link new pages from the index.')"
-      >
-        Ingest
-      </button>
-      <button
-        class="btn text-xs"
-        @click="preset('Check this knowledge base for problems: orphan pages, broken wikilinks, missing index entries, contradictions. Report what you find; only fix things after listing them.')"
-      >
-        Lint
-      </button>
+    <!-- Presets: KB skills when present, built-in prompts otherwise -->
+    <div v-if="!chat.messages.length" class="px-3 pb-2 flex gap-2 shrink-0 flex-wrap">
+      <template v-if="skills.all.length">
+        <button
+          v-for="s in skills.all.slice(0, 4)"
+          :key="s.name"
+          class="btn text-xs"
+          :title="s.description"
+          @click="preset(`/${s.name} `)"
+        >
+          /{{ s.name }}
+        </button>
+      </template>
+      <template v-else>
+        <button
+          class="btn text-xs"
+          @click="preset('Ingest the un-processed sources under raw/: read each one, then create or update wiki pages for them following the KB schema. Link new pages from the index.')"
+        >
+          Ingest
+        </button>
+        <button
+          class="btn text-xs"
+          @click="preset('Check this knowledge base for problems: orphan pages, broken wikilinks, missing index entries, contradictions. Report what you find; only fix things after listing them.')"
+        >
+          Lint
+        </button>
+      </template>
     </div>
 
     <!-- Input -->
@@ -376,9 +439,27 @@ watch(
       @dragleave="dragOver = false"
       @drop="onDrop"
     >
+      <!-- /skill dropdown -->
+      <div
+        v-if="slashMatches.length"
+        class="absolute bottom-full left-3 right-3 mb-1 z-20 rounded-md border border-border bg-bg-1 shadow-lg overflow-hidden"
+      >
+        <button
+          v-for="(s, i) in slashMatches"
+          :key="s.name"
+          class="w-full flex items-baseline gap-2 px-2 py-1.5 text-left text-xs"
+          :class="i === slashSel ? 'bg-accent/15 text-fg-0' : 'text-fg-2 hover:bg-bg-2'"
+          @mousedown.prevent="pickSkill(s.name)"
+          @mousemove="slashSel = i"
+        >
+          <span class="font-mono shrink-0">/{{ s.name }}</span>
+          <span class="truncate text-fg-3">{{ s.description }}</span>
+        </button>
+      </div>
+
       <!-- @-mention dropdown -->
       <div
-        v-if="mentionOpen && mentionMatches.length"
+        v-if="mentionOpen && mentionMatches.length && !slashMatches.length"
         class="absolute bottom-full left-3 right-3 mb-1 z-20 rounded-md border border-border bg-bg-1 shadow-lg overflow-hidden"
       >
         <button
@@ -416,7 +497,7 @@ watch(
         v-model="input"
         rows="3"
         class="input resize-none font-sans"
-        placeholder="Ask or instruct the agent… (@ 引用文件,可粘贴截图)"
+        placeholder="Ask or instruct the agent… (@ 引用文件 / 技能,可粘贴截图)"
         @keydown="onKeydown"
         @paste="onPaste"
         @input="syncCaret"
