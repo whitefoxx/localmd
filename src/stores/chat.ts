@@ -23,6 +23,7 @@ import {
 } from '@/lib/history'
 import { summarize as summarizeHistory } from '@/agent/summarize'
 import { loadSkill } from '@/lib/skills'
+import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
@@ -191,6 +192,14 @@ export const useChatStore = defineStore('chat', () => {
       } else {
         out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')} — 当前未配置视觉模型,无法查看图片内容,如需可提示用户在设置里配置]`
       }
+    }
+    // What the user is looking at right now — lets "总结这个文件" work
+    // without an explicit @-mention.
+    const files = useFilesStore()
+    const viewing = files.currentPath
+    if (viewing) {
+      const page = fileKind(viewing) === 'pdf' ? pdfPage.get(viewing) : undefined
+      out += `\n\n[用户当前正在查看: ${viewing}${page ? ` (第 ${page} 页)` : ''}]`
     }
     const textMentions = mentioned.filter((p) => !imagePaths.includes(p))
     if (textMentions.length) {
