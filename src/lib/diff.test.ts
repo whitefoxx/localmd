@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { diffLines } from './diff'
+import { diffLines, collapseContext } from './diff'
 
 describe('diffLines', () => {
   it('marks identical content as same', () => {
@@ -36,5 +36,35 @@ describe('diffLines', () => {
   it('treats a new file (empty before) as all additions plus the empty line', () => {
     const d = diffLines('', 'x\ny')
     expect(d.filter((l) => l.type === 'add').map((l) => l.text)).toEqual(['x', 'y'])
+  })
+})
+
+describe('collapseContext', () => {
+  const same = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({ type: 'same' as const, text: `line ${i}` }))
+
+  it('collapses long unchanged runs around a change', () => {
+    const lines = [...same(10), { type: 'add' as const, text: 'NEW' }, ...same(10)]
+    const out = collapseContext(lines, 3)
+    expect(out[0]).toEqual({ type: 'skip', count: 7 })
+    expect(out[out.length - 1]).toEqual({ type: 'skip', count: 7 })
+    expect(out.filter((l) => l.type === 'add')).toHaveLength(1)
+    // 3 context lines on each side survive
+    expect(out.filter((l) => l.type === 'same')).toHaveLength(6)
+  })
+
+  it('keeps everything when the file has no changes', () => {
+    const lines = same(20)
+    expect(collapseContext(lines, 3)).toEqual(lines)
+  })
+
+  it('merges overlapping context windows', () => {
+    const lines = [
+      { type: 'del' as const, text: 'a' },
+      ...same(2),
+      { type: 'add' as const, text: 'b' },
+    ]
+    const out = collapseContext(lines, 3)
+    expect(out).toEqual(lines) // nothing skipped — windows overlap
   })
 })

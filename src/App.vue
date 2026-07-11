@@ -4,16 +4,19 @@ import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
 import { useUiStore } from '@/stores/ui'
+import { useGitStore } from '@/stores/git'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 
 const kb = useKbStore()
 const files = useFilesStore()
 const ui = useUiStore()
+const git = useGitStore()
 useThemeStore() // instantiate so the html[data-theme] effect runs
 
 function onFocus(): void {
   void files.refreshOnFocus()
+  void git.refresh() // terminal commits/edits while the app was unfocused
 }
 
 function onKeydown(e: KeyboardEvent): void {

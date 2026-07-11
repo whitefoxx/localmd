@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useReviewStore } from '@/stores/review'
 import { useFilesStore } from '@/stores/files'
-import { diffLines } from '@/lib/diff'
+import { diffLines, collapseContext } from '@/lib/diff'
 
 const review = useReviewStore()
 const files = useFilesStore()
@@ -22,7 +22,7 @@ watch(
 const diff = computed(() => {
   const change = review.changes.find((c) => c.path === selected.value)
   if (!change) return []
-  return diffLines(change.before ?? '', change.after)
+  return collapseContext(diffLines(change.before ?? '', change.after))
 })
 
 async function openInEditor(path: string): Promise<void> {
@@ -73,7 +73,12 @@ async function openInEditor(path: string): Promise<void> {
                 class="codicon codicon-sm shrink-0"
                 :class="c.before === null ? 'codicon-diff-added text-added' : 'codicon-diff-modified text-accent'"
               />
-              <span class="truncate">{{ c.path }}</span>
+              <span class="truncate flex-1">{{ c.path }}</span>
+              <span
+                v-if="c.awaiting"
+                class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
+                title="Agent 正在等待你的决定"
+              >等待批准</span>
             </button>
           </div>
 
@@ -82,20 +87,29 @@ async function openInEditor(path: string): Promise<void> {
             <div v-if="selected" class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
               <span class="text-xs font-mono text-fg-2 flex-1 truncate">{{ selected }}</span>
               <button class="btn text-xs" @click="openInEditor(selected)">Open</button>
-              <button class="btn text-xs" @click="review.discard(selected)">Discard</button>
-              <button class="btn-primary text-xs" @click="review.approve(selected)">Approve</button>
+              <button class="btn text-xs" @click="review.discard(selected)">
+                {{ review.changes.find((c) => c.path === selected)?.awaiting ? 'Reject' : 'Discard' }}
+              </button>
+              <button class="btn-primary text-xs" @click="review.approve(selected)">
+                {{ review.changes.find((c) => c.path === selected)?.awaiting ? 'Approve & write' : 'Approve' }}
+              </button>
             </div>
             <div class="flex-1 panel-scroll font-mono text-xs leading-5 selectable">
-              <div
-                v-for="(line, i) in diff"
-                :key="i"
-                class="px-3 whitespace-pre-wrap"
-                :class="{
-                  'bg-added/10 text-added': line.type === 'add',
-                  'bg-removed/10 text-removed': line.type === 'del',
-                  'text-fg-2': line.type === 'same',
-                }"
-              >{{ (line.type === 'add' ? '+ ' : line.type === 'del' ? '- ' : '  ') + line.text }}</div>
+              <template v-for="(line, i) in diff" :key="i">
+                <div
+                  v-if="line.type === 'skip'"
+                  class="px-3 py-0.5 text-center text-fg-3 bg-bg-2/60 select-none"
+                >⋯ 未变动的 {{ line.count }} 行 ⋯</div>
+                <div
+                  v-else
+                  class="px-3 whitespace-pre-wrap"
+                  :class="{
+                    'bg-added/10 text-added': line.type === 'add',
+                    'bg-removed/10 text-removed': line.type === 'del',
+                    'text-fg-2': line.type === 'same',
+                  }"
+                >{{ (line.type === 'add' ? '+ ' : line.type === 'del' ? '- ' : '  ') + line.text }}</div>
+              </template>
             </div>
           </div>
         </div>

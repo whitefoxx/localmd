@@ -53,3 +53,15 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
   },
   { id: 'custom', label: 'Custom（OpenAI-compatible）', baseUrl: '', defaultModel: '' },
 ]
+
+/** Every provider a profile can use: Anthropic (native SDK) + the
+ *  OpenAI-compatible presets above. */
+export const ALL_PROVIDERS: ProviderPreset[] = [
+  {
+    id: 'anthropic',
+    label: 'Anthropic (Claude)',
+    baseUrl: '',
+    defaultModel: 'claude-opus-4-8',
+  },
+  ...OPENAI_COMPAT_PRESETS,
+]

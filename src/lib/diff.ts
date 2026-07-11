@@ -5,6 +5,39 @@ export interface DiffLine {
   text: string
 }
 
+export type HunkLine = DiffLine | { type: 'skip'; count: number }
+
+/** Collapse long runs of unchanged lines to `skip` markers, keeping `context`
+ *  lines around each change — so the changed lines are findable in big files.
+ *  A diff with no changes at all is returned untouched. */
+export function collapseContext(lines: DiffLine[], context = 3): HunkLine[] {
+  const keep = new Array<boolean>(lines.length).fill(false)
+  let hasChanges = false
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].type === 'same') continue
+    hasChanges = true
+    for (let j = Math.max(0, i - context); j <= Math.min(lines.length - 1, i + context); j++) {
+      keep[j] = true
+    }
+  }
+  if (!hasChanges) return lines
+  const out: HunkLine[] = []
+  let skipped = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (keep[i]) {
+      if (skipped > 0) {
+        out.push({ type: 'skip', count: skipped })
+        skipped = 0
+      }
+      out.push(lines[i])
+    } else {
+      skipped++
+    }
+  }
+  if (skipped > 0) out.push({ type: 'skip', count: skipped })
+  return out
+}
+
 const MAX_CELLS = 4_000_000
 
 export function diffLines(before: string, after: string): DiffLine[] {

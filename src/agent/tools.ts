@@ -10,8 +10,30 @@
  */
 import { z } from 'zod'
 import * as fs from '@/lib/fs'
+import * as g from '@/lib/git'
+import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
+import { applyEdit } from '@/lib/edits'
+import { diffLines, collapseContext } from '@/lib/diff'
 import { useReviewStore } from '@/stores/review'
 import { useFilesStore } from '@/stores/files'
+import { usePlanStore, type PlanItem } from '@/stores/plan'
+import { useSettingsStore } from '@/stores/settings'
+import { useGitStore } from '@/stores/git'
+
+/** In ask mode, pause until the user approves the proposed content; returns
+ *  whether the write may proceed (auto mode always may). */
+async function approved(path: string, before: string | null, after: string): Promise<boolean> {
+  if (useSettingsStore().state.writeMode !== 'ask') return true
+  return await useReviewStore().askApproval(path, before, after)
+}
+
+async function performWrite(path: string, before: string | null, content: string): Promise<void> {
+  await fs.writeFile(path, content)
+  useReviewStore().recordWrite(path, before, content)
+  const files = useFilesStore()
+  await files.refreshTree()
+  await files.reloadIfClean(path)
+}
 
 const MAX_READ_CHARS = 100_000
 const MAX_SEARCH_RESULTS = 50
@@ -83,7 +105,7 @@ const readFile = defineTool({
 const writeFile = defineTool({
   name: 'write_file',
   description:
-    'Create or overwrite a text file in the knowledge base. Always read_file first when modifying an existing file, and write the complete new content. Parent directories are created automatically.',
+    'Create a NEW text file, or fully rewrite an existing one. For partial modifications prefer edit_file — it is cheaper and reviewable. Always read_file first when overwriting, and write the complete new content. Parent directories are created automatically.',
   schema: z.object({
     path: z.string().describe('KB-relative path, e.g. "wiki/concepts/foo.md"'),
     content: z.string().describe('Full file content'),
@@ -91,12 +113,61 @@ const writeFile = defineTool({
   describeCall: (a) => `write ${a.path}`,
   run: async ({ path, content }) => {
     const before = await fs.tryReadFile(path)
-    await fs.writeFile(path, content)
-    useReviewStore().recordWrite(path, before, content)
-    const files = useFilesStore()
-    await files.refreshTree()
-    await files.reloadIfClean(path)
+    if (!(await approved(path, before, content))) {
+      return `User declined the write to ${path}. Ask them how to proceed instead of retrying.`
+    }
+    await performWrite(path, before, content)
     return `Wrote ${path} (${content.length} chars)`
+  },
+})
+
+const editFile = defineTool({
+  name: 'edit_file',
+  description:
+    'Replace an exact string in an existing file — the preferred way to modify files. old_string must match the file content exactly (including whitespace) and be unique unless replace_all is set. Read the file first.',
+  schema: z.object({
+    path: z.string().describe('KB-relative path'),
+    old_string: z.string().describe('Exact text to replace (must be unique in the file)'),
+    new_string: z.string().describe('Replacement text'),
+    replace_all: z.boolean().optional().describe('Replace every occurrence (default false)'),
+  }),
+  describeCall: (a) => `edit ${a.path}`,
+  run: async ({ path, old_string, new_string, replace_all }) => {
+    const before = await fs.tryReadFile(path)
+    if (before === null) return `Error: file not found: ${path}`
+    const result = applyEdit(before, old_string, new_string, replace_all ?? false)
+    if (!result.ok) return `Error: ${result.error}`
+    if (!(await approved(path, before, result.content))) {
+      return `User declined the edit to ${path}. Ask them how to proceed instead of retrying.`
+    }
+    await performWrite(path, before, result.content)
+    return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
+  },
+})
+
+const PLAN_STATUSES = ['pending', 'in_progress', 'done'] as const
+
+const updatePlan = defineTool({
+  name: 'update_plan',
+  description:
+    'Maintain a visible task checklist for multi-step work. Pass the FULL list every call (it replaces the previous one). Use it when a task has 3+ steps: create it up front, mark items in_progress/done as you go. Exactly one item should be in_progress at a time.',
+  schema: z.object({
+    items: z
+      .array(
+        z.object({
+          text: z.string().describe('Short imperative step description'),
+          status: z.enum(PLAN_STATUSES),
+        }),
+      )
+      .describe('The complete, updated plan'),
+  }),
+  describeCall: (a) => {
+    const done = a.items.filter((i) => i.status === 'done').length
+    return `plan ${done}/${a.items.length}`
+  },
+  run: async ({ items }) => {
+    usePlanStore().set(items as PlanItem[])
+    return `Plan updated (${items.length} items). Continue with the next in_progress step.`
   },
 })
 
@@ -150,4 +221,184 @@ const indexDocument = defineTool({
   },
 })
 
-export const TOOLS: ToolSpec[] = [listFiles, readFile, writeFile, searchFiles, indexDocument]
+/* ── git tools ───────────────────────────────────────────────────────────── */
+
+async function githubContext(): Promise<
+  { owner: string; repo: string; token: string } | string
+> {
+  const remotes = await g.listRemotes()
+  const origin = remotes.find((r) => r.name === 'origin') ?? remotes[0]
+  const repo = origin ? parseGithubRemote(origin.url) : null
+  if (!repo) return 'Error: no GitHub remote configured (or the remote is not github.com)'
+  return { ...repo, token: useSettingsStore().state.githubToken }
+}
+
+const gitStatus = defineTool({
+  name: 'git_status',
+  description:
+    'Show the git state of the KB: current branch, GitHub remote, and text files changed vs HEAD. Note: .trace/ and large binaries (PDF/EPUB/media) are excluded from in-app git — those are committed from a terminal.',
+  schema: z.object({}),
+  describeCall: () => 'git status',
+  run: async () => {
+    if (!(await g.isRepo())) return 'The opened folder is not a git repository.'
+    const branch = await g.currentBranch()
+    const changes = await g.changedFiles()
+    const remotes = await g.listRemotes()
+    const lines = [
+      `branch: ${branch ?? '(unborn)'}`,
+      `remote: ${remotes.map((r) => `${r.name} ${r.url}`).join(', ') || '(none)'}`,
+      changes.length
+        ? `changes (${changes.length}):\n${changes
+            .map(
+              (c) =>
+                `  ${c.kind}: ${c.path}${c.oversized ? ' [binary >100MB — terminal only]' : c.binary ? ' [binary]' : ''}`,
+            )
+            .join('\n')}`
+        : 'working tree clean (content changes to tracked binaries are not detectable here)',
+    ]
+    return lines.join('\n')
+  },
+})
+
+const gitDiff = defineTool({
+  name: 'git_diff',
+  description:
+    'Show the diff of one changed text file vs HEAD (unchanged regions collapsed). Use it to review a change before committing.',
+  schema: z.object({
+    path: z.string().describe('KB-relative path from git_status'),
+  }),
+  describeCall: (a) => `git diff ${a.path}`,
+  run: async ({ path }) => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    const before = await g.readHeadText(path)
+    const after = await fs.tryReadFile(path)
+    if (before === null && after === null) return `Error: ${path} not found in HEAD or worktree`
+    const lines = collapseContext(diffLines(before ?? '', after ?? ''))
+    const rendered = lines
+      .map((l) =>
+        l.type === 'skip'
+          ? `⋯ ${l.count} unchanged lines ⋯`
+          : `${l.type === 'add' ? '+' : l.type === 'del' ? '-' : ' '} ${l.text}`,
+      )
+      .join('\n')
+    return rendered.length > 20_000
+      ? rendered.slice(0, 20_000) + '\n[diff truncated]'
+      : rendered || '(no changes)'
+  },
+})
+
+const gitLog = defineTool({
+  name: 'git_log',
+  description: 'Show recent commits (newest first).',
+  schema: z.object({
+    depth: z.number().optional().describe('How many commits (default 10, max 50)'),
+  }),
+  describeCall: (a) => `git log${a.depth ? ` -${a.depth}` : ''}`,
+  run: async ({ depth }) => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    const entries = await g.recentLog(Math.min(depth ?? 10, 50))
+    if (!entries.length) return 'No commits yet.'
+    return entries
+      .map((e) => `${e.oid.slice(0, 7)} ${new Date(e.when).toISOString().slice(0, 10)} ${e.author}: ${e.message}`)
+      .join('\n')
+  },
+})
+
+const gitCommit = defineTool({
+  name: 'git_commit',
+  description:
+    'Commit changed text files. Omit "paths" to commit every changed text file from git_status; pass specific paths to commit a subset. Write a concise message summarizing the change.',
+  schema: z.object({
+    message: z.string().describe('Commit message'),
+    paths: z.array(z.string()).optional().describe('Subset of changed paths (default: all)'),
+  }),
+  describeCall: (a) => `git commit${a.paths ? ` (${a.paths.length} files)` : ''}: ${a.message.slice(0, 50)}`,
+  run: async ({ message, paths }) => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    if (!message.trim()) return 'Error: commit message must not be empty'
+    const changes = await g.changedFiles()
+    let chosen = paths?.length ? changes.filter((c) => paths.includes(c.path)) : changes
+    // Files above the 100MB API limit can't be added in-app — drop with a note.
+    const blocked = chosen.filter((c) => c.oversized)
+    chosen = chosen.filter((c) => !c.oversized)
+    if (!chosen.length) {
+      if (blocked.length) {
+        return `Error: only >100MB binary files were selected (${blocked.map((c) => c.path).join(', ')}) — those must be committed from a terminal.`
+      }
+      return paths?.length
+        ? `Error: none of the given paths are in the changed list. Changed: ${changes.map((c) => c.path).join(', ') || '(none)'}`
+        : 'Nothing to commit — no committable changes.'
+    }
+    const settings = useSettingsStore()
+    const author = await g.resolveAuthor({
+      name: settings.state.gitName || 'browser-md',
+      email: settings.state.gitEmail || 'browser-md@local',
+    })
+    const oid = await g.commitPaths(chosen, message.trim(), author)
+    void useGitStore().refresh()
+    const note = blocked.length
+      ? `\n(skipped >100MB files — commit from a terminal: ${blocked.map((c) => c.path).join(', ')})`
+      : ''
+    return `Committed ${chosen.length} file(s) as ${oid.slice(0, 7)}:\n${chosen.map((c) => `  ${c.path}`).join('\n')}${note}`
+  },
+})
+
+const gitPush = defineTool({
+  name: 'git_push',
+  description:
+    'Push local commits to the GitHub remote (fast-forward only, via the GitHub API). Requires a GitHub token in Settings. Commit first; on divergence tell the user to resolve in a terminal.',
+  schema: z.object({}),
+  describeCall: () => 'git push',
+  run: async () => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    const ctx = await githubContext()
+    if (typeof ctx === 'string') return ctx
+    if (!ctx.token) {
+      return 'Error: push requires a GitHub token — ask the user to add one in Settings → Git & GitHub (the README has a step-by-step guide under "获取 GitHub Token").'
+    }
+    try {
+      const summary = await ghPush(ctx)
+      void useGitStore().refresh()
+      return summary
+    } catch (err) {
+      return `Push failed: ${(err as Error).message}`
+    }
+  },
+})
+
+const gitPull = defineTool({
+  name: 'git_pull',
+  description:
+    'Pull new commits from the GitHub remote (fast-forward only, via the GitHub API) and update the working tree. Public repos work without a token.',
+  schema: z.object({}),
+  describeCall: () => 'git pull',
+  run: async () => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    const ctx = await githubContext()
+    if (typeof ctx === 'string') return ctx
+    try {
+      const summary = await ghPull(ctx)
+      await useFilesStore().refreshTree()
+      void useGitStore().refresh()
+      return summary
+    } catch (err) {
+      return `Pull failed: ${(err as Error).message}`
+    }
+  },
+})
+
+export const TOOLS: ToolSpec[] = [
+  listFiles,
+  readFile,
+  writeFile,
+  editFile,
+  searchFiles,
+  indexDocument,
+  updatePlan,
+  gitStatus,
+  gitDiff,
+  gitLog,
+  gitCommit,
+  gitPush,
+  gitPull,
+]

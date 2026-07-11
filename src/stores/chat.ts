@@ -2,12 +2,19 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
+import { useFilesStore } from '@/stores/files'
+import { useReviewStore } from '@/stores/review'
+import { usePlanStore } from '@/stores/plan'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
+import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
+import { extractMentions } from '@/lib/mentions'
+import { fileKind } from '@/lib/filetypes'
+import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
-import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta'
+import type { BetaMessageParam, BetaContentBlockParam } from '@anthropic-ai/sdk/resources/beta'
 import type OpenAI from 'openai'
 
 export type MessagePart =
@@ -15,10 +22,18 @@ export type MessagePart =
   | { type: 'thinking'; text: string }
   | { type: 'tool'; name: string; detail: string }
 
+/** A file the user attached to a message (pasted screenshot / upload). Already
+ *  saved into the KB — `path` is its KB location. */
+export interface Attachment {
+  path: string
+  image: boolean
+}
+
 export interface UiMessage {
   id: number
   role: 'user' | 'assistant'
   parts: MessagePart[]
+  attachments?: Attachment[]
   error?: string
 }
 
@@ -26,6 +41,8 @@ interface ChatSession {
   id: string
   kb: string
   title: string
+  /** Primary profile id the histories were built with. */
+  profileId: string
   provider: string
   uiMessages: UiMessage[]
   anthropicHistory: BetaMessageParam[]
@@ -39,6 +56,10 @@ export interface SessionSummary {
   title: string
   updatedAt: number
 }
+
+/** Text files this small are inlined into the message when @-mentioned;
+ *  larger ones the agent reads via tools. */
+const INLINE_MENTION_CHARS = 16_000
 
 let nextId = 1
 
@@ -74,6 +95,7 @@ export const useChatStore = defineStore('chat', () => {
     stop()
     current.value = null
     historyOpen.value = false
+    usePlanStore().clear()
   }
 
   async function openSession(id: string): Promise<void> {
@@ -83,6 +105,7 @@ export const useChatStore = defineStore('chat', () => {
     current.value = stored as unknown as ChatSession
     nextId = Math.max(0, ...current.value.uiMessages.map((m) => m.id)) + 1
     historyOpen.value = false
+    usePlanStore().clear()
   }
 
   async function removeSession(id: string): Promise<void> {
@@ -103,19 +126,76 @@ export const useChatStore = defineStore('chat', () => {
   function stop(): void {
     controller?.abort()
     controller = null
+    // Writes paused for approval must not dangle after the turn dies.
+    useReviewStore().rejectAwaiting()
   }
 
-  async function send(text: string): Promise<void> {
+  /** Model-facing message text: user text + notes about attachments and
+   *  @-mentioned files (small text files inlined; documents pointed at their
+   *  index workflow; images listed — they travel separately as image parts
+   *  or through view_image). */
+  async function buildModelText(
+    trimmed: string,
+    attachments: Attachment[],
+    mentioned: string[],
+    imagePaths: string[],
+    imagesTravelInline: boolean,
+    visionAvailable: boolean,
+  ): Promise<string> {
+    let out = trimmed
+    const uploaded = attachments.filter((a) => !a.image).map((a) => a.path)
+    if (uploaded.length) {
+      out += `\n\n[用户随消息上传了文件(已保存到知识库): ${uploaded.join(', ')} — 用 read_file 查看内容]`
+    }
+    if (imagePaths.length) {
+      if (imagesTravelInline) {
+        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')}]`
+      } else if (visionAvailable) {
+        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')} — 用 view_image 工具查看内容]`
+      } else {
+        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')} — 当前未配置视觉模型,无法查看图片内容,如需可提示用户在设置里配置]`
+      }
+    }
+    const textMentions = mentioned.filter((p) => !imagePaths.includes(p))
+    if (textMentions.length) {
+      const blocks: string[] = []
+      for (const p of textMentions) {
+        const kind = fileKind(p)
+        if (kind === 'pdf' || kind === 'epub') {
+          blocks.push(`@${p}: ${kind.toUpperCase()} 文档 — 通过 read_file 走结构化索引读取。`)
+          continue
+        }
+        const content = await fs.tryReadFile(p)
+        if (content === null) {
+          blocks.push(`@${p}: (文件不存在)`)
+        } else if (content.length <= INLINE_MENTION_CHARS) {
+          blocks.push(`@${p} 的内容:\n\`\`\`\n${content}\n\`\`\``)
+        } else {
+          blocks.push(`@${p}: 文件较大(${content.length} 字符) — 用 read_file 读取。`)
+        }
+      }
+      out += `\n\n<referenced_files>\n${blocks.join('\n\n')}\n</referenced_files>`
+    }
+    return out
+  }
+
+  async function send(text: string, attachments: Attachment[] = []): Promise<void> {
     const trimmed = text.trim()
-    if (!trimmed || running.value || !kb.name) return
-    const { settings } = useSettingsStore()
+    if ((!trimmed && !attachments.length) || running.value || !kb.name) return
+    const settings = useSettingsStore()
+    const files = useFilesStore()
+    const primary = settings.primary
+    if (!primary) return
+
+    const providerKind = primary.provider === 'anthropic' ? 'anthropic' : 'openai'
 
     if (!current.value) {
       current.value = {
         id: crypto.randomUUID(),
         kb: kb.name,
-        title: trimmed.slice(0, 40),
-        provider: settings.provider,
+        title: (trimmed || attachments[0]?.path || 'chat').slice(0, 40),
+        profileId: primary.id,
+        provider: providerKind,
         uiMessages: [],
         anthropicHistory: [],
         openaiHistory: [],
@@ -125,17 +205,37 @@ export const useChatStore = defineStore('chat', () => {
     }
     const session = current.value
 
-    // Switching provider mid-conversation would replay an incompatible history.
-    if (session.provider !== settings.provider) {
-      session.provider = settings.provider
+    // Switching the primary profile mid-conversation would replay an
+    // incompatible (or differently-priced) history — start the wire history
+    // fresh; the UI transcript stays.
+    if (session.profileId !== primary.id || session.provider !== providerKind) {
+      session.profileId = primary.id
+      session.provider = providerKind
       session.anthropicHistory = []
       session.openaiHistory = []
     }
+
+    const mentioned = extractMentions(trimmed, files.allFiles)
+    const imagePaths = [
+      ...attachments.filter((a) => a.image).map((a) => a.path),
+      ...mentioned.filter((p) => fileKind(p) === 'image' && !/\.svg$/i.test(p)),
+    ].filter((p, i, arr) => arr.indexOf(p) === i)
+
+    const inline = settings.visionInline
+    const modelText = await buildModelText(
+      trimmed,
+      attachments,
+      mentioned,
+      imagePaths,
+      inline,
+      settings.visionAvailable,
+    )
 
     session.uiMessages.push({
       id: nextId++,
       role: 'user',
       parts: [{ type: 'text', text: trimmed }],
+      attachments: attachments.length ? [...attachments] : undefined,
     })
     const assistant: UiMessage = { id: nextId++, role: 'assistant', parts: [] }
     session.uiMessages.push(assistant)
@@ -159,24 +259,63 @@ export const useChatStore = defineStore('chat', () => {
     controller = new AbortController()
     try {
       const system = await buildSystemPrompt()
-      if (settings.provider === 'anthropic') {
+      // Inline images: load bytes fresh from the KB at send time.
+      const inlineImages = inline
+        ? (await Promise.all(imagePaths.map((p) => loadKbImage(p)))).filter(
+            (i): i is NonNullable<typeof i> => i !== null,
+          )
+        : []
+
+      if (providerKind === 'anthropic') {
+        const content: BetaContentBlockParam[] = [{ type: 'text', text: modelText }]
+        for (const img of inlineImages) {
+          content.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: img.mediaType as 'image/png',
+              data: img.base64,
+            },
+          })
+        }
         session.anthropicHistory = await runAnthropicTurn({
-          apiKey: settings.anthropicApiKey,
-          model: settings.anthropicModel,
+          apiKey: primary.apiKey,
+          model: primary.model,
+          maxTokens: primary.maxTokens,
           system,
-          messages: [...session.anthropicHistory, { role: 'user', content: trimmed }],
+          messages: [
+            ...session.anthropicHistory,
+            { role: 'user', content: inlineImages.length ? content : modelText },
+          ],
           onEvent,
           signal: controller.signal,
+          allowSubagent: true,
         })
       } else {
+        const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+          { type: 'text', text: modelText },
+        ]
+        for (const img of inlineImages) {
+          content.push({
+            type: 'image_url',
+            image_url: { url: imageUrlForProvider(primary, toDataUrl(img)) },
+          })
+        }
         session.openaiHistory = await runOpenAITurn({
-          apiKey: settings.openaiApiKey,
-          baseURL: settings.openaiBaseUrl,
-          model: settings.openaiModel,
+          profile: primary,
           system,
-          messages: [...session.openaiHistory, { role: 'user', content: trimmed }],
+          messages: [
+            ...session.openaiHistory,
+            { role: 'user', content: inlineImages.length ? content : modelText },
+          ],
+          vision: settings.vision
+            ? { profile: settings.vision, inline }
+            : inline
+              ? { profile: primary, inline }
+              : undefined,
           onEvent,
           signal: controller.signal,
+          allowSubagent: true,
         })
       }
     } catch (err) {

@@ -4,6 +4,7 @@ import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
 import { useReviewStore } from '@/stores/review'
+import { useGitStore } from '@/stores/git'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import FileTree from '@/components/FileTree.vue'
@@ -12,6 +13,7 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import ReviewPanel from '@/components/review/ReviewPanel.vue'
+import GitPanel from '@/components/GitPanel.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
 import SearchPalette from '@/components/SearchPalette.vue'
 import GraphView from '@/components/GraphView.vue'
@@ -28,7 +30,13 @@ const kb = useKbStore()
 const files = useFilesStore()
 const theme = useThemeStore()
 const review = useReviewStore()
+const git = useGitStore()
 const ui = useUiStore()
+
+function openGit(): void {
+  git.panelOpen = true
+  void git.refresh()
+}
 const kbIndex = useKbIndexStore()
 
 const settingsOpen = ref(false)
@@ -95,6 +103,15 @@ function closeKb(): void {
         @click="review.panelOpen = true"
       >
         <span class="codicon codicon-sm codicon-diff mr-1" />{{ review.count }}
+      </button>
+      <button
+        v-if="git.isRepo"
+        class="btn text-xs"
+        :title="`Git: ${git.branch ?? ''}${git.dirtyCount ? ` · ${git.dirtyCount} changed` : ''}`"
+        @click="openGit"
+      >
+        <span class="codicon codicon-sm codicon-git-branch mr-1" />{{ git.branch
+        }}<span v-if="git.dirtyCount" class="ml-1 text-accent">{{ git.dirtyCount }}</span>
       </button>
       <button
         v-if="isMarkdown && ui.view === 'file'"
@@ -188,6 +205,7 @@ function closeKb(): void {
     </div>
 
     <ReviewPanel />
+    <GitPanel />
     <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
     <SearchPalette />
     <HealthPanel />
