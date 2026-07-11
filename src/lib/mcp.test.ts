@@ -5,6 +5,7 @@ import {
   parseExternalToolName,
   parseSseResponse,
   flattenToolResult,
+  isExtensionId,
 } from './mcp'
 
 describe('tool namespacing', () => {
@@ -57,5 +58,17 @@ describe('flattenToolResult', () => {
   })
   it('handles empty content', () => {
     expect(flattenToolResult({})).toBe('(empty result)')
+  })
+})
+
+describe('isExtensionId', () => {
+  it('matches 32-char a-p Chrome extension IDs', () => {
+    expect(isExtensionId('lggfijacmifhgidnjeicdffpgkjhpnla')).toBe(true)
+    expect(isExtensionId(' lggfijacmifhgidnjeicdffpgkjhpnla ')).toBe(true)
+  })
+  it('rejects URLs and malformed ids', () => {
+    expect(isExtensionId('http://localhost:8901/mcp')).toBe(false)
+    expect(isExtensionId('lggfijacmifhgidnjeicdffpgkjhpnl')).toBe(false) // 31 chars
+    expect(isExtensionId('zggfijacmifhgidnjeicdffpgkjhpnla')).toBe(false) // z not in a-p
   })
 })

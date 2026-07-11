@@ -166,3 +166,131 @@ export class McpHttpClient {
     return flattenToolResult(result ?? {})
   }
 }
+
+/* ── Chrome-extension transport (web-agent bridge) ───────────────────────── */
+
+/** Chrome extension IDs are exactly 32 chars of a-p. When a "server" entry's
+ *  url field matches, we speak the same JSON-RPC shapes over a
+ *  chrome.runtime Port instead of HTTP (externally_connectable). */
+export function isExtensionId(s: string): boolean {
+  return /^[a-p]{32}$/.test(s.trim())
+}
+
+export interface McpClientLike {
+  connect(): Promise<McpToolDef[]>
+  callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string>
+}
+
+interface ChromePort {
+  postMessage(msg: unknown): void
+  disconnect(): void
+  onMessage: { addListener(cb: (msg: unknown) => void): void }
+  onDisconnect: { addListener(cb: () => void): void }
+}
+
+interface ChromeRuntimeGlobal {
+  runtime?: {
+    connect(extensionId: string): ChromePort
+    lastError?: { message?: string }
+  }
+}
+
+const HANDSHAKE_TIMEOUT_MS = 10_000
+/** Web tasks legitimately take minutes (the extension runs a whole agent loop). */
+const CALL_TIMEOUT_MS = 600_000
+
+export class McpExtensionClient implements McpClientLike {
+  private port: ChromePort | null = null
+  private nextId = 1
+  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
+
+  constructor(private cfg: McpServerConfig) {}
+
+  private ensurePort(): ChromePort {
+    if (this.port) return this.port
+    const chrome = (globalThis as unknown as { chrome?: ChromeRuntimeGlobal }).chrome
+    if (!chrome?.runtime?.connect) {
+      throw new Error(
+        'chrome.runtime 不可用——需要安装对应扩展,且其 externally_connectable 允许本页面源',
+      )
+    }
+    const port = chrome.runtime.connect(this.cfg.url.trim())
+    port.onMessage.addListener((msg) => this.onMessage(msg))
+    port.onDisconnect.addListener(() => {
+      this.port = null
+      const detail = chrome.runtime?.lastError?.message
+      const err = new Error(`扩展连接已断开${detail ? `: ${detail}` : ''}`)
+      for (const p of this.pending.values()) p.reject(err)
+      this.pending.clear()
+    })
+    this.port = port
+    return port
+  }
+
+  private onMessage(msg: unknown): void {
+    const m = msg as { id?: number; result?: unknown; error?: RpcError; method?: string }
+    if (typeof m.method === 'string' && m.method.startsWith('notifications/')) return
+    if (typeof m.id !== 'number') return
+    const p = this.pending.get(m.id)
+    if (!p) return
+    this.pending.delete(m.id)
+    if (m.error) p.reject(new Error(`${m.error.message} (${m.error.code})`))
+    else p.resolve(m.result)
+  }
+
+  private rpc(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
+    const port = this.ensurePort()
+    const id = this.nextId++
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`MCP ${method} 超时(${Math.round(timeoutMs / 1000)}s)`))
+      }, timeoutMs)
+      const settle = {
+        resolve: (v: unknown) => {
+          clearTimeout(timer)
+          resolve(v)
+        },
+        reject: (e: Error) => {
+          clearTimeout(timer)
+          reject(e)
+        },
+      }
+      signal?.addEventListener('abort', () => {
+        this.pending.delete(id)
+        settle.reject(new Error('aborted'))
+      })
+      this.pending.set(id, settle)
+      port.postMessage({ jsonrpc: '2.0', id, method, params })
+    })
+  }
+
+  async connect(): Promise<McpToolDef[]> {
+    await this.rpc(
+      'initialize',
+      {
+        protocolVersion: '2025-03-26',
+        capabilities: {},
+        clientInfo: { name: 'browser-md', version: '0.1.0' },
+      },
+      HANDSHAKE_TIMEOUT_MS,
+    )
+    this.port?.postMessage({ jsonrpc: '2.0', method: 'notifications/initialized' })
+    const result = (await this.rpc('tools/list', {}, HANDSHAKE_TIMEOUT_MS)) as {
+      tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
+    }
+    return (result.tools ?? []).map((t) => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
+    }))
+  }
+
+  async callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
+    const result = (await this.rpc('tools/call', { name, arguments: args }, CALL_TIMEOUT_MS, signal)) as {
+      content?: Array<Record<string, unknown>>
+      isError?: boolean
+    }
+    return flattenToolResult(result ?? {})
+  }
+}

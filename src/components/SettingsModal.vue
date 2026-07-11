@@ -244,7 +244,7 @@ function slotBadges(p: LlmProfile): string[] {
           </div>
           <div class="grid grid-cols-[100px_1fr_100px_auto] gap-2 mt-1 mb-1">
             <input v-model="mcpName" class="input text-xs" placeholder="名称" />
-            <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp(Streamable HTTP)" />
+            <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp 或 Chrome 扩展 ID" />
             <input v-model="mcpToken" type="password" class="input text-xs" placeholder="token(可选)" autocomplete="off" />
             <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="addMcpServer">添加</button>
           </div>

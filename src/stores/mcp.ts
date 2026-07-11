@@ -9,8 +9,11 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import {
   McpHttpClient,
+  McpExtensionClient,
+  isExtensionId,
   externalToolName,
   sanitizeServerName,
+  type McpClientLike,
   type McpServerConfig,
   type McpToolDef,
 } from '@/lib/mcp'
@@ -33,7 +36,7 @@ export interface ExternalTool {
 
 export const useMcpStore = defineStore('mcp', () => {
   const servers = ref<McpServerState[]>([])
-  const clients = new Map<string, McpHttpClient>()
+  const clients = new Map<string, McpClientLike>()
 
   const allTools = computed<ExternalTool[]>(() =>
     servers.value.flatMap((s) =>
@@ -55,7 +58,11 @@ export const useMcpStore = defineStore('mcp', () => {
     servers.value = configs.map((config) => ({ config, status: 'connecting', tools: [] }))
     await Promise.all(
       configs.map(async (config, i) => {
-        const client = new McpHttpClient(config)
+        // A Chrome extension ID in the url field selects the Port transport
+        // (web-agent bridge); anything else is a Streamable-HTTP endpoint.
+        const client: McpClientLike = isExtensionId(config.url)
+          ? new McpExtensionClient(config)
+          : new McpHttpClient(config)
         clients.set(config.id, client)
         try {
           const tools = await client.connect()

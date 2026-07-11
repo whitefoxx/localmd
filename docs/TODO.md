@@ -1,11 +1,13 @@
 # TODO / 规划
 
-> 2026-07-11:远程 MCP server 支持(C8)已实现——Settings 里配置 Streamable HTTP
-> 端点,工具以 `mcp__<server>__<tool>` 注入两个 provider。下面的 web-agent 桥接
-> 变成它的一个特例:只需给 mcp store 增加一种 Port 传输的 source 类型,协议消息
-> 形状与 HTTP 版完全一致(initialize / tools/list / tools/call)。
+> 2026-07-11:远程 MCP server 支持(C8)与 **web-agent 桥接均已完成**。
+> Settings 里配置 Streamable HTTP 端点或 Chrome 扩展 ID(32 位 a-p,自动选
+> Port 传输),工具以 `mcp__<server>__<tool>` 注入两个 provider。web-agent 的
+> `web_task` 已实测跑通(browser-md agent 委托浏览任务 → web-agent 引擎执行
+> → 结果回传)。注意:扩展 manifest 带 `key` 字段时,ID 由 key 派生——重载后
+> ID 会变,可用 `sha256(base64decode(key))[:32]` 映射到 a-p 计算。
 
-## web-agent 桥接:把浏览器自动化当作 MCP 式工具(待实现)
+## web-agent 桥接:把浏览器自动化当作 MCP 式工具(已完成,设计存档)
 
 **动机**:browser-md 是纯网页,agent 没有网页浏览能力(fetch 任意站点被 CORS 挡);
 web-agent(Chrome 扩展)有 host 权限与完整的浏览 agent 引擎。桥接后,browser-md
