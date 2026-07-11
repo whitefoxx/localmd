@@ -10,6 +10,7 @@ import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
 import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
+import { trimAnthropicHistory, trimOpenAIHistory } from '@/lib/history'
 import { loadSkill } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
@@ -287,6 +288,8 @@ export const useChatStore = defineStore('chat', () => {
         : []
 
       if (providerKind === 'anthropic') {
+        // Old turns' large tool results/images become stubs before replay.
+        session.anthropicHistory = trimAnthropicHistory(session.anthropicHistory)
         const content: BetaContentBlockParam[] = [{ type: 'text', text: modelText }]
         for (const img of inlineImages) {
           content.push({
@@ -312,6 +315,7 @@ export const useChatStore = defineStore('chat', () => {
           allowSubagent: true,
         })
       } else {
+        session.openaiHistory = trimOpenAIHistory(session.openaiHistory)
         const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
           { type: 'text', text: modelText },
         ]
