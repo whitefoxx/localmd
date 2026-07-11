@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
@@ -237,7 +237,10 @@ export const useChatStore = defineStore('chat', () => {
       parts: [{ type: 'text', text: trimmed }],
       attachments: attachments.length ? [...attachments] : undefined,
     })
-    const assistant: UiMessage = { id: nextId++, role: 'assistant', parts: [] }
+    // reactive() is load-bearing: onEvent mutates this object from outside the
+    // store's proxy — a raw object would render nothing until the turn ends
+    // (no streaming). Mutating through the proxy triggers per-delta updates.
+    const assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
     session.uiMessages.push(assistant)
     void persist()
 
