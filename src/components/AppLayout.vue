@@ -23,6 +23,8 @@ import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
 import { captureFiles } from '@/lib/capture'
+import { scaffoldKb } from '@/lib/scaffold'
+import { useSkillsStore } from '@/stores/skillsStore'
 import { baseName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
 
@@ -41,6 +43,25 @@ const kbIndex = useKbIndexStore()
 
 const settingsOpen = ref(false)
 const dragging = ref(false)
+
+/* First-run scaffold offer for truly-empty folders. */
+const scaffoldDismissed = ref(false)
+const scaffolding = ref(false)
+const showScaffold = computed(
+  () => !scaffoldDismissed.value && files.allFiles.length === 0 && !files.currentPath,
+)
+
+async function doScaffold(): Promise<void> {
+  scaffolding.value = true
+  try {
+    await scaffoldKb()
+    await files.refreshTree()
+    await useSkillsStore().refresh()
+    await files.openFile('wiki/index.md')
+  } finally {
+    scaffolding.value = false
+  }
+}
 
 async function onDrop(e: DragEvent): Promise<void> {
   dragging.value = false
@@ -198,7 +219,21 @@ function closeKb(): void {
               v-else-if="!files.currentPath"
               class="h-full flex items-center justify-center text-fg-3"
             >
-              <div class="text-center">
+              <div v-if="showScaffold" class="text-center max-w-md px-6">
+                <span class="codicon codicon-lg codicon-sparkle block mb-3 text-accent" />
+                <div class="text-fg-1 font-medium mb-2">这个文件夹还是空的</div>
+                <p class="text-xs leading-relaxed mb-4">
+                  可以初始化为知识库:创建 raw/(源文件收集)、wiki/(LLM 维护的页面)、
+                  AGENTS.md(约定)和 ingest / lint 两个起步技能。
+                </p>
+                <div class="flex gap-2 justify-center">
+                  <button class="btn-primary text-xs" :disabled="scaffolding" @click="doScaffold">
+                    <span class="codicon codicon-sm codicon-rocket mr-1" />初始化知识库
+                  </button>
+                  <button class="btn text-xs" @click="scaffoldDismissed = true">先不用</button>
+                </div>
+              </div>
+              <div v-else class="text-center">
                 <span class="codicon codicon-lg codicon-markdown block mb-2" />
                 Select a file to start
               </div>
