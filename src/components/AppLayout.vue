@@ -154,6 +154,15 @@ function closeKb(): void {
       </button>
     </header>
 
+    <!-- Concurrent-tab warning -->
+    <div
+      v-if="kb.lockedByOther"
+      class="flex items-center gap-2 px-3 py-1.5 text-xs shrink-0 bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-b border-yellow-500/30"
+    >
+      <span class="codicon codicon-sm codicon-warning" />
+      该知识库已在另一个标签页打开——两边同时编辑会互相覆盖(自动保存、git、标注)。建议只保留一个标签页操作。
+    </div>
+
     <div class="flex-1 flex min-h-0">
       <!-- Sidebar -->
       <aside v-show="ui.sidebarOpen" class="w-64 shrink-0 border-r border-border bg-bg-1 flex flex-col">

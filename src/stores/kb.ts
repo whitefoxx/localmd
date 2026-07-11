@@ -8,6 +8,37 @@ export const useKbStore = defineStore('kb', () => {
   const isOpen = ref(false)
   const recents = ref<RecentKb[]>([])
   const error = ref<string | null>(null)
+  /** Another tab holds this KB open — concurrent writes would clobber each
+   *  other (autosave, .git/index, sidecars). We warn rather than hard-block. */
+  const lockedByOther = ref(false)
+
+  let releaseLock: (() => void) | null = null
+
+  /** Try to take the exclusive Web Lock for this KB; held until close().
+   *  Locks auto-release when the tab dies, so stale locks can't happen. */
+  async function acquireLock(kbName: string): Promise<void> {
+    releaseLock?.()
+    releaseLock = null
+    lockedByOther.value = false
+    if (!('locks' in navigator)) return
+    await new Promise<void>((ready) => {
+      void navigator.locks.request(
+        `browser-md:kb:${kbName}`,
+        { ifAvailable: true },
+        (lock) => {
+          if (!lock) {
+            lockedByOther.value = true
+            ready()
+            return
+          }
+          ready()
+          return new Promise<void>((release) => {
+            releaseLock = release
+          })
+        },
+      )
+    })
+  }
 
   async function refreshRecents(): Promise<void> {
     try {
@@ -26,6 +57,7 @@ export const useKbStore = defineStore('kb', () => {
     fs.setRoot(handle)
     name.value = handle.name
     isOpen.value = true
+    await acquireLock(handle.name)
     await saveRecent(handle)
     await refreshRecents()
     return true
@@ -52,10 +84,23 @@ export const useKbStore = defineStore('kb', () => {
   }
 
   function close(): void {
+    releaseLock?.()
+    releaseLock = null
+    lockedByOther.value = false
     fs.setRoot(null)
     name.value = null
     isOpen.value = false
   }
 
-  return { name, isOpen, recents, error, refreshRecents, pickAndOpen, openRecent, close }
+  return {
+    name,
+    isOpen,
+    recents,
+    error,
+    lockedByOther,
+    refreshRecents,
+    pickAndOpen,
+    openRecent,
+    close,
+  }
 })
