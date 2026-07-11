@@ -19,10 +19,22 @@ interface CachedPage {
   broken: string[]
 }
 
+/** A cached section file from a PDF/EPUB index under .trace/. */
+interface DocSection {
+  mtime: number
+  content: string
+  /** Source document path (from the index dir's manifest.json). */
+  source: string
+}
+
 export interface SearchHit {
   path: string
   line: number
   text: string
+  /** Set when the hit is inside an indexed PDF/EPUB (path = source doc). */
+  doc?: boolean
+  /** Block id of the hit line, for jumping straight to the passage. */
+  blockId?: string | null
 }
 
 export interface HealthReport {
@@ -34,6 +46,7 @@ const MAX_HITS = 100
 
 export const useKbIndexStore = defineStore('kbIndex', () => {
   const pages = ref<Map<string, CachedPage>>(new Map())
+  const docSections = ref<Map<string, DocSection>>(new Map())
   const refreshing = ref(false)
 
   /** Bring the cache in sync with the tree: re-read changed files, drop deleted. */
@@ -66,9 +79,54 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         next.set(path, { mtime, content, outgoing, broken })
       }
       pages.value = next
+      await refreshDocSections()
     } finally {
       refreshing.value = false
     }
+  }
+
+  /** Cache the section files of every PDF/EPUB index, so book content is
+   *  searchable and hits can jump to the passage via their block ids. */
+  async function refreshDocSections(): Promise<void> {
+    const next = new Map(docSections.value)
+    const seen = new Set<string>()
+    for (const kind of ['pdf-index', 'epub-index']) {
+      let tree
+      try {
+        tree = await fs.readTreeFrom(`.trace/${kind}`)
+      } catch {
+        continue // no such index kind yet
+      }
+      // One manifest per index dir gives the source document path.
+      for (const dir of tree) {
+        if (dir.kind !== 'dir') continue
+        const manifestRaw = await fs.tryReadFile(`${dir.path}/manifest.json`)
+        if (!manifestRaw) continue
+        let source: string
+        try {
+          source = (JSON.parse(manifestRaw) as { source: string }).source
+        } catch {
+          continue
+        }
+        const sectionPaths = fs
+          .collectFiles(dir.children ?? [])
+          .filter((p) => /\/sections\/[^/]+\.md$/.test(p))
+        for (const p of sectionPaths) {
+          seen.add(p)
+          const mtime = await fs.statMtime(p)
+          if (mtime === null) continue
+          const cached = next.get(p)
+          if (cached && cached.mtime === mtime) continue
+          const content = await fs.tryReadFile(p)
+          if (content === null) continue
+          next.set(p, { mtime, content, source })
+        }
+      }
+    }
+    for (const p of next.keys()) {
+      if (!seen.has(p)) next.delete(p)
+    }
+    docSections.value = next
   }
 
   /** path → set of pages linking to it. */
@@ -120,15 +178,18 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return { brokenLinks, orphans }
   })
 
-  /** Filename + full-text search over the cached contents. */
+  /** Filename search over every file, full-text over markdown, and full-text
+   *  over indexed PDF/EPUB sections (hits carry the block id to jump to). */
   function search(query: string): { files: string[]; hits: SearchHit[] } {
     const q = query.trim().toLowerCase()
     if (!q) return { files: [], hits: [] }
-    const files: string[] = []
+    const filesStore = useFilesStore()
+
+    const files = filesStore.allFiles.filter((p) => p.toLowerCase().includes(q)).sort()
+
     const hits: SearchHit[] = []
     for (const [path, page] of pages.value) {
-      if (path.toLowerCase().includes(q)) files.push(path)
-      if (hits.length >= MAX_HITS) continue
+      if (hits.length >= MAX_HITS) break
       const lines = page.content.split('\n')
       for (let i = 0; i < lines.length && hits.length < MAX_HITS; i++) {
         if (lines[i].toLowerCase().includes(q)) {
@@ -136,12 +197,32 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         }
       }
     }
-    files.sort()
-    return { files, hits }
+
+    const docHits: SearchHit[] = []
+    for (const section of docSections.value.values()) {
+      if (docHits.length >= MAX_HITS) break
+      const lines = section.content.split('\n')
+      for (let i = 0; i < lines.length && docHits.length < MAX_HITS; i++) {
+        if (lines[i].toLowerCase().includes(q)) {
+          const blockId = lines[i].match(/\[\[(b\d+-\d+)\]\]/)?.[1] ?? null
+          const text = lines[i].replace(/\[\[b\d+-\d+\]\]\s*/g, '').replace(/^#+\s*/, '')
+          docHits.push({
+            path: section.source,
+            line: i + 1,
+            text: text.trim().slice(0, 160),
+            doc: true,
+            blockId,
+          })
+        }
+      }
+    }
+
+    return { files, hits: [...hits, ...docHits] }
   }
 
   function reset(): void {
     pages.value = new Map()
+    docSections.value = new Map()
   }
 
   return { pages, refreshing, refresh, backlinks, graph, health, search, reset }

@@ -3,27 +3,39 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore } from '@/stores/kbIndex'
+import { useCitationsStore } from '@/stores/citations'
+import { baseName } from '@/lib/wiki'
 
 const ui = useUiStore()
 const files = useFilesStore()
 const index = useKbIndexStore()
+const citations = useCitationsStore()
 
 const query = ref('')
 const selected = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 
 interface Row {
-  kind: 'file' | 'hit'
+  kind: 'file' | 'hit' | 'doc'
   path: string
   line?: number
   text?: string
+  blockId?: string | null
 }
 
 const rows = computed<Row[]>(() => {
   const { files: fileMatches, hits } = index.search(query.value)
   return [
     ...fileMatches.map((path): Row => ({ kind: 'file', path })),
-    ...hits.map((h): Row => ({ kind: 'hit', path: h.path, line: h.line, text: h.text })),
+    ...hits.map(
+      (h): Row => ({
+        kind: h.doc ? 'doc' : 'hit',
+        path: h.path,
+        line: h.line,
+        text: h.text,
+        blockId: h.blockId,
+      }),
+    ),
   ].slice(0, 60)
 })
 
@@ -45,6 +57,11 @@ async function pick(row: Row | undefined): Promise<void> {
   if (!row) return
   ui.searchOpen = false
   ui.view = 'file'
+  if (row.kind === 'doc') {
+    // Jump straight to the matched passage inside the PDF/EPUB.
+    await citations.openCitation(row.path, row.blockId ?? null)
+    return
+  }
   await files.openFile(row.path)
 }
 
@@ -90,10 +107,20 @@ function onKeydown(e: KeyboardEvent): void {
           >
             <span
               class="codicon codicon-sm shrink-0 text-fg-3"
-              :class="row.kind === 'file' ? 'codicon-markdown' : 'codicon-search'"
+              :class="{
+                'codicon-markdown': row.kind === 'file',
+                'codicon-search': row.kind === 'hit',
+                'codicon-book': row.kind === 'doc',
+              }"
             />
             <template v-if="row.kind === 'file'">
               <span class="truncate text-fg-0">{{ row.path }}</span>
+            </template>
+            <template v-else-if="row.kind === 'doc'">
+              <span class="shrink-0 max-w-[140px] truncate text-fg-3 text-xs">
+                {{ baseName(row.path) }}
+              </span>
+              <span class="truncate text-fg-2">{{ row.text }}</span>
             </template>
             <template v-else>
               <span class="shrink-0 text-fg-3 font-mono text-xs">{{ row.path }}:{{ row.line }}</span>

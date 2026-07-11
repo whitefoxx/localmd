@@ -220,8 +220,9 @@ function normRect(l: Line, size: { w: number; h: number }): NormRect {
   }
 }
 
-/** Read the embedded outline and resolve each entry to a 1-based page. */
-async function readOutline(doc: pdfjs.PDFDocumentProxy): Promise<PdfExtractResult['outline']> {
+/** Read the embedded outline and resolve each entry to a 1-based page.
+ *  Also used by the PDF viewer's table-of-contents panel. */
+export async function readOutline(doc: pdfjs.PDFDocumentProxy): Promise<PdfExtractResult['outline']> {
   const flat: { title: string; level: number; page: number }[] = []
 
   interface RawOutline {

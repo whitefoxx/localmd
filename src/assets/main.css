@@ -212,3 +212,53 @@
 .md-preview a.cite-source {
   @apply text-accent hover:underline cursor-pointer font-mono text-[0.9em];
 }
+
+/* pdf.js text layer — minimal version of pdf.js's official text_layer CSS. */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  user-select: text;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: transparent;
+  z-index: 1;
+}
+.textLayer span,
+.textLayer br {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.textLayer ::selection {
+  background: rgb(0 100 255 / 0.3);
+}
+
+/* Saved highlight annotation overlays (below the text layer). */
+.pdf-annot {
+  position: absolute;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* pdf.js selection helper: expands to cover the layer while a selection drag
+   is active, so the drag can extend smoothly across whole lines. Must sit
+   BEHIND the text spans (z-index -1) — it fills the gaps between glyphs, it
+   must never intercept the pointer on the text itself. */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: -1;
+  cursor: default;
+  user-select: none;
+}
+.textLayer.selecting .endOfContent {
+  top: 0;
+}

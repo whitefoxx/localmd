@@ -6,5 +6,6 @@
  */
 export const editorScroll = new Map<string, number>()
 export const previewScroll = new Map<string, number>()
-export const pdfScroll = new Map<string, number>()
+/** Current page per PDF path (EmbedPDF viewer). */
+export const pdfPage = new Map<string, number>()
 export const epubLocation = new Map<string, string>()

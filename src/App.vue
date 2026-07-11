@@ -23,6 +23,12 @@ function onKeydown(e: KeyboardEvent): void {
   } else if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'p')) {
     e.preventDefault()
     if (kb.isOpen) ui.searchOpen = !ui.searchOpen
+  } else if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+    e.preventDefault()
+    if (kb.isOpen) ui.sidebarOpen = !ui.sidebarOpen
+  } else if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+    e.preventDefault()
+    if (kb.isOpen) ui.agentOpen = !ui.agentOpen
   }
 }
 

@@ -205,6 +205,7 @@ export const useFilesStore = defineStore('files', () => {
     saveState,
     mode,
     mdFiles,
+    allFiles,
     resolveWikilink,
     resolveRelativeLink,
     refreshTree,

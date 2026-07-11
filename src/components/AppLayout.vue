@@ -31,7 +31,6 @@ const review = useReviewStore()
 const ui = useUiStore()
 const kbIndex = useKbIndexStore()
 
-const chatOpen = ref(true)
 const settingsOpen = ref(false)
 const dragging = ref(false)
 
@@ -74,6 +73,14 @@ function closeKb(): void {
   >
     <!-- Title bar -->
     <header class="flex items-center gap-2 px-3 h-10 border-b border-border bg-bg-1 shrink-0">
+      <button
+        class="text-fg-3 hover:text-fg-0"
+        :class="{ '!text-accent': ui.sidebarOpen }"
+        title="Toggle sidebar (⌘B)"
+        @click="ui.sidebarOpen = !ui.sidebarOpen"
+      >
+        <span class="codicon codicon-layout-sidebar-left" />
+      </button>
       <span class="codicon codicon-book text-accent" />
       <span class="font-semibold text-fg-0">{{ kb.name }}</span>
       <span class="text-fg-3 text-xs" v-if="fileName">/ {{ fileName }}</span>
@@ -116,9 +123,9 @@ function closeKb(): void {
       </button>
       <button
         class="btn text-xs"
-        :class="{ '!text-accent': chatOpen }"
-        title="Toggle agent panel"
-        @click="chatOpen = !chatOpen"
+        :class="{ '!text-accent': ui.agentOpen }"
+        title="Toggle agent panel (⌘J)"
+        @click="ui.agentOpen = !ui.agentOpen"
       >
         <span class="codicon codicon-sm codicon-sparkle" />
       </button>
@@ -132,7 +139,7 @@ function closeKb(): void {
 
     <div class="flex-1 flex min-h-0">
       <!-- Sidebar -->
-      <aside class="w-64 shrink-0 border-r border-border bg-bg-1 flex flex-col">
+      <aside v-show="ui.sidebarOpen" class="w-64 shrink-0 border-r border-border bg-bg-1 flex flex-col">
         <div class="flex-1 panel-scroll">
           <FileTree />
         </div>
@@ -144,13 +151,15 @@ function closeKb(): void {
         <GraphView v-if="ui.view === 'graph'" class="flex-1 min-h-0" />
         <template v-else>
           <EditorTabs />
-          <div class="flex-1 min-h-0">
-            <template v-if="files.currentPath">
+          <div class="flex-1 min-h-0 relative">
+            <!-- PDFs stay mounted per open tab (trace-app pattern) — switching
+                 tabs only toggles visibility, never reloads the document. -->
+            <PdfViewer v-show="kind === 'pdf'" class="absolute inset-0" />
+            <template v-if="files.currentPath && kind !== 'pdf'">
               <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
               <MarkdownPreview v-else-if="isMarkdown" />
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
-              <PdfViewer v-else-if="kind === 'pdf'" />
               <EpubViewer v-else-if="kind === 'epub'" />
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">
@@ -159,7 +168,10 @@ function closeKb(): void {
                 </div>
               </div>
             </template>
-            <div v-else class="h-full flex items-center justify-center text-fg-3">
+            <div
+              v-else-if="!files.currentPath"
+              class="h-full flex items-center justify-center text-fg-3"
+            >
               <div class="text-center">
                 <span class="codicon codicon-lg codicon-markdown block mb-2" />
                 Select a file to start
@@ -170,7 +182,7 @@ function closeKb(): void {
       </main>
 
       <!-- Agent panel -->
-      <aside v-if="chatOpen" class="w-96 shrink-0 border-l border-border">
+      <aside v-show="ui.agentOpen" class="w-96 shrink-0 border-l border-border">
         <ChatPanel @open-settings="settingsOpen = true" />
       </aside>
     </div>
