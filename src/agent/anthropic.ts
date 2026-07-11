@@ -16,6 +16,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/beta'
 import { TOOLS } from './tools'
 import { loadKbImage } from './vision'
+import { mapLimit } from '@/lib/async'
 import type { AgentEventHandler } from './types'
 
 export interface AnthropicTurnOptions {
@@ -103,13 +104,25 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       betaZodTool({
         name: 'run_subagent',
         description:
-          'Delegate a scoped, self-contained subtask to a subagent with its own fresh context and the same KB tools (it cannot spawn subagents). Use it for work that would flood your context — e.g. surveying many files, summarizing a long document, or an independent research question. Give it the full task description and any context it needs; you receive only its final answer.',
+          'Delegate scoped, self-contained subtasks to subagents with fresh contexts and the same KB tools (they cannot spawn subagents). Use it for work that would flood your context — surveying many files, summarizing long documents, independent research questions. INDEPENDENT tasks run in parallel — pass them together in one call. Each task description must be complete and self-contained; you receive only the final answers.',
         inputSchema: z.object({
-          task: z.string().describe('Complete, self-contained task description for the subagent'),
+          tasks: z
+            .array(z.string())
+            .min(1)
+            .max(5)
+            .describe('1-5 self-contained subtask descriptions; independent tasks run concurrently'),
         }),
-        run: async ({ task }) => {
-          opts.onEvent({ type: 'tool', name: 'run_subagent', detail: `subagent: ${task.slice(0, 80)}` })
-          try {
+        run: async ({ tasks }) => {
+          opts.onEvent({
+            type: 'tool',
+            name: 'run_subagent',
+            detail:
+              tasks.length === 1
+                ? `subagent: ${tasks[0].slice(0, 80)}`
+                : `subagents ×${tasks.length}`,
+          })
+          const results = await mapLimit(tasks, 3, async (task, i) => {
+            const tag = tasks.length > 1 ? `[${i + 1}]` : ''
             const history = await runAnthropicTurn({
               ...opts,
               system: opts.system + SUBAGENT_SYSTEM_SUFFIX,
@@ -119,7 +132,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
                 // Surface tool activity (indented) and usage; the subagent's
                 // text comes back as this tool's result.
                 if (e.type === 'tool') {
-                  opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳ ${e.detail}` })
+                  opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}` })
                 } else if (e.type === 'usage') {
                   opts.onEvent(e)
                 }
@@ -136,9 +149,18 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
                     .map((b) => b.text)
                     .join('')
             return text || '(subagent returned no text)'
-          } catch (err) {
-            return `Subagent failed: ${(err as Error).message}`
+          })
+          if (tasks.length === 1) {
+            const r = results[0]
+            return r instanceof Error ? `Subagent failed: ${r.message}` : r
           }
+          return tasks
+            .map((t, i) => {
+              const r = results[i]
+              const body = r instanceof Error ? `(failed: ${r.message})` : r
+              return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
+            })
+            .join('\n\n')
         },
       }),
     )

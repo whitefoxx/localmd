@@ -12,6 +12,7 @@
 import OpenAI from 'openai'
 import { z } from 'zod'
 import { TOOLS } from './tools'
+import { mapLimit } from '@/lib/async'
 import { loadKbImage, toDataUrl, imageUrlForProvider, visionDescribe, type KbImage } from './vision'
 import type { LlmProfile } from '@/stores/settings'
 import type { AgentEventHandler } from './types'
@@ -85,16 +86,19 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       function: {
         name: 'run_subagent',
         description:
-          'Delegate a scoped, self-contained subtask to a subagent with its own fresh context and the same KB tools (it cannot spawn subagents). Use it for work that would flood your context — e.g. surveying many files or summarizing a long document. Give it the full task description; you receive only its final answer.',
+          'Delegate scoped, self-contained subtasks to subagents with fresh contexts and the same KB tools (they cannot spawn subagents). Use it for work that would flood your context — surveying many files, summarizing long documents. INDEPENDENT tasks run in parallel — pass them together in one call. Each task description must be complete and self-contained; you receive only the final answers.',
         parameters: {
           type: 'object',
           properties: {
-            task: {
-              type: 'string',
-              description: 'Complete, self-contained task description for the subagent',
+            tasks: {
+              type: 'array',
+              items: { type: 'string' },
+              minItems: 1,
+              maxItems: 5,
+              description: '1-5 self-contained subtask descriptions; independent tasks run concurrently',
             },
           },
-          required: ['task'],
+          required: ['tasks'],
         },
       },
     })
@@ -213,16 +217,26 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
 }
 
 async function handleSubagent(rawArgs: string, opts: OpenAITurnOptions): Promise<string> {
-  let task: string
+  let tasks: string[]
   try {
-    const args = JSON.parse(rawArgs || '{}') as { task?: unknown }
-    task = typeof args.task === 'string' ? args.task : ''
+    const args = JSON.parse(rawArgs || '{}') as { tasks?: unknown; task?: unknown }
+    tasks = Array.isArray(args.tasks)
+      ? args.tasks.filter((t): t is string => typeof t === 'string' && !!t.trim())
+      : typeof args.task === 'string' && args.task.trim()
+        ? [args.task] // tolerate the legacy single-task shape
+        : []
   } catch {
     return 'Error: invalid run_subagent arguments'
   }
-  if (!task.trim()) return 'Error: task must not be empty'
-  opts.onEvent({ type: 'tool', name: 'run_subagent', detail: `subagent: ${task.slice(0, 80)}` })
-  try {
+  if (!tasks.length) return 'Error: tasks must contain at least one non-empty task'
+  tasks = tasks.slice(0, 5)
+  opts.onEvent({
+    type: 'tool',
+    name: 'run_subagent',
+    detail: tasks.length === 1 ? `subagent: ${tasks[0].slice(0, 80)}` : `subagents ×${tasks.length}`,
+  })
+  const results = await mapLimit(tasks, 3, async (task, i) => {
+    const tag = tasks.length > 1 ? `[${i + 1}]` : ''
     const history = await runOpenAITurn({
       ...opts,
       system: opts.system + SUBAGENT_SYSTEM_SUFFIX,
@@ -232,7 +246,7 @@ async function handleSubagent(rawArgs: string, opts: OpenAITurnOptions): Promise
         // Surface tool activity (indented) and usage; the subagent's text
         // comes back as this tool's result.
         if (e.type === 'tool') {
-          opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳ ${e.detail}` })
+          opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}` })
         } else if (e.type === 'usage') {
           opts.onEvent(e)
         }
@@ -241,9 +255,18 @@ async function handleSubagent(rawArgs: string, opts: OpenAITurnOptions): Promise
     const last = history[history.length - 1]
     const text = typeof last?.content === 'string' ? last.content : ''
     return text || '(subagent returned no text)'
-  } catch (err) {
-    return `Subagent failed: ${(err as Error).message}`
+  })
+  if (tasks.length === 1) {
+    const r = results[0]
+    return r instanceof Error ? `Subagent failed: ${r.message}` : r
   }
+  return tasks
+    .map((t, i) => {
+      const r = results[i]
+      const body = r instanceof Error ? `(failed: ${r.message})` : r
+      return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
+    })
+    .join('\n\n')
 }
 
 async function handleViewImage(
