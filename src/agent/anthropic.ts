@@ -116,10 +116,12 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
               messages: [{ role: 'user', content: task }],
               allowSubagent: false,
               onEvent: (e) => {
-                // Surface only the subagent's tool activity, indented; its
+                // Surface tool activity (indented) and usage; the subagent's
                 // text comes back as this tool's result.
                 if (e.type === 'tool') {
                   opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳ ${e.detail}` })
+                } else if (e.type === 'usage') {
+                  opts.onEvent(e)
                 }
               },
             })
@@ -156,7 +158,16 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
   )
 
   for await (const stream of runner) {
+    let input = 0
+    let output = 0
+    let cacheRead = 0
     for await (const event of stream) {
+      if (event.type === 'message_start') {
+        input = event.message.usage.input_tokens ?? 0
+        cacheRead = event.message.usage.cache_read_input_tokens ?? 0
+      } else if (event.type === 'message_delta') {
+        output = event.usage.output_tokens ?? output
+      }
       if (event.type !== 'content_block_delta') continue
       if (event.delta.type === 'text_delta') {
         opts.onEvent({ type: 'text', delta: event.delta.text })
@@ -164,6 +175,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
         opts.onEvent({ type: 'thinking', delta: event.delta.thinking })
       }
     }
+    if (input || output) opts.onEvent({ type: 'usage', input, output, cacheRead })
   }
 
   const final = await runner.done()

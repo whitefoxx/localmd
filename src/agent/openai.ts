@@ -109,6 +109,7 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
         messages: [{ role: 'system', content: opts.system }, ...history],
         tools,
         stream: true,
+        stream_options: { include_usage: true },
         ...(opts.profile.maxTokens ? { max_tokens: opts.profile.maxTokens } : {}),
       },
       { signal: opts.signal },
@@ -118,6 +119,20 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
     const calls: { id: string; name: string; args: string }[] = []
 
     for await (const chunk of stream) {
+      if (chunk.usage) {
+        const details = chunk.usage.prompt_tokens_details as
+          | { cached_tokens?: number }
+          | undefined
+        // DeepSeek reports cache hits in a vendor field.
+        const dsCache = (chunk.usage as { prompt_cache_hit_tokens?: number })
+          .prompt_cache_hit_tokens
+        opts.onEvent({
+          type: 'usage',
+          input: chunk.usage.prompt_tokens ?? 0,
+          output: chunk.usage.completion_tokens ?? 0,
+          cacheRead: details?.cached_tokens ?? dsCache ?? 0,
+        })
+      }
       const delta = chunk.choices[0]?.delta
       if (!delta) continue
       // Reasoning models (DeepSeek etc.) stream their chain of thought in a
@@ -214,10 +229,12 @@ async function handleSubagent(rawArgs: string, opts: OpenAITurnOptions): Promise
       messages: [{ role: 'user', content: task }],
       allowSubagent: false,
       onEvent: (e) => {
-        // Surface only the subagent's tool activity, indented; its text
+        // Surface tool activity (indented) and usage; the subagent's text
         // comes back as this tool's result.
         if (e.type === 'tool') {
           opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳ ${e.detail}` })
+        } else if (e.type === 'usage') {
+          opts.onEvent(e)
         }
       },
     })

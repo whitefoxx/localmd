@@ -91,6 +91,10 @@ function baseName(p: string): string {
   return p.slice(p.lastIndexOf('/') + 1)
 }
 
+function fmtTokens(n: number): string {
+  return n >= 10_000 ? `${(n / 1000).toFixed(0)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
 /* ── @-mention autocomplete ──────────────────────────────────────────────── */
 
 const caret = ref(0)
@@ -516,6 +520,12 @@ watch(
         <span class="text-xs text-fg-3 flex-1 truncate">
           {{ settingsStore.primary?.model || 'not configured' }}
           <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
+          <span
+            v-if="chat.sessionUsage.input || chat.sessionUsage.output"
+            :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
+          >
+            · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
+          </span>
         </span>
         <button v-if="chat.running" class="btn text-xs" @click="chat.stop()">
           <span class="codicon codicon-sm codicon-stop-circle mr-1" />Stop

@@ -42,11 +42,18 @@ export interface Attachment {
   image: boolean
 }
 
+export interface TokenUsage {
+  input: number
+  output: number
+  cacheRead: number
+}
+
 export interface UiMessage {
   id: number
   role: 'user' | 'assistant'
   parts: MessagePart[]
   attachments?: Attachment[]
+  usage?: TokenUsage
   error?: string
 }
 
@@ -282,6 +289,11 @@ export const useChatStore = defineStore('chat', () => {
       } else if (e.type === 'thinking') {
         if (last?.type === 'thinking') last.text += e.delta
         else parts.push({ type: 'thinking', text: e.delta })
+      } else if (e.type === 'usage') {
+        const u = (assistant.usage ??= { input: 0, output: 0, cacheRead: 0 })
+        u.input += e.input
+        u.output += e.output
+        u.cacheRead += e.cacheRead
       } else {
         parts.push({ type: 'tool', name: e.name, detail: e.detail })
       }
@@ -416,11 +428,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  /** Session-wide token totals (sum of every assistant message's usage). */
+  const sessionUsage = computed<TokenUsage>(() => {
+    const total = { input: 0, output: 0, cacheRead: 0 }
+    for (const m of messages.value) {
+      if (!m.usage) continue
+      total.input += m.usage.input
+      total.output += m.usage.output
+      total.cacheRead += m.usage.cacheRead
+    }
+    return total
+  })
+
   return {
     messages,
     sessions,
     running,
     historyOpen,
+    sessionUsage,
     currentSessionId: computed(() => current.value?.id ?? null),
     send,
     stop,
