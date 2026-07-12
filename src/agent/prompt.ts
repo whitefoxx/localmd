@@ -7,6 +7,7 @@
  */
 import * as fs from '@/lib/fs'
 import { listSkills } from '@/lib/skills'
+import { useMcpStore } from '@/stores/mcp'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools (list_files, read_file, write_file, search_files). All paths are relative to the KB root.
 
@@ -40,6 +41,18 @@ export async function buildSystemPrompt(): Promise<string> {
     prompt +=
       `\n\nSkills available in this knowledge base (reusable workflows). When a task matches one, call use_skill with its name and follow the loaded instructions. The user can also invoke one directly with /name:\n` +
       skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
+  }
+
+  // Delegation guidance appears only when a web_task bridge is connected.
+  const webTask = useMcpStore().allTools.find((t) => t.qualifiedName.endsWith('__web_task'))
+  if (webTask) {
+    prompt += `
+
+Web delegation (${webTask.qualifiedName}): this tool hands a task to a FULL browser agent (a Chrome extension with its own model) that can search the web, open pages, and operate websites.
+- Each call is a fresh session with NO memory of previous calls — write complete, self-contained task descriptions: include exact URLs, what to do, and precisely what to return.
+- Use it for anything requiring the live web: searches, reading pages, checking current facts, multi-step site operations. Never guess web content — delegate instead.
+- Each call runs a whole agent loop (slow, costs the user money): batch related needs into ONE task instead of many small calls, and don't delegate things your KB tools can do.
+- When capturing web content into the KB, ask it to return verbatim excerpts plus source URLs, then write the wiki page yourself with proper citations.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))
