@@ -14,7 +14,7 @@
 import { defineStore } from 'pinia'
 import { reactive, computed, watch } from 'vue'
 import { OPENAI_COMPAT_PRESETS } from '@/lib/providers'
-import type { McpServerConfig } from '@/lib/mcp'
+import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 
 export interface LlmProfile {
   id: string
@@ -73,31 +73,13 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   mcpServers: [],
 }
 
-function normalizeMcpServers(raw: unknown): McpServerConfig[] {
-  if (!Array.isArray(raw)) return []
-  const out: McpServerConfig[] = []
-  for (const s of raw) {
-    if (!s || typeof s !== 'object') continue
-    const ss = s as Record<string, unknown>
-    const url = String(ss.url ?? '')
-    if (!url) continue
-    out.push({
-      id: typeof ss.id === 'string' && ss.id ? ss.id : newProfileId(),
-      name: String(ss.name ?? 'server'),
-      url,
-      ...(ss.token ? { token: String(ss.token) } : {}),
-    })
-  }
-  return out
-}
-
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
   return {
     gitName: String(obj.gitName ?? ''),
     gitEmail: String(obj.gitEmail ?? ''),
     githubToken: String(obj.githubToken ?? ''),
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
-    mcpServers: normalizeMcpServers(obj.mcpServers),
+    mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
   }
 }
 

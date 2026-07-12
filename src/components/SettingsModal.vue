@@ -35,11 +35,16 @@ function removeMcpServer(id: string): void {
   store.state.mcpServers = store.state.mcpServers.filter((s) => s.id !== id)
 }
 
-function mcpStatus(id: string): { label: string; ok: boolean } {
-  const s = mcp.servers.find((x) => x.config.id === id)
-  if (!s || s.status === 'connecting') return { label: '连接中…', ok: false }
-  if (s.status === 'error') return { label: s.error?.slice(0, 60) ?? '连接失败', ok: false }
-  return { label: `${s.tools.length} 个工具`, ok: true }
+function toggleMcpServer(id: string): void {
+  const s = store.state.mcpServers.find((x) => x.id === id)
+  if (s) s.enabled = s.enabled === false ? true : false
+}
+
+function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: string } {
+  if (s.status === 'off') return { label: '已停用', cls: 'bg-fg-3' }
+  if (s.status === 'connecting') return { label: '连接中…', cls: 'bg-fg-3' }
+  if (s.status === 'error') return { label: s.error?.slice(0, 60) ?? '连接失败', cls: 'bg-removed' }
+  return { label: `${s.tools.length} 个工具`, cls: 'bg-added' }
 }
 
 function addProfile(): void {
@@ -228,19 +233,39 @@ function slotBadges(p: LlmProfile): string[] {
             <button class="ml-1 normal-case text-accent hover:underline" @click="mcp.refresh()">重连</button>
           </label>
           <div
-            v-for="s in store.state.mcpServers"
-            :key="s.id"
+            v-for="s in mcp.servers"
+            :key="s.config.id"
             class="flex items-center gap-2 px-2 py-1 rounded hover:bg-bg-2 text-xs"
           >
+            <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="mcpStatusLabel(s).cls" />
+            <span class="text-fg-1 shrink-0">{{ s.config.name }}</span>
             <span
-              class="w-1.5 h-1.5 rounded-full shrink-0"
-              :class="mcpStatus(s.id).ok ? 'bg-added' : 'bg-removed'"
-            />
-            <span class="text-fg-1 shrink-0">{{ s.name }}</span>
-            <span class="text-fg-3 truncate flex-1" :title="s.url">{{ mcpStatus(s.id).label }}</span>
-            <button class="text-fg-3 hover:text-removed shrink-0" title="删除" @click="removeMcpServer(s.id)">
-              <span class="codicon codicon-sm codicon-trash" />
-            </button>
+              v-if="s.source === 'kb'"
+              class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
+              title="来自知识库的 .agents/mcp.json — 编辑该文件修改"
+            >KB</span>
+            <span class="text-fg-3 truncate flex-1" :title="s.config.url">
+              {{ mcpStatusLabel(s).label }}
+            </span>
+            <template v-if="s.source === 'global'">
+              <button
+                class="text-fg-3 hover:text-fg-0 shrink-0"
+                :title="s.config.enabled === false ? '启用' : '停用(保留配置)'"
+                @click="toggleMcpServer(s.config.id)"
+              >
+                <span
+                  class="codicon codicon-sm"
+                  :class="s.config.enabled === false ? 'codicon-circle-slash' : 'codicon-pass'"
+                />
+              </button>
+              <button
+                class="text-fg-3 hover:text-removed shrink-0"
+                title="删除"
+                @click="removeMcpServer(s.config.id)"
+              >
+                <span class="codicon codicon-sm codicon-trash" />
+              </button>
+            </template>
           </div>
           <div class="grid grid-cols-[100px_1fr_100px_auto] gap-2 mt-1 mb-1">
             <input v-model="mcpName" class="input text-xs" placeholder="名称" />
@@ -249,7 +274,9 @@ function slotBadges(p: LlmProfile): string[] {
             <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="addMcpServer">添加</button>
           </div>
           <p class="text-xs text-fg-3 mb-4">
-            服务器必须允许浏览器 CORS。连接成功后其工具以 mcp__名称__工具 出现在 agent
+            服务器必须允许浏览器 CORS;URL 栏填 32 位 Chrome 扩展 ID 则走扩展桥接。这里是
+            全局配置;知识库还可以自带 <code>.agents/mcp.json</code>(随 git 走,重复目标以
+            KB 为准,token 建议只放这里不放文件)。工具以 mcp__名称__工具 出现在 agent
             工具列表;外部工具的结果按不可信数据处理。
           </p>
 

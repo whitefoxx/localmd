@@ -12,9 +12,12 @@ export interface McpServerConfig {
   id: string
   /** Short name used in tool namespacing — sanitized to [a-z0-9-]. */
   name: string
+  /** HTTP endpoint, or a 32-char Chrome extension ID (Port transport). */
   url: string
   /** Optional bearer token. */
   token?: string
+  /** false = keep the config but don't connect (default true). */
+  enabled?: boolean
 }
 
 export interface McpToolDef {
@@ -293,4 +296,48 @@ export class McpExtensionClient implements McpClientLike {
     }
     return flattenToolResult(result ?? {})
   }
+}
+
+/* ── config parsing & merging (global Settings + KB .agents/mcp.json) ────── */
+
+/** KB-level config file: tool-neutral location, travels with the KB via git. */
+export const KB_MCP_CONFIG_PATH = '.agents/mcp.json'
+
+/** Parse a raw server list (from Settings storage or the KB file). Invalid
+ *  entries are dropped; `enabled` defaults to true. `makeId` supplies stable
+ *  ids for entries that lack one (KB entries derive from name+url). */
+export function normalizeMcpServerList(
+  raw: unknown,
+  makeId: (s: { name: string; url: string }) => string,
+): McpServerConfig[] {
+  if (!Array.isArray(raw)) return []
+  const out: McpServerConfig[] = []
+  for (const s of raw) {
+    if (!s || typeof s !== 'object') continue
+    const ss = s as Record<string, unknown>
+    const url = String(ss.url ?? '').trim()
+    if (!url) continue
+    const name = String(ss.name ?? 'server')
+    out.push({
+      id: typeof ss.id === 'string' && ss.id ? ss.id : makeId({ name, url }),
+      name,
+      url,
+      ...(ss.token ? { token: String(ss.token) } : {}),
+      ...(ss.enabled === false ? { enabled: false } : {}),
+    })
+  }
+  return out
+}
+
+/** Merge global + KB server lists. Duplicate targets (same url/extension id)
+ *  keep the KB entry — the KB is the more specific scope. */
+export function mergeMcpConfigs(
+  global: McpServerConfig[],
+  kb: McpServerConfig[],
+): Array<McpServerConfig & { source: 'global' | 'kb' }> {
+  const kbUrls = new Set(kb.map((s) => s.url))
+  return [
+    ...kb.map((s) => ({ ...s, source: 'kb' as const })),
+    ...global.filter((s) => !kbUrls.has(s.url)).map((s) => ({ ...s, source: 'global' as const })),
+  ]
 }

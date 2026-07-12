@@ -1,9 +1,11 @@
 /**
- * External tool sources — remote MCP servers (Streamable HTTP) registered in
- * Settings. Each connected server contributes namespaced tools
- * (mcp__<server>__<tool>) that both agent providers append to their tool
- * lists. Designed so other transports (e.g. a Chrome-extension bridge like
- * web-agent) can slot in later as additional source types.
+ * External tool sources — MCP servers from TWO config scopes, merged:
+ *   - global: Settings (localStorage, follows the browser)
+ *   - KB-level: `.agents/mcp.json` in the opened folder (travels with the KB
+ *     via git; duplicate targets override global — the KB is more specific)
+ * Transports: Streamable HTTP, or a chrome.runtime Port when the url field is
+ * a 32-char extension ID. Connected servers contribute namespaced tools
+ * (mcp__<server>__<tool>) that both agent providers append per turn.
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
@@ -13,15 +15,21 @@ import {
   isExtensionId,
   externalToolName,
   sanitizeServerName,
+  normalizeMcpServerList,
+  mergeMcpConfigs,
+  KB_MCP_CONFIG_PATH,
   type McpClientLike,
   type McpServerConfig,
   type McpToolDef,
 } from '@/lib/mcp'
 import { useSettingsStore } from '@/stores/settings'
+import { useKbStore } from '@/stores/kb'
+import * as fs from '@/lib/fs'
 
 export interface McpServerState {
   config: McpServerConfig
-  status: 'connecting' | 'ok' | 'error'
+  source: 'global' | 'kb'
+  status: 'connecting' | 'ok' | 'error' | 'off'
   error?: string
   tools: McpToolDef[]
 }
@@ -32,6 +40,17 @@ export interface ExternalTool {
   serverId: string
   serverName: string
   def: McpToolDef
+}
+
+async function loadKbServers(): Promise<McpServerConfig[]> {
+  const raw = await fs.tryReadFile(KB_MCP_CONFIG_PATH)
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as { servers?: unknown }
+    return normalizeMcpServerList(parsed.servers, (s) => `kb:${s.name}:${s.url}`)
+  } catch {
+    return [] // malformed file — surfaced implicitly (no kb servers appear)
+  }
 }
 
 export const useMcpStore = defineStore('mcp', () => {
@@ -53,11 +72,21 @@ export const useMcpStore = defineStore('mcp', () => {
 
   async function refresh(): Promise<void> {
     const settings = useSettingsStore()
-    const configs = settings.state.mcpServers
+    const kb = useKbStore()
+    const kbServers = kb.isOpen ? await loadKbServers() : []
+    const merged = mergeMcpConfigs(settings.state.mcpServers, kbServers)
+
     clients.clear()
-    servers.value = configs.map((config) => ({ config, status: 'connecting', tools: [] }))
+    servers.value = merged.map(({ source, ...config }) => ({
+      config,
+      source,
+      status: config.enabled === false ? 'off' : 'connecting',
+      tools: [],
+    }))
     await Promise.all(
-      configs.map(async (config, i) => {
+      servers.value.map(async (state, i) => {
+        if (state.status === 'off') return
+        const config = state.config
         // A Chrome extension ID in the url field selects the Port transport
         // (web-agent bridge); anything else is a Streamable-HTTP endpoint.
         const client: McpClientLike = isExtensionId(config.url)
@@ -66,9 +95,14 @@ export const useMcpStore = defineStore('mcp', () => {
         clients.set(config.id, client)
         try {
           const tools = await client.connect()
-          servers.value[i] = { config, status: 'ok', tools }
+          servers.value[i] = { ...servers.value[i], status: 'ok', tools }
         } catch (err) {
-          servers.value[i] = { config, status: 'error', error: (err as Error).message, tools: [] }
+          servers.value[i] = {
+            ...servers.value[i],
+            status: 'error',
+            error: (err as Error).message,
+            tools: [],
+          }
         }
       }),
     )
@@ -85,10 +119,11 @@ export const useMcpStore = defineStore('mcp', () => {
     return client.callTool(tool, args, signal)
   }
 
-  // Reconnect when the configured server list changes (incl. app start).
+  // Reconnect when the global config or the opened KB changes.
   const settings = useSettingsStore()
+  const kb = useKbStore()
   watch(
-    () => JSON.stringify(settings.state.mcpServers),
+    () => [JSON.stringify(settings.state.mcpServers), kb.name] as const,
     () => void refresh(),
     { immediate: true },
   )

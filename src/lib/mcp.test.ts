@@ -6,6 +6,8 @@ import {
   parseSseResponse,
   flattenToolResult,
   isExtensionId,
+  normalizeMcpServerList,
+  mergeMcpConfigs,
 } from './mcp'
 
 describe('tool namespacing', () => {
@@ -70,5 +72,42 @@ describe('isExtensionId', () => {
     expect(isExtensionId('http://localhost:8901/mcp')).toBe(false)
     expect(isExtensionId('lggfijacmifhgidnjeicdffpgkjhpnl')).toBe(false) // 31 chars
     expect(isExtensionId('zggfijacmifhgidnjeicdffpgkjhpnla')).toBe(false) // z not in a-p
+  })
+})
+
+describe('normalizeMcpServerList', () => {
+  const makeId = (s: { name: string; url: string }) => `kb:${s.name}:${s.url}`
+  it('parses valid entries, defaults enabled, drops garbage', () => {
+    const out = normalizeMcpServerList(
+      [
+        { name: 'a', url: 'https://x/mcp' },
+        { name: 'b', url: 'https://y/mcp', enabled: false, token: 't' },
+        { url: '' },
+        'junk',
+        null,
+      ],
+      makeId,
+    )
+    expect(out).toHaveLength(2)
+    expect(out[0]).toEqual({ id: 'kb:a:https://x/mcp', name: 'a', url: 'https://x/mcp' })
+    expect(out[1].enabled).toBe(false)
+    expect(out[1].token).toBe('t')
+  })
+  it('returns empty for non-arrays', () => {
+    expect(normalizeMcpServerList({ servers: [] }, makeId)).toEqual([])
+    expect(normalizeMcpServerList(undefined, makeId)).toEqual([])
+  })
+})
+
+describe('mergeMcpConfigs', () => {
+  it('KB entries win on duplicate targets; sources are tagged', () => {
+    const merged = mergeMcpConfigs(
+      [
+        { id: 'g1', name: 'shared', url: 'https://same/mcp' },
+        { id: 'g2', name: 'globalonly', url: 'https://g/mcp' },
+      ],
+      [{ id: 'k1', name: 'shared-kb', url: 'https://same/mcp' }],
+    )
+    expect(merged.map((s) => `${s.source}:${s.id}`)).toEqual(['kb:k1', 'global:g2'])
   })
 })
