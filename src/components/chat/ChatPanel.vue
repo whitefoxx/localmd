@@ -258,7 +258,17 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   if (rel) await files.openFile(rel)
 }
 
-// Keep the transcript pinned to the bottom while streaming.
+// Keep the transcript pinned to the bottom while streaming — but ONLY while
+// the user is already there. Scrolling up detaches (so they can read during
+// a stream); scrolling back near the bottom re-attaches.
+const autoFollow = ref(true)
+
+function onTranscriptScroll(): void {
+  const el = scroller.value
+  if (!el) return
+  autoFollow.value = el.scrollHeight - el.scrollTop - el.clientHeight < 60
+}
+
 watch(
   () =>
     chat.messages
@@ -268,6 +278,17 @@ watch(
       })
       .join(),
   async () => {
+    if (!autoFollow.value) return
+    await nextTick()
+    scroller.value?.scrollTo({ top: scroller.value.scrollHeight })
+  },
+)
+
+// A new user message always jumps to the bottom (they just sent it).
+watch(
+  () => chat.messages.length,
+  async () => {
+    autoFollow.value = true
     await nextTick()
     scroller.value?.scrollTo({ top: scroller.value.scrollHeight })
   },
@@ -322,7 +343,7 @@ watch(
     </div>
 
     <!-- Transcript -->
-    <div ref="scroller" class="flex-1 panel-scroll px-3 py-3 space-y-4">
+    <div ref="scroller" class="flex-1 panel-scroll px-3 py-3 space-y-4" @scroll.passive="onTranscriptScroll">
       <div v-if="!chat.messages.length" class="text-xs text-fg-3 leading-relaxed">
         Ask questions about your knowledge base, or let the agent maintain it. It can list, read,
         search, index and write files in the opened folder — writes appear in the review panel.

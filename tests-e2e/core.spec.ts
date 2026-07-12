@@ -51,3 +51,22 @@ test('plan tool renders the checklist card', async ({ page }) => {
   await expect(page.getByText('第三步')).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('2/3', { exact: true })).toBeVisible()
 })
+
+test('scrolling up during a stream detaches auto-follow', async ({ page }) => {
+  await page.getByRole('button', { name: /初始化知识库/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('echo ' + '前置内容。'.repeat(80))
+  await input.press('Enter')
+  await expect(page.getByRole('button', { name: /Send/ })).toBeVisible({ timeout: 10_000 })
+  await input.fill('echo ' + '长流式输出。'.repeat(400))
+  await input.press('Enter')
+  await page.waitForTimeout(500) // stream underway
+  const scroller = page.locator('.panel-scroll', { hasText: '前置内容' }).first()
+  await scroller.evaluate((el) => {
+    el.scrollTop = 0
+    el.dispatchEvent(new Event('scroll'))
+  })
+  await page.waitForTimeout(1200) // stream keeps growing meanwhile
+  const top = await scroller.evaluate((el) => el.scrollTop)
+  expect(top).toBeLessThan(50) // not yanked back to the bottom
+})
