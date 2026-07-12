@@ -223,9 +223,18 @@ function slotBadges(p: LlmProfile): string[] {
             <option value="auto">直接写入（事后在 Review 面板审查/回退）</option>
             <option value="ask">先询问（每次写入暂停，等我批准）</option>
           </select>
-          <p class="text-xs text-fg-3 mb-4">
+          <p class="text-xs text-fg-3 mb-1">
             先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
             Approve 或 Reject。
+          </p>
+          <select v-model="store.state.checkpointMode" class="input mb-1">
+            <option value="off">回合 checkpoint:关闭</option>
+            <option value="auto">回合 checkpoint:自动(每个有写入的回合自动 commit)</option>
+          </select>
+          <p class="text-xs text-fg-3 mb-4">
+            开启后(需 KB 为 git 仓库)，agent 每个写过文件的回合会把这些文件提交为
+            "checkpoint: …"，Git 面板的提交历史上可一键回滚该回合。只提交 agent
+            改的文件，不会卷入你自己的未提交改动。
           </p>
 
           <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1 mt-1">

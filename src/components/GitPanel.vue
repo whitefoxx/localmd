@@ -191,8 +191,23 @@ function fmtTime(ms: number): string {
             <template v-else>
               <div class="px-3 py-2 text-xs uppercase tracking-wide text-fg-3 shrink-0">Recent commits</div>
               <div class="flex-1 panel-scroll">
-                <div v-for="e in git.log" :key="e.oid" class="px-3 py-1.5 border-b border-border/40">
-                  <div class="text-sm text-fg-1 truncate">{{ e.message }}</div>
+                <div
+                  v-for="e in git.log"
+                  :key="e.oid"
+                  class="group px-3 py-1.5 border-b border-border/40"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="text-sm text-fg-1 truncate flex-1">{{ e.message }}</div>
+                    <button
+                      v-if="e.message.startsWith('checkpoint:')"
+                      class="btn text-xs opacity-0 group-hover:opacity-100 shrink-0"
+                      :disabled="!!git.busy"
+                      title="把该回合改动的文件还原到回合之前(不动其他文件,结果留在工作区待确认)"
+                      @click="git.revertCheckpoint(e.oid)"
+                    >
+                      回滚
+                    </button>
+                  </div>
                   <div class="text-xs text-fg-3">
                     <span class="font-mono">{{ e.oid.slice(0, 7) }}</span> · {{ e.author }} · {{ fmtTime(e.when) }}
                   </div>

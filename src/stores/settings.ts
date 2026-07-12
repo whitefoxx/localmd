@@ -44,6 +44,10 @@ export interface SettingsState {
   /** auto: agent writes land immediately (reviewable after the fact).
    *  ask: every write/edit pauses until approved in the review panel. */
   writeMode: 'auto' | 'ask'
+  /** auto: after each agent turn that wrote files (KB must be a git repo),
+   *  commit those paths as "checkpoint: …" — one-click revert in the Git
+   *  panel. off: no automatic commits (default). */
+  checkpointMode: 'off' | 'auto'
   /** Remote MCP servers (Streamable HTTP; must allow browser CORS). */
   mcpServers: McpServerConfig[]
 }
@@ -70,6 +74,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   gitEmail: '',
   githubToken: '',
   writeMode: 'auto',
+  checkpointMode: 'off',
   mcpServers: [],
 }
 
@@ -79,6 +84,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     gitEmail: String(obj.gitEmail ?? ''),
     githubToken: String(obj.githubToken ?? ''),
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
+    checkpointMode: obj.checkpointMode === 'auto' ? 'auto' : 'off',
     mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
   }
 }

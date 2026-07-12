@@ -31,7 +31,15 @@ export const useReviewStore = defineStore('review', () => {
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
 
+  /** Paths written during the CURRENT agent turn (for git checkpoints). */
+  const turnWrites = ref<Set<string>>(new Set())
+
+  function beginTurn(): void {
+    turnWrites.value = new Set()
+  }
+
   function recordWrite(path: string, before: string | null, after: string): void {
+    turnWrites.value.add(path)
     const existing = pending.value.get(path)
     if (existing) {
       existing.after = after // keep the original `before` snapshot
@@ -120,6 +128,8 @@ export const useReviewStore = defineStore('review', () => {
     panelOpen,
     changes,
     count,
+    turnWrites,
+    beginTurn,
     recordWrite,
     askApproval,
     decide,

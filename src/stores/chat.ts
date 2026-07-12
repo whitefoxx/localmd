@@ -6,6 +6,8 @@ import { useFilesStore } from '@/stores/files'
 import { useReviewStore } from '@/stores/review'
 import { usePlanStore } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
+import { useGitStore } from '@/stores/git'
+import * as g from '@/lib/git'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
@@ -313,6 +315,7 @@ export const useChatStore = defineStore('chat', () => {
 
     running.value = true
     controller = new AbortController()
+    useReviewStore().beginTurn() // collect this turn's writes for checkpointing
     try {
       const system = await buildSystemPrompt()
       // Inline images: load bytes fresh from the KB at send time.
@@ -437,6 +440,36 @@ export const useChatStore = defineStore('chat', () => {
       running.value = false
       controller = null
       void persist()
+      void checkpoint(trimmed, assistant)
+    }
+  }
+
+  /** Auto-commit this turn's agent writes as a revertable checkpoint. */
+  async function checkpoint(userText: string, assistant: UiMessage): Promise<void> {
+    const settings = useSettingsStore()
+    if (settings.state.checkpointMode !== 'auto') return
+    const written = [...useReviewStore().turnWrites]
+    if (!written.length) return
+    try {
+      if (!(await g.isRepo())) return
+      const changes = (await g.changedFiles()).filter(
+        (c) => written.includes(c.path) && !c.oversized,
+      )
+      if (!changes.length) return
+      const author = await g.resolveAuthor({
+        name: settings.state.gitName || 'browser-md',
+        email: settings.state.gitEmail || 'browser-md@local',
+      })
+      const summary = userText.replace(/\s+/g, ' ').slice(0, 50) || 'agent edits'
+      const oid = await g.commitPaths(changes, `checkpoint: ${summary}`, author)
+      assistant.parts.push({
+        type: 'tool',
+        name: 'checkpoint',
+        detail: `checkpoint ${oid.slice(0, 7)} (${changes.length} file(s))`,
+      })
+      void useGitStore().refresh()
+    } catch {
+      /* checkpoint failures must never break the turn */
     }
   }
 

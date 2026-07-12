@@ -82,6 +82,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       gitEmail: '',
       githubToken: '',
       writeMode: 'auto',
+      checkpointMode: 'off',
       mcpServers: [],
     }
     expect(normalizeSettings(null)).toEqual(empty)
