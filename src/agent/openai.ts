@@ -121,51 +121,70 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
   const history: ChatMessage[] = [...opts.messages]
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const stream = await client.chat.completions.create(
-      {
-        model: opts.profile.model,
-        messages: [{ role: 'system', content: opts.system }, ...history],
-        tools: requestTools(),
-        stream: true,
-        stream_options: { include_usage: true },
-        ...(opts.profile.maxTokens ? { max_tokens: opts.profile.maxTokens } : {}),
-      },
-      { signal: opts.signal },
-    )
-
     let text = ''
     const calls: { id: string; name: string; args: string }[] = []
 
-    for await (const chunk of stream) {
-      if (chunk.usage) {
-        const details = chunk.usage.prompt_tokens_details as
-          | { cached_tokens?: number }
-          | undefined
-        // DeepSeek reports cache hits in a vendor field.
-        const dsCache = (chunk.usage as { prompt_cache_hit_tokens?: number })
-          .prompt_cache_hit_tokens
-        opts.onEvent({
-          type: 'usage',
-          input: chunk.usage.prompt_tokens ?? 0,
-          output: chunk.usage.completion_tokens ?? 0,
-          cacheRead: details?.cached_tokens ?? dsCache ?? 0,
-        })
-      }
-      const delta = chunk.choices[0]?.delta
-      if (!delta) continue
-      // Reasoning models (DeepSeek etc.) stream their chain of thought in a
-      // vendor field — surface it, but never send it back in history.
-      const reasoning = (delta as { reasoning_content?: string | null }).reasoning_content
-      if (reasoning) opts.onEvent({ type: 'thinking', delta: reasoning })
-      if (delta.content) {
-        text += delta.content
-        opts.onEvent({ type: 'text', delta: delta.content })
-      }
-      for (const tc of delta.tool_calls ?? []) {
-        const slot = (calls[tc.index] ??= { id: '', name: '', args: '' })
-        if (tc.id) slot.id = tc.id
-        if (tc.function?.name) slot.name = tc.function.name
-        if (tc.function?.arguments) slot.args += tc.function.arguments
+    // The SDK already retries failures BEFORE the stream opens; this loop
+    // additionally retries a MID-STREAM drop, but only when nothing has been
+    // emitted to the UI yet (a clean retry — no duplicated output).
+    for (let attempt = 0; ; attempt++) {
+      let emitted = false
+      try {
+        const stream = await client.chat.completions.create(
+          {
+            model: opts.profile.model,
+            messages: [{ role: 'system', content: opts.system }, ...history],
+            tools: requestTools(),
+            stream: true,
+            stream_options: { include_usage: true },
+            ...(opts.profile.maxTokens ? { max_tokens: opts.profile.maxTokens } : {}),
+          },
+          { signal: opts.signal },
+        )
+
+        for await (const chunk of stream) {
+          if (chunk.usage) {
+            const details = chunk.usage.prompt_tokens_details as
+              | { cached_tokens?: number }
+              | undefined
+            // DeepSeek reports cache hits in a vendor field.
+            const dsCache = (chunk.usage as { prompt_cache_hit_tokens?: number })
+              .prompt_cache_hit_tokens
+            opts.onEvent({
+              type: 'usage',
+              input: chunk.usage.prompt_tokens ?? 0,
+              output: chunk.usage.completion_tokens ?? 0,
+              cacheRead: details?.cached_tokens ?? dsCache ?? 0,
+            })
+          }
+          const delta = chunk.choices[0]?.delta
+          if (!delta) continue
+          // Reasoning models (DeepSeek etc.) stream their chain of thought in
+          // a vendor field — surface it, but never send it back in history.
+          const reasoning = (delta as { reasoning_content?: string | null }).reasoning_content
+          if (reasoning) {
+            emitted = true
+            opts.onEvent({ type: 'thinking', delta: reasoning })
+          }
+          if (delta.content) {
+            emitted = true
+            text += delta.content
+            opts.onEvent({ type: 'text', delta: delta.content })
+          }
+          for (const tc of delta.tool_calls ?? []) {
+            emitted = true
+            const slot = (calls[tc.index] ??= { id: '', name: '', args: '' })
+            if (tc.id) slot.id = tc.id
+            if (tc.function?.name) slot.name = tc.function.name
+            if (tc.function?.arguments) slot.args += tc.function.arguments
+          }
+        }
+        break // stream completed
+      } catch (err) {
+        const aborted =
+          (err as Error).name === 'AbortError' || (err as Error).name === 'APIUserAbortError'
+        if (aborted || emitted || attempt >= 1) throw err
+        await new Promise((r) => setTimeout(r, 1500))
       }
     }
 

@@ -121,6 +121,7 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 - URL 栏填 **32 位 Chrome 扩展 ID** 时自动改走扩展 Port 传输（`externally_connectable`）——这是 web-agent 桥接的接法：配置 web-agent 的扩展 ID 后，agent 获得 `mcp__webagent__web_task` 工具，可把整个网页浏览任务委托给 web-agent 的 agent 引擎执行。通信原理详见 [docs/web-agent-bridge.md](docs/web-agent-bridge.md)
 - 外部工具的**结果按不可信数据处理**——系统提示词明确要求 agent 不执行结果中内嵌的指令、不主动把 KB 内容发给外部工具
 - `scripts/mcp-test-server.mjs` 提供一个本地测试 server（add/echo 两个工具），`node scripts/mcp-test-server.mjs` 后在 Settings 添加 `http://localhost:8901/mcp` 即可试用
+- 已验证可直连的真实公共 server：DeepWiki（`https://mcp.deepwiki.com/mcp`，问答任意 GitHub 仓库）、Context7（`https://mcp.context7.com/mcp`，查库文档）——加 URL 即用
 
 ## Git 与 GitHub 同步
 
