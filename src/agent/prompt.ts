@@ -43,16 +43,22 @@ export async function buildSystemPrompt(): Promise<string> {
       skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
   }
 
-  // Delegation guidance appears only when a web_task bridge is connected.
-  const webTask = useMcpStore().allTools.find((t) => t.qualifiedName.endsWith('__web_task'))
-  if (webTask) {
+  // Browser-bridge guidance appears only when the tools are connected.
+  const mcpTools = useMcpStore().allTools
+  const webTask = mcpTools.find((t) => t.qualifiedName.endsWith('__web_task'))
+  const hasGeneric = mcpTools.some((t) => t.qualifiedName.includes('__generic__'))
+  if (webTask || hasGeneric) {
     prompt += `
 
-Web delegation (${webTask.qualifiedName}): this tool hands a task to a FULL browser agent (a Chrome extension with its own model) that can search the web, open pages, and operate websites.
-- Each call is a fresh session with NO memory of previous calls — write complete, self-contained task descriptions: include exact URLs, what to do, and precisely what to return.
-- Use it for anything requiring the live web: searches, reading pages, checking current facts, multi-step site operations. Never guess web content — delegate instead.
-- Each call runs a whole agent loop (slow, costs the user money): batch related needs into ONE task instead of many small calls, and don't delegate things your KB tools can do.
-- When capturing web content into the KB, ask it to return verbatim excerpts plus source URLs, then write the wiki page yourself with proper citations.`
+Browser access: never guess live web content — use the connected browser tools. Two modes; pick per step:`
+    if (hasGeneric) {
+      prompt += `
+- DIRECT (mcp__*__generic__* tools): you drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Prefer this for precise, short, or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Results come back word-for-word with no model in between. Screenshot-type tools return images (need vision).`
+    }
+    if (webTask) {
+      prompt += `
+- DELEGATE (${webTask.qualifiedName}): hands a whole errand to a browser agent with its own model. Each call is a fresh session with NO memory — write complete, self-contained descriptions (URLs, steps, exactly what to return). Prefer this for long multi-step errands (research a topic, operate an unfamiliar site) where step-by-step driving would flood your context. It's slow and costs money: batch related needs into ONE task, and ask for verbatim excerpts + source URLs when capturing into the KB.`
+    }
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))
