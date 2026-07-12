@@ -25,7 +25,7 @@ import {
   renderOpenAITranscript,
   compactedPrefix,
 } from '@/lib/history'
-import { summarize as summarizeHistory } from '@/agent/summarize'
+import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
 import { loadSkill } from '@/lib/skills'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
@@ -455,6 +455,29 @@ export const useChatStore = defineStore('chat', () => {
       controller = null
       void persist()
       void checkpoint(trimmed, assistant)
+      void autoTitle(session, trimmed, assistant)
+    }
+  }
+
+  /** After the FIRST exchange, replace the sliced-text title with a short
+   *  model-generated one (fire-and-forget; failures keep the fallback). */
+  async function autoTitle(
+    session: ChatSession,
+    userText: string,
+    assistant: UiMessage,
+  ): Promise<void> {
+    if (session.uiMessages.length > 2) return // only the first turn
+    const settings = useSettingsStore()
+    if (!settings.primary) return
+    const reply = assistant.parts
+      .filter((p) => p.type === 'text')
+      .map((p) => p.text)
+      .join(' ')
+    if (!reply) return
+    const title = await generateTitle(settings.primary, userText, reply)
+    if (title && current.value === session) {
+      session.title = title
+      void persist()
     }
   }
 

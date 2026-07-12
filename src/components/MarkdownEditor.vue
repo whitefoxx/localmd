@@ -6,6 +6,11 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import {
+  autocompletion,
+  type CompletionContext,
+  type CompletionResult,
+} from '@codemirror/autocomplete'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -22,6 +27,32 @@ function themeExt() {
   return theme.isDark ? oneDark : syntaxHighlighting(defaultHighlightStyle)
 }
 
+/** [[ triggers wikilink completion over the KB's markdown files: stems for
+ *  wiki-style targets, full paths as secondary matches. Inserts the closing
+ *  ]] unless auto-close already put one after the cursor. */
+function wikilinkCompletions(context: CompletionContext): CompletionResult | null {
+  const before = context.matchBefore(/\[\[([^\][\n]*)$/)
+  if (!before) return null
+  const from = before.from + 2 // after the [[
+  const closed = context.state.sliceDoc(context.pos, context.pos + 2) === ']]'
+  const seen = new Set<string>()
+  const options = files.mdFiles.flatMap((path) => {
+    const stem = path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/i, '')
+    const target = path.replace(/\.md$/i, '')
+    const out = []
+    if (!seen.has(stem)) {
+      seen.add(stem)
+      out.push({ label: stem, detail: path, apply: closed ? stem : `${stem}]]` })
+    }
+    if (target !== stem && !seen.has(target)) {
+      seen.add(target)
+      out.push({ label: target, apply: closed ? target : `${target}]]`, boost: -1 })
+    }
+    return out
+  })
+  return { from, options, validFor: /^[^\][\n]*$/ }
+}
+
 function createView(): void {
   view = new EditorView({
     parent: host.value!,
@@ -33,6 +64,7 @@ function createView(): void {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         markdown({ base: markdownLanguage, codeLanguages: languages }),
+        autocompletion({ override: [wikilinkCompletions], icons: false }),
         EditorView.lineWrapping,
         themeCompartment.of(themeExt()),
         EditorView.updateListener.of((u) => {
