@@ -207,7 +207,18 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       } else {
         const spec = TOOLS.find((t) => t.name === call.name)
         if (!spec) {
-          result = `Error: unknown tool ${call.name}`
+          // Self-healing for deferred tools: the model called one directly by
+          // its catalog name — activate it and ask for a retry (its arguments
+          // were guessed without the schema, so we don't execute them).
+          const { useMcpStore } = await import('@/stores/mcp')
+          const mcp = useMcpStore()
+          if (mcp.deferredTools.some((t) => t.qualifiedName === call.name)) {
+            mcp.activate([call.name])
+            opts.onEvent({ type: 'tool', name: 'enable_tools', detail: `auto-enable ${call.name}` })
+            result = `${call.name} was deferred and is NOW ENABLED with its full schema. Check the schema and call it again.`
+          } else {
+            result = `Error: unknown tool ${call.name}`
+          }
         } else {
           try {
             const args = JSON.parse(call.args || '{}')
