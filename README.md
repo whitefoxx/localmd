@@ -24,6 +24,10 @@ browser-md 是 [trace-app](../trace-app)（Electron 桌面版 AI 知识库）的
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # 产物在 dist/，纯静态，可部署到任何支持 https 的托管
+npm test           # 单元测试(vitest)
+npm run test:e2e   # 端到端测试(Playwright,用系统 Chrome):
+                   # ?e2e=1 启动内存文件系统 + mock LLM provider,
+                   # 覆盖 脚手架/流式聊天/写入审查/计划卡片,无需 key 无网络
 ```
 
 **浏览器要求**：Chrome / Edge（`showDirectoryPicker` 目前仅 Chromium 系支持）。生产部署需 https（File System Access API 要求 secure context）。

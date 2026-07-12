@@ -101,6 +101,7 @@ export const useKbStore = defineStore('kb', () => {
     refreshRecents,
     pickAndOpen,
     openRecent,
+    openHandle, // used by the E2E bootstrap (memory-fs handle)
     close,
   }
 })

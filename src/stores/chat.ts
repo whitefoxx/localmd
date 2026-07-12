@@ -11,6 +11,7 @@ import * as g from '@/lib/git'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
+import { runMockTurn } from '@/agent/mock'
 import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
 import {
@@ -237,7 +238,12 @@ export const useChatStore = defineStore('chat', () => {
     const primary = settings.primary
     if (!primary) return
 
-    const providerKind = primary.provider === 'anthropic' ? 'anthropic' : 'openai'
+    const providerKind =
+      primary.provider === 'anthropic'
+        ? 'anthropic'
+        : primary.provider === 'mock'
+          ? 'mock'
+          : 'openai'
 
     if (!current.value) {
       current.value = {
@@ -325,7 +331,15 @@ export const useChatStore = defineStore('chat', () => {
           )
         : []
 
-      if (providerKind === 'anthropic') {
+      if (providerKind === 'mock') {
+        // E2E test provider: deterministic scripted turns, no network.
+        session.openaiHistory = await runMockTurn({
+          system,
+          messages: [...session.openaiHistory, { role: 'user', content: modelText }],
+          onEvent,
+          signal: controller.signal,
+        })
+      } else if (providerKind === 'anthropic') {
         // Old turns' large tool results/images become stubs before replay.
         session.anthropicHistory = trimAnthropicHistory(session.anthropicHistory)
         // Still huge after trimming → replace the old prefix with a summary.

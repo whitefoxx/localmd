@@ -193,7 +193,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function isConfigured(): boolean {
     const p = primary.value
-    return !!p && !!p.apiKey && !!p.model && (p.provider === 'anthropic' || !!p.baseUrl)
+    if (!p) return false
+    if (p.provider === 'mock') return true // E2E provider needs no credentials
+    return !!p.apiKey && !!p.model && (p.provider === 'anthropic' || !!p.baseUrl)
   }
 
   function upsertProfile(profile: LlmProfile): void {
