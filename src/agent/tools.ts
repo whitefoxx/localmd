@@ -223,6 +223,28 @@ const indexDocument = defineTool({
   },
 })
 
+const enableTools = defineTool({
+  name: 'enable_tools',
+  description:
+    'Activate deferred external tools before calling them. The system prompt lists deferred tools (name + summary) — their full schemas are loaded only on demand to save context. Pass the EXACT qualified names (e.g. ["mcp__webagent__generic__open_url"]); they become callable immediately.',
+  schema: z.object({
+    names: z.array(z.string()).min(1).describe('Qualified tool names from the deferred catalog'),
+  }),
+  describeCall: (a) => `enable ${a.names.length} tool(s)`,
+  run: async ({ names }) => {
+    const mcp = useMcpStore()
+    const accepted = mcp.activate(names)
+    const unknown = names.filter((n) => !accepted.includes(n))
+    if (!accepted.length) {
+      return `Error: no matching tools. Unknown: ${unknown.join(', ')}. Use exact names from the deferred-tools catalog in the system prompt.`
+    }
+    return (
+      `Enabled and now callable: ${accepted.join(', ')}.` +
+      (unknown.length ? ` Unknown (skipped): ${unknown.join(', ')}.` : '')
+    )
+  },
+})
+
 const useSkill = defineTool({
   name: 'use_skill',
   description:
@@ -421,11 +443,12 @@ export interface ExternalToolSpec {
   run: (args: Record<string, unknown>) => Promise<string>
 }
 
-/** Snapshot of currently-connected external tools; called per turn so newly
- *  configured servers appear without a reload. */
+/** Snapshot of currently-ACTIVE external tools (deferred ones stay out until
+ *  enable_tools activates them); called per request iteration so activation
+ *  takes effect within the same turn. */
 export function externalToolSpecs(): ExternalToolSpec[] {
   const mcp = useMcpStore()
-  return mcp.allTools.map((t) => ({
+  return mcp.activeTools.map((t) => ({
     name: t.qualifiedName,
     description: `[外部 MCP:${t.serverName}] ${t.def.description}`.slice(0, 1024),
     jsonSchema: t.def.inputSchema,
@@ -449,6 +472,7 @@ export const TOOLS: ToolSpec[] = [
   indexDocument,
   updatePlan,
   useSkill,
+  enableTools,
   gitStatus,
   gitDiff,
   gitLog,

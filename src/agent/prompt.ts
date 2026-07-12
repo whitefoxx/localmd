@@ -7,6 +7,7 @@
  */
 import * as fs from '@/lib/fs'
 import { listSkills } from '@/lib/skills'
+import { catalogEntry } from '@/lib/mcp'
 import { useMcpStore } from '@/stores/mcp'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools (list_files, read_file, write_file, search_files). All paths are relative to the KB root.
@@ -43,8 +44,17 @@ export async function buildSystemPrompt(): Promise<string> {
       skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
   }
 
+  // Deferred external tools: schemas stay out of the request until activated —
+  // the model sees this compact catalog and calls enable_tools on demand.
+  const mcpStore = useMcpStore()
+  if (mcpStore.deferredTools.length) {
+    prompt +=
+      `\n\nDeferred external tools — NOT yet callable. To use one, first call enable_tools with its exact name(s); it becomes callable immediately:\n` +
+      mcpStore.deferredTools.map((t) => catalogEntry(t.qualifiedName, t.def.description)).join('\n')
+  }
+
   // Browser-bridge guidance appears only when the tools are connected.
-  const mcpTools = useMcpStore().allTools
+  const mcpTools = mcpStore.allTools
   const webTask = mcpTools.find((t) => t.qualifiedName.endsWith('__web_task'))
   const hasGeneric = mcpTools.some((t) => t.qualifiedName.includes('__generic__'))
   if (webTask || hasGeneric) {
@@ -53,7 +63,7 @@ export async function buildSystemPrompt(): Promise<string> {
 Browser access: never guess live web content — use the connected browser tools. Two modes; pick per step:`
     if (hasGeneric) {
       prompt += `
-- DIRECT (mcp__*__generic__* tools): you drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Prefer this for precise, short, or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Results come back word-for-word with no model in between. Screenshot-type tools return images (need vision).`
+- DIRECT (mcp__*__generic__* tools): you drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Prefer this for precise, short, or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Results come back word-for-word with no model in between. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
     }
     if (webTask) {
       prompt += `

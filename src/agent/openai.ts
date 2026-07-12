@@ -80,13 +80,18 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       },
     })
   }
-  // Remote MCP tools — raw JSON schemas pass straight through.
-  const external = externalToolSpecs()
-  for (const ext of external) {
-    tools.push({
-      type: 'function',
-      function: { name: ext.name, description: ext.description, parameters: ext.jsonSchema },
-    })
+  // Remote MCP tools — raw JSON schemas pass straight through. Rebuilt per
+  // request iteration so enable_tools activation lands within the same turn.
+  let external = externalToolSpecs()
+  const requestTools = (): OpenAI.Chat.Completions.ChatCompletionTool[] => {
+    external = externalToolSpecs()
+    return [
+      ...tools,
+      ...external.map((ext) => ({
+        type: 'function' as const,
+        function: { name: ext.name, description: ext.description, parameters: ext.jsonSchema },
+      })),
+    ]
   }
 
   if (opts.allowSubagent) {
@@ -120,7 +125,7 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       {
         model: opts.profile.model,
         messages: [{ role: 'system', content: opts.system }, ...history],
-        tools,
+        tools: requestTools(),
         stream: true,
         stream_options: { include_usage: true },
         ...(opts.profile.maxTokens ? { max_tokens: opts.profile.maxTokens } : {}),

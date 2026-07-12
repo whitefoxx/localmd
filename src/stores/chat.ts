@@ -5,6 +5,7 @@ import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useReviewStore } from '@/stores/review'
 import { usePlanStore } from '@/stores/plan'
+import { useMcpStore } from '@/stores/mcp'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
@@ -117,6 +118,7 @@ export const useChatStore = defineStore('chat', () => {
     current.value = null
     historyOpen.value = false
     usePlanStore().clear()
+    useMcpStore().clearActivated() // deferred-tool activation is per-session
   }
 
   async function openSession(id: string): Promise<void> {
@@ -127,6 +129,7 @@ export const useChatStore = defineStore('chat', () => {
     nextId = Math.max(0, ...current.value.uiMessages.map((m) => m.id)) + 1
     historyOpen.value = false
     usePlanStore().clear()
+    useMcpStore().clearActivated()
   }
 
   async function removeSession(id: string): Promise<void> {

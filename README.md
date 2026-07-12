@@ -113,7 +113,9 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 | **KB 级工具** | 知识库里的 `.agents/mcp.json`（随 git 走） | 这个库特有的服务；格式 `{"servers":[{"name","url","token"?,"enabled"?}]}`；与全局重复的目标以 KB 为准 |
 | **用法知识** | `.agents/skills/`（技能） | "什么任务用什么工具、怎么措辞"的流程沉淀 |
 
-每个条目支持 `enabled: false` 停用（保留配置）；Settings 里全局条目有停用/删除按钮，KB 条目显示 KB 徽章（编辑文件修改）。连接成功后工具以 `mcp__<名称>__<工具>` 出现在 agent 的工具列表，两个 provider 通用。约束与安全：
+每个条目支持 `enabled: false` 停用（保留配置）；Settings 里全局条目有停用/删除按钮，KB 条目显示 KB 徽章（编辑文件修改）。连接成功后工具以 `mcp__<名称>__<工具>` 出现在 agent 的工具列表，两个 provider 通用。
+
+**延迟加载（token 控制）**：工具数超过 8 的服务器，其工具 schema 默认不随请求发送——系统提示词只带一行一个的紧凑目录（约省 80%），agent 需要时调 `enable_tools` 按名激活，**当轮立即可用**（OpenAI 路径逐轮重建工具列表；Anthropic 路径经 `setMessagesParams` 热更新）。激活按会话计，新会话重置。`web_task` 类单工具委托入口不参与延迟。约束与安全：
 
 - 服务器必须允许浏览器 CORS（与 LLM 端点同一约束）；本地起的 server（localhost）天然可用
 - URL 栏填 **32 位 Chrome 扩展 ID** 时自动改走扩展 Port 传输（`externally_connectable`）——这是 web-agent 桥接的接法：配置 web-agent 的扩展 ID 后，agent 获得 `mcp__webagent__web_task` 工具，可把整个网页浏览任务委托给 web-agent 的 agent 引擎执行。通信原理详见 [docs/web-agent-bridge.md](docs/web-agent-bridge.md)

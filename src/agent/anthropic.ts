@@ -51,6 +51,37 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
     dangerouslyAllowBrowser: true,
   })
 
+  // Assigned after the runner is created; enable_tools uses it to add newly
+  // activated external tools to the SAME turn via setMessagesParams.
+  interface RunnerParamsRef {
+    setMessagesParams(mutator: (p: { tools?: unknown[] }) => { tools?: unknown[] }): void
+  }
+  let runnerRef: RunnerParamsRef | null = null
+  const externalNames = new Set<string>()
+
+  const makeExternalTool = (ext: ReturnType<typeof externalToolSpecs>[number]) =>
+    betaTool({
+      name: ext.name,
+      description: ext.description,
+      inputSchema: ext.jsonSchema as never,
+      run: async (args) => {
+        const a = (args ?? {}) as Record<string, unknown>
+        opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a) })
+        return await ext.run(a)
+      },
+    }) as never
+
+  const syncExternalTools = (): void => {
+    const added = externalToolSpecs().filter((e) => !externalNames.has(e.name))
+    if (!added.length || !runnerRef) return
+    for (const e of added) externalNames.add(e.name)
+    const newTools = added.map(makeExternalTool)
+    runnerRef.setMessagesParams((p) => ({
+      ...p,
+      tools: [...(p.tools ?? []), ...newTools],
+    }))
+  }
+
   const tools = TOOLS.map((t) =>
     betaZodTool({
       name: t.name,
@@ -59,7 +90,9 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       run: async (args) => {
         opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(args) })
         try {
-          return await t.run(args)
+          const result = await t.run(args)
+          if (t.name === 'enable_tools') syncExternalTools()
+          return result
         } catch (err) {
           return `Error: ${(err as Error).message}`
         }
@@ -104,19 +137,10 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
   )
 
   // Remote MCP tools (raw JSON schemas — betaTool skips the zod round trip).
+  // Only currently-active ones; deferred tools join via enable_tools.
   for (const ext of externalToolSpecs()) {
-    tools.push(
-      betaTool({
-        name: ext.name,
-        description: ext.description,
-        inputSchema: ext.jsonSchema as never,
-        run: async (args) => {
-          const a = (args ?? {}) as Record<string, unknown>
-          opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a) })
-          return await ext.run(a)
-        },
-      }) as never,
-    )
+    externalNames.add(ext.name)
+    tools.push(makeExternalTool(ext))
   }
 
   if (opts.allowSubagent) {
@@ -204,6 +228,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
     },
     { signal: opts.signal },
   )
+  runnerRef = runner as unknown as RunnerParamsRef
 
   for await (const stream of runner) {
     let input = 0

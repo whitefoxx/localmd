@@ -17,6 +17,7 @@ import {
   sanitizeServerName,
   normalizeMcpServerList,
   mergeMcpConfigs,
+  isDeferredTool,
   KB_MCP_CONFIG_PATH,
   type McpClientLike,
   type McpServerConfig,
@@ -69,6 +70,57 @@ export const useMcpStore = defineStore('mcp', () => {
         : [],
     ),
   )
+
+  /** Tools the model activated this session (deferred-loading escape hatch). */
+  const activated = ref(new Set<string>())
+
+  const toolCountByServer = computed(() => {
+    const counts = new Map<string, number>()
+    for (const s of servers.value) counts.set(s.config.id, s.tools.length)
+    return counts
+  })
+
+  /** Tools whose schemas ride along with every request. */
+  const activeTools = computed<ExternalTool[]>(() =>
+    allTools.value.filter(
+      (t) =>
+        !isDeferredTool(
+          t.qualifiedName,
+          toolCountByServer.value.get(t.serverId) ?? 0,
+          activated.value,
+        ),
+    ),
+  )
+
+  /** Big-server tools kept OUT of requests until activated — the system
+   *  prompt lists them as a compact catalog instead. */
+  const deferredTools = computed<ExternalTool[]>(() =>
+    allTools.value.filter(
+      (t) =>
+        isDeferredTool(
+          t.qualifiedName,
+          toolCountByServer.value.get(t.serverId) ?? 0,
+          activated.value,
+        ),
+    ),
+  )
+
+  /** Activate deferred tools by qualified name; returns what actually matched. */
+  function activate(names: string[]): string[] {
+    const known = new Set(allTools.value.map((t) => t.qualifiedName))
+    const accepted = names.filter((n) => known.has(n))
+    if (accepted.length) {
+      const next = new Set(activated.value)
+      for (const n of accepted) next.add(n)
+      activated.value = next
+    }
+    return accepted
+  }
+
+  /** Per-session scope: cleared when the chat session changes. */
+  function clearActivated(): void {
+    if (activated.value.size) activated.value = new Set()
+  }
 
   async function refresh(): Promise<void> {
     const settings = useSettingsStore()
@@ -128,5 +180,14 @@ export const useMcpStore = defineStore('mcp', () => {
     { immediate: true },
   )
 
-  return { servers, allTools, refresh, callTool }
+  return {
+    servers,
+    allTools,
+    activeTools,
+    deferredTools,
+    activate,
+    clearActivated,
+    refresh,
+    callTool,
+  }
 })

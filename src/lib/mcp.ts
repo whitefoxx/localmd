@@ -341,3 +341,30 @@ export function mergeMcpConfigs(
     ...global.filter((s) => !kbUrls.has(s.url)).map((s) => ({ ...s, source: 'global' as const })),
   ]
 }
+
+/* ── deferred loading (tool-schema bloat control) ────────────────────────── */
+
+/** Servers with more tools than this get DEFERRED: their tools stay out of
+ *  the request until the model activates them via enable_tools. The system
+ *  prompt carries a one-line-per-tool catalog instead (~10 tokens/tool vs
+ *  hundreds for a full schema). */
+export const DEFER_THRESHOLD = 8
+
+/** Is this tool deferred right now? web_task never defers (it's the single
+ *  high-level delegate and its own schema is tiny). */
+export function isDeferredTool(
+  qualifiedName: string,
+  serverToolCount: number,
+  activated: ReadonlySet<string>,
+  threshold = DEFER_THRESHOLD,
+): boolean {
+  if (serverToolCount <= threshold) return false
+  if (qualifiedName.endsWith('__web_task')) return false
+  return !activated.has(qualifiedName)
+}
+
+/** One catalog line for the system prompt. */
+export function catalogEntry(qualifiedName: string, description: string): string {
+  const desc = description.replace(/\s+/g, ' ').trim()
+  return `- ${qualifiedName}: ${desc.length > 80 ? `${desc.slice(0, 80)}…` : desc}`
+}

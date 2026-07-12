@@ -8,6 +8,8 @@ import {
   isExtensionId,
   normalizeMcpServerList,
   mergeMcpConfigs,
+  isDeferredTool,
+  catalogEntry,
 } from './mcp'
 
 describe('tool namespacing', () => {
@@ -109,5 +111,21 @@ describe('mergeMcpConfigs', () => {
       [{ id: 'k1', name: 'shared-kb', url: 'https://same/mcp' }],
     )
     expect(merged.map((s) => `${s.source}:${s.id}`)).toEqual(['kb:k1', 'global:g2'])
+  })
+})
+
+describe('deferred loading', () => {
+  it('defers only big-server tools that are not activated', () => {
+    const none = new Set<string>()
+    expect(isDeferredTool('mcp__wa__generic__click', 34, none)).toBe(true)
+    expect(isDeferredTool('mcp__wa__generic__click', 34, new Set(['mcp__wa__generic__click']))).toBe(false)
+    expect(isDeferredTool('mcp__small__add', 2, none)).toBe(false)
+  })
+  it('never defers web_task', () => {
+    expect(isDeferredTool('mcp__wa__web_task', 34, new Set())).toBe(false)
+  })
+  it('renders compact catalog lines', () => {
+    expect(catalogEntry('mcp__x__y', 'short  desc')).toBe('- mcp__x__y: short desc')
+    expect(catalogEntry('mcp__x__y', 'z'.repeat(100))).toContain('…')
   })
 })
