@@ -43,3 +43,17 @@ describe('renderMarkdown', () => {
     expect(html).toContain('<table>')
   })
 })
+
+describe('code highlighting', () => {
+  it('highlights fenced blocks with a known language', () => {
+    const html = renderMarkdown('```js\nconst x = 1\n```', resolver)
+    expect(html).toContain('class="hljs language-javascript"')
+    expect(html).toContain('hljs-keyword')
+  })
+  it('escapes unknown languages as plain text', () => {
+    const html = renderMarkdown('```brainfuck\n<+++>\n```', resolver)
+    expect(html).toContain('class="hljs"')
+    expect(html).toContain('&lt;+++&gt;')
+    expect(html).not.toContain('hljs-keyword')
+  })
+})

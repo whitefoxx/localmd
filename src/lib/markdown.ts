@@ -5,8 +5,73 @@
  * store-agnostic.
  */
 import { Marked } from 'marked'
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import python from 'highlight.js/lib/languages/python'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import xml from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import markdownLang from 'highlight.js/lib/languages/markdown'
+import yaml from 'highlight.js/lib/languages/yaml'
+import sql from 'highlight.js/lib/languages/sql'
+import go from 'highlight.js/lib/languages/go'
+import rust from 'highlight.js/lib/languages/rust'
+import java from 'highlight.js/lib/languages/java'
+import cpp from 'highlight.js/lib/languages/cpp'
+import diff from 'highlight.js/lib/languages/diff'
 import { splitLink, escapeHtml, splitFrontmatter } from './wiki'
 import { renderCitationTokens } from './citations'
+
+// Core build + a curated language set keeps the bundle sane; unknown
+// languages fall back to escaped plain text.
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('typescript', typescript)
+hljs.registerLanguage('python', python)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('bash', bash)
+hljs.registerLanguage('xml', xml) // also html
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('markdown', markdownLang)
+hljs.registerLanguage('yaml', yaml)
+hljs.registerLanguage('sql', sql)
+hljs.registerLanguage('go', go)
+hljs.registerLanguage('rust', rust)
+hljs.registerLanguage('java', java)
+hljs.registerLanguage('cpp', cpp)
+hljs.registerLanguage('diff', diff)
+
+const LANG_ALIASES: Record<string, string> = {
+  js: 'javascript',
+  jsx: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  py: 'python',
+  sh: 'bash',
+  shell: 'bash',
+  zsh: 'bash',
+  html: 'xml',
+  vue: 'xml',
+  yml: 'yaml',
+  c: 'cpp',
+  'c++': 'cpp',
+  golang: 'go',
+  md: 'markdown',
+}
+
+function highlightCode(code: string, infostring?: string): string {
+  const lang = LANG_ALIASES[infostring ?? ''] ?? infostring ?? ''
+  if (lang && hljs.getLanguage(lang)) {
+    try {
+      const html = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
+      return `<pre><code class="hljs language-${escapeHtml(lang)}">${html}</code></pre>`
+    } catch {
+      /* fall through to plain */
+    }
+  }
+  return `<pre><code class="hljs">${escapeHtml(code)}</code></pre>`
+}
 
 export interface WikilinkResolver {
   /** Returns the KB-relative path for a wikilink target, or null if missing. */
@@ -31,6 +96,11 @@ export function renderMarkdown(content: string, resolver: WikilinkResolver): str
   })
 
   marked.use({
+    renderer: {
+      code(code: string, infostring: string | undefined) {
+        return highlightCode(code, infostring?.trim().split(/\s+/)[0]?.toLowerCase())
+      },
+    },
     extensions: [
       {
         name: 'wikilink',
