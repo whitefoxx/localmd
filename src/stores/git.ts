@@ -27,6 +27,28 @@ export const useGitStore = defineStore('git', () => {
 
   const dirtyCount = computed(() => changes.value.length)
 
+  /** path → change kind, for tinting file rows in the tree (VS Code style). */
+  const statusByPath = computed(() => {
+    const m = new Map<string, g.FileChange['kind']>()
+    for (const c of changes.value) m.set(c.path, c.kind)
+    return m
+  })
+
+  /** Aggregate git status of a directory from its descendants: modified wins
+   *  over deleted over new, so a folder shows the most notable change under it. */
+  function dirStatus(dirPath: string): g.FileChange['kind'] | null {
+    const prefix = `${dirPath}/`
+    let hasDeleted = false
+    let hasNew = false
+    for (const c of changes.value) {
+      if (!c.path.startsWith(prefix)) continue
+      if (c.kind === 'modified') return 'modified'
+      if (c.kind === 'deleted') hasDeleted = true
+      else hasNew = true
+    }
+    return hasDeleted ? 'deleted' : hasNew ? 'new' : null
+  }
+
   watch(
     () => kb.name,
     async (name) => {
@@ -155,6 +177,8 @@ export const useGitStore = defineStore('git', () => {
     error,
     lastSync,
     dirtyCount,
+    statusByPath,
+    dirStatus,
     refresh,
     commit,
     revertCheckpoint,
