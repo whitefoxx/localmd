@@ -8,6 +8,7 @@ import { usePlanStore } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
 import { useGitStore } from '@/stores/git'
 import * as g from '@/lib/git'
+import { withGitLock, GitBusyError } from '@/lib/gitlock'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runAnthropicTurn } from '@/agent/anthropic'
 import { runOpenAITurn } from '@/agent/openai'
@@ -632,7 +633,10 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Auto-commit this turn's agent writes as a revertable checkpoint. */
+  /** Auto-commit this turn's agent writes as a revertable checkpoint. The whole
+   *  read-status→commit sequence runs under the git lock so concurrent sessions
+   *  checkpoint strictly one after another; a contended session says so in its
+   *  transcript, and gives up (keeping its changes) if the wait drags on. */
   async function checkpoint(
     session: OpenSession,
     userText: string,
@@ -643,25 +647,49 @@ export const useChatStore = defineStore('chat', () => {
     const written = useReviewStore().turnWritesFor(session.id)
     if (!written.length) return
     try {
-      if (!(await g.isRepo())) return
-      const changes = (await g.changedFiles()).filter(
-        (c) => written.includes(c.path) && !c.oversized,
+      const committed = await withGitLock(
+        async () => {
+          if (!(await g.isRepo())) return null
+          const changes = (await g.changedFiles()).filter(
+            (c) => written.includes(c.path) && !c.oversized,
+          )
+          if (!changes.length) return null
+          const author = await g.resolveAuthor({
+            name: settings.state.gitName || 'browser-md',
+            email: settings.state.gitEmail || 'browser-md@local',
+          })
+          const summary = userText.replace(/\s+/g, ' ').slice(0, 50) || 'agent edits'
+          const oid = await g.commitPaths(changes, `checkpoint: ${summary}`, author)
+          return { oid, count: changes.length }
+        },
+        {
+          timeoutMs: 30_000,
+          onWait: () =>
+            assistant.parts.push({
+              type: 'tool',
+              name: 'checkpoint',
+              detail: '等待另一个会话的 git 操作完成…',
+            }),
+        },
       )
-      if (!changes.length) return
-      const author = await g.resolveAuthor({
-        name: settings.state.gitName || 'browser-md',
-        email: settings.state.gitEmail || 'browser-md@local',
-      })
-      const summary = userText.replace(/\s+/g, ' ').slice(0, 50) || 'agent edits'
-      const oid = await g.commitPaths(changes, `checkpoint: ${summary}`, author)
+      if (!committed) return
       assistant.parts.push({
         type: 'tool',
         name: 'checkpoint',
-        detail: `checkpoint ${oid.slice(0, 7)} (${changes.length} file(s))`,
+        detail: `checkpoint ${committed.oid.slice(0, 7)} (${committed.count} file(s))`,
       })
       void useGitStore().refresh()
-    } catch {
-      /* checkpoint failures must never break the turn */
+      void persist(session) // the checkpoint line must survive a reload
+    } catch (err) {
+      if (err instanceof GitBusyError) {
+        assistant.parts.push({
+          type: 'tool',
+          name: 'checkpoint',
+          detail: '跳过 checkpoint:另一会话的 git 操作耗时过久——本回合改动仍在工作区,稍后可在 Git 面板手动提交',
+        })
+        void persist(session)
+      }
+      /* other checkpoint failures must never break the turn */
     }
   }
 

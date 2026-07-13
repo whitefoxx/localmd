@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import * as g from '@/lib/git'
+import { withGitLock } from '@/lib/gitlock'
 import { parseGithubRemote, push as ghPush, pull as ghPull, type GithubRepo } from '@/lib/github'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
@@ -66,16 +67,24 @@ export const useGitStore = defineStore('git', () => {
     { immediate: true },
   )
 
-  /** Re-read branch/status/log. Cheap after the first run (index cache). */
+  /** Sets the panel's "waiting" note when another session holds the git lock. */
+  function noteWait(): void {
+    progress.value = '等待其他 git 操作完成…'
+  }
+
+  /** Re-read branch/status/log. Cheap after the first run (index cache).
+   *  Locked: statusMatrix writes the index cache back. */
   async function refresh(): Promise<void> {
     if (!kb.name || busy.value) return
     try {
       isRepo.value = await g.isRepo()
       if (!isRepo.value) return
       busy.value = 'status'
-      branch.value = await g.currentBranch()
-      changes.value = await g.changedFiles()
-      log.value = await g.recentLog()
+      await withGitLock(async () => {
+        branch.value = await g.currentBranch()
+        changes.value = await g.changedFiles()
+        log.value = await g.recentLog()
+      })
       const remotes = await g.listRemotes()
       const origin = remotes.find((r) => r.name === 'origin') ?? remotes[0]
       remote.value = origin ? parseGithubRemote(origin.url) : null
@@ -93,18 +102,24 @@ export const useGitStore = defineStore('git', () => {
     busy.value = 'commit'
     error.value = ''
     try {
-      const settings = useSettingsStore()
-      const author = await g.resolveAuthor({
-        name: settings.state.gitName || 'browser-md',
-        email: settings.state.gitEmail || 'browser-md@local',
-      })
-      const selected = changes.value.filter((c) => paths.includes(c.path))
-      const oid = await g.commitPaths(selected, message.trim(), author)
+      const oid = await withGitLock(
+        async () => {
+          const settings = useSettingsStore()
+          const author = await g.resolveAuthor({
+            name: settings.state.gitName || 'browser-md',
+            email: settings.state.gitEmail || 'browser-md@local',
+          })
+          const selected = changes.value.filter((c) => paths.includes(c.path))
+          return g.commitPaths(selected, message.trim(), author)
+        },
+        { onWait: noteWait },
+      )
       lastSync.value = `已提交 ${oid.slice(0, 7)}`
     } catch (err) {
       error.value = (err as Error).message
     } finally {
       busy.value = null
+      progress.value = ''
     }
     await refresh()
   }
@@ -116,7 +131,7 @@ export const useGitStore = defineStore('git', () => {
     busy.value = 'revert'
     error.value = ''
     try {
-      const paths = await g.revertCommitInWorktree(oid)
+      const paths = await withGitLock(() => g.revertCommitInWorktree(oid), { onWait: noteWait })
       lastSync.value = `已还原 ${paths.length} 个文件到 ${oid.slice(0, 7)} 之前(未提交,可在 Changes 里确认)`
       const files = useFilesStore()
       await files.refreshTree()
@@ -125,6 +140,7 @@ export const useGitStore = defineStore('git', () => {
       error.value = (err as Error).message
     } finally {
       busy.value = null
+      progress.value = ''
     }
     await refresh()
   }
@@ -146,7 +162,10 @@ export const useGitStore = defineStore('git', () => {
     try {
       const ctx = { ...remote.value, token: settings.state.githubToken }
       const onProgress = (msg: string) => (progress.value = msg)
-      lastSync.value = direction === 'push' ? await ghPush(ctx, onProgress) : await ghPull(ctx, onProgress)
+      lastSync.value = await withGitLock(
+        () => (direction === 'push' ? ghPush(ctx, onProgress) : ghPull(ctx, onProgress)),
+        { onWait: noteWait },
+      )
       if (direction === 'pull') {
         const files = useFilesStore()
         await files.refreshTree()

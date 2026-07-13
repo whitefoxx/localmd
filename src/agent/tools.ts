@@ -11,6 +11,7 @@
 import { z } from 'zod'
 import * as fs from '@/lib/fs'
 import * as g from '@/lib/git'
+import { withGitLock, GitBusyError } from '@/lib/gitlock'
 import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { diffLines, collapseContext } from '@/lib/diff'
@@ -285,6 +286,20 @@ const useSkill = defineTool({
 
 /* ── git tools ───────────────────────────────────────────────────────────── */
 
+/** Run a git-mutating tool body under the app-wide git lock. On contention
+ *  past the timeout (e.g. another session's push), give the model a clear
+ *  busy message to relay instead of stalling the turn. */
+async function lockedGit(fn: () => Promise<string>): Promise<string> {
+  try {
+    return await withGitLock(fn, { timeoutMs: 15_000 })
+  } catch (err) {
+    if (err instanceof GitBusyError) {
+      return 'Error: 另一个会话正在执行 git 操作(checkpoint/commit/sync),稍后重试。请告知用户当前 git 被占用。'
+    }
+    throw err
+  }
+}
+
 async function githubContext(): Promise<
   { owner: string; repo: string; token: string } | string
 > {
@@ -301,7 +316,7 @@ const gitStatus = defineTool({
     'Show the git state of the KB: current branch, GitHub remote, and text files changed vs HEAD. Note: .trace/ and large binaries (PDF/EPUB/media) are excluded from in-app git — those are committed from a terminal.',
   schema: z.object({}),
   describeCall: () => 'git status',
-  run: async () => {
+  run: () => lockedGit(async () => {
     if (!(await g.isRepo())) return 'The opened folder is not a git repository.'
     const branch = await g.currentBranch()
     const changes = await g.changedFiles()
@@ -319,7 +334,7 @@ const gitStatus = defineTool({
         : 'working tree clean (content changes to tracked binaries are not detectable here)',
     ]
     return lines.join('\n')
-  },
+  }),
 })
 
 const gitDiff = defineTool({
@@ -375,7 +390,7 @@ const gitCommit = defineTool({
     paths: z.array(z.string()).optional().describe('Subset of changed paths (default: all)'),
   }),
   describeCall: (a) => `git commit${a.paths ? ` (${a.paths.length} files)` : ''}: ${a.message.slice(0, 50)}`,
-  run: async ({ message, paths }) => {
+  run: ({ message, paths }) => lockedGit(async () => {
     if (!(await g.isRepo())) return 'Error: not a git repository'
     if (!message.trim()) return 'Error: commit message must not be empty'
     const changes = await g.changedFiles()
@@ -402,7 +417,7 @@ const gitCommit = defineTool({
       ? `\n(skipped >100MB files — commit from a terminal: ${blocked.map((c) => c.path).join(', ')})`
       : ''
     return `Committed ${chosen.length} file(s) as ${oid.slice(0, 7)}:\n${chosen.map((c) => `  ${c.path}`).join('\n')}${note}`
-  },
+  }),
 })
 
 const gitPush = defineTool({
@@ -411,7 +426,7 @@ const gitPush = defineTool({
     'Push local commits to the GitHub remote (fast-forward only, via the GitHub API). Requires a GitHub token in Settings. Commit first; on divergence tell the user to resolve in a terminal.',
   schema: z.object({}),
   describeCall: () => 'git push',
-  run: async () => {
+  run: () => lockedGit(async () => {
     if (!(await g.isRepo())) return 'Error: not a git repository'
     const ctx = await githubContext()
     if (typeof ctx === 'string') return ctx
@@ -425,7 +440,7 @@ const gitPush = defineTool({
     } catch (err) {
       return `Push failed: ${(err as Error).message}`
     }
-  },
+  }),
 })
 
 const gitPull = defineTool({
@@ -434,7 +449,7 @@ const gitPull = defineTool({
     'Pull new commits from the GitHub remote (fast-forward only, via the GitHub API) and update the working tree. Public repos work without a token.',
   schema: z.object({}),
   describeCall: () => 'git pull',
-  run: async () => {
+  run: () => lockedGit(async () => {
     if (!(await g.isRepo())) return 'Error: not a git repository'
     const ctx = await githubContext()
     if (typeof ctx === 'string') return ctx
@@ -446,7 +461,7 @@ const gitPull = defineTool({
     } catch (err) {
       return `Pull failed: ${(err as Error).message}`
     }
-  },
+  }),
 })
 
 /* ── external tool sources (remote MCP servers) ─────────────────────────── */
