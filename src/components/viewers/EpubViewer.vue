@@ -67,8 +67,14 @@ async function load(path: string | null): Promise<void> {
   docPath = path
   toc.value = []
   if (!path || !host.value) return
-  indexState.value = (await hasIndex(path)) ? 'indexed' : 'none'
   indexDetail.value = ''
+  if (await hasIndex(path)) {
+    indexState.value = 'indexed'
+  } else {
+    // Auto-index on first open, matching the PDF viewer.
+    indexState.value = 'none'
+    void runIndex()
+  }
   const buf = await fs.readBinary(path)
   book = ePub(buf)
   rendition = book.renderTo(host.value, {
@@ -289,23 +295,7 @@ function next(): void {
 
 <template>
   <div class="h-full flex flex-col">
-    <div class="flex-1 flex min-h-0">
-      <!-- Table of contents -->
-      <div v-if="tocOpen && toc.length" class="w-72 shrink-0 border-r border-border bg-bg-1 panel-scroll py-2">
-        <button
-          v-for="(entry, i) in toc"
-          :key="i"
-          class="w-full text-left py-1 pr-2 text-sm text-fg-1 hover:bg-bg-2"
-          :style="{ paddingLeft: `${8 + (entry.level - 1) * 14}px` }"
-          @click="goTo(entry.href)"
-        >
-          <span class="block truncate">{{ entry.title }}</span>
-        </button>
-      </div>
-      <div class="flex-1 min-w-0" :class="theme.isDark ? 'bg-bg-1' : 'bg-white'" ref="host" />
-    </div>
-
-    <div class="flex items-center gap-2 h-10 px-3 border-t border-border shrink-0">
+    <div class="flex items-center gap-2 h-10 px-3 border-b border-border shrink-0">
       <button
         class="btn text-xs"
         :class="{ '!text-accent': tocOpen }"
@@ -340,7 +330,6 @@ function next(): void {
 
       <span class="text-xs text-fg-3 flex-1 truncate">
         {{ chapterLabel }}<template v-if="chapterLabel"> · </template>{{ progressPct }}%
-        <template v-if="indexDetail"> · {{ indexDetail }}</template>
       </span>
       <button class="btn text-xs" @click="prev">
         <span class="codicon codicon-sm codicon-chevron-left" /> Prev
@@ -348,17 +337,22 @@ function next(): void {
       <button class="btn text-xs" @click="next">
         Next <span class="codicon codicon-sm codicon-chevron-right" />
       </button>
-      <button class="btn text-xs" :disabled="indexState === 'indexing'" @click="runIndex">
-        <span
-          class="codicon codicon-sm mr-1"
-          :class="{
-            'codicon-sparkle': indexState === 'none',
-            'codicon-loading codicon-modifier-spin': indexState === 'indexing',
-            'codicon-check': indexState === 'indexed',
-          }"
-        />
-        {{ indexState === 'indexed' ? 'Indexed' : indexState === 'indexing' ? 'Indexing…' : 'Index for AI' }}
-      </button>
+    </div>
+
+    <div class="flex-1 flex min-h-0">
+      <!-- Table of contents -->
+      <div v-if="tocOpen && toc.length" class="w-72 shrink-0 border-r border-border bg-bg-1 panel-scroll py-2">
+        <button
+          v-for="(entry, i) in toc"
+          :key="i"
+          class="w-full text-left py-1 pr-2 text-sm text-fg-1 hover:bg-bg-2"
+          :style="{ paddingLeft: `${8 + (entry.level - 1) * 14}px` }"
+          @click="goTo(entry.href)"
+        >
+          <span class="block truncate">{{ entry.title }}</span>
+        </button>
+      </div>
+      <div class="flex-1 min-w-0" :class="theme.isDark ? 'bg-bg-1' : 'bg-white'" ref="host" />
     </div>
 
     <!-- Highlight popup -->

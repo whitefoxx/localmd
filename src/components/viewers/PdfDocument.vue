@@ -345,23 +345,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="h-full w-full flex flex-col">
-    <div class="flex items-center gap-2 px-3 h-8 border-b border-border shrink-0">
-      <span class="text-xs text-fg-3 flex-1 truncate">{{ path }}</span>
-      <span
-        v-if="indexMsg"
-        class="selectable text-[11px] truncate max-w-[280px]"
-        :class="indexState === 'error' ? 'text-removed' : 'text-fg-3'"
-      >
-        {{ indexMsg }}
-      </span>
-      <button
-        class="h-6 px-2 inline-flex items-center rounded border border-border text-[11px] text-fg-2 hover:text-fg-0 hover:bg-bg-2 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-        :disabled="indexState === 'parsing'"
-        @click="runIndex()"
-      >
-        {{ indexState === 'parsing' ? 'Indexing…' : indexState === 'done' ? 'Re-index for AI' : 'Index for AI' }}
-      </button>
-    </div>
+    <!-- No chrome bar: filename shows in the editor tab, and (re)indexing lives
+         in the file-tree right-click menu. PDFs still auto-index on open. -->
     <div class="flex-1 min-h-0">
       <PDFViewer
         v-if="blobUrl"

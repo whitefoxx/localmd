@@ -90,6 +90,19 @@ async function indexDocs(dir: string): Promise<void> {
   await useKbIndexStore().refresh()
 }
 
+/** (Re)build the AI index for a single pdf/epub/md file. */
+async function indexFile(path: string): Promise<void> {
+  closeMenu()
+  indexStatus.value = 'Indexing…'
+  try {
+    await indexDocument(path)
+  } catch (err) {
+    console.error('index failed', path, err)
+  }
+  indexStatus.value = ''
+  await useKbIndexStore().refresh()
+}
+
 /* ── rename / delete / copy (operate on the menu target) ────────────────── */
 function menuOpen(node: TreeNode): void {
   closeMenu()
@@ -185,6 +198,13 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
         <template v-else>
           <button :class="ctxItem" @click="menuOpen(ctx.node)">
             <span class="codicon codicon-sm codicon-go-to-file" />Open
+          </button>
+          <button
+            v-if="indexableKind(ctx.node.path)"
+            :class="ctxItem"
+            @click="indexFile(ctx.node.path)"
+          >
+            <span class="codicon codicon-sm codicon-book" />Index for AI
           </button>
           <div :class="ctxSep" />
         </template>
