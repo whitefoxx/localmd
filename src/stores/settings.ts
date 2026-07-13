@@ -15,6 +15,7 @@ import { defineStore } from 'pinia'
 import { reactive, computed, watch } from 'vue'
 import { OPENAI_COMPAT_PRESETS } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
+import { isE2eMode } from '@/lib/e2e'
 
 export interface LlmProfile {
   id: string
@@ -161,6 +162,7 @@ export function normalizeSettings(raw: unknown): SettingsState {
 }
 
 function load(): SettingsState {
+  if (isE2eMode()) return { profiles: [], slots: {}, ...EMPTY } // never touch real config
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return normalizeSettings(JSON.parse(raw))
@@ -173,7 +175,11 @@ function load(): SettingsState {
 export const useSettingsStore = defineStore('settings', () => {
   const state = reactive<SettingsState>(load())
 
-  watch(state, () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), { deep: true })
+  // E2E mode must NOT persist — the mock profile once leaked into the user's
+  // real localStorage through this watcher and wiped their API keys.
+  if (!isE2eMode()) {
+    watch(state, () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), { deep: true })
+  }
 
   const byId = (id: string | undefined): LlmProfile | null =>
     state.profiles.find((p) => p.id === id) ?? null

@@ -70,3 +70,11 @@ test('scrolling up during a stream detaches auto-follow', async ({ page }) => {
   const top = await scroller.evaluate((el) => el.scrollTop)
   expect(top).toBeLessThan(50) // not yanked back to the bottom
 })
+
+test('e2e mode never persists to real storage', async ({ page }) => {
+  // Regression guard: the mock profile once leaked through the settings
+  // watcher into localStorage and wiped the user's real API keys.
+  await page.getByRole('button', { name: /初始化知识库/ }).click()
+  const stored = await page.evaluate(() => localStorage.getItem('browser-md:settings'))
+  expect(stored).toBeNull()
+})

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import * as fs from '@/lib/fs'
+import { isE2eMode } from '@/lib/e2e'
 import { saveRecent, listRecents, removeRecent, type RecentKb } from '@/lib/idb'
 
 export const useKbStore = defineStore('kb', () => {
@@ -58,8 +59,11 @@ export const useKbStore = defineStore('kb', () => {
     name.value = handle.name
     isOpen.value = true
     await acquireLock(handle.name)
-    await saveRecent(handle)
-    await refreshRecents()
+    if (!isE2eMode()) {
+      // Memory handles from E2E runs must not pollute the real recents list.
+      await saveRecent(handle)
+      await refreshRecents()
+    }
     return true
   }
 
