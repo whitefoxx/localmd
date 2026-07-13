@@ -164,6 +164,17 @@ export async function renameFile(oldPath: string, newPath: string): Promise<void
   await removeFile(oldPath)
 }
 
+/** Rename/move a directory by copying every file under it to the new prefix,
+ *  then removing the old tree. (Empty subdirectories are not preserved.) */
+export async function renameDir(oldPath: string, newPath: string): Promise<void> {
+  const files = collectFiles(await readTreeFrom(oldPath))
+  for (const p of files) {
+    const dest = newPath + p.slice(oldPath.length) // p starts with `${oldPath}/`
+    await writeFile(dest, await (await getFileHandle(p)).getFile())
+  }
+  await removeDir(oldPath)
+}
+
 export async function readTree(): Promise<TreeNode[]> {
   return readDirRecursive(getRoot(), '', true)
 }

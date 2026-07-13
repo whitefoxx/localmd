@@ -23,6 +23,44 @@ export const useFilesStore = defineStore('files', () => {
   const content = ref('')
   const saveState = ref<SaveState>('saved')
   const mode = ref<'edit' | 'preview'>('preview')
+  /** The tree node the user has selected (file OR directory) — drives the row
+   *  highlight and is the target for new files/folders/imports. '' = nothing
+   *  selected (= KB root). Cleared by clicking blank space in the tree. */
+  const selectedPath = ref('')
+  const selectedIsDir = ref(false)
+  /** Directory new items land in: the selected folder, a selected file's
+   *  parent, or '' (KB root) when nothing is selected. */
+  const targetDir = computed(() => {
+    if (!selectedPath.value) return ''
+    if (selectedIsDir.value) return selectedPath.value
+    const i = selectedPath.value.lastIndexOf('/')
+    return i < 0 ? '' : selectedPath.value.slice(0, i)
+  })
+
+  function select(path: string, isDir: boolean): void {
+    selectedPath.value = path
+    selectedIsDir.value = isDir
+  }
+  function clearSelection(): void {
+    selectedPath.value = ''
+    selectedIsDir.value = false
+  }
+  /** Set of directory paths currently expanded in the file tree. Centralized so
+   *  "collapse all" is a single clear() rather than per-node signalling. */
+  const expandedDirs = ref(new Set<string>())
+  /** Seed top-level folders open exactly once per KB — not on every refresh, so
+   *  collapse-all survives a later refresh/focus. */
+  let expansionSeeded = false
+
+  function toggleDir(path: string): void {
+    const s = expandedDirs.value
+    if (s.has(path)) s.delete(path)
+    else s.add(path)
+  }
+
+  function collapseAll(): void {
+    expandedDirs.value.clear()
+  }
 
   /** Disk mtime of the current file at load/save time, for external-change detection. */
   let loadedMtime: number | null = null
@@ -70,6 +108,10 @@ export const useFilesStore = defineStore('files', () => {
   async function refreshTree(): Promise<void> {
     if (!fs.hasRoot()) return
     tree.value = await fs.readTree()
+    if (!expansionSeeded) {
+      for (const n of tree.value) if (n.kind === 'dir') expandedDirs.value.add(n.path)
+      expansionSeeded = true
+    }
   }
 
   async function openFile(path: string): Promise<void> {
@@ -190,9 +232,94 @@ export const useFilesStore = defineStore('files', () => {
     }
   }
 
+  /** Close a set of tabs at once, switching away from the current file if it is
+   *  among them (flushing it first). */
+  async function closeTabs(paths: string[]): Promise<void> {
+    if (!paths.length) return
+    const set = new Set(paths)
+    const closingCurrent = currentPath.value !== null && set.has(currentPath.value)
+    if (closingCurrent) await flush()
+    const curIdx = currentPath.value ? openTabs.value.indexOf(currentPath.value) : -1
+    openTabs.value = openTabs.value.filter((p) => !set.has(p))
+    if (closingCurrent) {
+      currentPath.value = null
+      if (openTabs.value.length) {
+        await openFile(openTabs.value[Math.min(curIdx, openTabs.value.length - 1)])
+      } else {
+        content.value = ''
+        saveState.value = 'saved'
+      }
+    }
+  }
+
+  async function closeOtherTabs(keep: string): Promise<void> {
+    await closeTabs(openTabs.value.filter((p) => p !== keep))
+    if (currentPath.value !== keep) await openFile(keep)
+  }
+
+  async function closeTabsToRight(from: string): Promise<void> {
+    const i = openTabs.value.indexOf(from)
+    if (i < 0) return
+    await closeTabs(openTabs.value.slice(i + 1))
+  }
+
+  /** Close every tab with no unsaved edits — only the current buffer can be
+   *  dirty, so it's the sole candidate to keep. */
+  async function closeSavedTabs(): Promise<void> {
+    const keep = currentPath.value && saveState.value !== 'saved' ? currentPath.value : null
+    await closeTabs(openTabs.value.filter((p) => p !== keep))
+  }
+
+  async function closeAllTabs(): Promise<void> {
+    await closeTabs([...openTabs.value])
+  }
+
+  /** Rename a file or directory in place; retargets open tabs and selection. */
+  async function renameEntry(oldPath: string, newPath: string, isDir: boolean): Promise<void> {
+    if (oldPath === newPath) return
+    const underOld = (p: string): boolean => p === oldPath || (isDir && p.startsWith(`${oldPath}/`))
+    if (currentPath.value && underOld(currentPath.value)) await flush()
+    if (isDir) await fs.renameDir(oldPath, newPath)
+    else await fs.renameFile(oldPath, newPath)
+    const remap = (p: string): string =>
+      p === oldPath ? newPath : underOld(p) ? newPath + p.slice(oldPath.length) : p
+    openTabs.value = openTabs.value.map(remap)
+    if (currentPath.value) currentPath.value = remap(currentPath.value)
+    await refreshTree()
+    select(newPath, isDir)
+  }
+
+  /** Delete a file or directory; closes affected tabs and clears selection. */
+  async function deleteEntry(path: string, isDir: boolean): Promise<void> {
+    if (isDir) await fs.removeDir(path)
+    else await fs.removeFile(path)
+    const affected = (p: string): boolean => p === path || (isDir && p.startsWith(`${path}/`))
+    if (currentPath.value !== null && affected(currentPath.value)) {
+      if (autosaveTimer) {
+        clearTimeout(autosaveTimer)
+        autosaveTimer = null
+      }
+      currentPath.value = null
+      openTabs.value = openTabs.value.filter((p) => !affected(p))
+      const next = openTabs.value[openTabs.value.length - 1]
+      if (next) await openFile(next)
+      else {
+        content.value = ''
+        saveState.value = 'saved'
+      }
+    } else {
+      openTabs.value = openTabs.value.filter((p) => !affected(p))
+    }
+    if (affected(selectedPath.value)) clearSelection()
+    await refreshTree()
+  }
+
   function reset(): void {
     tree.value = []
     openTabs.value = []
+    clearSelection()
+    expandedDirs.value.clear()
+    expansionSeeded = false
     closeCurrent()
   }
 
@@ -204,6 +331,19 @@ export const useFilesStore = defineStore('files', () => {
     content,
     saveState,
     mode,
+    selectedPath,
+    targetDir,
+    select,
+    clearSelection,
+    expandedDirs,
+    toggleDir,
+    collapseAll,
+    renameEntry,
+    deleteEntry,
+    closeOtherTabs,
+    closeTabsToRight,
+    closeSavedTabs,
+    closeAllTabs,
     mdFiles,
     allFiles,
     resolveWikilink,

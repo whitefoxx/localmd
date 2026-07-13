@@ -73,6 +73,16 @@ export async function importFile(f: File): Promise<string> {
   return dest
 }
 
+/** Write an incoming File into an explicit KB directory ('' = root), keeping
+ *  its original name (collision-safe). Used by the file-tree "Import" action,
+ *  which places files where the user points rather than routing into raw/. */
+export async function importFileInto(f: File, dir: string): Promise<string> {
+  const name = ensureFilename(f.name, f.type, Date.now())
+  const dest = await resolveUniquePath(dir ? `${dir}/${name}` : name)
+  await fs.writeFile(dest, f)
+  return dest
+}
+
 /** Save dropped/uploaded files into raw/; returns the KB paths written. */
 export async function captureFiles(files: File[]): Promise<string[]> {
   const written: string[] = []

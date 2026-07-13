@@ -12,7 +12,7 @@ import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
 import type { MessagePart } from '@/stores/chat'
 
-const emit = defineEmits<{ openSettings: [] }>()
+const emit = defineEmits<{ openSettings: []; close: [] }>()
 
 const chat = useChatStore()
 const settingsStore = useSettingsStore()
@@ -379,8 +379,8 @@ watch(
       >
         <span class="codicon codicon-sm codicon-history" />
       </button>
-      <button class="text-fg-3 hover:text-fg-0" title="Settings" @click="emit('openSettings')">
-        <span class="codicon codicon-sm codicon-gear" />
+      <button class="text-fg-3 hover:text-fg-0" title="Close agent panel (⌘J)" @click="emit('close')">
+        <span class="codicon codicon-sm codicon-close" />
       </button>
     </div>
 

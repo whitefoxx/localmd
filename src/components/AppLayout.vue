@@ -25,8 +25,12 @@ import EpubViewer from '@/components/viewers/EpubViewer.vue'
 import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
-import { baseName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
+import type { RecentKb } from '@/lib/idb'
+
+/* Shared styling for the VS Code–style activity-bar buttons. */
+const actBtn =
+  'group relative w-10 h-10 flex items-center justify-center rounded-md text-fg-2 hover:text-fg-0 hover:bg-bg-2 transition-colors'
 
 const kb = useKbStore()
 const files = useFilesStore()
@@ -71,7 +75,6 @@ async function onDrop(e: DragEvent): Promise<void> {
   await files.refreshTree()
 }
 
-const fileName = computed(() => (files.currentPath ? baseName(files.currentPath) : null))
 const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
 const isMarkdown = computed(() => kind.value === 'markdown')
 
@@ -79,10 +82,67 @@ const saveLabel = computed(
   () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
 )
 
+/* Save state shown as a colored dot in the sidebar header (label = tooltip):
+   green = saved, yellow = pending write. */
+const saveDisplay = computed(
+  () =>
+    ({
+      saved: { icon: 'codicon-circle-filled', class: 'text-added' },
+      dirty: { icon: 'codicon-circle-filled', class: 'text-yellow-500' },
+      saving: { icon: 'codicon-circle-filled', class: 'text-yellow-500 animate-pulse' },
+    })[files.saveState],
+)
+
+const gitTitle = computed(
+  () => `Git: ${git.branch ?? ''}${git.dirtyCount ? ` · ${git.dirtyCount} changed` : ''}`,
+)
+
+/* codicons 0.0.45 has no sun/moon glyphs — use ones that actually render. */
 const themeIcon = computed(
   () =>
-    ({ system: 'codicon-color-mode', light: 'codicon-sun', dark: 'codicon-moon' })[theme.pref],
+    ({ system: 'codicon-device-desktop', light: 'codicon-lightbulb', dark: 'codicon-color-mode' })[
+      theme.pref
+    ],
 )
+
+/* ── KB switcher menu (sidebar header dropdown) ─────────────────────────── */
+const kbMenuOpen = ref(false)
+const menuItem =
+  'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
+const recentsOther = computed(() => kb.recents.filter((r) => r.name !== kb.name))
+
+function toggleKbMenu(): void {
+  kbMenuOpen.value = !kbMenuOpen.value
+  if (kbMenuOpen.value) void kb.refreshRecents()
+}
+
+/** Flush the current KB, swap to another, then reload the tree (and optionally
+ *  scaffold a brand-new one). A cancelled picker leaves the current KB intact. */
+async function switchKb(pick: () => Promise<boolean>, scaffold = false): Promise<void> {
+  kbMenuOpen.value = false
+  await files.flush()
+  if (!(await pick())) return
+  files.reset()
+  kbIndex.reset()
+  if (scaffold) {
+    await scaffoldKb()
+    await files.refreshTree()
+    await useSkillsStore().refresh()
+    await files.openFile('wiki/index.md')
+  } else {
+    await files.refreshTree()
+  }
+}
+
+function openFolder(): void {
+  void switchKb(() => kb.pickAndOpen())
+}
+function newKb(): void {
+  void switchKb(() => kb.pickAndOpen(), true)
+}
+function openRecentEntry(entry: RecentKb): void {
+  void switchKb(() => kb.openRecent(entry))
+}
 
 function closeKb(): void {
   void files.flush().finally(() => {
@@ -100,81 +160,6 @@ function closeKb(): void {
     @dragleave.self="dragging = false"
     @drop.prevent="onDrop"
   >
-    <!-- Title bar -->
-    <header class="flex items-center gap-2 px-3 h-10 border-b border-border bg-bg-1 shrink-0">
-      <button
-        class="text-fg-3 hover:text-fg-0"
-        :class="{ '!text-accent': ui.sidebarOpen }"
-        title="Toggle sidebar (⌘B)"
-        @click="ui.sidebarOpen = !ui.sidebarOpen"
-      >
-        <span class="codicon codicon-layout-sidebar-left" />
-      </button>
-      <span class="codicon codicon-book text-accent" />
-      <span class="font-semibold text-fg-0">{{ kb.name }}</span>
-      <span class="text-fg-3 text-xs" v-if="fileName">/ {{ fileName }}</span>
-      <span class="flex-1" />
-      <span class="text-xs" :class="files.saveState === 'saved' ? 'text-fg-3' : 'text-accent'">
-        {{ saveLabel }}
-      </span>
-      <button
-        v-if="review.count"
-        class="btn text-xs !border-accent !text-accent"
-        title="Review agent changes"
-        @click="review.panelOpen = true"
-      >
-        <span class="codicon codicon-sm codicon-diff mr-1" />{{ review.count }}
-      </button>
-      <button
-        v-if="git.isRepo"
-        class="btn text-xs"
-        :title="`Git: ${git.branch ?? ''}${git.dirtyCount ? ` · ${git.dirtyCount} changed` : ''}`"
-        @click="openGit"
-      >
-        <span class="codicon codicon-sm codicon-git-branch mr-1" />{{ git.branch
-        }}<span v-if="git.dirtyCount" class="ml-1 text-accent">{{ git.dirtyCount }}</span>
-      </button>
-      <button
-        v-if="isMarkdown && ui.view === 'file'"
-        class="btn text-xs"
-        @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
-      >
-        <span
-          class="codicon codicon-sm mr-1"
-          :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
-        />
-        {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
-      </button>
-      <button class="btn text-xs" title="Search (⌘K)" @click="ui.searchOpen = true">
-        <span class="codicon codicon-sm codicon-search" />
-      </button>
-      <button
-        class="btn text-xs"
-        :class="{ '!text-accent': ui.view === 'graph' }"
-        title="Graph view"
-        @click="ui.view = ui.view === 'graph' ? 'file' : 'graph'"
-      >
-        <span class="codicon codicon-sm codicon-type-hierarchy-sub" />
-      </button>
-      <button class="btn text-xs" title="KB health" @click="ui.healthOpen = true">
-        <span class="codicon codicon-sm codicon-pulse" />
-      </button>
-      <button
-        class="btn text-xs"
-        :class="{ '!text-accent': ui.agentOpen }"
-        title="Toggle agent panel (⌘J)"
-        @click="ui.agentOpen = !ui.agentOpen"
-      >
-        <span class="codicon codicon-sm codicon-sparkle" />
-      </button>
-      <button class="btn text-xs" :title="`Theme: ${theme.pref}`" @click="theme.cycle()">
-        <span class="codicon codicon-sm" :class="themeIcon" />
-      </button>
-      <button class="btn text-xs" title="Close folder" @click="closeKb">
-        <span class="codicon codicon-sm codicon-close" />
-      </button>
-    </header>
-
     <!-- Concurrent-tab warning -->
     <div
       v-if="kb.lockedByOther"
@@ -185,10 +170,125 @@ function closeKb(): void {
     </div>
 
     <div class="flex-1 flex min-h-0">
+      <!-- Activity bar (VS Code style) -->
+      <nav class="w-12 shrink-0 bg-bg-1 border-r border-border flex flex-col items-center py-2 gap-1">
+        <!-- Top group -->
+        <button :class="actBtn" title="Toggle sidebar (⌘B)" @click="ui.sidebarOpen = !ui.sidebarOpen">
+          <span
+            v-if="ui.sidebarOpen"
+            class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
+          />
+          <span class="codicon codicon-files" :class="{ 'text-accent': ui.sidebarOpen }" />
+        </button>
+        <button :class="actBtn" title="Search (⌘K)" @click="ui.searchOpen = true">
+          <span class="codicon codicon-search" />
+        </button>
+        <button
+          :class="actBtn"
+          title="Graph view"
+          @click="ui.view = ui.view === 'graph' ? 'file' : 'graph'"
+        >
+          <span
+            v-if="ui.view === 'graph'"
+            class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
+          />
+          <span class="codicon codicon-type-hierarchy-sub" :class="{ 'text-accent': ui.view === 'graph' }" />
+        </button>
+        <button v-if="git.isRepo" :class="actBtn" :title="gitTitle" @click="openGit">
+          <span
+            v-if="git.panelOpen"
+            class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
+          />
+          <span class="codicon codicon-git-branch" :class="{ 'text-accent': git.panelOpen }" />
+          <span
+            v-if="git.dirtyCount"
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] leading-4 text-center font-medium"
+          >{{ git.dirtyCount }}</span>
+        </button>
+        <button :class="actBtn" title="KB health" @click="ui.healthOpen = true">
+          <span class="codicon codicon-pulse" />
+        </button>
+        <button
+          v-if="review.count"
+          :class="actBtn"
+          title="Review agent changes"
+          @click="review.panelOpen = true"
+        >
+          <span class="codicon codicon-diff text-accent" />
+          <span
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] leading-4 text-center font-medium"
+          >{{ review.count }}</span>
+        </button>
+
+        <span class="flex-1" />
+
+        <!-- Bottom group -->
+        <button :class="actBtn" title="Settings" @click="settingsOpen = true">
+          <span class="codicon codicon-settings-gear" :class="{ 'text-accent': settingsOpen }" />
+        </button>
+        <button :class="actBtn" :title="`Theme: ${theme.pref}`" @click="theme.cycle()">
+          <span class="codicon" :class="themeIcon" />
+        </button>
+        <button :class="actBtn" title="Close folder" @click="closeKb">
+          <span class="codicon codicon-close" />
+        </button>
+      </nav>
+
       <!-- Sidebar -->
       <aside v-show="ui.sidebarOpen" class="w-64 shrink-0 border-r border-border bg-bg-1 flex flex-col">
-        <div class="flex-1 panel-scroll">
-          <FileTree />
+        <!-- KB switcher header (h-9 matches the editor tab bar / agent header) -->
+        <div class="relative shrink-0 h-9 border-b border-border">
+          <button
+            class="flex items-center gap-1.5 w-full px-3 h-full text-left hover:bg-bg-2 transition-colors"
+            :title="kb.name ?? ''"
+            @click="toggleKbMenu"
+          >
+            <span class="codicon codicon-sm codicon-book text-accent shrink-0" />
+            <span class="font-semibold text-fg-0 text-sm truncate">{{ kb.name }}</span>
+            <span
+              class="codicon codicon-sm codicon-chevron-down text-fg-3 shrink-0 transition-transform"
+              :class="{ 'rotate-180': kbMenuOpen }"
+            />
+            <span class="flex-1" />
+            <span
+              class="codicon codicon-sm shrink-0"
+              :class="[saveDisplay.icon, saveDisplay.class]"
+              :title="saveLabel"
+            />
+          </button>
+
+          <!-- Dropdown -->
+          <div
+            v-if="kbMenuOpen"
+            class="absolute left-2 right-2 top-full mt-1 z-50 rounded-md border border-border bg-bg-1 shadow-lg py-1 text-sm"
+          >
+            <button :class="menuItem" @click="openFolder">
+              <span class="codicon codicon-sm codicon-folder-opened text-fg-3" />Open Folder…
+            </button>
+            <div class="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-fg-3">
+              Open Recent
+            </div>
+            <button
+              v-for="r in recentsOther"
+              :key="r.name"
+              :class="menuItem"
+              @click="openRecentEntry(r)"
+            >
+              <span class="codicon codicon-sm codicon-folder text-fg-3 shrink-0" />
+              <span class="truncate">{{ r.name }}</span>
+            </button>
+            <div v-if="!recentsOther.length" class="px-3 py-1 text-xs text-fg-3">
+              No other folders
+            </div>
+            <div class="border-t border-border my-1" />
+            <button :class="menuItem" @click="newKb">
+              <span class="codicon codicon-sm codicon-add text-fg-3" />New KB…
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 panel-scroll flex flex-col">
+          <FileTree class="flex-1" />
         </div>
         <BacklinksPanel />
       </aside>
@@ -199,6 +299,19 @@ function closeKb(): void {
         <template v-else>
           <EditorTabs />
           <div class="flex-1 min-h-0 relative">
+            <!-- Editor actions (contextual, markdown only) -->
+            <button
+              v-if="isMarkdown && files.currentPath"
+              class="btn text-xs absolute top-2 right-3 z-10 shadow-sm"
+              @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
+            >
+              <span
+                class="codicon codicon-sm mr-1"
+                :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
+              />
+              {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
+            </button>
+
             <!-- PDFs stay mounted per open tab (trace-app pattern) — switching
                  tabs only toggles visibility, never reloads the document. -->
             <PdfViewer v-show="kind === 'pdf'" class="absolute inset-0" />
@@ -244,9 +357,22 @@ function closeKb(): void {
 
       <!-- Agent panel -->
       <aside v-show="ui.agentOpen" class="w-96 shrink-0 border-l border-border">
-        <ChatPanel @open-settings="settingsOpen = true" />
+        <ChatPanel @open-settings="settingsOpen = true" @close="ui.agentOpen = false" />
       </aside>
     </div>
+
+    <!-- Click-away layer for the KB switcher menu -->
+    <div v-if="kbMenuOpen" class="fixed inset-0 z-40" @click="kbMenuOpen = false" />
+
+    <!-- Floating agent button — opens the panel, hides while it is open -->
+    <button
+      v-if="!ui.agentOpen"
+      class="absolute bottom-5 right-5 z-30 w-12 h-12 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+      title="Open agent (⌘J)"
+      @click="ui.agentOpen = true"
+    >
+      <span class="codicon codicon-lg codicon-sparkle" />
+    </button>
 
     <ReviewPanel />
     <GitPanel />
