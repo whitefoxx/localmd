@@ -87,6 +87,12 @@ interface ChatSession {
   updatedAt: number
 }
 
+/** An open chat tab: a session plus its runtime `running` flag. Multiple tabs
+ *  run concurrently; `running` is not persisted. */
+interface OpenSession extends ChatSession {
+  running: boolean
+}
+
 export interface SessionSummary {
   id: string
   title: string
@@ -102,22 +108,33 @@ let nextId = 1
 export const useChatStore = defineStore('chat', () => {
   const kb = useKbStore()
 
-  const current = ref<ChatSession | null>(null)
+  /** Max concurrent chat tabs. Creating/opening past this recycles the oldest
+   *  idle tab; if every tab is running, the action is refused (with a flash). */
+  const MAX_TABS = 6
+
+  // Open chat tabs run concurrently. Each carries its own `running` flag; the
+  // per-session AbortController lives in a non-reactive map. Switching the
+  // active tab never touches another tab's in-flight turn.
+  const tabs = ref<OpenSession[]>([])
+  const activeId = ref<string | null>(null)
   const sessions = ref<SessionSummary[]>([])
-  const running = ref(false)
   const historyOpen = ref(false)
+  const limitMsg = ref('')
 
-  let controller: AbortController | null = null
+  const controllers = new Map<string, AbortController>()
 
-  const messages = computed<UiMessage[]>(() => current.value?.uiMessages ?? [])
+  const active = computed(() => tabs.value.find((t) => t.id === activeId.value) ?? null)
+  const messages = computed<UiMessage[]>(() => active.value?.uiMessages ?? [])
+  const running = computed(() => active.value?.running ?? false)
 
   // Sessions are per-KB: on KB switch, reload the list and auto-open the most
   // recent session (if any) so the user resumes where they left off.
   watch(
     () => kb.name,
     async (name) => {
-      stop()
-      current.value = null
+      stopAll()
+      tabs.value = []
+      activeId.value = null
       historyOpen.value = false
       if (!name) {
         sessions.value = []
@@ -135,49 +152,130 @@ export const useChatStore = defineStore('chat', () => {
     return list.map((s) => ({ id: s.id, title: s.title, updatedAt: s.updatedAt }))
   }
 
+  function makeEmptySession(): OpenSession {
+    return reactive({
+      id: crypto.randomUUID(),
+      kb: kb.name ?? '',
+      title: 'New chat',
+      profileId: '',
+      provider: '',
+      uiMessages: [],
+      anthropicHistory: [],
+      openaiHistory: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      running: false,
+    }) as OpenSession
+  }
+
+  /** Add a tab, honoring MAX_TABS by recycling the oldest idle tab. Returns
+   *  false (and flashes a message) when every existing tab is busy. */
+  function addTab(s: OpenSession): boolean {
+    if (tabs.value.length >= MAX_TABS) {
+      const victim = tabs.value.find((t) => !t.running)
+      if (!victim) {
+        limitMsg.value = `最多同时打开 ${MAX_TABS} 个会话`
+        window.setTimeout(() => (limitMsg.value = ''), 3000)
+        return false
+      }
+      closeTab(victim.id)
+    }
+    tabs.value.push(s)
+    return true
+  }
+
+  function activateTab(id: string): void {
+    if (tabs.value.some((t) => t.id === id)) activeId.value = id
+    historyOpen.value = false
+  }
+
+  function closeTab(id: string): void {
+    controllers.get(id)?.abort()
+    controllers.delete(id)
+    const i = tabs.value.findIndex((t) => t.id === id)
+    if (i < 0) return
+    tabs.value.splice(i, 1)
+    if (activeId.value === id) {
+      activeId.value = tabs.value[Math.min(i, tabs.value.length - 1)]?.id ?? null
+    }
+  }
+
   function newSession(): void {
-    stop()
-    current.value = null
+    // Reuse an existing empty draft tab rather than piling up blank tabs.
+    const empty = tabs.value.find((t) => !t.uiMessages.length && !t.running)
+    if (empty) activeId.value = empty.id
+    else {
+      const s = makeEmptySession()
+      if (!addTab(s)) return
+      activeId.value = s.id
+    }
     historyOpen.value = false
     usePlanStore().clear()
     useMcpStore().clearActivated() // deferred-tool activation is per-session
   }
 
-  /** Load an already-fetched stored session into view. */
+  /** Open a stored session as a tab (deduped: focus it if already open). */
   function adoptSession(stored: idb.StoredSession): void {
-    current.value = stored as unknown as ChatSession
-    nextId = Math.max(0, ...current.value.uiMessages.map((m) => m.id)) + 1
+    const existing = tabs.value.find((t) => t.id === stored.id)
+    if (existing) {
+      activeId.value = existing.id
+      historyOpen.value = false
+      return
+    }
+    const s = reactive({ ...(stored as unknown as ChatSession), running: false }) as OpenSession
+    if (!addTab(s)) return
+    const maxId = s.uiMessages.reduce((a, m) => Math.max(a, m.id), 0)
+    nextId = Math.max(nextId, maxId + 1)
+    activeId.value = s.id
     historyOpen.value = false
     usePlanStore().clear()
     useMcpStore().clearActivated() // deferred-tool activation is per-session
   }
 
   async function openSession(id: string): Promise<void> {
-    stop()
+    const existing = tabs.value.find((t) => t.id === id)
+    if (existing) {
+      activeId.value = existing.id
+      historyOpen.value = false
+      return
+    }
     const stored = await idb.getSession(id)
     if (!stored) return
     adoptSession(stored)
   }
 
   async function removeSession(id: string): Promise<void> {
+    closeTab(id)
     await idb.deleteSession(id)
-    if (current.value?.id === id) current.value = null
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
-  async function persist(): Promise<void> {
-    const s = current.value
-    if (!s || !s.uiMessages.length) return
-    s.updatedAt = Date.now()
+  async function persist(session: OpenSession): Promise<void> {
+    if (!session.uiMessages.length) return
+    session.updatedAt = Date.now()
     // JSON round-trip strips Vue reactivity proxies before structured clone.
-    await idb.saveSession(JSON.parse(JSON.stringify(s)) as idb.StoredSession)
+    const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & { running?: boolean }
+    delete snapshot.running
+    await idb.saveSession(snapshot)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
-  function stop(): void {
-    controller?.abort()
-    controller = null
+  /** Stop a single session's turn (the active one by default). */
+  function stop(id: string | null = activeId.value): void {
+    if (id) {
+      controllers.get(id)?.abort()
+      controllers.delete(id)
+      const t = tabs.value.find((x) => x.id === id)
+      if (t) t.running = false
+    }
     // Writes paused for approval must not dangle after the turn dies.
+    useReviewStore().rejectAwaiting()
+  }
+
+  function stopAll(): void {
+    for (const c of controllers.values()) c.abort()
+    controllers.clear()
+    for (const t of tabs.value) t.running = false
     useReviewStore().rejectAwaiting()
   }
 
@@ -256,7 +354,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function send(text: string, attachments: Attachment[] = []): Promise<void> {
     const trimmed = text.trim()
-    if ((!trimmed && !attachments.length) || running.value || !kb.name) return
+    if ((!trimmed && !attachments.length) || !kb.name) return
     const settings = useSettingsStore()
     const files = useFilesStore()
     const primary = settings.primary
@@ -269,25 +367,23 @@ export const useChatStore = defineStore('chat', () => {
           ? 'mock'
           : 'openai'
 
-    if (!current.value) {
-      current.value = {
-        id: crypto.randomUUID(),
-        kb: kb.name,
-        title: (trimmed || attachments[0]?.path || 'chat').slice(0, 40),
-        profileId: primary.id,
-        provider: providerKind,
-        uiMessages: [],
-        anthropicHistory: [],
-        openaiHistory: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
+    // Send goes to the active tab (creating one if none). Other tabs may be
+    // mid-turn; only THIS tab being busy blocks a new send.
+    let session = active.value
+    if (!session) {
+      session = makeEmptySession()
+      if (!addTab(session)) return
+      activeId.value = session.id
     }
-    const session = current.value
+    if (session.running) return
+
+    if (!session.uiMessages.length) {
+      session.title = (trimmed || attachments[0]?.path || 'chat').slice(0, 40)
+    }
 
     // Switching the primary profile mid-conversation would replay an
     // incompatible (or differently-priced) history — start the wire history
-    // fresh; the UI transcript stays.
+    // fresh; the UI transcript stays. (Also fills profile on a fresh session.)
     if (session.profileId !== primary.id || session.provider !== providerKind) {
       session.profileId = primary.id
       session.provider = providerKind
@@ -322,7 +418,7 @@ export const useChatStore = defineStore('chat', () => {
     // (no streaming). Mutating through the proxy triggers per-delta updates.
     const assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
     session.uiMessages.push(assistant)
-    void persist()
+    void persist(session)
 
     const onEvent = (e: AgentEvent): void => {
       const parts = assistant.parts
@@ -356,8 +452,9 @@ export const useChatStore = defineStore('chat', () => {
       }
     }
 
-    running.value = true
-    controller = new AbortController()
+    session.running = true
+    const controller = new AbortController()
+    controllers.set(session.id, controller)
     useReviewStore().beginTurn() // collect this turn's writes for checkpointing
     try {
       const system = await buildSystemPrompt()
@@ -488,8 +585,8 @@ export const useChatStore = defineStore('chat', () => {
         assistant.error = msg
       }
     } finally {
-      running.value = false
-      controller = null
+      session.running = false
+      controllers.delete(session.id)
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever.
       for (const p of assistant.parts) {
@@ -498,7 +595,7 @@ export const useChatStore = defineStore('chat', () => {
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
         }
       }
-      void persist()
+      void persist(session)
       void checkpoint(trimmed, assistant)
       void autoTitle(session, trimmed, assistant)
     }
@@ -507,7 +604,7 @@ export const useChatStore = defineStore('chat', () => {
   /** After the FIRST exchange, replace the sliced-text title with a short
    *  model-generated one (fire-and-forget; failures keep the fallback). */
   async function autoTitle(
-    session: ChatSession,
+    session: OpenSession,
     userText: string,
     assistant: UiMessage,
   ): Promise<void> {
@@ -520,9 +617,9 @@ export const useChatStore = defineStore('chat', () => {
       .join(' ')
     if (!reply) return
     const title = await generateTitle(settings.primary, userText, reply)
-    if (title && current.value === session) {
+    if (title) {
       session.title = title
-      void persist()
+      void persist(session)
     }
   }
 
@@ -569,15 +666,19 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     messages,
+    tabs,
     sessions,
     running,
     historyOpen,
+    limitMsg,
     sessionUsage,
-    currentSessionId: computed(() => current.value?.id ?? null),
+    currentSessionId: computed(() => active.value?.id ?? null),
     send,
     stop,
     newSession,
     openSession,
     removeSession,
+    activateTab,
+    closeTab,
   }
 })

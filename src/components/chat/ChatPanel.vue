@@ -384,6 +384,38 @@ watch(
       </button>
     </div>
 
+    <!-- Session tabs (concurrent chats) -->
+    <div
+      v-if="chat.tabs.length > 1"
+      class="flex items-stretch h-8 border-b border-border bg-bg-1 overflow-x-auto panel-scroll shrink-0"
+    >
+      <button
+        v-for="t in chat.tabs"
+        :key="t.id"
+        class="group flex items-center gap-1.5 px-2.5 text-xs border-r border-border whitespace-nowrap max-w-[150px]"
+        :class="t.id === chat.currentSessionId ? 'bg-bg-0 text-fg-0' : 'text-fg-2 hover:bg-bg-2/50'"
+        :title="t.title"
+        @click="chat.activateTab(t.id)"
+      >
+        <span
+          v-if="t.running"
+          class="codicon codicon-sm codicon-loading codicon-modifier-spin text-accent shrink-0"
+        />
+        <span class="truncate">{{ t.title }}</span>
+        <span
+          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 shrink-0"
+          :class="{ '!opacity-100': t.id === chat.currentSessionId }"
+          @click.stop="chat.closeTab(t.id)"
+        />
+      </button>
+    </div>
+    <div
+      v-if="chat.limitMsg"
+      class="px-3 py-1 text-[11px] text-yellow-700 dark:text-yellow-300 bg-yellow-500/10 border-b border-border shrink-0"
+    >
+      {{ chat.limitMsg }}
+    </div>
+
     <!-- Session history overlay -->
     <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll">
       <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
