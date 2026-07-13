@@ -27,6 +27,9 @@ const PLAN_ICONS = {
   done: 'codicon-pass-filled text-added',
 } as const
 
+/** The ACTIVE session's plan — each chat tab keeps its own. */
+const planItems = computed(() => plan.itemsFor(chat.currentSessionId))
+
 const input = ref('')
 const scroller = ref<HTMLElement | null>(null)
 const textarea = ref<HTMLTextAreaElement | null>(null)
@@ -506,24 +509,28 @@ watch(
       </div>
     </div>
 
-    <!-- Agent plan (update_plan tool) -->
+    <!-- Agent plan (update_plan tool, per session) -->
     <div
-      v-if="plan.items.length"
+      v-if="planItems.length"
       class="mx-3 mb-2 rounded-md border border-border bg-bg-2/50 px-3 py-2 shrink-0 max-h-40 overflow-y-auto"
     >
       <div class="flex items-center gap-1.5 text-xs text-fg-3 uppercase tracking-wide mb-1.5">
         <span class="codicon codicon-sm codicon-checklist" />
         Plan
         <span class="normal-case">
-          {{ plan.items.filter((i) => i.status === 'done').length }}/{{ plan.items.length }}
+          {{ planItems.filter((i) => i.status === 'done').length }}/{{ planItems.length }}
         </span>
         <span class="flex-1" />
-        <button class="hover:text-fg-0" title="Dismiss" @click="plan.clear()">
+        <button
+          class="hover:text-fg-0"
+          title="Dismiss"
+          @click="chat.currentSessionId && plan.clear(chat.currentSessionId)"
+        >
           <span class="codicon codicon-sm codicon-close" />
         </button>
       </div>
       <div
-        v-for="(item, i) in plan.items"
+        v-for="(item, i) in planItems"
         :key="i"
         class="flex items-start gap-1.5 text-xs py-0.5"
         :class="item.status === 'done' ? 'text-fg-3 line-through' : 'text-fg-1'"

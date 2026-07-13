@@ -34,7 +34,7 @@ Documents (PDF/EPUB) and citation workflow:
 - PDFs and EPUBs are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).
 - Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
 
-export async function buildSystemPrompt(): Promise<string> {
+export async function buildSystemPrompt(sessionId: string): Promise<string> {
   let prompt = BASE
 
   const skills = await listSkills()
@@ -46,11 +46,13 @@ export async function buildSystemPrompt(): Promise<string> {
 
   // Deferred external tools: schemas stay out of the request until activated —
   // the model sees this compact catalog and calls enable_tools on demand.
+  // Activation is per session, so the catalog is too.
   const mcpStore = useMcpStore()
-  if (mcpStore.deferredTools.length) {
+  const deferred = mcpStore.deferredToolsFor(sessionId)
+  if (deferred.length) {
     prompt +=
       `\n\nDeferred external tools — NOT yet callable. To use one, first call enable_tools with its exact name(s); it becomes callable immediately:\n` +
-      mcpStore.deferredTools.map((t) => catalogEntry(t.qualifiedName, t.def.description)).join('\n')
+      deferred.map((t) => catalogEntry(t.qualifiedName, t.def.description)).join('\n')
   }
 
   // Browser-bridge guidance appears only when the tools are connected.

@@ -14,9 +14,12 @@ test.beforeEach(async ({ page }) => {
 
 test('scaffold initializes the KB and opens the index', async ({ page }) => {
   await page.getByRole('button', { name: /初始化知识库/ }).click()
-  // The scaffolded index opens (file name in the title bar) and the tree
-  // gained the starter structure.
-  await expect(page.locator('header').getByText('index.md')).toBeVisible({ timeout: 10_000 })
+  // The scaffolded index opens (file name in the editor tab bar — the old
+  // title bar became a VS Code-style activity bar) and the tree gained the
+  // starter structure.
+  await expect(page.locator('main').getByRole('button', { name: 'index.md' })).toBeVisible({
+    timeout: 10_000,
+  })
   await expect(page.locator('aside').getByText('wiki', { exact: true })).toBeVisible()
   await expect(page.locator('aside').getByText('AGENTS.md', { exact: true })).toBeVisible()
 })

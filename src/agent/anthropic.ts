@@ -30,6 +30,9 @@ export interface AnthropicTurnOptions {
   system: string
   /** Full conversation history including the newest user message. */
   messages: BetaMessageParam[]
+  /** Chat session this turn belongs to — scopes tool side effects (writes,
+   *  plan, deferred-tool activation) so concurrent sessions stay isolated. */
+  sessionId: string
   onEvent: AgentEventHandler
   signal: AbortSignal
   /** Offer the run_subagent tool (disabled inside subagents — depth 1 only). */
@@ -83,8 +86,10 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       },
     }) as never
 
+  const ctx = { sessionId: opts.sessionId }
+
   const syncExternalTools = (): void => {
-    const added = externalToolSpecs().filter((e) => !externalNames.has(e.name))
+    const added = externalToolSpecs(opts.sessionId).filter((e) => !externalNames.has(e.name))
     if (!added.length || !runnerRef) return
     for (const e of added) externalNames.add(e.name)
     const newTools = added.map(makeExternalTool)
@@ -102,7 +107,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       run: async (args) => {
         opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(args) })
         try {
-          const result = await t.run(args)
+          const result = await t.run(args, ctx)
           if (t.name === 'enable_tools') syncExternalTools()
           return result
         } catch (err) {
@@ -150,7 +155,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
 
   // Remote MCP tools (raw JSON schemas — betaTool skips the zod round trip).
   // Only currently-active ones; deferred tools join via enable_tools.
-  for (const ext of externalToolSpecs()) {
+  for (const ext of externalToolSpecs(opts.sessionId)) {
     externalNames.add(ext.name)
     tools.push(makeExternalTool(ext))
   }

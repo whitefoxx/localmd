@@ -22,16 +22,33 @@ import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
 import { useMcpStore } from '@/stores/mcp'
 
-/** In ask mode, pause until the user approves the proposed content; returns
- *  whether the write may proceed (auto mode always may). */
-async function approved(path: string, before: string | null, after: string): Promise<boolean> {
-  if (useSettingsStore().state.writeMode !== 'ask') return true
-  return await useReviewStore().askApproval(path, before, after)
+/** Per-turn execution context threaded from the runners into every tool call,
+ *  attributing side effects (writes, plan updates, tool activations) to the
+ *  chat session the turn belongs to — concurrent sessions stay isolated. */
+export interface ToolCtx {
+  sessionId: string
 }
 
-async function performWrite(path: string, before: string | null, content: string): Promise<void> {
+/** In ask mode, pause until the user approves the proposed content; returns
+ *  whether the write may proceed (auto mode always may). */
+async function approved(
+  ctx: ToolCtx,
+  path: string,
+  before: string | null,
+  after: string,
+): Promise<boolean> {
+  if (useSettingsStore().state.writeMode !== 'ask') return true
+  return await useReviewStore().askApproval(ctx.sessionId, path, before, after)
+}
+
+async function performWrite(
+  ctx: ToolCtx,
+  path: string,
+  before: string | null,
+  content: string,
+): Promise<void> {
   await fs.writeFile(path, content)
-  useReviewStore().recordWrite(path, before, content)
+  useReviewStore().recordWrite(ctx.sessionId, path, before, content)
   const files = useFilesStore()
   await files.refreshTree()
   await files.reloadIfClean(path)
@@ -47,7 +64,7 @@ export interface ToolSpec<S extends z.ZodType = any> {
   schema: S
   /** One-line human summary of a call, shown in the chat transcript. */
   describeCall: (args: z.infer<S>) => string
-  run: (args: z.infer<S>) => Promise<string>
+  run: (args: z.infer<S>, ctx: ToolCtx) => Promise<string>
 }
 
 function defineTool<S extends z.ZodType>(spec: ToolSpec<S>): ToolSpec<S> {
@@ -113,12 +130,12 @@ const writeFile = defineTool({
     content: z.string().describe('Full file content'),
   }),
   describeCall: (a) => `write ${a.path}`,
-  run: async ({ path, content }) => {
+  run: async ({ path, content }, ctx) => {
     const before = await fs.tryReadFile(path)
-    if (!(await approved(path, before, content))) {
+    if (!(await approved(ctx, path, before, content))) {
       return `User declined the write to ${path}. Ask them how to proceed instead of retrying.`
     }
-    await performWrite(path, before, content)
+    await performWrite(ctx, path, before, content)
     return `Wrote ${path} (${content.length} chars)`
   },
 })
@@ -134,15 +151,15 @@ const editFile = defineTool({
     replace_all: z.boolean().optional().describe('Replace every occurrence (default false)'),
   }),
   describeCall: (a) => `edit ${a.path}`,
-  run: async ({ path, old_string, new_string, replace_all }) => {
+  run: async ({ path, old_string, new_string, replace_all }, ctx) => {
     const before = await fs.tryReadFile(path)
     if (before === null) return `Error: file not found: ${path}`
     const result = applyEdit(before, old_string, new_string, replace_all ?? false)
     if (!result.ok) return `Error: ${result.error}`
-    if (!(await approved(path, before, result.content))) {
+    if (!(await approved(ctx, path, before, result.content))) {
       return `User declined the edit to ${path}. Ask them how to proceed instead of retrying.`
     }
-    await performWrite(path, before, result.content)
+    await performWrite(ctx, path, before, result.content)
     return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
   },
 })
@@ -167,8 +184,8 @@ const updatePlan = defineTool({
     const done = a.items.filter((i) => i.status === 'done').length
     return `plan ${done}/${a.items.length}`
   },
-  run: async ({ items }) => {
-    usePlanStore().set(items as PlanItem[])
+  run: async ({ items }, ctx) => {
+    usePlanStore().set(ctx.sessionId, items as PlanItem[])
     return `Plan updated (${items.length} items). Continue with the next in_progress step.`
   },
 })
@@ -231,9 +248,9 @@ const enableTools = defineTool({
     names: z.array(z.string()).min(1).describe('Qualified tool names from the deferred catalog'),
   }),
   describeCall: (a) => `enable ${a.names.length} tool(s)`,
-  run: async ({ names }) => {
+  run: async ({ names }, ctx) => {
     const mcp = useMcpStore()
-    const accepted = mcp.activate(names)
+    const accepted = mcp.activate(ctx.sessionId, names)
     const unknown = names.filter((n) => !accepted.includes(n))
     if (!accepted.length) {
       return `Error: no matching tools. Unknown: ${unknown.join(', ')}. Use exact names from the deferred-tools catalog in the system prompt.`
@@ -443,12 +460,12 @@ export interface ExternalToolSpec {
   run: (args: Record<string, unknown>) => Promise<string>
 }
 
-/** Snapshot of currently-ACTIVE external tools (deferred ones stay out until
- *  enable_tools activates them); called per request iteration so activation
- *  takes effect within the same turn. */
-export function externalToolSpecs(): ExternalToolSpec[] {
+/** Snapshot of the session's currently-ACTIVE external tools (deferred ones
+ *  stay out until enable_tools activates them); called per request iteration
+ *  so activation takes effect within the same turn. */
+export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
   const mcp = useMcpStore()
-  return mcp.activeTools.map((t) => ({
+  return mcp.activeToolsFor(sessionId).map((t) => ({
     name: t.qualifiedName,
     description: `[外部 MCP:${t.serverName}] ${t.def.description}`.slice(0, 1024),
     jsonSchema: t.def.inputSchema,

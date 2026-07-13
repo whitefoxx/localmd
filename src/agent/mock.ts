@@ -18,6 +18,7 @@ type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
 export interface MockTurnOptions {
   system: string
   messages: ChatMessage[]
+  sessionId: string
   onEvent: AgentEventHandler
   signal: AbortSignal
 }
@@ -31,11 +32,15 @@ async function streamText(text: string, onEvent: AgentEventHandler): Promise<voi
   }
 }
 
-async function runTool(name: string, args: Record<string, unknown>, onEvent: AgentEventHandler): Promise<string> {
+async function runTool(
+  name: string,
+  args: Record<string, unknown>,
+  opts: MockTurnOptions,
+): Promise<string> {
   const spec = TOOLS.find((t) => t.name === name)
   if (!spec) return `Error: unknown tool ${name}`
-  onEvent({ type: 'tool', name, detail: spec.describeCall(args) })
-  return await spec.run(args)
+  opts.onEvent({ type: 'tool', name, detail: spec.describeCall(args) })
+  return await spec.run(args, { sessionId: opts.sessionId })
 }
 
 export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]> {
@@ -58,7 +63,7 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]>
     reply = script.slice(5)
     await streamText(reply, opts.onEvent)
   } else if (writeMatch) {
-    const result = await runTool('write_file', { path: writeMatch[1], content: writeMatch[2] }, opts.onEvent)
+    const result = await runTool('write_file', { path: writeMatch[1], content: writeMatch[2] }, opts)
     reply = `完成:${result}`
     await streamText(reply, opts.onEvent)
   } else if (script === 'plan') {
@@ -71,7 +76,7 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]>
           { text: '第三步', status: 'in_progress' },
         ],
       },
-      opts.onEvent,
+      opts,
     )
     reply = '计划已更新'
     await streamText(reply, opts.onEvent)

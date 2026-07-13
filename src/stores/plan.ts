@@ -1,7 +1,9 @@
 /**
  * The agent's living task list (Claude Code TodoWrite semantics): the
  * update_plan tool replaces the whole list each call; the chat panel renders
- * it as a checklist card. Cleared when the session or KB changes.
+ * it as a checklist card. Keyed by chat session so concurrent sessions keep
+ * independent plans; entries are dropped when their tab closes or the KB
+ * switches.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -14,15 +16,23 @@ export interface PlanItem {
 }
 
 export const usePlanStore = defineStore('plan', () => {
-  const items = ref<PlanItem[]>([])
+  const byId = ref(new Map<string, PlanItem[]>())
 
-  function set(next: PlanItem[]): void {
-    items.value = next
+  function itemsFor(sessionId: string | null): PlanItem[] {
+    return sessionId ? (byId.value.get(sessionId) ?? []) : []
   }
 
-  function clear(): void {
-    items.value = []
+  function set(sessionId: string, next: PlanItem[]): void {
+    byId.value.set(sessionId, next)
   }
 
-  return { items, set, clear }
+  function clear(sessionId: string): void {
+    byId.value.delete(sessionId)
+  }
+
+  function reset(): void {
+    byId.value.clear()
+  }
+
+  return { byId, itemsFor, set, clear, reset }
 })

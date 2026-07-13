@@ -71,8 +71,9 @@ export const useMcpStore = defineStore('mcp', () => {
     ),
   )
 
-  /** Tools the model activated this session (deferred-loading escape hatch). */
-  const activated = ref(new Set<string>())
+  /** Deferred tools the model activated, keyed by chat session — concurrent
+   *  sessions activate independently (deferred-loading escape hatch). */
+  const activated = ref(new Map<string, Set<string>>())
 
   const toolCountByServer = computed(() => {
     const counts = new Map<string, number>()
@@ -80,46 +81,50 @@ export const useMcpStore = defineStore('mcp', () => {
     return counts
   })
 
-  /** Tools whose schemas ride along with every request. */
-  const activeTools = computed<ExternalTool[]>(() =>
-    allTools.value.filter(
-      (t) =>
-        !isDeferredTool(
-          t.qualifiedName,
-          toolCountByServer.value.get(t.serverId) ?? 0,
-          activated.value,
-        ),
-    ),
-  )
+  function activatedFor(sessionId: string): Set<string> {
+    return activated.value.get(sessionId) ?? new Set()
+  }
 
-  /** Big-server tools kept OUT of requests until activated — the system
-   *  prompt lists them as a compact catalog instead. */
-  const deferredTools = computed<ExternalTool[]>(() =>
-    allTools.value.filter(
-      (t) =>
-        isDeferredTool(
-          t.qualifiedName,
-          toolCountByServer.value.get(t.serverId) ?? 0,
-          activated.value,
-        ),
-    ),
-  )
+  /** Tools whose schemas ride along with every request of this session. */
+  function activeToolsFor(sessionId: string): ExternalTool[] {
+    const set = activatedFor(sessionId)
+    return allTools.value.filter(
+      (t) => !isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, set),
+    )
+  }
+
+  /** Big-server tools kept OUT of this session's requests until activated —
+   *  the system prompt lists them as a compact catalog instead. */
+  function deferredToolsFor(sessionId: string): ExternalTool[] {
+    const set = activatedFor(sessionId)
+    return allTools.value.filter(
+      (t) => isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, set),
+    )
+  }
 
   /** Activate deferred tools by qualified name; returns what actually matched. */
-  function activate(names: string[]): string[] {
+  function activate(sessionId: string, names: string[]): string[] {
     const known = new Set(allTools.value.map((t) => t.qualifiedName))
     const accepted = names.filter((n) => known.has(n))
     if (accepted.length) {
-      const next = new Set(activated.value)
+      const next = new Set(activatedFor(sessionId))
       for (const n of accepted) next.add(n)
-      activated.value = next
+      const map = new Map(activated.value)
+      map.set(sessionId, next)
+      activated.value = map
     }
     return accepted
   }
 
-  /** Per-session scope: cleared when the chat session changes. */
-  function clearActivated(): void {
-    if (activated.value.size) activated.value = new Set()
+  /** Drop a session's activations (its tab closed) — or all on KB switch. */
+  function clearActivated(sessionId?: string): void {
+    if (sessionId === undefined) {
+      if (activated.value.size) activated.value = new Map()
+    } else if (activated.value.has(sessionId)) {
+      const map = new Map(activated.value)
+      map.delete(sessionId)
+      activated.value = map
+    }
   }
 
   async function refresh(): Promise<void> {
@@ -183,8 +188,8 @@ export const useMcpStore = defineStore('mcp', () => {
   return {
     servers,
     allTools,
-    activeTools,
-    deferredTools,
+    activeToolsFor,
+    deferredToolsFor,
     activate,
     clearActivated,
     refresh,

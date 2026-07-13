@@ -136,6 +136,9 @@ export const useChatStore = defineStore('chat', () => {
       tabs.value = []
       activeId.value = null
       historyOpen.value = false
+      // Per-session subsystem state belongs to the old KB's sessions.
+      usePlanStore().reset()
+      useMcpStore().clearActivated()
       if (!name) {
         sessions.value = []
         return
@@ -192,6 +195,12 @@ export const useChatStore = defineStore('chat', () => {
   function closeTab(id: string): void {
     controllers.get(id)?.abort()
     controllers.delete(id)
+    // Release the session's per-subsystem state (paused approvals, plan,
+    // deferred-tool activations, turn-write collection).
+    useReviewStore().rejectAwaiting(id)
+    useReviewStore().clearTurn(id)
+    usePlanStore().clear(id)
+    useMcpStore().clearActivated(id)
     const i = tabs.value.findIndex((t) => t.id === id)
     if (i < 0) return
     tabs.value.splice(i, 1)
@@ -210,8 +219,7 @@ export const useChatStore = defineStore('chat', () => {
       activeId.value = s.id
     }
     historyOpen.value = false
-    usePlanStore().clear()
-    useMcpStore().clearActivated() // deferred-tool activation is per-session
+    // plan/mcp state is keyed per session — a fresh session starts empty.
   }
 
   /** Open a stored session as a tab (deduped: focus it if already open). */
@@ -228,8 +236,6 @@ export const useChatStore = defineStore('chat', () => {
     nextId = Math.max(nextId, maxId + 1)
     activeId.value = s.id
     historyOpen.value = false
-    usePlanStore().clear()
-    useMcpStore().clearActivated() // deferred-tool activation is per-session
   }
 
   async function openSession(id: string): Promise<void> {
@@ -260,16 +266,16 @@ export const useChatStore = defineStore('chat', () => {
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
-  /** Stop a single session's turn (the active one by default). */
+  /** Stop a single session's turn (the active one by default). Only that
+   *  session's paused approvals are rejected — others keep waiting. */
   function stop(id: string | null = activeId.value): void {
-    if (id) {
-      controllers.get(id)?.abort()
-      controllers.delete(id)
-      const t = tabs.value.find((x) => x.id === id)
-      if (t) t.running = false
-    }
+    if (!id) return
+    controllers.get(id)?.abort()
+    controllers.delete(id)
+    const t = tabs.value.find((x) => x.id === id)
+    if (t) t.running = false
     // Writes paused for approval must not dangle after the turn dies.
-    useReviewStore().rejectAwaiting()
+    useReviewStore().rejectAwaiting(id)
   }
 
   function stopAll(): void {
@@ -455,9 +461,9 @@ export const useChatStore = defineStore('chat', () => {
     session.running = true
     const controller = new AbortController()
     controllers.set(session.id, controller)
-    useReviewStore().beginTurn() // collect this turn's writes for checkpointing
+    useReviewStore().beginTurn(session.id) // collect this turn's writes for checkpointing
     try {
-      const system = await buildSystemPrompt()
+      const system = await buildSystemPrompt(session.id)
       // Inline images: load bytes fresh from the KB at send time.
       const inlineImages = inline
         ? (await Promise.all(imagePaths.map((p) => loadKbImage(p)))).filter(
@@ -470,6 +476,7 @@ export const useChatStore = defineStore('chat', () => {
         session.openaiHistory = await runMockTurn({
           system,
           messages: [...session.openaiHistory, { role: 'user', content: modelText }],
+          sessionId: session.id,
           onEvent,
           signal: controller.signal,
         })
@@ -518,6 +525,7 @@ export const useChatStore = defineStore('chat', () => {
             ...session.anthropicHistory,
             { role: 'user', content: inlineImages.length ? content : modelText },
           ],
+          sessionId: session.id,
           onEvent,
           signal: controller.signal,
           allowSubagent: true,
@@ -566,6 +574,7 @@ export const useChatStore = defineStore('chat', () => {
             : inline
               ? { profile: primary, inline }
               : undefined,
+          sessionId: session.id,
           onEvent,
           signal: controller.signal,
           allowSubagent: true,
@@ -596,7 +605,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
       void persist(session)
-      void checkpoint(trimmed, assistant)
+      void checkpoint(session, trimmed, assistant)
       void autoTitle(session, trimmed, assistant)
     }
   }
@@ -624,10 +633,14 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /** Auto-commit this turn's agent writes as a revertable checkpoint. */
-  async function checkpoint(userText: string, assistant: UiMessage): Promise<void> {
+  async function checkpoint(
+    session: OpenSession,
+    userText: string,
+    assistant: UiMessage,
+  ): Promise<void> {
     const settings = useSettingsStore()
     if (settings.state.checkpointMode !== 'auto') return
-    const written = [...useReviewStore().turnWrites]
+    const written = useReviewStore().turnWritesFor(session.id)
     if (!written.length) return
     try {
       if (!(await g.isRepo())) return

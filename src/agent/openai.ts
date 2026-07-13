@@ -27,6 +27,9 @@ export interface OpenAITurnOptions {
   /** Vision slot: undefined = no image understanding; inline = the primary is
    *  multimodal (vision profile === primary). */
   vision?: { profile: LlmProfile; inline: boolean }
+  /** Chat session this turn belongs to — scopes tool side effects (writes,
+   *  plan, deferred-tool activation) so concurrent sessions stay isolated. */
+  sessionId: string
   onEvent: AgentEventHandler
   signal: AbortSignal
   /** Offer the run_subagent tool (disabled inside subagents — depth 1 only). */
@@ -82,9 +85,9 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
   }
   // Remote MCP tools — raw JSON schemas pass straight through. Rebuilt per
   // request iteration so enable_tools activation lands within the same turn.
-  let external = externalToolSpecs()
+  let external = externalToolSpecs(opts.sessionId)
   const requestTools = (): OpenAI.Chat.Completions.ChatCompletionTool[] => {
-    external = externalToolSpecs()
+    external = externalToolSpecs(opts.sessionId)
     return [
       ...tools,
       ...external.map((ext) => ({
@@ -239,8 +242,8 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
           // were guessed without the schema, so we don't execute them).
           const { useMcpStore } = await import('@/stores/mcp')
           const mcp = useMcpStore()
-          if (mcp.deferredTools.some((t) => t.qualifiedName === call.name)) {
-            mcp.activate([call.name])
+          if (mcp.deferredToolsFor(opts.sessionId).some((t) => t.qualifiedName === call.name)) {
+            mcp.activate(opts.sessionId, [call.name])
             opts.onEvent({ type: 'tool', name: 'enable_tools', detail: `auto-enable ${call.name}` })
             result = `${call.name} was deferred and is NOW ENABLED with its full schema. Check the schema and call it again.`
           } else {
@@ -250,7 +253,7 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
           try {
             const args = JSON.parse(call.args || '{}')
             opts.onEvent({ type: 'tool', name: call.name, detail: spec.describeCall(args) })
-            result = await spec.run(args)
+            result = await spec.run(args, { sessionId: opts.sessionId })
           } catch (err) {
             result = `Error: ${(err as Error).message}`
           }

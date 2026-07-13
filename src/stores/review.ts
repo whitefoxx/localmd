@@ -25,21 +25,34 @@ export const useReviewStore = defineStore('review', () => {
   const pending = ref<Map<string, PendingChange>>(new Map())
   const panelOpen = ref(false)
 
-  /** Resolvers for writes paused in ask mode, keyed by path. */
-  const resolvers = new Map<string, (approved: boolean) => void>()
+  /** Writes paused in ask mode, keyed by path; sessionId attributes the pause
+   *  to the chat session whose turn it belongs to, so stopping one session
+   *  never rejects another's pending approvals. */
+  const resolvers = new Map<string, { sessionId: string; resolve: (approved: boolean) => void }>()
 
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
 
-  /** Paths written during the CURRENT agent turn (for git checkpoints). */
-  const turnWrites = ref<Set<string>>(new Set())
+  /** Paths written during each session's CURRENT turn (for git checkpoints).
+   *  Keyed by session so concurrent turns don't pollute each other's set. */
+  const turnWrites = ref(new Map<string, Set<string>>())
 
-  function beginTurn(): void {
-    turnWrites.value = new Set()
+  function beginTurn(sessionId: string): void {
+    turnWrites.value.set(sessionId, new Set())
   }
 
-  function recordWrite(path: string, before: string | null, after: string): void {
-    turnWrites.value.add(path)
+  function turnWritesFor(sessionId: string): string[] {
+    return [...(turnWrites.value.get(sessionId) ?? [])]
+  }
+
+  function clearTurn(sessionId: string): void {
+    turnWrites.value.delete(sessionId)
+  }
+
+  function recordWrite(sessionId: string, path: string, before: string | null, after: string): void {
+    let set = turnWrites.value.get(sessionId)
+    if (!set) turnWrites.value.set(sessionId, (set = new Set()))
+    set.add(path)
     const existing = pending.value.get(path)
     if (existing) {
       existing.after = after // keep the original `before` snapshot
@@ -50,7 +63,12 @@ export const useReviewStore = defineStore('review', () => {
 
   /** Ask-first mode: register the proposed write and pause the tool until the
    *  user decides. Resolves false when rejected or the turn is stopped. */
-  function askApproval(path: string, before: string | null, after: string): Promise<boolean> {
+  function askApproval(
+    sessionId: string,
+    path: string,
+    before: string | null,
+    after: string,
+  ): Promise<boolean> {
     const existing = pending.value.get(path)
     if (existing) {
       existing.after = after
@@ -60,14 +78,14 @@ export const useReviewStore = defineStore('review', () => {
     }
     panelOpen.value = true
     return new Promise((resolve) => {
-      resolvers.get(path)?.(false) // a superseded ask counts as rejected
-      resolvers.set(path, resolve)
+      resolvers.get(path)?.resolve(false) // a superseded ask counts as rejected
+      resolvers.set(path, { sessionId, resolve })
     })
   }
 
   function decide(path: string, approved: boolean): void {
-    const resolver = resolvers.get(path)
-    if (!resolver) return
+    const entry = resolvers.get(path)
+    if (!entry) return
     resolvers.delete(path)
     const change = pending.value.get(path)
     if (change) {
@@ -77,12 +95,15 @@ export const useReviewStore = defineStore('review', () => {
         pending.value.delete(path)
       }
     }
-    resolver(approved)
+    entry.resolve(approved)
   }
 
-  /** Stop/abort: every paused write resolves as rejected. */
-  function rejectAwaiting(): void {
-    for (const path of [...resolvers.keys()]) decide(path, false)
+  /** Stop/abort: paused writes of that session resolve as rejected (all
+   *  sessions when omitted — KB switch / global teardown). */
+  function rejectAwaiting(sessionId?: string): void {
+    for (const [path, entry] of [...resolvers.entries()]) {
+      if (sessionId === undefined || entry.sessionId === sessionId) decide(path, false)
+    }
   }
 
   function approve(path: string): void {
@@ -128,8 +149,9 @@ export const useReviewStore = defineStore('review', () => {
     panelOpen,
     changes,
     count,
-    turnWrites,
     beginTurn,
+    turnWritesFor,
+    clearTurn,
     recordWrite,
     askApproval,
     decide,
