@@ -38,7 +38,18 @@ import type OpenAI from 'openai'
 export type MessagePart =
   | { type: 'text'; text: string }
   | { type: 'thinking'; text: string }
-  | { type: 'tool'; name: string; detail: string }
+  /** `status`/`startedAt`/`elapsedMs` are set only for id-bearing tool calls
+   *  (external MCP tools) so the UI can show a loading spinner + timer;
+   *  instant built-in tools stay status-less and render as a plain line. */
+  | {
+      type: 'tool'
+      name: string
+      detail: string
+      id?: number
+      status?: 'running' | 'done' | 'error'
+      startedAt?: number
+      elapsedMs?: number
+    }
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
  *  saved into the KB — `path` is its KB location. */
@@ -100,14 +111,22 @@ export const useChatStore = defineStore('chat', () => {
 
   const messages = computed<UiMessage[]>(() => current.value?.uiMessages ?? [])
 
-  // Sessions are per-KB: reload the list (and drop the open one) on KB switch.
+  // Sessions are per-KB: on KB switch, reload the list and auto-open the most
+  // recent session (if any) so the user resumes where they left off.
   watch(
     () => kb.name,
     async (name) => {
       stop()
       current.value = null
       historyOpen.value = false
-      sessions.value = name ? summarize(await idb.listSessions(name)) : []
+      if (!name) {
+        sessions.value = []
+        return
+      }
+      const stored = await idb.listSessions(name) // sorted newest-first
+      if (kb.name !== name) return // KB switched again while we awaited
+      sessions.value = summarize(stored)
+      if (stored.length) adoptSession(stored[0])
     },
     { immediate: true },
   )
@@ -124,15 +143,20 @@ export const useChatStore = defineStore('chat', () => {
     useMcpStore().clearActivated() // deferred-tool activation is per-session
   }
 
-  async function openSession(id: string): Promise<void> {
-    stop()
-    const stored = await idb.getSession(id)
-    if (!stored) return
+  /** Load an already-fetched stored session into view. */
+  function adoptSession(stored: idb.StoredSession): void {
     current.value = stored as unknown as ChatSession
     nextId = Math.max(0, ...current.value.uiMessages.map((m) => m.id)) + 1
     historyOpen.value = false
     usePlanStore().clear()
-    useMcpStore().clearActivated()
+    useMcpStore().clearActivated() // deferred-tool activation is per-session
+  }
+
+  async function openSession(id: string): Promise<void> {
+    stop()
+    const stored = await idb.getSession(id)
+    if (!stored) return
+    adoptSession(stored)
   }
 
   async function removeSession(id: string): Promise<void> {
@@ -314,8 +338,21 @@ export const useChatStore = defineStore('chat', () => {
         u.input += e.input
         u.output += e.output
         u.cacheRead += e.cacheRead
+      } else if (e.type === 'tool_result') {
+        const p = parts.find((x): x is Extract<MessagePart, { type: 'tool' }> =>
+          x.type === 'tool' && x.id === e.id,
+        )
+        if (p) {
+          p.status = e.ok ? 'done' : 'error'
+          p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
+        }
       } else {
-        parts.push({ type: 'tool', name: e.name, detail: e.detail })
+        // Only id-bearing tool calls get the loading/timer treatment.
+        parts.push(
+          e.id != null
+            ? { type: 'tool', name: e.name, detail: e.detail, id: e.id, status: 'running', startedAt: Date.now() }
+            : { type: 'tool', name: e.name, detail: e.detail },
+        )
       }
     }
 
@@ -453,6 +490,14 @@ export const useChatStore = defineStore('chat', () => {
     } finally {
       running.value = false
       controller = null
+      // A tool still "running" means the turn died mid-call (abort/error) before
+      // its tool_result — settle it so the spinner doesn't spin forever.
+      for (const p of assistant.parts) {
+        if (p.type === 'tool' && p.status === 'running') {
+          p.status = assistant.error ? 'error' : 'done'
+          p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
+        }
+      }
       void persist()
       void checkpoint(trimmed, assistant)
       void autoTitle(session, trimmed, assistant)

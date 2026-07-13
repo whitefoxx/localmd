@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch } from 'vue'
-import { useChatStore, type Attachment } from '@/stores/chat'
+import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
+import { useChatStore, type Attachment, type UiMessage } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
@@ -93,6 +93,73 @@ function baseName(p: string): string {
 
 function fmtTokens(n: number): string {
   return n >= 10_000 ? `${(n / 1000).toFixed(0)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
+}
+
+/* ── tool call loading + timer ──────────────────────────────────────────────
+ * External MCP tool calls carry a status/timer; a shared clock ticks once a
+ * second while a turn is running so in-flight timers advance without churning
+ * the transcript when idle. */
+const now = ref(Date.now())
+let clock: ReturnType<typeof setInterval> | undefined
+watch(
+  () => chat.running,
+  (r) => {
+    clearInterval(clock)
+    clock = undefined
+    if (r) {
+      now.value = Date.now()
+      clock = setInterval(() => (now.value = Date.now()), 1000)
+    }
+  },
+  { immediate: true },
+)
+onUnmounted(() => clearInterval(clock))
+
+type ToolPart = Extract<MessagePart, { type: 'tool' }>
+
+function toolTime(part: ToolPart): string {
+  if (part.status === 'running') {
+    return `${Math.floor((now.value - (part.startedAt ?? now.value)) / 1000)}s`
+  }
+  const ms = part.elapsedMs ?? 0
+  return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
+}
+
+function toolIcon(part: ToolPart): string {
+  if (part.status === 'running') return 'codicon-loading codicon-modifier-spin'
+  if (part.status === 'error') return 'codicon-error'
+  if (part.status === 'done') return 'codicon-pass'
+  return 'codicon-tools'
+}
+
+/* A thinking block auto-expands while it is actively streaming (the tail of the
+ * live assistant message), then STAYS open — the user collapses it by hand, and
+ * that choice sticks (tracked in `collapsedThinking`, keyed by message+part). */
+function thinkingStreaming(m: UiMessage, i: number): boolean {
+  return (
+    chat.running &&
+    m === chat.messages[chat.messages.length - 1] &&
+    i === m.parts.length - 1
+  )
+}
+
+const collapsedThinking = ref<Set<string>>(new Set())
+function thinkKey(m: UiMessage, i: number): string {
+  return `${m.id}:${i}`
+}
+function thinkingOpen(m: UiMessage, i: number): boolean {
+  return thinkingStreaming(m, i) || !collapsedThinking.value.has(thinkKey(m, i))
+}
+function onThinkingToggle(m: UiMessage, i: number, e: Event): void {
+  // Ignore programmatic toggles while streaming forces it open; only record the
+  // user's own collapse/expand once the block is settled.
+  if (thinkingStreaming(m, i)) return
+  const open = (e.target as HTMLDetailsElement).open
+  const key = thinkKey(m, i)
+  const next = new Set(collapsedThinking.value)
+  if (open) next.delete(key)
+  else next.add(key)
+  collapsedThinking.value = next
 }
 
 /* ── @-mention autocomplete ──────────────────────────────────────────────── */
@@ -373,12 +440,19 @@ watch(
           <template v-for="(part, i) in m.parts" :key="i">
             <div
               v-if="part.type === 'tool'"
-              class="flex items-center gap-1.5 text-xs text-fg-3 font-mono"
+              class="flex items-center gap-1.5 text-xs font-mono"
+              :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
             >
-              <span class="codicon codicon-sm codicon-tools" />
+              <span class="codicon codicon-sm shrink-0" :class="toolIcon(part)" />
               <span class="truncate">{{ part.detail }}</span>
+              <span v-if="part.status" class="shrink-0 tabular-nums text-fg-3">{{ toolTime(part) }}</span>
             </div>
-            <details v-else-if="part.type === 'thinking'" class="text-xs text-fg-3">
+            <details
+              v-else-if="part.type === 'thinking'"
+              class="text-xs text-fg-3"
+              :open="thinkingOpen(m, i)"
+              @toggle="onThinkingToggle(m, i, $event)"
+            >
               <summary class="cursor-pointer select-none hover:text-fg-2">
                 <span class="codicon codicon-sm codicon-lightbulb mr-1" />Thinking
               </summary>

@@ -119,6 +119,10 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
   }
 
   const history: ChatMessage[] = [...opts.messages]
+  // Monotonic id per turn, correlating a tool's start event with its result so
+  // the UI can time it. Subagents run with a wrapped onEvent that strips ids,
+  // so their ids never collide with this turn's.
+  let toolSeq = 0
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     let text = ''
@@ -212,12 +216,16 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
       let result: string
       const ext = external.find((t) => t.name === call.name)
       if (ext) {
+        let id: number | undefined
         try {
           const args = JSON.parse(call.args || '{}') as Record<string, unknown>
-          opts.onEvent({ type: 'tool', name: call.name, detail: ext.describeCall(args) })
+          id = toolSeq++
+          opts.onEvent({ type: 'tool', name: call.name, detail: ext.describeCall(args), id })
           result = await ext.run(args)
+          opts.onEvent({ type: 'tool_result', id, ok: !result.startsWith('Error') })
         } catch (err) {
           result = `Error: ${(err as Error).message}`
+          if (id != null) opts.onEvent({ type: 'tool_result', id, ok: false })
         }
       } else if (call.name === 'view_image' && opts.vision) {
         result = await handleViewImage(call.args, opts.vision, inlineImages, opts)

@@ -58,6 +58,10 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
   }
   let runnerRef: RunnerParamsRef | null = null
   const externalNames = new Set<string>()
+  // Monotonic id per turn correlating an external tool's start with its result
+  // so the UI can show a loading spinner + timer (MCP calls range from instant
+  // to minutes). Subagents wrap onEvent and strip ids, so ids never collide.
+  let toolSeq = 0
 
   const makeExternalTool = (ext: ReturnType<typeof externalToolSpecs>[number]) =>
     betaTool({
@@ -66,8 +70,16 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       inputSchema: ext.jsonSchema as never,
       run: async (args) => {
         const a = (args ?? {}) as Record<string, unknown>
-        opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a) })
-        return await ext.run(a)
+        const id = toolSeq++
+        opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a), id })
+        let ok = false
+        try {
+          const result = await ext.run(a)
+          ok = !result.startsWith('Error')
+          return result
+        } finally {
+          opts.onEvent({ type: 'tool_result', id, ok })
+        }
       },
     }) as never
 
