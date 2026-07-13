@@ -42,6 +42,8 @@ let docPath: string | null = null
 let lastHighlight: string | null = null
 let selText = ''
 let annotations: EpubAnnotation[] = []
+let ro: ResizeObserver | null = null
+let resizeTimer = 0
 
 function destroy(): void {
   if (docPath && rendition) {
@@ -51,6 +53,12 @@ function destroy(): void {
     } catch {
       /* not displayed yet */
     }
+  }
+  ro?.disconnect()
+  ro = null
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = 0
   }
   rendition?.destroy()
   book?.destroy()
@@ -87,6 +95,22 @@ async function load(path: string | null): Promise<void> {
   registerThemes()
   rendition.themes.fontSize(`${fontPct.value}%`)
   await rendition.display(epubLocation.get(path))
+
+  // The container can change width without a window resize (e.g. toggling or
+  // dragging the agent panel). epub.js only auto-handles window resizes, so
+  // observe the host and refit. Debounced: a re-layout is expensive, so we skip
+  // every intermediate size during a drag and refit once it settles.
+  const el = host.value
+  if (el) {
+    ro = new ResizeObserver(() => {
+      if (resizeTimer) clearTimeout(resizeTimer)
+      resizeTimer = window.setTimeout(() => {
+        resizeTimer = 0
+        rendition?.resize(el.clientWidth, el.clientHeight)
+      }, 150)
+    })
+    ro.observe(el)
+  }
 
   // Capture text selections so the highlight buttons know what to apply to.
   rendition.on('selected', (cfiRange: string, contents: { window: Window }) => {

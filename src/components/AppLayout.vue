@@ -19,6 +19,7 @@ import SearchPalette from '@/components/SearchPalette.vue'
 import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
 import BacklinksPanel from '@/components/BacklinksPanel.vue'
+import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
@@ -42,6 +43,30 @@ const ui = useUiStore()
 function openGit(): void {
   git.panelOpen = true
   void git.refresh()
+}
+
+/** True while dragging the agent panel edge — shows a full-window overlay so
+ *  the mouse can't get captured by iframes (EPUB) and the drag stays smooth. */
+const resizingAgent = ref(false)
+
+/** Drag the agent panel's left edge to resize it (dragging left widens it). */
+function startAgentResize(e: MouseEvent): void {
+  const startX = e.clientX
+  const startW = ui.agentWidth
+  resizingAgent.value = true
+  function onMove(ev: MouseEvent): void {
+    const next = startW + (startX - ev.clientX)
+    ui.agentWidth = Math.max(280, Math.min(next, window.innerWidth - 360))
+  }
+  function onUp(): void {
+    resizingAgent.value = false
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    document.body.style.userSelect = ''
+  }
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
 }
 const kbIndex = useKbIndexStore()
 
@@ -287,6 +312,7 @@ function closeKb(): void {
           </div>
         </div>
 
+        <OpenFilesPanel />
         <div class="flex-1 panel-scroll flex flex-col">
           <FileTree class="flex-1" />
         </div>
@@ -297,7 +323,7 @@ function closeKb(): void {
       <main class="flex-1 min-w-0 bg-bg-0 flex flex-col">
         <GraphView v-if="ui.view === 'graph'" class="flex-1 min-h-0" />
         <template v-else>
-          <EditorTabs />
+          <EditorTabs v-if="ui.editorTabsVisible" />
           <div class="flex-1 min-h-0 relative">
             <!-- Editor actions (contextual, markdown only) -->
             <button
@@ -355,8 +381,17 @@ function closeKb(): void {
         </template>
       </main>
 
-      <!-- Agent panel -->
-      <aside v-show="ui.agentOpen" class="w-96 shrink-0 border-l border-border">
+      <!-- Agent panel (left edge is a drag handle to resize) -->
+      <aside
+        v-show="ui.agentOpen"
+        class="shrink-0 border-l border-border relative"
+        :style="{ width: `${ui.agentWidth}px` }"
+      >
+        <div
+          class="absolute left-0 top-0 bottom-0 w-1 -ml-0.5 z-20 cursor-col-resize hover:bg-accent/40"
+          title="Drag to resize"
+          @mousedown.prevent="startAgentResize"
+        />
         <ChatPanel @open-settings="settingsOpen = true" @close="ui.agentOpen = false" />
       </aside>
     </div>
@@ -379,6 +414,9 @@ function closeKb(): void {
     <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
     <SearchPalette />
     <HealthPanel />
+
+    <!-- While resizing the agent panel, capture the pointer above all iframes -->
+    <div v-if="resizingAgent" class="fixed inset-0 z-50 cursor-col-resize" />
 
     <!-- Drop overlay -->
     <div
