@@ -86,7 +86,6 @@ const startSidebarResize = (e: MouseEvent): void => {
 }
 const kbIndex = useKbIndexStore()
 
-const settingsOpen = ref(false)
 const dragging = ref(false)
 
 /* First-run scaffold offer for truly-empty folders. */
@@ -267,8 +266,8 @@ function closeKb(): void {
         <span class="flex-1" />
 
         <!-- Bottom group -->
-        <button :class="actBtn" title="Settings" @click="settingsOpen = true">
-          <span class="codicon codicon-settings-gear" :class="{ 'text-accent': settingsOpen }" />
+        <button :class="actBtn" title="Settings" @click="ui.settingsOpen = true">
+          <span class="codicon codicon-settings-gear" :class="{ 'text-accent': ui.settingsOpen }" />
         </button>
         <button :class="actBtn" :title="`Theme: ${theme.pref}`" @click="theme.cycle()">
           <span class="codicon" :class="themeIcon" />
@@ -417,7 +416,7 @@ function closeKb(): void {
           title="Drag to resize"
           @mousedown.prevent="startAgentResize"
         />
-        <ChatPanel @open-settings="settingsOpen = true" @close="ui.agentOpen = false" />
+        <ChatPanel @open-settings="ui.settingsOpen = true" @close="ui.agentOpen = false" />
       </aside>
     </div>
 
@@ -451,7 +450,7 @@ function closeKb(): void {
 
     <ReviewPanel />
     <GitPanel />
-    <SettingsModal :open="settingsOpen" @close="settingsOpen = false" />
+    <SettingsModal :open="ui.settingsOpen" @close="ui.settingsOpen = false" />
     <SearchPalette />
     <HealthPanel />
 

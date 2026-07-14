@@ -20,6 +20,7 @@ export const useUiStore = defineStore('ui', () => {
   const agentOpen = ref(true)
   const searchOpen = ref(false)
   const healthOpen = ref(false)
+  const settingsOpen = ref(false)
   /** Show the editor tab bar. When hidden, files open via the Open Files list. */
   const editorTabsVisible = ref(true)
 
@@ -39,6 +40,7 @@ export const useUiStore = defineStore('ui', () => {
     agentOpen,
     searchOpen,
     healthOpen,
+    settingsOpen,
     editorTabsVisible,
     agentWidth,
     sidebarWidth,

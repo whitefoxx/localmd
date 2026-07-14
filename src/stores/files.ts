@@ -233,6 +233,14 @@ export const useFilesStore = defineStore('files', () => {
     }
   }
 
+  /** Hotkey tab cycling (⌘[/⌘]): jump to the previous/next open tab, wrapping. */
+  async function cycleTab(delta: 1 | -1): Promise<void> {
+    const tabs = openTabs.value
+    if (tabs.length < 2) return
+    const i = currentPath.value ? tabs.indexOf(currentPath.value) : -1
+    await openFile(tabs[(i + delta + tabs.length) % tabs.length])
+  }
+
   /** Close a set of tabs at once, switching away from the current file if it is
    *  among them (flushing it first). */
   async function closeTabs(paths: string[]): Promise<void> {
@@ -341,9 +349,11 @@ export const useFilesStore = defineStore('files', () => {
     saveState,
     mode,
     selectedPath,
+    selectedIsDir,
     targetDir,
     select,
     clearSelection,
+    cycleTab,
     expandedDirs,
     toggleDir,
     collapseAll,

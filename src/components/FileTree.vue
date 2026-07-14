@@ -2,26 +2,24 @@
 import { ref, provide, computed } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbStore } from '@/stores/kb'
-import { useGitStore } from '@/stores/git'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import * as fs from '@/lib/fs'
 import { importFileInto } from '@/lib/capture'
 import { indexableKind, indexDocument } from '@/lib/docindex'
+import {
+  moveEntry,
+  newFileInteractive,
+  deleteInteractive,
+  refreshGitStatus,
+} from '@/lib/fileOps'
 import FileTreeNode from '@/components/FileTreeNode.vue'
 import type { TreeNode } from '@/lib/fs'
 
 const files = useFilesStore()
 const kb = useKbStore()
-const git = useGitStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
 const expanded = ref(true)
-
-/** File operations change git status immediately — refresh so the tree's
- *  U/M/D decorations don't show a stale snapshot until the next focus. */
-function refreshGit(): void {
-  if (git.isRepo) void git.refresh()
-}
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
@@ -33,22 +31,8 @@ provide('fileTreeCtx', (node: TreeNode, e: MouseEvent) => {
   ctx.value = { node, x: e.clientX, y: e.clientY }
 })
 
-/* ── drag-to-move (shared with every FileTreeNode via provide) ──────────── */
-/** Move a file/dir into targetDir ('' = KB root). No-ops when it's already
- *  there or would move a directory into itself; refuses name collisions. */
-async function moveEntry(source: string, isDir: boolean, targetDir: string): Promise<void> {
-  const name = source.slice(source.lastIndexOf('/') + 1)
-  const parent = source.includes('/') ? source.slice(0, source.lastIndexOf('/')) : ''
-  if (parent === targetDir) return
-  if (isDir && (targetDir === source || targetDir.startsWith(`${source}/`))) return
-  const dest = targetDir ? `${targetDir}/${name}` : name
-  if (await fs.exists(dest)) {
-    window.alert(`"${targetDir || 'KB 根目录'}" 下已存在 ${name},移动已取消`)
-    return
-  }
-  await files.renameEntry(source, dest, isDir)
-  refreshGit()
-}
+/* ── drag-to-move: the actual logic lives in lib/fileOps (shared with the
+ *    ⌘M hotkey); nodes reach it via provide. ─────────────────────────────── */
 provide('fileTreeMove', moveEntry)
 
 /* Root drop = move to the KB root — but ONLY on true blank space (.self
@@ -80,13 +64,7 @@ function inTarget(name: string): string {
 
 async function newFile(): Promise<void> {
   closeMenu()
-  const name = prompt('New file name (e.g. idea.md):')?.trim()
-  if (!name) return
-  const rel = inTarget(name)
-  const path = /\.[^/]+$/.test(rel) ? rel : `${rel}.md`
-  const stem = path.split('/').pop()!.replace(/\.md$/, '')
-  await files.createFile(path, path.endsWith('.md') ? `# ${stem}\n\n` : '')
-  refreshGit()
+  await newFileInteractive()
 }
 
 async function newFolder(): Promise<void> {
@@ -110,7 +88,7 @@ async function onImport(e: Event): Promise<void> {
   if (!list.length) return
   for (const f of list) await importFileInto(f, files.targetDir)
   await files.refreshTree()
-  refreshGit()
+  refreshGitStatus()
 }
 
 /** Build a PDF/EPUB/MD index for every indexable file under `dir` ('' = root). */
@@ -161,15 +139,12 @@ async function menuRename(node: TreeNode): Promise<void> {
   const i = node.path.lastIndexOf('/')
   const newPath = i < 0 ? next : `${node.path.slice(0, i)}/${next}`
   await files.renameEntry(node.path, newPath, node.kind === 'dir')
-  refreshGit()
+  refreshGitStatus()
 }
 
 async function menuDelete(node: TreeNode): Promise<void> {
   closeMenu()
-  const what = node.kind === 'dir' ? 'folder (and its contents)' : 'file'
-  if (!confirm(`Delete ${what} “${node.name}”? This cannot be undone.`)) return
-  await files.deleteEntry(node.path, node.kind === 'dir')
-  refreshGit()
+  await deleteInteractive(node.path, node.kind === 'dir')
 }
 
 async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
