@@ -86,7 +86,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       },
     }) as never
 
-  const ctx = { sessionId: opts.sessionId }
+  const ctx = { sessionId: opts.sessionId, emit: opts.onEvent }
 
   const syncExternalTools = (): void => {
     const added = externalToolSpecs(opts.sessionId).filter((e) => !externalNames.has(e.name))
@@ -257,6 +257,13 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
         cacheRead = event.message.usage.cache_read_input_tokens ?? 0
       } else if (event.type === 'message_delta') {
         output = event.usage.output_tokens ?? output
+      } else if (
+        event.type === 'content_block_start' &&
+        event.content_block.type === 'tool_use' &&
+        event.content_block.name === 'create_artifact'
+      ) {
+        // The HTML streams as tool input for a while — show a loading card now.
+        opts.onEvent({ type: 'artifact', title: '', path: '', pending: true })
       }
       if (event.type !== 'content_block_delta') continue
       if (event.delta.type === 'text_delta') {

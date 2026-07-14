@@ -46,6 +46,22 @@ test('agent write shows up in review and can be approved', async ({ page }) => {
   await expect(reviewBadge).toBeHidden()
 })
 
+test('artifact tool renders a card that opens the sandboxed viewer', async ({ page }) => {
+  await page.getByRole('button', { name: /初始化知识库/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('artifact 学习指南')
+  await input.press('Enter')
+  // Clickable card in the transcript.
+  const card = page.getByRole('button', { name: /学习指南/ })
+  await expect(card).toBeVisible({ timeout: 10_000 })
+  await card.click()
+  // Opens in a sandboxed iframe — and crucially WITHOUT allow-same-origin.
+  const frame = page.locator('iframe[sandbox]')
+  await expect(frame).toBeVisible()
+  const sandbox = await frame.getAttribute('sandbox')
+  expect(sandbox).not.toContain('allow-same-origin')
+})
+
 test('plan tool renders the checklist card', async ({ page }) => {
   await page.getByRole('button', { name: /初始化知识库/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)

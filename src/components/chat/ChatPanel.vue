@@ -155,6 +155,7 @@ const TOOL_ICONS: Record<string, string> = {
   edit_file: 'codicon-edit',
   search_files: 'codicon-search',
   index_document: 'codicon-book',
+  create_artifact: 'codicon-file-code',
   update_plan: 'codicon-checklist',
   use_skill: 'codicon-lightbulb',
   enable_tools: 'codicon-plug',
@@ -404,7 +405,8 @@ watch(
     chat.messages
       .map((m) => {
         const last = m.parts[m.parts.length - 1]
-        return m.parts.length + (last?.type !== 'tool' ? (last?.text.length ?? 0) : 0)
+        const tail = last && (last.type === 'text' || last.type === 'thinking') ? last.text.length : 0
+        return m.parts.length + tail
       })
       .join(),
   async () => {
@@ -582,6 +584,31 @@ watch(
                 {{ part.text }}
               </div>
             </details>
+            <button
+              v-else-if="part.type === 'artifact'"
+              class="w-full flex items-center gap-2.5 my-2.5 rounded-lg border border-accent/30 bg-accent/5 px-3 py-2.5 text-left transition-colors"
+              :class="part.pending ? 'cursor-default' : 'hover:bg-accent/10'"
+              :disabled="part.pending"
+              :title="part.pending ? '' : part.path"
+              @click="!part.pending && files.openFile(part.path)"
+            >
+              <span
+                class="codicon shrink-0 text-accent"
+                :class="part.pending ? 'codicon-loading codicon-modifier-spin' : 'codicon-file-code'"
+              />
+              <span class="flex-1 min-w-0">
+                <span class="block text-sm font-medium text-fg-0 truncate">
+                  {{ part.pending ? '正在生成 artifact…' : part.title }}
+                </span>
+                <span class="block text-xs text-fg-3">
+                  {{ part.pending ? '请稍候,HTML 生成中' : 'HTML artifact · 点击打开' }}
+                </span>
+              </span>
+              <span
+                v-if="!part.pending"
+                class="codicon codicon-sm codicon-arrow-right text-fg-3 shrink-0"
+              />
+            </button>
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div v-else class="md-preview text-sm" v-html="renderPart(part)" @click="onPreviewClick" />
           </template>

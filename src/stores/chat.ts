@@ -51,6 +51,9 @@ export type MessagePart =
       startedAt?: number
       elapsedMs?: number
     }
+  /** A created artifact (interactive HTML) — a clickable card that opens the
+   *  file at `path`. `pending` = still being generated (loading card). */
+  | { type: 'artifact'; title: string; path: string; pending?: boolean }
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
  *  saved into the KB — `path` is its KB location. */
@@ -449,6 +452,20 @@ export const useChatStore = defineStore('chat', () => {
           p.status = e.ok ? 'done' : 'error'
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
         }
+      } else if (e.type === 'artifact') {
+        if (e.pending) {
+          parts.push({ type: 'artifact', title: '', path: '', pending: true })
+        } else {
+          // Fill in the pending card from this turn, if any; else add one.
+          const p = [...parts].reverse().find((x) => x.type === 'artifact' && x.pending)
+          if (p && p.type === 'artifact') {
+            p.title = e.title
+            p.path = e.path
+            p.pending = false
+          } else {
+            parts.push({ type: 'artifact', title: e.title, path: e.path })
+          }
+        }
       } else {
         // Only id-bearing tool calls get the loading/timer treatment.
         parts.push(
@@ -605,6 +622,9 @@ export const useChatStore = defineStore('chat', () => {
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
         }
       }
+      // A still-pending artifact means the turn died before the file was
+      // written — drop the loading card so it doesn't spin forever.
+      assistant.parts = assistant.parts.filter((p) => !(p.type === 'artifact' && p.pending))
       void persist(session)
       void checkpoint(session, trimmed, assistant)
       void autoTitle(session, trimmed, assistant)

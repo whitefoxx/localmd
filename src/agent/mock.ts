@@ -40,7 +40,7 @@ async function runTool(
   const spec = TOOLS.find((t) => t.name === name)
   if (!spec) return `Error: unknown tool ${name}`
   opts.onEvent({ type: 'tool', name, detail: spec.describeCall(args) })
-  return await spec.run(args, { sessionId: opts.sessionId })
+  return await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
 }
 
 export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]> {
@@ -65,6 +65,18 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]>
   } else if (writeMatch) {
     const result = await runTool('write_file', { path: writeMatch[1], content: writeMatch[2] }, opts)
     reply = `完成:${result}`
+    await streamText(reply, opts.onEvent)
+  } else if (script.startsWith('artifact ')) {
+    const title = script.slice('artifact '.length).trim() || 'artifact'
+    await runTool(
+      'create_artifact',
+      {
+        title,
+        html: `<!doctype html><meta charset="utf-8"><title>${title}</title><h1>${title}</h1><p>mock artifact</p>`,
+      },
+      opts,
+    )
+    reply = `已生成 artifact:${title}`
     await streamText(reply, opts.onEvent)
   } else if (script === 'plan') {
     await runTool(

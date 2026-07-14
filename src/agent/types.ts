@@ -10,5 +10,10 @@ export type AgentEvent =
   | { type: 'tool_result'; id: number; ok: boolean }
   /** Per-API-request token usage (a turn with tool calls emits several). */
   | { type: 'usage'; input: number; output: number; cacheRead: number }
+  /** An artifact (self-contained interactive HTML). `pending` fires when the
+   *  model STARTS emitting one (its HTML streams for a while) so the chat can
+   *  show a loading card; the non-pending event (once written) fills in the
+   *  title/path and makes the card clickable. */
+  | { type: 'artifact'; title: string; path: string; pending?: boolean }
 
 export type AgentEventHandler = (e: AgentEvent) => void

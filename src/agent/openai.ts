@@ -130,6 +130,9 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     let text = ''
     const calls: { id: string; name: string; args: string }[] = []
+    // Loading card as soon as an artifact tool call is named (its HTML args
+    // stream for a while after). Per-index guard so it fires at most once.
+    const artifactPending = new Set<number>()
 
     // The SDK already retries failures BEFORE the stream opens; this loop
     // additionally retries a MID-STREAM drop, but only when nothing has been
@@ -183,6 +186,10 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
             const slot = (calls[tc.index] ??= { id: '', name: '', args: '' })
             if (tc.id) slot.id = tc.id
             if (tc.function?.name) slot.name = tc.function.name
+            if (slot.name === 'create_artifact' && !artifactPending.has(tc.index)) {
+              artifactPending.add(tc.index)
+              opts.onEvent({ type: 'artifact', title: '', path: '', pending: true })
+            }
             if (tc.function?.arguments) slot.args += tc.function.arguments
           }
         }
@@ -253,7 +260,7 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
           try {
             const args = JSON.parse(call.args || '{}')
             opts.onEvent({ type: 'tool', name: call.name, detail: spec.describeCall(args) })
-            result = await spec.run(args, { sessionId: opts.sessionId })
+            result = await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
           } catch (err) {
             result = `Error: ${(err as Error).message}`
           }
