@@ -128,11 +128,37 @@ function toolTime(part: ToolPart): string {
   return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
 }
 
+/** Per-tool glyph so the transcript reads at a glance instead of a wall of
+ *  identical wrenches. External MCP tools carry a status, so they keep the
+ *  spinner/check/error markers; built-in (status-less) tools map by name. */
+const TOOL_ICONS: Record<string, string> = {
+  list_files: 'codicon-list-tree',
+  read_file: 'codicon-file',
+  write_file: 'codicon-edit',
+  edit_file: 'codicon-edit',
+  search_files: 'codicon-search',
+  index_document: 'codicon-book',
+  update_plan: 'codicon-checklist',
+  use_skill: 'codicon-lightbulb',
+  enable_tools: 'codicon-plug',
+  run_subagent: 'codicon-run-all',
+  view_image: 'codicon-device-camera',
+  compact: 'codicon-fold',
+  checkpoint: 'codicon-git-commit',
+  git_status: 'codicon-source-control',
+  git_diff: 'codicon-diff',
+  git_log: 'codicon-history',
+  git_commit: 'codicon-git-commit',
+  git_push: 'codicon-repo-push',
+  git_pull: 'codicon-repo-pull',
+}
+
 function toolIcon(part: ToolPart): string {
   if (part.status === 'running') return 'codicon-loading codicon-modifier-spin'
   if (part.status === 'error') return 'codicon-error'
   if (part.status === 'done') return 'codicon-pass'
-  return 'codicon-tools'
+  if (part.name.startsWith('mcp__')) return 'codicon-plug'
+  return TOOL_ICONS[part.name] ?? 'codicon-tools'
 }
 
 /* A thinking block auto-expands while it is actively streaming (the tail of the
@@ -387,15 +413,13 @@ watch(
       </button>
     </div>
 
-    <!-- Session tabs (concurrent chats) -->
-    <div
-      v-if="chat.tabs.length > 1"
-      class="flex items-stretch h-8 border-b border-border bg-bg-1 overflow-x-auto panel-scroll shrink-0"
-    >
+    <!-- Session tabs (concurrent chats). Tabs shrink evenly to fit the panel
+         width (VS Code style) so the close button never scrolls out of view. -->
+    <div v-if="chat.tabs.length > 1" class="flex items-stretch h-8 border-b border-border bg-bg-1 shrink-0">
       <button
         v-for="t in chat.tabs"
         :key="t.id"
-        class="group flex items-center gap-1.5 px-2.5 text-xs border-r border-border whitespace-nowrap max-w-[150px]"
+        class="group flex items-center gap-1 px-2 text-xs border-r border-border whitespace-nowrap flex-1 min-w-0 max-w-[150px] overflow-hidden"
         :class="t.id === chat.currentSessionId ? 'bg-bg-0 text-fg-0' : 'text-fg-2 hover:bg-bg-2/50'"
         :title="t.title"
         @click="chat.activateTab(t.id)"
@@ -404,7 +428,7 @@ watch(
           v-if="t.running"
           class="codicon codicon-sm codicon-loading codicon-modifier-spin text-accent shrink-0"
         />
-        <span class="truncate">{{ t.title }}</span>
+        <span class="truncate flex-1 min-w-0 text-left">{{ t.title }}</span>
         <span
           class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 shrink-0"
           :class="{ '!opacity-100': t.id === chat.currentSessionId }"
@@ -422,20 +446,49 @@ watch(
     <!-- Session history overlay -->
     <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll">
       <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
+      <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
       <div
         v-for="s in chat.sessions"
         :key="s.id"
-        class="group flex items-center gap-2 px-3 py-2 hover:bg-bg-2 cursor-pointer border-b border-border/50"
-        :class="{ 'bg-bg-2': s.id === chat.currentSessionId }"
+        class="group relative flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-border/50"
+        :class="
+          s.id === chat.currentSessionId
+            ? 'bg-accent/15'
+            : chat.tabs.some((t) => t.id === s.id)
+              ? 'bg-bg-2 hover:bg-bg-3'
+              : 'hover:bg-bg-2/60'
+        "
         @click="chat.openSession(s.id)"
       >
-        <span class="codicon codicon-sm codicon-comment-discussion text-fg-3 shrink-0" />
-        <span class="flex-1 truncate text-sm text-fg-1">{{ s.title }}</span>
+        <span
+          v-if="s.id === chat.currentSessionId"
+          class="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
+        />
+        <span
+          class="codicon codicon-sm shrink-0"
+          :class="
+            chat.tabs.some((t) => t.id === s.id)
+              ? `codicon-circle-filled ${s.id === chat.currentSessionId ? 'text-accent' : 'text-fg-2'}`
+              : 'codicon-comment-discussion text-fg-3'
+          "
+        />
+        <span
+          class="flex-1 truncate text-sm"
+          :class="s.id === chat.currentSessionId ? 'text-fg-0 font-medium' : 'text-fg-1'"
+        >{{ s.title }}</span>
+        <span
+          v-if="s.id === chat.currentSessionId"
+          class="text-[10px] px-1 rounded bg-accent/20 text-accent shrink-0"
+        >当前</span>
+        <span
+          v-else-if="chat.tabs.some((t) => t.id === s.id)"
+          class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0"
+        >已打开</span>
         <span class="text-xs text-fg-3 shrink-0">
           {{ new Date(s.updatedAt).toLocaleDateString() }}
         </span>
         <button
-          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100"
+          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 shrink-0"
           title="Delete"
           @click.stop="chat.removeSession(s.id)"
         >
@@ -613,65 +666,83 @@ watch(
         </button>
       </div>
 
-      <!-- Attachment chips -->
-      <div v-if="attachments.length || importing" class="flex flex-wrap gap-1.5 mb-2">
-        <span
-          v-for="(a, i) in attachments"
-          :key="a.path"
-          class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
-          :title="a.path"
-        >
-          <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
-          <span class="truncate max-w-[140px]">{{ baseName(a.path) }}</span>
-          <button class="text-fg-3 hover:text-fg-0" @click="removeAttachment(i)">
-            <span class="codicon codicon-sm codicon-close" />
-          </button>
-        </span>
-        <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">saving…</span>
-      </div>
-
-      <textarea
-        ref="textarea"
-        v-model="input"
-        rows="3"
-        class="input resize-none font-sans"
-        placeholder="Ask or instruct the agent… (@ 引用文件 / 技能,可粘贴截图)"
-        @keydown="onKeydown"
-        @paste="onPaste"
-        @input="syncCaret"
-        @click="syncCaret"
-        @keyup="syncCaret"
-      />
-      <input ref="fileInput" type="file" multiple class="hidden" @change="onPickFiles" />
-      <div class="flex items-center mt-2 gap-2">
-        <button
-          class="text-fg-3 hover:text-fg-0 shrink-0"
-          title="Attach files (saved into the KB)"
-          @click="fileInput?.click()"
-        >
-          <span class="codicon codicon-sm codicon-attach" />
-        </button>
-        <span class="text-xs text-fg-3 flex-1 truncate">
-          {{ settingsStore.primary?.model || 'not configured' }}
-          <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
+      <!-- ChatGPT-style composer: one rounded frame holding the attachment
+           chips, the borderless textarea, and the +/model/send action row. -->
+      <div
+        class="rounded-xl border bg-bg-0 focus-within:border-accent transition-colors"
+        :class="dragOver ? 'border-accent' : 'border-border'"
+      >
+        <!-- Attachment chips -->
+        <div v-if="attachments.length || importing" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
           <span
-            v-if="chat.sessionUsage.input || chat.sessionUsage.output"
-            :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
+            v-for="(a, i) in attachments"
+            :key="a.path"
+            class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+            :title="a.path"
           >
-            · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
+            <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
+            <span class="truncate max-w-[140px]">{{ baseName(a.path) }}</span>
+            <button class="text-fg-3 hover:text-fg-0" @click="removeAttachment(i)">
+              <span class="codicon codicon-sm codicon-close" />
+            </button>
           </span>
-        </span>
-        <button v-if="chat.running" class="btn text-xs" @click="chat.stop()">
-          <span class="codicon codicon-sm codicon-stop-circle mr-1" />Stop
-        </button>
-        <button
-          v-else
-          class="btn-primary text-xs"
-          :disabled="!input.trim() && !attachments.length"
-          @click="send"
-        >
-          <span class="codicon codicon-sm codicon-send mr-1" />Send
-        </button>
+          <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">saving…</span>
+        </div>
+
+        <textarea
+          ref="textarea"
+          v-model="input"
+          rows="3"
+          class="w-full bg-transparent border-0 outline-none resize-none font-sans text-sm text-fg-0 placeholder-fg-3 px-3 pt-2.5"
+          placeholder="Ask or instruct the agent… (@ 引用文件 / 技能,可粘贴截图)"
+          @keydown="onKeydown"
+          @paste="onPaste"
+          @input="syncCaret"
+          @click="syncCaret"
+          @keyup="syncCaret"
+        />
+        <input ref="fileInput" type="file" multiple class="hidden" @change="onPickFiles" />
+
+        <!-- Action row (inside the frame) -->
+        <div class="flex items-center gap-2 px-2 pb-2">
+          <button
+            class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-fg-2 hover:text-fg-0 hover:bg-bg-2 transition-colors"
+            title="Attach files (saved into the KB)"
+            aria-label="Attach files"
+            @click="fileInput?.click()"
+          >
+            <span class="codicon codicon-add" />
+          </button>
+          <span class="text-xs text-fg-3 flex-1 truncate">
+            {{ settingsStore.primary?.model || 'not configured' }}
+            <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
+            <span
+              v-if="chat.sessionUsage.input || chat.sessionUsage.output"
+              :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
+            >
+              · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
+            </span>
+          </span>
+          <button
+            v-if="chat.running"
+            class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-bg-3 text-fg-0 hover:bg-removed/20 hover:text-removed transition-colors"
+            title="Stop"
+            aria-label="Stop"
+            @click="chat.stop()"
+          >
+            <span class="codicon codicon-sm codicon-primitive-square" />
+          </button>
+          <button
+            v-else
+            class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-accent text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
+            title="Send (Enter)"
+            aria-label="Send"
+            :disabled="!input.trim() && !attachments.length"
+            @click="send"
+          >
+            <span class="codicon codicon-arrow-up" />
+          </button>
+        </div>
       </div>
     </div>
   </div>
