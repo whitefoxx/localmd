@@ -32,6 +32,8 @@ function onKeydown(e: KeyboardEvent): void {
   } else if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
     e.preventDefault()
     if (kb.isOpen) ui.agentOpen = !ui.agentOpen
+  } else if (e.key === 'Escape' && ui.graphOpen && !ui.searchOpen) {
+    ui.graphOpen = false
   }
 }
 

@@ -80,7 +80,7 @@ function render(): void {
     .join('g')
     .attr('cursor', 'pointer')
     .on('click', (_e, d) => {
-      ui.view = 'file'
+      ui.graphOpen = false
       void files.openFile(d.id)
     })
 
@@ -137,9 +137,12 @@ function render(): void {
     })
 }
 
-onMounted(async () => {
-  await index.refresh()
+onMounted(() => {
+  // Paint immediately from the cached index; refresh in the background — the
+  // graph watch below re-renders only if something actually changed (refresh
+  // keeps the same Map reference when nothing did).
   render()
+  void index.refresh()
 })
 
 watch(

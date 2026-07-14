@@ -49,7 +49,9 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   const docSections = ref<Map<string, DocSection>>(new Map())
   const refreshing = ref(false)
 
-  /** Bring the cache in sync with the tree: re-read changed files, drop deleted. */
+  /** Bring the cache in sync with the tree: re-read changed files, drop deleted.
+   *  Keeps the SAME Map reference when nothing changed, so downstream computeds
+   *  (graph, health) don't re-emit and the graph view doesn't re-layout. */
   async function refresh(): Promise<void> {
     if (refreshing.value || !fs.hasRoot()) return
     refreshing.value = true
@@ -57,9 +59,13 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       const files = useFilesStore()
       const mdPaths = new Set(files.mdFiles)
       const next = new Map(pages.value)
+      let changed = false
 
       for (const cached of next.keys()) {
-        if (!mdPaths.has(cached)) next.delete(cached)
+        if (!mdPaths.has(cached)) {
+          next.delete(cached)
+          changed = true
+        }
       }
 
       for (const path of mdPaths) {
@@ -77,8 +83,9 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
           else broken.push(link.target)
         }
         next.set(path, { mtime, content, outgoing, broken })
+        changed = true
       }
-      pages.value = next
+      if (changed) pages.value = next
       await refreshDocSections()
     } finally {
       refreshing.value = false
@@ -90,6 +97,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   async function refreshDocSections(): Promise<void> {
     const next = new Map(docSections.value)
     const seen = new Set<string>()
+    let changed = false
     for (const kind of ['pdf-index', 'epub-index']) {
       let tree
       try {
@@ -120,13 +128,17 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
           const content = await fs.tryReadFile(p)
           if (content === null) continue
           next.set(p, { mtime, content, source })
+          changed = true
         }
       }
     }
     for (const p of next.keys()) {
-      if (!seen.has(p)) next.delete(p)
+      if (!seen.has(p)) {
+        next.delete(p)
+        changed = true
+      }
     }
-    docSections.value = next
+    if (changed) docSections.value = next
   }
 
   /** path → set of pages linking to it. */

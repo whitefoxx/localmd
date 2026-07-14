@@ -56,7 +56,7 @@ watch(
 async function pick(row: Row | undefined): Promise<void> {
   if (!row) return
   ui.searchOpen = false
-  ui.view = 'file'
+  ui.graphOpen = false
   if (row.kind === 'doc') {
     // Jump straight to the matched passage inside the PDF/EPUB.
     await citations.openCitation(row.path, row.blockId ?? null)

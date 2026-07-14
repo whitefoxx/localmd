@@ -120,6 +120,7 @@ async function onDrop(e: DragEvent): Promise<void> {
   if (!dropped.length) return
   await captureFiles(dropped)
   await files.refreshTree()
+  if (git.isRepo) void git.refresh() // new files show as U immediately
 }
 
 const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
@@ -230,16 +231,12 @@ function closeKb(): void {
         <button :class="actBtn" title="Search (⌘K)" @click="ui.searchOpen = true">
           <span class="codicon codicon-search" />
         </button>
-        <button
-          :class="actBtn"
-          title="Graph view"
-          @click="ui.view = ui.view === 'graph' ? 'file' : 'graph'"
-        >
+        <button :class="actBtn" title="Graph view" @click="ui.graphOpen = !ui.graphOpen">
           <span
-            v-if="ui.view === 'graph'"
+            v-if="ui.graphOpen"
             class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
           />
-          <span class="codicon codicon-type-hierarchy-sub" :class="{ 'text-accent': ui.view === 'graph' }" />
+          <span class="codicon codicon-type-hierarchy-sub" :class="{ 'text-accent': ui.graphOpen }" />
         </button>
         <button v-if="git.isRepo" :class="actBtn" :title="gitTitle" @click="openGit">
           <span
@@ -350,12 +347,10 @@ function closeKb(): void {
         <BacklinksPanel />
       </aside>
 
-      <!-- Main content -->
+      <!-- Main content (always mounted — the graph is an overlay above it) -->
       <main class="flex-1 min-w-0 bg-bg-0 flex flex-col">
-        <GraphView v-if="ui.view === 'graph'" class="flex-1 min-h-0" />
-        <template v-else>
-          <EditorTabs v-if="ui.editorTabsVisible" />
-          <div class="flex-1 min-h-0 relative">
+        <EditorTabs v-if="ui.editorTabsVisible" />
+        <div class="flex-1 min-h-0 relative">
             <!-- Editor actions (contextual, markdown only) -->
             <button
               v-if="isMarkdown && files.currentPath"
@@ -409,7 +404,6 @@ function closeKb(): void {
               </div>
             </div>
           </div>
-        </template>
       </main>
 
       <!-- Agent panel (left edge is a drag handle to resize) -->
@@ -425,6 +419,21 @@ function closeKb(): void {
         />
         <ChatPanel @open-settings="settingsOpen = true" @close="ui.agentOpen = false" />
       </aside>
+    </div>
+
+    <!-- Graph view: full-screen overlay so the editor (PDFs included) stays
+         mounted underneath — closing it never reloads anything. -->
+    <div v-if="ui.graphOpen" class="fixed inset-0 z-40 bg-bg-0 flex flex-col">
+      <div class="flex items-center gap-2 px-4 h-11 border-b border-border shrink-0">
+        <span class="codicon codicon-type-hierarchy-sub text-accent" />
+        <span class="font-semibold text-fg-0">Graph</span>
+        <span class="text-xs text-fg-3">点击节点打开文件</span>
+        <span class="flex-1" />
+        <button class="text-fg-3 hover:text-fg-0" title="Close (Esc)" @click="ui.graphOpen = false">
+          <span class="codicon codicon-close" />
+        </button>
+      </div>
+      <GraphView class="flex-1 min-h-0" />
     </div>
 
     <!-- Click-away layer for the KB switcher menu -->

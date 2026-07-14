@@ -25,7 +25,7 @@ export const useCitationsStore = defineStore('citations', () => {
   async function openCitation(path: string, blockId: string | null): Promise<void> {
     const ui = useUiStore()
     const files = useFilesStore()
-    ui.view = 'file'
+    ui.graphOpen = false
     pending.value = { path, blockId, nonce: ++nonce }
     await files.openFile(path)
   }

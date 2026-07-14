@@ -17,7 +17,7 @@ watch(
 
 async function open(path: string): Promise<void> {
   ui.healthOpen = false
-  ui.view = 'file'
+  ui.graphOpen = false
   await files.openFile(path)
 }
 </script>

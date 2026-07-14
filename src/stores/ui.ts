@@ -13,8 +13,9 @@ function persistedWidth(key: string, fallback: number): number {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  /** Main-area view: the current file, or the wikilink graph. */
-  const view = ref<'file' | 'graph'>('file')
+  /** The wikilink graph, shown as a full-screen overlay above the editor
+   *  (which stays mounted — closing the graph never reloads a PDF). */
+  const graphOpen = ref(false)
   const sidebarOpen = ref(true)
   const agentOpen = ref(true)
   const searchOpen = ref(false)
@@ -33,7 +34,7 @@ export const useUiStore = defineStore('ui', () => {
   })
 
   return {
-    view,
+    graphOpen,
     sidebarOpen,
     agentOpen,
     searchOpen,
