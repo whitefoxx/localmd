@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useGitStore } from '@/stores/git'
 import { useFilesStore } from '@/stores/files'
 import { readHeadText } from '@/lib/git'
+import { GIT_DECOR } from '@/lib/gitStatus'
 import { diffLines, collapseContext, type HunkLine } from '@/lib/diff'
 import * as fs from '@/lib/fs'
 
@@ -54,13 +55,6 @@ async function doCommit(): Promise<void> {
   if (!git.error) message.value = ''
 }
 
-const kindIcon = computed(
-  () => (kind: string) =>
-    ({ new: 'codicon-diff-added', modified: 'codicon-diff-modified', deleted: 'codicon-diff-removed' })[
-      kind
-    ] ?? 'codicon-file',
-)
-
 function fmtTime(ms: number): string {
   return new Date(ms).toLocaleString()
 }
@@ -78,10 +72,25 @@ function fmtTime(ms: number): string {
         <div class="flex items-center gap-2 px-4 h-11 border-b border-border shrink-0">
           <span class="codicon codicon-source-control text-accent" />
           <span class="font-semibold text-fg-0">Git</span>
-          <span v-if="git.branch" class="text-xs text-fg-3">
+          <span v-if="git.branch" class="text-xs text-fg-3 shrink-0">
             <span class="codicon codicon-sm codicon-git-branch" /> {{ git.branch }}
           </span>
-          <span class="flex-1" />
+          <!-- Inline status: the header height is fixed, so busy→idle never
+               shifts the changes/diff below (it used to be a row that appeared
+               and disappeared on every open). -->
+          <span
+            class="text-xs flex-1 min-w-0 truncate px-1"
+            :class="git.error ? 'text-removed' : 'text-fg-3'"
+            :title="git.error || git.progress || git.busy || git.lastSync || ''"
+          >
+            <template v-if="git.busy">
+              <span class="codicon codicon-sm codicon-loading codicon-modifier-spin mr-1" />{{
+                git.progress || git.busy
+              }}
+            </template>
+            <template v-else-if="git.error">{{ git.error }}</template>
+            <template v-else-if="git.lastSync">{{ git.lastSync }}</template>
+          </span>
           <template v-if="git.remote">
             <span class="text-xs text-fg-3 truncate">{{ git.remote.owner }}/{{ git.remote.repo }}</span>
             <button class="btn text-xs" :disabled="!!git.busy" @click="git.sync('pull')">
@@ -97,17 +106,6 @@ function fmtTime(ms: number): string {
           <button class="text-fg-3 hover:text-fg-0" @click="git.panelOpen = false">
             <span class="codicon codicon-close" />
           </button>
-        </div>
-
-        <!-- Status line -->
-        <div v-if="git.busy || git.error || git.lastSync" class="px-4 py-1.5 border-b border-border text-xs shrink-0"
-          :class="git.error ? 'text-removed' : 'text-fg-3'">
-          <template v-if="git.busy">
-            <span class="codicon codicon-sm codicon-loading codicon-modifier-spin mr-1" />
-            {{ git.progress || git.busy }}
-          </template>
-          <template v-else-if="git.error">{{ git.error }}</template>
-          <template v-else>{{ git.lastSync }}</template>
         </div>
 
         <div class="flex-1 flex min-h-0">
@@ -135,13 +133,17 @@ function fmtTime(ms: number): string {
                   :title="committable(c) ? '' : '超过 100MB(GitHub API 推送上限),请在终端提交'"
                   @click.stop="committable(c) && toggle(c.path)"
                 />
-                <span class="codicon codicon-sm shrink-0" :class="kindIcon(c.kind)" />
-                <span class="truncate text-fg-1 flex-1" :title="c.path">{{ c.path }}</span>
+                <span class="truncate flex-1" :class="GIT_DECOR[c.kind].class" :title="c.path">{{ c.path }}</span>
                 <span
                   v-if="c.binary"
                   class="text-[10px] px-1 rounded bg-bg-2 text-fg-3 shrink-0"
                   :title="c.oversized ? '超过 100MB,请在终端提交' : '二进制文件'"
                 >{{ c.oversized ? '>100MB' : 'bin' }}</span>
+                <span
+                  class="shrink-0 text-xs font-medium w-3 text-center"
+                  :class="GIT_DECOR[c.kind].class"
+                  :title="c.kind"
+                >{{ GIT_DECOR[c.kind].letter }}</span>
               </div>
             </div>
             <div class="p-3 border-t border-border shrink-0">
