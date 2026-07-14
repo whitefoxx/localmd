@@ -108,6 +108,12 @@ async function doScaffold(): Promise<void> {
   }
 }
 
+/** Only external OS-file drags raise the capture overlay — internal file-tree
+ *  moves carry a custom type, not "Files". */
+function onDragOver(e: DragEvent): void {
+  dragging.value = !!e.dataTransfer?.types.includes('Files')
+}
+
 async function onDrop(e: DragEvent): Promise<void> {
   dragging.value = false
   const dropped = [...(e.dataTransfer?.files ?? [])]
@@ -197,7 +203,7 @@ function closeKb(): void {
 <template>
   <div
     class="h-full flex flex-col relative"
-    @dragover.prevent="dragging = true"
+    @dragover.prevent="onDragOver"
     @dragleave.self="dragging = false"
     @drop.prevent="onDrop"
   >

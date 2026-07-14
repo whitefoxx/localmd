@@ -24,6 +24,34 @@ const ctx = ref<{ node: TreeNode; x: number; y: number } | null>(null)
 provide('fileTreeCtx', (node: TreeNode, e: MouseEvent) => {
   ctx.value = { node, x: e.clientX, y: e.clientY }
 })
+
+/* ── drag-to-move (shared with every FileTreeNode via provide) ──────────── */
+/** Move a file/dir into targetDir ('' = KB root). No-ops when it's already
+ *  there or would move a directory into itself; refuses name collisions. */
+async function moveEntry(source: string, isDir: boolean, targetDir: string): Promise<void> {
+  const name = source.slice(source.lastIndexOf('/') + 1)
+  const parent = source.includes('/') ? source.slice(0, source.lastIndexOf('/')) : ''
+  if (parent === targetDir) return
+  if (isDir && (targetDir === source || targetDir.startsWith(`${source}/`))) return
+  const dest = targetDir ? `${targetDir}/${name}` : name
+  if (await fs.exists(dest)) {
+    window.alert(`"${targetDir || 'KB 根目录'}" 下已存在 ${name},移动已取消`)
+    return
+  }
+  await files.renameEntry(source, dest, isDir)
+}
+provide('fileTreeMove', moveEntry)
+
+function onRootDragOver(e: DragEvent): void {
+  if (e.dataTransfer?.types.includes('application/x-bmd-path')) e.preventDefault()
+}
+function onRootDrop(e: DragEvent): void {
+  const src = e.dataTransfer?.getData('application/x-bmd-path')
+  if (!src) return
+  e.preventDefault()
+  e.stopPropagation()
+  void moveEntry(src, e.dataTransfer!.getData('application/x-bmd-isdir') === 'true', '')
+}
 function closeMenu(): void {
   ctx.value = null
 }
@@ -141,7 +169,7 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
 </script>
 
 <template>
-  <div class="py-2" @click.self="files.clearSelection()">
+  <div class="py-2" @click.self="files.clearSelection()" @dragover="onRootDragOver" @drop="onRootDrop">
     <div class="flex items-center px-3 mb-1">
       <button
         class="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"
