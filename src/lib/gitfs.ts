@@ -50,6 +50,13 @@ function segments(path: string): string[] {
 let dirCache = new Map<string, FileSystemDirectoryHandle>()
 let cachedRoot: FileSystemDirectoryHandle | null = null
 
+/** Drop cached directory handles. Must be called after directories are moved
+ *  or deleted OUTSIDE gitFs (app-side fs.renameDir/removeDir) — a cached
+ *  handle to a removed directory throws on use and corrupts status results. */
+export function invalidateGitFsCache(): void {
+  dirCache = new Map()
+}
+
 function root(): FileSystemDirectoryHandle {
   const r = fs.getRoot()
   if (r !== cachedRoot) {

@@ -55,6 +55,14 @@ const moveEntry = inject<((source: string, isDir: boolean, targetDir: string) =>
   undefined,
 )
 
+/** Drop target dir for this row: the dir itself, or a file's parent — so a
+ *  drop landing on any row goes where it visually belongs, never to the root. */
+const dropDir = computed(() => {
+  if (isDir.value) return props.node.path
+  const i = props.node.path.lastIndexOf('/')
+  return i < 0 ? '' : props.node.path.slice(0, i)
+})
+
 function onDragStart(e: DragEvent): void {
   if (!e.dataTransfer) return
   e.dataTransfer.effectAllowed = 'move'
@@ -62,20 +70,20 @@ function onDragStart(e: DragEvent): void {
   e.dataTransfer.setData(DRAG_ISDIR, String(isDir.value))
 }
 function onDragOver(e: DragEvent): void {
-  if (!isDir.value || !e.dataTransfer?.types.includes(DRAG_PATH)) return
+  if (!e.dataTransfer?.types.includes(DRAG_PATH)) return
   e.preventDefault()
+  e.stopPropagation()
   e.dataTransfer.dropEffect = 'move'
   dragOver.value = true
 }
 function onDrop(e: DragEvent): void {
-  if (!isDir.value) return
   dragOver.value = false
   const src = e.dataTransfer?.getData(DRAG_PATH)
   if (!src) return
   e.preventDefault()
   e.stopPropagation()
-  moveEntry?.(src, e.dataTransfer!.getData(DRAG_ISDIR) === 'true', props.node.path)
-  if (!expanded.value) files.toggleDir(props.node.path) // reveal where it landed
+  moveEntry?.(src, e.dataTransfer!.getData(DRAG_ISDIR) === 'true', dropDir.value)
+  if (isDir.value && !expanded.value) files.toggleDir(props.node.path) // reveal where it landed
 }
 </script>
 

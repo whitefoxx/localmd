@@ -2,6 +2,7 @@
 import { ref, provide, computed } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbStore } from '@/stores/kb'
+import { useGitStore } from '@/stores/git'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import * as fs from '@/lib/fs'
 import { importFileInto } from '@/lib/capture'
@@ -11,9 +12,16 @@ import type { TreeNode } from '@/lib/fs'
 
 const files = useFilesStore()
 const kb = useKbStore()
+const git = useGitStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
 const expanded = ref(true)
+
+/** File operations change git status immediately — refresh so the tree's
+ *  U/M/D decorations don't show a stale snapshot until the next focus. */
+function refreshGit(): void {
+  if (git.isRepo) void git.refresh()
+}
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
@@ -39,9 +47,13 @@ async function moveEntry(source: string, isDir: boolean, targetDir: string): Pro
     return
   }
   await files.renameEntry(source, dest, isDir)
+  refreshGit()
 }
 provide('fileTreeMove', moveEntry)
 
+/* Root drop = move to the KB root — but ONLY on true blank space (.self
+ * modifiers): rows handle their own drops (dir = into it, file = into its
+ * parent), so a drop between rows can't fall through to the root by accident. */
 function onRootDragOver(e: DragEvent): void {
   if (e.dataTransfer?.types.includes('application/x-bmd-path')) e.preventDefault()
 }
@@ -49,7 +61,6 @@ function onRootDrop(e: DragEvent): void {
   const src = e.dataTransfer?.getData('application/x-bmd-path')
   if (!src) return
   e.preventDefault()
-  e.stopPropagation()
   void moveEntry(src, e.dataTransfer!.getData('application/x-bmd-isdir') === 'true', '')
 }
 function closeMenu(): void {
@@ -75,6 +86,7 @@ async function newFile(): Promise<void> {
   const path = /\.[^/]+$/.test(rel) ? rel : `${rel}.md`
   const stem = path.split('/').pop()!.replace(/\.md$/, '')
   await files.createFile(path, path.endsWith('.md') ? `# ${stem}\n\n` : '')
+  refreshGit()
 }
 
 async function newFolder(): Promise<void> {
@@ -98,6 +110,7 @@ async function onImport(e: Event): Promise<void> {
   if (!list.length) return
   for (const f of list) await importFileInto(f, files.targetDir)
   await files.refreshTree()
+  refreshGit()
 }
 
 /** Build a PDF/EPUB/MD index for every indexable file under `dir` ('' = root). */
@@ -148,6 +161,7 @@ async function menuRename(node: TreeNode): Promise<void> {
   const i = node.path.lastIndexOf('/')
   const newPath = i < 0 ? next : `${node.path.slice(0, i)}/${next}`
   await files.renameEntry(node.path, newPath, node.kind === 'dir')
+  refreshGit()
 }
 
 async function menuDelete(node: TreeNode): Promise<void> {
@@ -155,6 +169,7 @@ async function menuDelete(node: TreeNode): Promise<void> {
   const what = node.kind === 'dir' ? 'folder (and its contents)' : 'file'
   if (!confirm(`Delete ${what} “${node.name}”? This cannot be undone.`)) return
   await files.deleteEntry(node.path, node.kind === 'dir')
+  refreshGit()
 }
 
 async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
@@ -169,7 +184,7 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
 </script>
 
 <template>
-  <div class="py-2" @click.self="files.clearSelection()" @dragover="onRootDragOver" @drop="onRootDrop">
+  <div class="py-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
     <div class="flex items-center px-3 mb-1">
       <button
         class="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"

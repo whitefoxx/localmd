@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
+import { invalidateGitFsCache } from '@/lib/gitfs'
 import { fileStem } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
 import type { TreeNode } from '@/lib/fs'
@@ -279,8 +280,12 @@ export const useFilesStore = defineStore('files', () => {
     if (oldPath === newPath) return
     const underOld = (p: string): boolean => p === oldPath || (isDir && p.startsWith(`${oldPath}/`))
     if (currentPath.value && underOld(currentPath.value)) await flush()
-    if (isDir) await fs.renameDir(oldPath, newPath)
-    else await fs.renameFile(oldPath, newPath)
+    if (isDir) {
+      await fs.renameDir(oldPath, newPath)
+      invalidateGitFsCache() // cached handles under the old dir are dead
+    } else {
+      await fs.renameFile(oldPath, newPath)
+    }
     const remap = (p: string): string =>
       p === oldPath ? newPath : underOld(p) ? newPath + p.slice(oldPath.length) : p
     openTabs.value = openTabs.value.map(remap)
@@ -291,8 +296,12 @@ export const useFilesStore = defineStore('files', () => {
 
   /** Delete a file or directory; closes affected tabs and clears selection. */
   async function deleteEntry(path: string, isDir: boolean): Promise<void> {
-    if (isDir) await fs.removeDir(path)
-    else await fs.removeFile(path)
+    if (isDir) {
+      await fs.removeDir(path)
+      invalidateGitFsCache() // cached handles under the removed dir are dead
+    } else {
+      await fs.removeFile(path)
+    }
     const affected = (p: string): boolean => p === path || (isDir && p.startsWith(`${path}/`))
     if (currentPath.value !== null && affected(currentPath.value)) {
       if (autosaveTimer) {
