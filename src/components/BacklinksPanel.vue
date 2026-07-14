@@ -34,12 +34,12 @@ watch(
       <button
         v-for="p in links"
         :key="p"
-        class="w-full text-left px-8 py-0.5 text-sm text-fg-1 truncate hover:bg-bg-2"
+        class="w-full text-left pl-6 pr-2 py-0.5 text-sm text-fg-1 truncate hover:bg-bg-2"
         @click="files.openFile(p)"
       >
         {{ p }}
       </button>
-      <div v-if="!links.length" class="px-8 text-xs text-fg-3">No backlinks</div>
+      <div v-if="!links.length" class="pl-6 pr-2 text-xs text-fg-3">No backlinks</div>
     </div>
   </div>
 </template>

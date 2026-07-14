@@ -45,28 +45,44 @@ function openGit(): void {
   void git.refresh()
 }
 
-/** True while dragging the agent panel edge — shows a full-window overlay so
- *  the mouse can't get captured by iframes (EPUB) and the drag stays smooth. */
-const resizingAgent = ref(false)
+/** True while dragging a panel edge — shows a full-window overlay so the mouse
+ *  can't get captured by iframes (EPUB) and the drag stays smooth. */
+const resizing = ref(false)
 
-/** Drag the agent panel's left edge to resize it (dragging left widens it). */
-function startAgentResize(e: MouseEvent): void {
-  const startX = e.clientX
+/** Shared drag loop for the panel edges. `apply` maps the pointer delta to a
+ *  new width and clamps it. */
+function startResize(getWidth: (dx: number) => number): (e: MouseEvent) => void {
+  return (e: MouseEvent) => {
+    const startX = e.clientX
+    resizing.value = true
+    function onMove(ev: MouseEvent): void {
+      getWidth(ev.clientX - startX)
+    }
+    function onUp(): void {
+      resizing.value = false
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = ''
+    }
+    document.body.style.userSelect = 'none'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+}
+
+// Agent panel: left edge, dragging left widens it.
+const startAgentResize = (e: MouseEvent): void => {
   const startW = ui.agentWidth
-  resizingAgent.value = true
-  function onMove(ev: MouseEvent): void {
-    const next = startW + (startX - ev.clientX)
-    ui.agentWidth = Math.max(280, Math.min(next, window.innerWidth - 360))
-  }
-  function onUp(): void {
-    resizingAgent.value = false
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
-    document.body.style.userSelect = ''
-  }
-  document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
+  startResize((dx) => (ui.agentWidth = Math.max(280, Math.min(startW - dx, window.innerWidth - 360))))(
+    e,
+  )
+}
+// Sidebar: right edge, dragging right widens it.
+const startSidebarResize = (e: MouseEvent): void => {
+  const startW = ui.sidebarWidth
+  startResize((dx) => (ui.sidebarWidth = Math.max(180, Math.min(startW + dx, window.innerWidth - 480))))(
+    e,
+  )
 }
 const kbIndex = useKbIndexStore()
 
@@ -259,8 +275,17 @@ function closeKb(): void {
         </button>
       </nav>
 
-      <!-- Sidebar -->
-      <aside v-show="ui.sidebarOpen" class="w-64 shrink-0 border-r border-border bg-bg-1 flex flex-col">
+      <!-- Sidebar (right edge is a drag handle to resize) -->
+      <aside
+        v-show="ui.sidebarOpen"
+        class="shrink-0 border-r border-border bg-bg-1 flex flex-col relative"
+        :style="{ width: `${ui.sidebarWidth}px` }"
+      >
+        <div
+          class="absolute right-0 top-0 bottom-0 w-1 -mr-0.5 z-20 cursor-col-resize hover:bg-accent/40"
+          title="Drag to resize"
+          @mousedown.prevent="startSidebarResize"
+        />
         <!-- KB switcher header (h-9 matches the editor tab bar / agent header) -->
         <div class="relative shrink-0 h-9 border-b border-border">
           <button
@@ -415,8 +440,8 @@ function closeKb(): void {
     <SearchPalette />
     <HealthPanel />
 
-    <!-- While resizing the agent panel, capture the pointer above all iframes -->
-    <div v-if="resizingAgent" class="fixed inset-0 z-50 cursor-col-resize" />
+    <!-- While resizing a panel, capture the pointer above all iframes -->
+    <div v-if="resizing" class="fixed inset-0 z-50 cursor-col-resize" />
 
     <!-- Drop overlay -->
     <div

@@ -13,6 +13,7 @@ const files = useFilesStore()
 const kb = useKbStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
+const expanded = ref(true)
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
@@ -142,9 +143,16 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
 <template>
   <div class="py-2" @click.self="files.clearSelection()">
     <div class="flex items-center px-3 mb-1">
-      <span class="text-xs uppercase tracking-wide text-fg-3 flex-1 truncate">
-        {{ indexStatus || 'Files' }}
-      </span>
+      <button
+        class="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"
+        @click="expanded = !expanded"
+      >
+        <span
+          class="codicon codicon-sm shrink-0"
+          :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
+        />
+        <span class="truncate">{{ indexStatus || 'Files' }}</span>
+      </button>
       <button class="text-fg-3 hover:text-fg-1 ml-2" title="New file" @click="newFile">
         <span class="codicon codicon-sm codicon-new-file" />
       </button>
@@ -169,8 +177,10 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
         <span class="codicon codicon-sm codicon-refresh" />
       </button>
     </div>
-    <FileTreeNode v-for="node in files.tree" :key="node.path" :node="node" :depth="0" />
-    <div v-if="!files.tree.length" class="px-3 py-2 text-xs text-fg-3">Empty folder</div>
+    <template v-if="expanded">
+      <FileTreeNode v-for="node in files.tree" :key="node.path" :node="node" :depth="0" />
+      <div v-if="!files.tree.length" class="px-3 py-2 text-xs text-fg-3">Empty folder</div>
+    </template>
     <input ref="fileInput" type="file" multiple class="hidden" @change="onImport" />
 
     <!-- Right-click context menu -->
