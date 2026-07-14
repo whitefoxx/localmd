@@ -16,6 +16,8 @@ import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
+import { slugify } from '@/lib/docindex/util'
+import type { AgentEvent } from '@/agent/types'
 import { useReviewStore } from '@/stores/review'
 import { useFilesStore } from '@/stores/files'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
@@ -28,6 +30,9 @@ import { useMcpStore } from '@/stores/mcp'
  *  chat session the turn belongs to — concurrent sessions stay isolated. */
 export interface ToolCtx {
   sessionId: string
+  /** Emit a UI event mid-tool (e.g. an artifact card). Optional so tools that
+   *  don't need it stay simple; runners wire it to their onEvent. */
+  emit?: (e: AgentEvent) => void
 }
 
 /** In ask mode, pause until the user approves the proposed content; returns
@@ -162,6 +167,36 @@ const editFile = defineTool({
     }
     await performWrite(ctx, path, before, result.content)
     return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
+  },
+})
+
+/** Pick `artifacts/<slug>.html`, appending -2, -3… on collision. */
+async function uniqueArtifactPath(title: string): Promise<string> {
+  const slug = slugify(title) || 'artifact'
+  for (let n = 1; n < 1000; n++) {
+    const path = `artifacts/${slug}${n > 1 ? `-${n}` : ''}.html`
+    if (!(await fs.exists(path))) return path
+  }
+  return `artifacts/${slug}-${Date.now()}.html`
+}
+
+const createArtifact = defineTool({
+  name: 'create_artifact',
+  description:
+    'Create a self-contained interactive HTML artifact (a study guide, learning path, roadmap, interactive explainer, diagram, etc.) saved under artifacts/. The user opens it in a sandboxed viewer. Requirements: return a COMPLETE standalone HTML document (start with <!doctype html>), inline ALL CSS and JS, no external network/CDN dependencies (it must work fully offline and runs sandboxed with no access to the app). Use it when the user wants a rich, interactive, or visually structured deliverable that plain markdown cannot express; otherwise prefer write_file.',
+  schema: z.object({
+    title: z.string().describe('Short human title, e.g. "机器学习学习路径"'),
+    html: z.string().describe('The complete standalone HTML document'),
+  }),
+  describeCall: (a) => `artifact: ${a.title}`,
+  run: async ({ title, html }, ctx) => {
+    const path = await uniqueArtifactPath(title)
+    if (!(await approved(ctx, path, null, html))) {
+      return `User declined the artifact ${path}. Ask them how to proceed instead of retrying.`
+    }
+    await performWrite(ctx, path, null, html)
+    ctx.emit?.({ type: 'artifact', title, path })
+    return `Created artifact "${title}" at ${path} (${html.length} chars). It opens in a sandboxed viewer; a clickable card was shown to the user — do not paste the HTML back.`
   },
 })
 
@@ -500,6 +535,7 @@ export const TOOLS: ToolSpec[] = [
   readFile,
   writeFile,
   editFile,
+  createArtifact,
   searchFiles,
   indexDocument,
   updatePlan,

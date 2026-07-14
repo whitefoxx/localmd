@@ -23,6 +23,7 @@ import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
+import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
 import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
@@ -372,6 +373,7 @@ function closeKb(): void {
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
               <EpubViewer v-else-if="kind === 'epub'" />
+              <ArtifactViewer v-else-if="kind === 'html'" />
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">
                   <span class="codicon codicon-lg codicon-file-binary block mb-2" />

@@ -11,6 +11,13 @@ describe('fileKind', () => {
     expect(fileKind('src/app.ts')).toBe('text')
     expect(fileKind('data/blob.bin')).toBe('binary')
   })
+
+  it('classifies HTML as its own kind (artifact viewer), not text', () => {
+    expect(fileKind('artifacts/guide.html')).toBe('html')
+    expect(fileKind('x.HTM')).toBe('html')
+    // .ts / .css etc stay text — only html/htm route to the sandboxed viewer.
+    expect(fileKind('style.css')).toBe('text')
+  })
 })
 
 describe('mimeFor', () => {
