@@ -57,3 +57,40 @@ describe('code highlighting', () => {
     expect(html).not.toContain('hljs-keyword')
   })
 })
+
+describe('math (KaTeX)', () => {
+  it('renders inline $…$', () => {
+    const html = renderMarkdown('质能方程 $E = mc^2$ 很有名', resolver)
+    expect(html).toContain('katex')
+    expect(html).not.toContain('$E = mc^2$')
+  })
+  it('renders display $$…$$ blocks', () => {
+    const html = renderMarkdown('$$\n\\int_0^1 x^2 \\, dx = \\frac{1}{3}\n$$', resolver)
+    expect(html).toContain('katex-display')
+  })
+  it('leaves plain dollar amounts alone', () => {
+    const html = renderMarkdown('价格是 $5 一件', resolver)
+    expect(html).not.toContain('katex')
+  })
+  it('leaves paired dollar amounts alone (Pandoc rules)', () => {
+    // "$5,那件 $10" once got swallowed as one formula spanning the two $s.
+    const html = renderMarkdown('这件商品价格 $5,那件 $10,美元符号不该变成公式。', resolver)
+    expect(html).not.toContain('katex')
+    expect(html).toContain('$5')
+    expect(html).toContain('$10')
+  })
+  it('renders CJK-adjacent inline math (no surrounding spaces)', () => {
+    const html = renderMarkdown('当$x > 0$时,函数$f(x) = \\ln x$单调递增。', resolver)
+    expect(html).toContain('katex')
+    expect(html).not.toContain('$x > 0$')
+  })
+  it('renders single-line $$…$$ as display math', () => {
+    const html = renderMarkdown('结论:$$E = mc^2$$', resolver)
+    expect(html).toContain('katex-display')
+  })
+  it('does not treat citation tokens as math', () => {
+    const html = renderMarkdown('claim [[1:b2-1]] holds for $x > 0$', resolver)
+    expect(html).toContain('class="citation"')
+    expect(html).toContain('katex')
+  })
+})

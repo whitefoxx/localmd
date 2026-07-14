@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, watch, onUnmounted } from 'vue'
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useChatStore, type Attachment, type UiMessage } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
+import { useUiStore } from '@/stores/ui'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { usePlanStore } from '@/stores/plan'
@@ -16,6 +17,7 @@ const emit = defineEmits<{ openSettings: []; close: [] }>()
 
 const chat = useChatStore()
 const settingsStore = useSettingsStore()
+const ui = useUiStore()
 const files = useFilesStore()
 const citations = useCitationsStore()
 const plan = usePlanStore()
@@ -117,6 +119,20 @@ watch(
   { immediate: true },
 )
 onUnmounted(() => clearInterval(clock))
+
+/* ⌘↑/⌘↓ scroll the transcript to top/bottom while the panel is open — even
+ * from the input (jumping the conversation beats moving the caret there).
+ * Reaching the bottom re-arms auto-follow via the scroll handler itself. */
+function onScrollHotkey(e: KeyboardEvent): void {
+  if (!ui.agentOpen || e.defaultPrevented) return
+  if (!(e.metaKey || e.ctrlKey) || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+  const el = scroller.value
+  if (!el) return
+  e.preventDefault()
+  el.scrollTo({ top: e.key === 'ArrowDown' ? el.scrollHeight : 0, behavior: 'smooth' })
+}
+onMounted(() => window.addEventListener('keydown', onScrollHotkey))
+onUnmounted(() => window.removeEventListener('keydown', onScrollHotkey))
 
 type ToolPart = Extract<MessagePart, { type: 'tool' }>
 
