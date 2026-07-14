@@ -54,3 +54,20 @@ describe('renderCitationTokens', () => {
     expect(renderCitationTokens(body)).toBe(body)
   })
 })
+
+describe('renderCitationTokens with extraSources', () => {
+  it('resolves a chip whose source declaration is out of this text', () => {
+    // Chat renders part-by-part: the [[pdf1:…]] declaration lives elsewhere.
+    const extra = new Map([['1', { kind: 'pdf' as const, path: 'raw/x.pdf' }]])
+    const html = renderCitationTokens('claim [[1:b14-3]].', extra)
+    expect(html).toContain('data-cite-path="raw/x.pdf"')
+    expect(html).toContain('>[1]<')
+  })
+
+  it('a chip with no resolvable source stays clickable (falls back at click)', () => {
+    const html = renderCitationTokens('claim [[1:b14-3]].')
+    expect(html).toContain('class="citation"')
+    expect(html).toContain('data-block="b14-3"')
+    expect(html).not.toContain('data-cite-path')
+  })
+})

@@ -38,9 +38,23 @@ export function parseCiteSources(body: string): Map<string, CiteSource> {
  * these specific tokens are consumed first). Source declarations become links
  * that open the document; inline citations become numbered chips carrying the
  * resolved source path so a click can reveal the cited block.
+ *
+ * `extraSources` supplies declarations from outside this text — chat messages
+ * render part-by-part, so a `[[pdf1:…]]` declared in an earlier part (or an
+ * earlier message) wouldn't otherwise resolve `[[1:bxx-y]]` here. Chips that
+ * still resolve to no source stay clickable: the click handler falls back to
+ * locating the block through the document indexes.
  */
-export function renderCitationTokens(body: string): string {
+export function renderCitationTokens(
+  body: string,
+  extraSources?: Map<string, CiteSource>,
+): string {
   const sources = parseCiteSources(body)
+  if (extraSources) {
+    for (const [num, src] of extraSources) {
+      if (!sources.has(num)) sources.set(num, src)
+    }
+  }
 
   CITE_SOURCE_RE.lastIndex = 0
   let out = body.replace(CITE_SOURCE_RE, (_m, _kind: string, _num: string, path: string) => {
@@ -53,7 +67,7 @@ export function renderCitationTokens(body: string): string {
   out = out.replace(CITE_INLINE_RE, (_m, num: string | undefined, blockId: string) => {
     const src = num ? sources.get(num) : undefined
     const label = num ? `[${num}]` : '[•]'
-    const title = src ? `${blockId} · ${src.path}` : blockId
+    const title = src ? `${blockId} · ${src.path}` : `${blockId}(点击时自动定位来源)`
     const dataPath = src ? ` data-cite-path="${escapeHtml(src.path)}"` : ''
     return `<a href="#" class="citation" data-block="${escapeHtml(blockId)}"${dataPath} title="${escapeHtml(title)}">${label}</a>`
   })

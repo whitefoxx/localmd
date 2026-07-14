@@ -49,6 +49,7 @@ async function onClick(e: MouseEvent): Promise<void> {
     e.preventDefault()
     const path = a.dataset.citePath
     if (path) await citations.openCitation(path, a.dataset.block ?? null)
+    else if (a.dataset.block) await citations.openByBlock(a.dataset.block)
     return
   }
   const wikilink = a.classList.contains('wikilink')

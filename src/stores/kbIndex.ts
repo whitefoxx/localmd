@@ -232,10 +232,22 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return { files, hits: [...hits, ...docHits] }
   }
 
+  /** Source documents whose index contains the given block tag — the click-
+   *  time fallback for citation chips that carry no resolved source path.
+   *  Block ids are per-document, so several docs can legitimately match. */
+  function findBlockSources(blockId: string): string[] {
+    const tag = `[[${blockId}]]`
+    const out = new Set<string>()
+    for (const section of docSections.value.values()) {
+      if (section.content.includes(tag)) out.add(section.source)
+    }
+    return [...out]
+  }
+
   function reset(): void {
     pages.value = new Map()
     docSections.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, graph, health, search, reset }
+  return { pages, refreshing, refresh, backlinks, graph, health, search, findBlockSources, reset }
 })

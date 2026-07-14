@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { useFilesStore } from '@/stores/files'
+import { useKbIndexStore } from '@/stores/kbIndex'
 import { useUiStore } from '@/stores/ui'
 
 export interface PendingJump {
@@ -30,10 +31,28 @@ export const useCitationsStore = defineStore('citations', () => {
     await files.openFile(path)
   }
 
+  /** Fallback for chips with no resolved source (declaration out of reach, or
+   *  the numberless [[bxx-y]] form): locate the block through the document
+   *  indexes. Block ids repeat across documents, so prefer the current one. */
+  async function openByBlock(blockId: string): Promise<void> {
+    const kbIndex = useKbIndexStore()
+    const files = useFilesStore()
+    let sources = kbIndex.findBlockSources(blockId)
+    if (!sources.length) {
+      await kbIndex.refresh() // index may not be loaded yet
+      sources = kbIndex.findBlockSources(blockId)
+    }
+    if (!sources.length) return
+    const path = files.currentPath && sources.includes(files.currentPath)
+      ? files.currentPath
+      : sources[0]
+    await openCitation(path, blockId)
+  }
+
   /** Called by a viewer once it has handled (or cannot handle) the jump. */
   function clear(): void {
     pending.value = null
   }
 
-  return { pending, openCitation, clear }
+  return { pending, openCitation, openByBlock, clear }
 })

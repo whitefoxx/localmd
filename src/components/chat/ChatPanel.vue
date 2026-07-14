@@ -8,6 +8,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { usePlanStore } from '@/stores/plan'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { renderMarkdown } from '@/lib/markdown'
+import { parseCiteSources } from '@/lib/citations'
 import { importFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
@@ -276,8 +277,24 @@ function pickSkill(name: string): void {
 
 /* ── sending ─────────────────────────────────────────────────────────────── */
 
+/** Citation declarations across the WHOLE transcript: messages render part by
+ *  part, so [[1:bxx]] often sits in a different part (or message) than its
+ *  [[pdf1:…]] declaration. First declaration of a number wins. */
+const sessionCiteSources = computed(() => {
+  const all = chat.messages
+    .flatMap((m) => m.parts)
+    .filter((p): p is MessagePart & { type: 'text' } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n')
+  return parseCiteSources(all)
+})
+
 function renderPart(part: MessagePart & { type: 'text' }): string {
-  return renderMarkdown(part.text, { resolve: (t) => files.resolveWikilink(t) })
+  return renderMarkdown(
+    part.text,
+    { resolve: (t) => files.resolveWikilink(t) },
+    { citeSources: sessionCiteSources.value },
+  )
 }
 
 function userText(m: { parts: MessagePart[] }): string {
@@ -354,6 +371,7 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   if (a.classList.contains('citation') || a.classList.contains('cite-source')) {
     const path = a.dataset.citePath
     if (path) await citations.openCitation(path, a.dataset.block ?? null)
+    else if (a.dataset.block) await citations.openByBlock(a.dataset.block)
     return
   }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {

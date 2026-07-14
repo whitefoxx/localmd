@@ -24,7 +24,7 @@ import java from 'highlight.js/lib/languages/java'
 import cpp from 'highlight.js/lib/languages/cpp'
 import diff from 'highlight.js/lib/languages/diff'
 import { splitLink, escapeHtml, splitFrontmatter } from './wiki'
-import { renderCitationTokens } from './citations'
+import { renderCitationTokens, type CiteSource } from './citations'
 
 // Core build + a curated language set keeps the bundle sane; unknown
 // languages fall back to escaped plain text.
@@ -148,11 +148,21 @@ const mathExtensions = [
   },
 ]
 
-export function renderMarkdown(content: string, resolver: WikilinkResolver): string {
+export interface RenderOptions {
+  /** Citation source declarations from surrounding context (e.g. the whole
+   *  chat session) for resolving [[N:block]] chips in a partial text. */
+  citeSources?: Map<string, CiteSource>
+}
+
+export function renderMarkdown(
+  content: string,
+  resolver: WikilinkResolver,
+  opts: RenderOptions = {},
+): string {
   const { body: raw } = splitFrontmatter(content)
   // Citation tokens ([[pdf1:…]], [[1:b14-3]]) share the [[…]] syntax but are
   // not wikilinks — consume them first, before the wikilink tokenizer runs.
-  const body = renderCitationTokens(raw)
+  const body = renderCitationTokens(raw, opts.citeSources)
 
   const marked = new Marked({
     gfm: true,
