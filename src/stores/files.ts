@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { invalidateGitFsCache } from '@/lib/gitfs'
-import { fileStem } from '@/lib/wiki'
+import { fileStem, dirName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
 import type { TreeNode } from '@/lib/fs'
 
@@ -101,6 +101,30 @@ export const useFilesStore = defineStore('files', () => {
   function resolveRelativeLink(href: string): string | null {
     const rel = decodeURIComponent(href).replace(/^\.\//, '').replace(/^\//, '')
     if (!rel || rel.startsWith('#')) return null
+    if (allFiles.value.includes(rel)) return rel
+    const withExt = `${rel}.md`
+    return mdFiles.value.includes(withExt) ? withExt : null
+  }
+
+  /**
+   * Resolve a standard markdown-link href from the linking file to a KB path.
+   * Absolute hrefs (`/tables/x.md`) are bundle-relative — bundle root == KB
+   * root, per OKF. Relative hrefs (`./x`, `../y`, `x`) resolve against the
+   * linking file's own directory, with `..`/`.` segments applied. Returns the
+   * KB path if the target (or target + `.md`) exists, else null.
+   */
+  function resolveMarkdownLink(fromPath: string, href: string): string | null {
+    let h = decodeURIComponent(href.trim()).replace(/[?#].*$/, '')
+    if (!h) return null
+    const parts = h.startsWith('/') ? [] : dirName(fromPath).split('/').filter(Boolean)
+    if (h.startsWith('/')) h = h.slice(1)
+    for (const seg of h.split('/')) {
+      if (seg === '' || seg === '.') continue
+      if (seg === '..') parts.pop()
+      else parts.push(seg)
+    }
+    const rel = parts.join('/')
+    if (!rel) return null
     if (allFiles.value.includes(rel)) return rel
     const withExt = `${rel}.md`
     return mdFiles.value.includes(withExt) ? withExt : null
@@ -367,6 +391,7 @@ export const useFilesStore = defineStore('files', () => {
     allFiles,
     resolveWikilink,
     resolveRelativeLink,
+    resolveMarkdownLink,
     refreshTree,
     openFile,
     onEdited,

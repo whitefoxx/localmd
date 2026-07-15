@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseWikilinks,
+  parseMarkdownLinks,
   splitLink,
   splitFrontmatter,
   extractTitle,
@@ -28,6 +29,29 @@ describe('parseWikilinks', () => {
     const links = parseWikilinks('[[wiki/entities/阿德勒]] [[概念|说明]]')
     expect(links[0].target).toBe('wiki/entities/阿德勒')
     expect(links[1]).toEqual({ target: '概念', label: '说明' })
+  })
+})
+
+describe('parseMarkdownLinks', () => {
+  it('finds absolute, relative, and bare page links', () => {
+    const md = 'See [a](/tables/customers.md), [b](./orders.md), [c](../metrics/wau).'
+    expect(parseMarkdownLinks(md)).toEqual([
+      '/tables/customers.md',
+      './orders.md',
+      '../metrics/wau',
+    ])
+  })
+
+  it('skips external links, anchors, images, and non-page assets', () => {
+    const md =
+      '[ext](https://x.com) [mail](mailto:a@b.c) [anchor](#top) ' +
+      '![img](./pic.png) [pdf](./paper.pdf) [proto](//cdn.x/y.md)'
+    expect(parseMarkdownLinks(md)).toEqual([])
+  })
+
+  it('strips query strings, fragments, and link titles', () => {
+    const md = '[a](/a.md?v=2#sec) [b](./b.md "Tooltip") [c](<./c d.md>)'
+    expect(parseMarkdownLinks(md)).toEqual(['/a.md', './b.md', './c d.md'])
   })
 })
 

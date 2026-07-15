@@ -7,15 +7,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
-import { parseWikilinks } from '@/lib/wiki'
+import { parseWikilinks, parseMarkdownLinks } from '@/lib/wiki'
 import { useFilesStore } from '@/stores/files'
 
 interface CachedPage {
   mtime: number
   content: string
-  /** Resolved KB paths of outgoing wikilinks. */
+  /** Resolved KB paths of outgoing links (wikilinks + standard markdown links). */
   outgoing: string[]
-  /** Wikilink targets that resolve to no file. */
+  /** Link targets that resolve to no file (wikilink targets or markdown hrefs). */
   broken: string[]
 }
 
@@ -81,6 +81,12 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
           const resolved = files.resolveWikilink(link.target)
           if (resolved) outgoing.push(resolved)
           else broken.push(link.target)
+        }
+        // Standard markdown links (OKF bundles use these instead of wikilinks).
+        for (const href of parseMarkdownLinks(content)) {
+          const resolved = files.resolveMarkdownLink(path, href)
+          if (resolved) outgoing.push(resolved)
+          else broken.push(href)
         }
         next.set(path, { mtime, content, outgoing, broken })
         changed = true

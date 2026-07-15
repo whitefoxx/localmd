@@ -25,6 +25,36 @@ export function splitLink(inner: string): ParsedWikilink {
   return { target: t, label: l || t }
 }
 
+// Inline markdown links `[label](href "title")`, excluding images (`![...]`).
+// The leading `(?<!\!)` drops image syntax; the href stops at whitespace or `)`.
+const MD_LINK_RE = /(?<!!)\[(?:[^\[\]]|\[[^\]]*\])*\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/g
+
+/**
+ * Extract internal document links from a markdown body — the OKF/CommonMark
+ * counterpart to wikilinks. Returns hrefs pointing at pages: bundle-relative
+ * absolute (`/tables/x.md`), relative (`./x.md`, `../x`), or bare (`x.md`).
+ * External URLs, `mailto:`, protocol-relative, pure anchors, and non-page
+ * assets (images, `.pdf`, `.png` …) are filtered out so the graph and health
+ * report stay page-to-page. Query strings and anchors are stripped.
+ */
+export function parseMarkdownLinks(content: string): string[] {
+  const out: string[] = []
+  MD_LINK_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = MD_LINK_RE.exec(content)) !== null) {
+    let href = m[1].replace(/^<|>$/g, '').trim()
+    if (!href || href.startsWith('#')) continue
+    // Scheme (http:, mailto:, …) or protocol-relative → external, skip.
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) continue
+    href = href.replace(/[?#].*$/, '') // drop query / fragment
+    if (!href) continue
+    // Keep only page references: explicit `.md`, or an extensionless basename.
+    const base = href.split('/').pop() ?? href
+    if (href.endsWith('.md') || !base.includes('.')) out.push(href)
+  }
+  return out
+}
+
 const FM_RE = /^---\n([\s\S]*?)\n---\n?/
 
 export interface FrontmatterParse {
