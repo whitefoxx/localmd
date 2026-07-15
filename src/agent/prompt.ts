@@ -33,7 +33,11 @@ Attachments and file references:
 
 Documents (PDF/EPUB) and citation workflow:
 - PDFs and EPUBs are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).
-- Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
+- Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.
+
+Knowledge types (optional convention):
+- An optional file types.yaml at the KB root maps a knowledge type to a directory and a color (a YAML list under \`types:\`, each entry: name, optional dir, optional color). It is a lightweight suggestion, not a hard rule. A page's type = its frontmatter \`type:\` if present, else the type of the deepest matching schema dir, else untyped.
+- When you lint, or the user asks to organize types: if types.yaml is missing, offer to create it — scan the wiki content directories and propose a sensible type + color per meaningful directory. If it exists but new directories aren't covered, propose additions. Leave non-content dirs (raw/, .agents/, .trace/, and index/log pages) untyped. Always show the proposed types.yaml as a diff and write it only after the user agrees; it commits with the KB.`
 
 export async function buildSystemPrompt(sessionId: string): Promise<string> {
   let prompt = BASE

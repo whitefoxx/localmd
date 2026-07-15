@@ -20,6 +20,7 @@ import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
 import BacklinksPanel from '@/components/BacklinksPanel.vue'
 import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
+import TypeDriftBanner from '@/components/TypeDriftBanner.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
@@ -358,6 +359,7 @@ function closeKb(): void {
           </div>
         </div>
 
+        <TypeDriftBanner />
         <OpenFilesPanel />
         <div class="flex-1 panel-scroll flex flex-col">
           <FileTree class="flex-1" />

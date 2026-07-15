@@ -197,6 +197,23 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return schemaColor(type, schema.value) ?? typeColor(type)
   }
 
+  /** Directories holding untyped pages while a schema exists — the "drift" the
+   *  /lint nudge points at. Empty without a schema (then everything is simply
+   *  untyped, not drift). Dot-prefixed infra dirs (.agents, .trace) are skipped. */
+  const untypedDirs = computed(() => {
+    if (!schema.value) return []
+    const dirs = new Set<string>()
+    for (const [path, page] of pages.value) {
+      if (resolveType(path, page.type, schema.value) !== null) continue
+      const slash = path.lastIndexOf('/')
+      if (slash < 0) continue // root-level loose file, not a directory
+      const dir = path.slice(0, slash)
+      if (dir.startsWith('.')) continue // .agents/, .trace/, …
+      dirs.add(dir)
+    }
+    return [...dirs].sort()
+  })
+
   const graph = computed(() => {
     const nodes = [...pages.value.keys()]
     const links: { source: string; target: string }[] = []
@@ -287,5 +304,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     docSections.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, types, colorFor, graph, health, search, findBlockSources, reset }
+  return { pages, refreshing, refresh, backlinks, types, colorFor, untypedDirs, graph, health, search, findBlockSources, reset }
 })
