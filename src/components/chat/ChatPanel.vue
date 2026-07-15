@@ -384,8 +384,10 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
     window.open(href, '_blank', 'noopener')
     return
   }
-  // Relative markdown links ([label](wiki/entities/foo.md)) open the KB file.
-  const rel = files.resolveRelativeLink(href)
+  // Standard markdown links open the KB file. Chat isn't anchored to a file,
+  // so resolve against the KB (bundle) root — absolute /… and bare paths both
+  // land correctly there.
+  const rel = files.resolveMarkdownLink('', href)
   if (rel) await files.openFile(rel)
 }
 

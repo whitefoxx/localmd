@@ -72,8 +72,9 @@ async function onClick(e: MouseEvent): Promise<void> {
     window.open(href, '_blank', 'noopener')
     return
   }
-  // Relative markdown links ([label](wiki/entities/foo.md)) open the KB file.
-  const rel = files.resolveRelativeLink(href)
+  // Standard markdown links open the KB file — resolved relative to THIS file's
+  // directory (so ./ and ../ work), absolute /… against the KB (bundle) root.
+  const rel = files.resolveMarkdownLink(files.currentPath ?? '', href)
   if (rel) await files.openFile(rel)
 }
 

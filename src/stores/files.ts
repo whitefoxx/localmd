@@ -97,15 +97,6 @@ export const useFilesStore = defineStore('files', () => {
     return stemIndex.value.get(t.toLowerCase()) ?? null
   }
 
-  /** Resolve a relative markdown-link href to an existing KB file, if any. */
-  function resolveRelativeLink(href: string): string | null {
-    const rel = decodeURIComponent(href).replace(/^\.\//, '').replace(/^\//, '')
-    if (!rel || rel.startsWith('#')) return null
-    if (allFiles.value.includes(rel)) return rel
-    const withExt = `${rel}.md`
-    return mdFiles.value.includes(withExt) ? withExt : null
-  }
-
   /**
    * Resolve a standard markdown-link href from the linking file to a KB path.
    * Absolute hrefs (`/tables/x.md`) are bundle-relative — bundle root == KB
@@ -390,7 +381,6 @@ export const useFilesStore = defineStore('files', () => {
     mdFiles,
     allFiles,
     resolveWikilink,
-    resolveRelativeLink,
     resolveMarkdownLink,
     refreshTree,
     openFile,
