@@ -2,16 +2,13 @@
 import { computed, inject, ref } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useGitStore } from '@/stores/git'
-import { useKbIndexStore } from '@/stores/kbIndex'
 import { GIT_DECOR } from '@/lib/gitStatus'
-import { typeColor } from '@/lib/typeColor'
 import type { TreeNode } from '@/lib/fs'
 
 const props = defineProps<{ node: TreeNode; depth: number }>()
 
 const files = useFilesStore()
 const git = useGitStore()
-const index = useKbIndexStore()
 const isDir = computed(() => props.node.kind === 'dir')
 const dragOver = ref(false)
 const expanded = computed(() => files.expandedDirs.has(props.node.path))
@@ -26,9 +23,6 @@ const gitKind = computed(() => {
   return isDir.value ? git.dirStatus(props.node.path) : (git.statusByPath.get(props.node.path) ?? null)
 })
 const gitDeco = computed(() => (gitKind.value ? GIT_DECOR[gitKind.value] : null))
-
-/* ── OKF `type` chip: the concept kind, colored consistently with the graph ── */
-const nodeType = computed(() => (isDir.value ? null : (index.types.get(props.node.path) ?? null)))
 
 const icon = computed(() => {
   if (isDir.value) return expanded.value ? 'codicon-folder-opened' : 'codicon-folder'
@@ -125,14 +119,6 @@ function onDrop(e: DragEvent): void {
         <span class="codicon codicon-sm" :class="icon" />
       </span>
       <span class="truncate flex-1" :class="gitDeco?.class">{{ node.name }}</span>
-      <span
-        v-if="nodeType"
-        class="shrink-0 max-w-[96px] truncate rounded border px-1 text-[10px] leading-[1.4] opacity-90"
-        :style="{ color: typeColor(nodeType), borderColor: typeColor(nodeType) }"
-        :title="`type: ${nodeType}`"
-      >
-        {{ nodeType }}
-      </span>
       <span v-if="gitDeco" class="shrink-0 text-xs font-medium" :class="gitDeco.class">
         {{ gitDeco.letter }}
       </span>

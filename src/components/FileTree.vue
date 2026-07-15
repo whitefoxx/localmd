@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, computed, onMounted, watch } from 'vue'
+import { ref, provide, computed } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbStore } from '@/stores/kb'
 import { useKbIndexStore } from '@/stores/kbIndex'
@@ -20,16 +20,6 @@ const kb = useKbStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
 const expanded = ref(true)
-
-// Populate the content index whenever the tree becomes visible or its file set
-// changes, so the `type` chips (and backlinks/health/graph) have data without
-// waiting for the user to open search/graph. refresh() is mtime-cached, so
-// repeat calls are cheap when nothing changed.
-onMounted(() => void useKbIndexStore().refresh())
-watch(
-  () => files.mdFiles,
-  () => void useKbIndexStore().refresh(),
-)
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
