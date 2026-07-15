@@ -238,6 +238,12 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
     const s = reactive({ ...(stored as unknown as ChatSession), running: false }) as OpenSession
+    // A session persisted mid-stream (reload during a turn) can carry unsettled
+    // parts: stop forever-spinning tool calls and drop never-written artifacts.
+    for (const m of s.uiMessages) {
+      for (const p of m.parts) if (p.type === 'tool' && p.status === 'running') p.status = 'error'
+      m.parts = m.parts.filter((p) => !(p.type === 'artifact' && p.pending))
+    }
     if (!addTab(s)) return
     const maxId = s.uiMessages.reduce((a, m) => Math.max(a, m.id), 0)
     nextId = Math.max(nextId, maxId + 1)
@@ -432,6 +438,9 @@ export const useChatStore = defineStore('chat', () => {
     const assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
     session.uiMessages.push(assistant)
     void persist(session)
+    // Throttle streaming persistence so a reload mid-turn keeps the partial
+    // reply (the turn-end persist never runs if the tab is closed first).
+    let lastStreamPersist = Date.now()
 
     const onEvent = (e: AgentEvent): void => {
       const parts = assistant.parts
@@ -477,6 +486,11 @@ export const useChatStore = defineStore('chat', () => {
             : { type: 'tool', name: e.name, detail: e.detail, args: e.args },
         )
       }
+      const t = Date.now()
+      if (t - lastStreamPersist > 1000) {
+        lastStreamPersist = t
+        void persist(session)
+      }
     }
 
     session.running = true
@@ -494,9 +508,10 @@ export const useChatStore = defineStore('chat', () => {
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
+        session.openaiHistory = [...session.openaiHistory, { role: 'user', content: modelText }]
         session.openaiHistory = await runMockTurn({
           system,
-          messages: [...session.openaiHistory, { role: 'user', content: modelText }],
+          messages: [...session.openaiHistory],
           sessionId: session.id,
           onEvent,
           signal: controller.signal,
@@ -537,15 +552,22 @@ export const useChatStore = defineStore('chat', () => {
             },
           })
         }
+        // Commit the user turn to the wire history BEFORE running, so an
+        // interrupted turn (reload mid-stream) still replays it next time.
+        // Pass a COPY: runAnthropicTurn's SDK runner grows its messages array
+        // in place, so on abort the committed history stays clean (just the
+        // user message, no dangling tool_use).
+        session.anthropicHistory = [
+          ...session.anthropicHistory,
+          { role: 'user', content: inlineImages.length ? content : modelText },
+        ]
+        void persist(session)
         session.anthropicHistory = await runAnthropicTurn({
           apiKey: primary.apiKey,
           model: primary.model,
           maxTokens: primary.maxTokens,
           system,
-          messages: [
-            ...session.anthropicHistory,
-            { role: 'user', content: inlineImages.length ? content : modelText },
-          ],
+          messages: [...session.anthropicHistory],
           sessionId: session.id,
           onEvent,
           signal: controller.signal,
@@ -583,13 +605,18 @@ export const useChatStore = defineStore('chat', () => {
             image_url: { url: imageUrlForProvider(primary, toDataUrl(img)) },
           })
         }
+        // Commit the user turn to the wire history before running (see the
+        // anthropic branch); runOpenAITurn copies its input, so on abort this
+        // stays clean (just the user message, no dangling tool calls).
+        session.openaiHistory = [
+          ...session.openaiHistory,
+          { role: 'user', content: inlineImages.length ? content : modelText },
+        ]
+        void persist(session)
         session.openaiHistory = await runOpenAITurn({
           profile: primary,
           system,
-          messages: [
-            ...session.openaiHistory,
-            { role: 'user', content: inlineImages.length ? content : modelText },
-          ],
+          messages: session.openaiHistory,
           vision: settings.vision
             ? { profile: settings.vision, inline }
             : inline
