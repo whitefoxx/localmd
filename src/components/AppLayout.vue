@@ -28,6 +28,7 @@ import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind } from '@/lib/filetypes'
+import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
 
 /* Shared styling for the VS Code–style activity-bar buttons. */
@@ -86,6 +87,24 @@ const startSidebarResize = (e: MouseEvent): void => {
   )
 }
 const kbIndex = useKbIndexStore()
+
+/** OKF `type` → color legend for the graph top bar: the distinct types present
+ *  among graph nodes (each colored via typeColor, matching the node fills),
+ *  plus whether any untyped node or the accent-colored current file is shown. */
+const graphLegend = computed(() => {
+  const present = new Map<string, string>()
+  let hasUntyped = false
+  for (const id of kbIndex.graph.nodes) {
+    const t = kbIndex.types.get(id)
+    if (t) present.set(t, typeColor(t))
+    else hasUntyped = true
+  }
+  return {
+    types: [...present.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+    hasUntyped,
+    hasCurrent: !!files.currentPath && kbIndex.graph.nodes.includes(files.currentPath),
+  }
+})
 
 const dragging = ref(false)
 
@@ -426,11 +445,35 @@ function closeKb(): void {
          mounted underneath — closing it never reloads anything. -->
     <div v-if="ui.graphOpen" class="fixed inset-0 z-40 bg-bg-0 flex flex-col">
       <div class="flex items-center gap-2 px-4 h-11 border-b border-border shrink-0">
-        <span class="codicon codicon-type-hierarchy-sub text-accent" />
-        <span class="font-semibold text-fg-0">Graph</span>
-        <span class="text-xs text-fg-3">点击节点打开文件</span>
-        <span class="flex-1" />
-        <button class="text-fg-3 hover:text-fg-0" title="Close (Esc)" @click="ui.graphOpen = false">
+        <span class="codicon codicon-type-hierarchy-sub text-accent shrink-0" />
+        <span class="font-semibold text-fg-0 shrink-0">Graph</span>
+        <span class="text-xs text-fg-3 shrink-0">点击节点打开文件</span>
+        <!-- type color legend: what each node color means -->
+        <div class="flex items-center gap-3 overflow-x-auto min-w-0 flex-1 pl-2 text-xs">
+          <span
+            v-for="[t, color] in graphLegend.types"
+            :key="t"
+            class="flex items-center gap-1.5 shrink-0"
+          >
+            <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: color }" />
+            <span class="text-fg-2 whitespace-nowrap">{{ t }}</span>
+          </span>
+          <span v-if="graphLegend.hasUntyped" class="flex items-center gap-1.5 shrink-0">
+            <span
+              class="inline-block h-2.5 w-2.5 rounded-full"
+              style="background: rgb(var(--c-fg-3))"
+            />
+            <span class="text-fg-3 whitespace-nowrap">无类型</span>
+          </span>
+          <span v-if="graphLegend.hasCurrent" class="flex items-center gap-1.5 shrink-0">
+            <span
+              class="inline-block h-2.5 w-2.5 rounded-full"
+              style="background: rgb(var(--c-accent))"
+            />
+            <span class="text-fg-3 whitespace-nowrap">当前文件</span>
+          </span>
+        </div>
+        <button class="text-fg-3 hover:text-fg-0 shrink-0" title="Close (Esc)" @click="ui.graphOpen = false">
           <span class="codicon codicon-close" />
         </button>
       </div>
