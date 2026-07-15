@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseWikilinks,
   parseMarkdownLinks,
+  extractType,
   splitLink,
   splitFrontmatter,
   extractTitle,
@@ -86,6 +87,17 @@ describe('extractTitle', () => {
   })
   it('returns null when neither exists', () => {
     expect(extractTitle('plain text only')).toBeNull()
+  })
+})
+
+describe('extractType', () => {
+  it('reads the frontmatter type, quoted or bare', () => {
+    expect(extractType('---\ntype: "BigQuery Table"\n---\nbody')).toBe('BigQuery Table')
+    expect(extractType('---\ntype: Playbook\ntitle: x\n---\nbody')).toBe('Playbook')
+  })
+  it('returns null without frontmatter or a type field', () => {
+    expect(extractType('# no frontmatter')).toBeNull()
+    expect(extractType('---\ntitle: x\n---\nbody')).toBeNull()
   })
 })
 

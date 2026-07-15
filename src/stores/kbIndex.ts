@@ -7,7 +7,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
-import { parseWikilinks, parseMarkdownLinks } from '@/lib/wiki'
+import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { useFilesStore } from '@/stores/files'
 
 interface CachedPage {
@@ -17,6 +17,8 @@ interface CachedPage {
   outgoing: string[]
   /** Link targets that resolve to no file (wikilink targets or markdown hrefs). */
   broken: string[]
+  /** OKF frontmatter `type`, or null when the page declares none. */
+  type: string | null
 }
 
 /** A cached section file from a PDF/EPUB index under .trace/. */
@@ -88,7 +90,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
           if (resolved) outgoing.push(resolved)
           else broken.push(href)
         }
-        next.set(path, { mtime, content, outgoing, broken })
+        next.set(path, { mtime, content, outgoing, broken, type: extractType(content) })
         changed = true
       }
       if (changed) pages.value = next
@@ -164,6 +166,14 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   function backlinks(path: string): string[] {
     return [...(inbound.value.get(path) ?? [])].sort()
   }
+
+  /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
+   *  chips, graph node coloring, and the search palette's `type:` filter. */
+  const types = computed(() => {
+    const map = new Map<string, string>()
+    for (const [path, page] of pages.value) if (page.type) map.set(path, page.type)
+    return map
+  })
 
   const graph = computed(() => {
     const nodes = [...pages.value.keys()]
@@ -255,5 +265,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     docSections.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, graph, health, search, findBlockSources, reset }
+  return { pages, refreshing, refresh, backlinks, types, graph, health, search, findBlockSources, reset }
 })

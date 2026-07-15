@@ -2,9 +2,10 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import { useFilesStore } from '@/stores/files'
-import { useKbIndexStore } from '@/stores/kbIndex'
+import { useKbIndexStore, type SearchHit } from '@/stores/kbIndex'
 import { useCitationsStore } from '@/stores/citations'
 import { baseName } from '@/lib/wiki'
+import { typeColor } from '@/lib/typeColor'
 
 const ui = useUiStore()
 const files = useFilesStore()
@@ -21,12 +22,42 @@ interface Row {
   line?: number
   text?: string
   blockId?: string | null
+  type?: string | null
 }
 
+// `type:foo` (or `type:"foo bar"`) filters results to that OKF concept type;
+// the rest of the query is the usual filename/content search.
+const TYPE_RE = /\btype:(?:"([^"]*)"|(\S+))/i
+const parsed = computed(() => {
+  const m = query.value.match(TYPE_RE)
+  return {
+    typeFilter: m ? (m[1] ?? m[2]).toLowerCase() : '',
+    text: query.value.replace(TYPE_RE, '').trim(),
+  }
+})
+
 const rows = computed<Row[]>(() => {
-  const { files: fileMatches, hits } = index.search(query.value)
+  const { typeFilter, text } = parsed.value
+  let fileMatches: string[]
+  let hits: SearchHit[]
+  if (typeFilter) {
+    const inType = (p: string) => (index.types.get(p) ?? '').toLowerCase().includes(typeFilter)
+    if (text) {
+      const r = index.search(text)
+      fileMatches = r.files.filter(inType)
+      hits = r.hits.filter((h) => inType(h.path))
+    } else {
+      // Type filter alone → list every page of that type.
+      fileMatches = [...index.types.keys()].filter(inType).sort()
+      hits = []
+    }
+  } else {
+    const r = index.search(text)
+    fileMatches = r.files
+    hits = r.hits
+  }
   return [
-    ...fileMatches.map((path): Row => ({ kind: 'file', path })),
+    ...fileMatches.map((path): Row => ({ kind: 'file', path, type: index.types.get(path) ?? null })),
     ...hits.map(
       (h): Row => ({
         kind: h.doc ? 'doc' : 'hit',
@@ -34,6 +65,7 @@ const rows = computed<Row[]>(() => {
         line: h.line,
         text: h.text,
         blockId: h.blockId,
+        type: index.types.get(h.path) ?? null,
       }),
     ),
   ].slice(0, 60)
@@ -93,7 +125,7 @@ function onKeydown(e: KeyboardEvent): void {
           ref="inputEl"
           v-model="query"
           class="px-4 py-3 bg-transparent text-fg-0 placeholder-fg-3 focus:outline-none border-b border-border"
-          placeholder="Search files and content…"
+          placeholder="Search files and content…  (type:foo to filter by concept type)"
           @keydown="onKeydown"
         />
         <div class="panel-scroll">
@@ -126,6 +158,13 @@ function onKeydown(e: KeyboardEvent): void {
               <span class="shrink-0 text-fg-3 font-mono text-xs">{{ row.path }}:{{ row.line }}</span>
               <span class="truncate text-fg-2">{{ row.text }}</span>
             </template>
+            <span
+              v-if="row.type"
+              class="ml-auto shrink-0 max-w-[110px] truncate rounded border px-1 text-[10px] leading-[1.4]"
+              :style="{ color: typeColor(row.type), borderColor: typeColor(row.type) }"
+            >
+              {{ row.type }}
+            </span>
           </button>
           <div v-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">No results</div>
         </div>

@@ -81,6 +81,14 @@ export function extractTitle(content: string): string | null {
   return h1 ? h1[1].trim() : null
 }
 
+/** Frontmatter `type:` value (OKF's one required field per concept), or null. */
+export function extractType(content: string): string | null {
+  const { yaml } = splitFrontmatter(content)
+  if (!yaml) return null
+  const m = yaml.match(/^type:\s*['"]?([^'"\n]+?)['"]?\s*$/m)
+  return m ? m[1].trim() : null
+}
+
 /** Cross-platform basename. */
 export function baseName(p: string): string {
   return p.split('/').pop() ?? p

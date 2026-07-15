@@ -15,9 +15,11 @@ import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { fileStem } from '@/lib/wiki'
+import { typeColor } from '@/lib/typeColor'
 
 interface GraphNode {
   id: string
+  type?: string | null
   x?: number
   y?: number
   fx?: number | null
@@ -42,7 +44,7 @@ function render(): void {
   const width = el.clientWidth
   const height = el.clientHeight
 
-  const nodes: GraphNode[] = index.graph.nodes.map((id) => ({ id }))
+  const nodes: GraphNode[] = index.graph.nodes.map((id) => ({ id, type: index.types.get(id) ?? null }))
   const links: GraphLink[] = index.graph.links.map((l) => ({ ...l }))
   const degree = new Map<string, number>()
   for (const l of index.graph.links) {
@@ -88,7 +90,11 @@ function render(): void {
     .append('circle')
     .attr('r', (d) => 4 + Math.min(6, degree.get(d.id) ?? 0))
     .attr('fill', (d) =>
-      d.id === files.currentPath ? 'rgb(var(--c-accent))' : 'rgb(var(--c-fg-3))',
+      d.id === files.currentPath
+        ? 'rgb(var(--c-accent))'
+        : d.type
+          ? typeColor(d.type)
+          : 'rgb(var(--c-fg-3))',
     )
 
   node
