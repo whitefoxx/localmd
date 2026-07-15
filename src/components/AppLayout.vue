@@ -28,7 +28,6 @@ import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind } from '@/lib/filetypes'
-import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
 
 /* Shared styling for the VS Code–style activity-bar buttons. */
@@ -96,7 +95,7 @@ const graphLegend = computed(() => {
   let hasUntyped = false
   for (const id of kbIndex.graph.nodes) {
     const t = kbIndex.types.get(id)
-    if (t) present.set(t, typeColor(t))
+    if (t) present.set(t, kbIndex.colorFor(t))
     else hasUntyped = true
   }
   return {
