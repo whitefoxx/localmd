@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
+import { computeLint, type LintReport } from '@/lib/lint'
 import { useFilesStore } from '@/stores/files'
 
 interface CachedPage {
@@ -167,6 +168,11 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return [...(inbound.value.get(path) ?? [])].sort()
   }
 
+  /** Deterministic structural lint over the cached page graph (no file reads). */
+  function lintReport(): LintReport {
+    return computeLint(pages.value)
+  }
+
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
    *  chips, graph node coloring, and the search palette's `type:` filter. */
   const types = computed(() => {
@@ -265,5 +271,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     docSections.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, types, graph, health, search, findBlockSources, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, graph, health, search, findBlockSources, reset }
 })

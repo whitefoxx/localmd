@@ -16,6 +16,7 @@ import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
+import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
 import { useReviewStore } from '@/stores/review'
@@ -24,6 +25,7 @@ import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
 import { useMcpStore } from '@/stores/mcp'
+import { useKbIndexStore } from '@/stores/kbIndex'
 
 /** Per-turn execution context threaded from the runners into every tool call,
  *  attributing side effects (writes, plan updates, tool activations) to the
@@ -254,6 +256,19 @@ const searchFiles = defineTool({
     if (!out.length) return `No matches for "${query}"`
     const capped = out.length >= MAX_SEARCH_RESULTS ? `\n[capped at ${MAX_SEARCH_RESULTS} results]` : ''
     return out.join('\n') + capped
+  },
+})
+
+const kbHealth = defineTool({
+  name: 'kb_health',
+  description:
+    'Deterministic structural lint of the WHOLE knowledge base — broken wikilinks, orphan and weakly-linked pages, pages unreachable from the index, pages missing frontmatter, and thin / self-linking / placeholder pages. Computed from the content index with NO page reads, so it is cheap and complete: for structural/health checks call this ONCE instead of listing and reading pages. It does NOT check semantics (contradictions, stale claims) — those need reading content and are token-heavy, so report these findings first and confirm scope with the user before scanning content.',
+  schema: z.object({}),
+  describeCall: () => 'kb health',
+  run: async () => {
+    const kb = useKbIndexStore()
+    await kb.refresh()
+    return formatLintReport(kb.lintReport())
   },
 })
 
@@ -537,6 +552,7 @@ export const TOOLS: ToolSpec[] = [
   editFile,
   createArtifact,
   searchFiles,
+  kbHealth,
   indexDocument,
   updatePlan,
   useSkill,

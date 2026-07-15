@@ -24,6 +24,7 @@ Guidelines:
 - For rich, interactive, or visually-structured deliverables that markdown can't express (a study guide, learning path, roadmap, interactive explainer, quiz, diagram), use create_artifact to produce a self-contained interactive HTML document. It opens in a sandboxed viewer with no app access, so inline all CSS/JS and avoid external network/CDN. Prefer plain markdown pages for ordinary notes.
 - Use [[wikilinks]] to connect pages; link targets are file names without the .md extension.
 - Pages may carry a frontmatter \`type:\` — a short, producer-defined kind (concept, source, entity, …); a lightweight convention, no registry or fixed vocabulary. Preserve it when editing, and set a sensible one when creating a page alongside typed siblings.
+- Lint / KB health: call kb_health for structural problems (broken links, orphans, unreachable/thin pages) — do NOT read pages to find those. Report its findings first; semantic checks (contradictions, stale claims) need reading content and are token-heavy, so ask the user before scanning content and let them narrow the scope. Prefer catching issues at the source: when you create a page, link it into the relevant index and use resolvable [[wikilinks]] so it never becomes an orphan or a dangling link.
 - Keep edits minimal and focused on what the user asked.
 - Answer in the user's language.
 
