@@ -15,6 +15,7 @@ import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { fileStem } from '@/lib/wiki'
+import { typeColor } from '@/lib/typeColor'
 
 interface GraphNode {
   id: string
@@ -92,7 +93,7 @@ function render(): void {
       d.id === files.currentPath
         ? 'rgb(var(--c-accent))'
         : d.type
-          ? index.colorFor(d.type)
+          ? typeColor(d.type)
           : 'rgb(var(--c-fg-3))',
     )
 

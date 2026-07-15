@@ -20,7 +20,6 @@ import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
 import BacklinksPanel from '@/components/BacklinksPanel.vue'
 import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
-import TypeDriftBanner from '@/components/TypeDriftBanner.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
@@ -29,6 +28,7 @@ import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind } from '@/lib/filetypes'
+import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
 
 /* Shared styling for the VS Code–style activity-bar buttons. */
@@ -96,7 +96,7 @@ const graphLegend = computed(() => {
   let hasUntyped = false
   for (const id of kbIndex.graph.nodes) {
     const t = kbIndex.types.get(id)
-    if (t) present.set(t, kbIndex.colorFor(t))
+    if (t) present.set(t, typeColor(t))
     else hasUntyped = true
   }
   return {
@@ -359,7 +359,6 @@ function closeKb(): void {
           </div>
         </div>
 
-        <TypeDriftBanner />
         <OpenFilesPanel />
         <div class="flex-1 panel-scroll flex flex-col">
           <FileTree class="flex-1" />

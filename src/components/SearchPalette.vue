@@ -5,6 +5,7 @@ import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore, type SearchHit } from '@/stores/kbIndex'
 import { useCitationsStore } from '@/stores/citations'
 import { baseName } from '@/lib/wiki'
+import { typeColor } from '@/lib/typeColor'
 
 const ui = useUiStore()
 const files = useFilesStore()
@@ -160,7 +161,7 @@ function onKeydown(e: KeyboardEvent): void {
             <span
               v-if="row.type"
               class="ml-auto shrink-0 max-w-[110px] truncate rounded border px-1 text-[10px] leading-[1.4]"
-              :style="{ color: index.colorFor(row.type), borderColor: index.colorFor(row.type) }"
+              :style="{ color: typeColor(row.type), borderColor: typeColor(row.type) }"
             >
               {{ row.type }}
             </span>

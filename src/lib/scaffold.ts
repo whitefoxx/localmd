@@ -16,7 +16,6 @@ raw/    ← 不可变的源文件(文章、书、图片、数据)。只读,不�
 wiki/   ← LLM 维护的 markdown 页面。用 [[wikilinks]] 互相链接
 wiki/index.md ← 入口页,新页面要从这里可达
 .agents/skills/ ← 可复用的工作流(SKILL.md)
-types.yaml ← 可选:type ↔ 目录 ↔ 颜色 的类型 schema(见下)
 \`\`\`
 
 ## 规则
@@ -25,7 +24,6 @@ types.yaml ← 可选:type ↔ 目录 ↔ 颜色 的类型 schema(见下)
 - 每个 wiki 页面聚焦一个主题;宁可多建小页面 + 链接,不要堆大杂烩
 - 引用来源:从 PDF/EPUB 得出的结论用 [[N:block-id]] 引用标注
 - 修改前先读原文件;编辑保持最小化
-- 类型(可选):根目录 types.yaml 把「类型」映射到目录和颜色。页面类型 = frontmatter 的 type,其次是所在目录在 schema 里的类型,再无则无类型。这是建议不是强制——用 /lint 让 agent 创建/更新它。
 `
 
 const INDEX_MD = `# 索引
@@ -65,9 +63,8 @@ description: 检查知识库健康度——孤儿页、断链、缺失索引项�
 
 1. 遍历 wiki/ 全部页面,收集 [[wikilinks]]。
 2. 找出:孤儿页(无入链)、断链(目标不存在)、index.md 缺失的页面。
-3. 类型 schema:检查根目录 types.yaml。缺失则提议扫描 wiki/ 目录、为每个有意义的目录建议一个 type + 颜色,生成 types.yaml;已存在但有新目录未覆盖则提议补充(raw/、.agents/、index/log 等不分类)。改动前给用户看 diff,同意后再写,随 KB 提交。
-4. 抽查内容矛盾(同一事实在不同页面说法不一)。
-5. 先列出全部问题再动手修;修复需逐项说明。
+3. 抽查内容矛盾(同一事实在不同页面说法不一)。
+4. 先列出全部问题再动手修;修复需逐项说明。
 `
 
 const FILES: Array<[string, string]> = [

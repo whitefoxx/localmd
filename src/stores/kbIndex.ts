@@ -8,14 +8,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
-import {
-  parseTypeSchema,
-  resolveType,
-  schemaColor,
-  TYPE_SCHEMA_PATH,
-  type TypeSchema,
-} from '@/lib/kbTypes'
-import { typeColor } from '@/lib/typeColor'
 import { useFilesStore } from '@/stores/files'
 
 interface CachedPage {
@@ -58,8 +50,6 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   const pages = ref<Map<string, CachedPage>>(new Map())
   const docSections = ref<Map<string, DocSection>>(new Map())
   const refreshing = ref(false)
-  /** The optional KB type schema (types.yaml), reloaded on each refresh. */
-  const schema = ref<TypeSchema | null>(null)
 
   /** Bring the cache in sync with the tree: re-read changed files, drop deleted.
    *  Keeps the SAME Map reference when nothing changed, so downstream computeds
@@ -68,10 +58,6 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     if (refreshing.value || !fs.hasRoot()) return
     refreshing.value = true
     try {
-      // Reload the (optional) type schema — tiny file, cheap to re-read.
-      const schemaText = await fs.tryReadFile(TYPE_SCHEMA_PATH)
-      schema.value = schemaText != null ? parseTypeSchema(schemaText) : null
-
       const files = useFilesStore()
       const mdPaths = new Set(files.mdFiles)
       const next = new Map(pages.value)
@@ -181,37 +167,12 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return [...(inbound.value.get(path) ?? [])].sort()
   }
 
-  /** KB path → resolved `type` (frontmatter wins, else schema dir, else none).
-   *  Feeds graph node coloring, the legend, and the search `type:` filter. */
+  /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
+   *  chips, graph node coloring, and the search palette's `type:` filter. */
   const types = computed(() => {
     const map = new Map<string, string>()
-    for (const [path, page] of pages.value) {
-      const t = resolveType(path, page.type, schema.value)
-      if (t) map.set(path, t)
-    }
+    for (const [path, page] of pages.value) if (page.type) map.set(path, page.type)
     return map
-  })
-
-  /** Display color for a type: schema-defined if set, else a stable auto hue. */
-  function colorFor(type: string): string {
-    return schemaColor(type, schema.value) ?? typeColor(type)
-  }
-
-  /** Directories holding untyped pages while a schema exists — the "drift" the
-   *  /lint nudge points at. Empty without a schema (then everything is simply
-   *  untyped, not drift). Dot-prefixed infra dirs (.agents, .trace) are skipped. */
-  const untypedDirs = computed(() => {
-    if (!schema.value) return []
-    const dirs = new Set<string>()
-    for (const [path, page] of pages.value) {
-      if (resolveType(path, page.type, schema.value) !== null) continue
-      const slash = path.lastIndexOf('/')
-      if (slash < 0) continue // root-level loose file, not a directory
-      const dir = path.slice(0, slash)
-      if (dir.startsWith('.')) continue // .agents/, .trace/, …
-      dirs.add(dir)
-    }
-    return [...dirs].sort()
   })
 
   const graph = computed(() => {
@@ -304,5 +265,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     docSections.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, types, colorFor, untypedDirs, graph, health, search, findBlockSources, reset }
+  return { pages, refreshing, refresh, backlinks, types, graph, health, search, findBlockSources, reset }
 })
