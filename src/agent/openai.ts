@@ -230,7 +230,7 @@ export async function runOpenAITurn(opts: OpenAITurnOptions): Promise<ChatMessag
         try {
           const args = JSON.parse(call.args || '{}') as Record<string, unknown>
           id = toolSeq++
-          opts.onEvent({ type: 'tool', name: call.name, detail: ext.describeCall(args), id })
+          opts.onEvent({ type: 'tool', name: call.name, detail: ext.describeCall(args), id, args })
           result = await ext.run(args)
           opts.onEvent({ type: 'tool_result', id, ok: !result.startsWith('Error') })
         } catch (err) {
@@ -317,7 +317,7 @@ async function handleSubagent(rawArgs: string, opts: OpenAITurnOptions): Promise
         // Surface tool activity (indented) and usage; the subagent's text
         // comes back as this tool's result.
         if (e.type === 'tool') {
-          opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}` })
+          opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
         } else if (e.type === 'usage') {
           opts.onEvent(e)
         }

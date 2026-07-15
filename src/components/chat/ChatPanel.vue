@@ -179,6 +179,20 @@ function toolIcon(part: ToolPart): string {
   return TOOL_ICONS[part.name] ?? 'codicon-tools'
 }
 
+/** Tool calls that carry non-empty args (MCP tools) render as an expandable
+ *  disclosure so the full parameters can be toggled open. */
+function toolHasArgs(part: ToolPart): boolean {
+  return !!part.args && Object.keys(part.args).length > 0
+}
+
+function formatArgs(part: ToolPart): string {
+  try {
+    return JSON.stringify(part.args, null, 2)
+  } catch {
+    return String(part.args)
+  }
+}
+
 /* A thinking block auto-expands while it is actively streaming (the tail of the
  * live assistant message), then STAYS open — the user collapses it by hand, and
  * that choice sticks (tracked in `collapsedThinking`, keyed by message+part). */
@@ -564,8 +578,29 @@ watch(
         </div>
         <div v-else class="space-y-1">
           <template v-for="(part, i) in m.parts" :key="i">
+            <!-- Tool call with params (MCP): expandable disclosure. -->
+            <details
+              v-if="part.type === 'tool' && toolHasArgs(part)"
+              class="group text-xs font-mono"
+              :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
+            >
+              <summary
+                class="flex items-center gap-1.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-fg-2"
+              >
+                <span
+                  class="codicon codicon-sm codicon-chevron-right shrink-0 text-fg-3 transition-transform group-open:rotate-90"
+                />
+                <span class="codicon codicon-sm shrink-0" :class="toolIcon(part)" />
+                <span class="truncate">{{ part.detail }}</span>
+                <span v-if="part.status" class="shrink-0 tabular-nums text-fg-3">{{ toolTime(part) }}</span>
+              </summary>
+              <pre
+                class="mt-1 ml-5 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
+              >{{ formatArgs(part) }}</pre>
+            </details>
+            <!-- Tool call without params: plain one-liner. -->
             <div
-              v-if="part.type === 'tool'"
+              v-else-if="part.type === 'tool'"
               class="flex items-center gap-1.5 text-xs font-mono"
               :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
             >

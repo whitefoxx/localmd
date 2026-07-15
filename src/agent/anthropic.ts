@@ -74,7 +74,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
       run: async (args) => {
         const a = (args ?? {}) as Record<string, unknown>
         const id = toolSeq++
-        opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a), id })
+        opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(a), id, args: a })
         let ok = false
         try {
           const result = await ext.run(a)
@@ -193,7 +193,7 @@ export async function runAnthropicTurn(opts: AnthropicTurnOptions): Promise<Beta
                 // Surface tool activity (indented) and usage; the subagent's
                 // text comes back as this tool's result.
                 if (e.type === 'tool') {
-                  opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}` })
+                  opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
                 } else if (e.type === 'usage') {
                   opts.onEvent(e)
                 }

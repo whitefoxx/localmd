@@ -50,6 +50,9 @@ export type MessagePart =
       status?: 'running' | 'done' | 'error'
       startedAt?: number
       elapsedMs?: number
+      /** Raw call arguments, kept for MCP tools so the UI can expand the full
+       *  params (describeCall truncates them to a one-line summary). */
+      args?: Record<string, unknown>
     }
   /** A created artifact (interactive HTML) — a clickable card that opens the
    *  file at `path`. `pending` = still being generated (loading card). */
@@ -470,8 +473,8 @@ export const useChatStore = defineStore('chat', () => {
         // Only id-bearing tool calls get the loading/timer treatment.
         parts.push(
           e.id != null
-            ? { type: 'tool', name: e.name, detail: e.detail, id: e.id, status: 'running', startedAt: Date.now() }
-            : { type: 'tool', name: e.name, detail: e.detail },
+            ? { type: 'tool', name: e.name, detail: e.detail, id: e.id, args: e.args, status: 'running', startedAt: Date.now() }
+            : { type: 'tool', name: e.name, detail: e.detail, args: e.args },
         )
       }
     }
