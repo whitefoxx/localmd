@@ -18,6 +18,9 @@ export const useUiStore = defineStore('ui', () => {
   const graphOpen = ref(false)
   const sidebarOpen = ref(true)
   const agentOpen = ref(true)
+  /** Agent panel maximized to fill the whole window (not native fullscreen —
+   *  just an overlay covering the app). Transient; not persisted. */
+  const agentMaximized = ref(false)
   const searchOpen = ref(false)
   const healthOpen = ref(false)
   const settingsOpen = ref(false)
@@ -38,6 +41,7 @@ export const useUiStore = defineStore('ui', () => {
     graphOpen,
     sidebarOpen,
     agentOpen,
+    agentMaximized,
     searchOpen,
     healthOpen,
     settingsOpen,

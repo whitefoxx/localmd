@@ -426,13 +426,16 @@ function closeKb(): void {
           </div>
       </main>
 
-      <!-- Agent panel (left edge is a drag handle to resize) -->
+      <!-- Agent panel — docked on the right (left edge resizes), or maximized to
+           fill the whole window as a z-40 overlay above the editor. -->
       <aside
         v-show="ui.agentOpen"
-        class="shrink-0 border-l border-border relative"
-        :style="{ width: `${ui.agentWidth}px` }"
+        class="relative"
+        :class="ui.agentMaximized ? 'fixed inset-0 z-40' : 'shrink-0 border-l border-border'"
+        :style="ui.agentMaximized ? undefined : { width: `${ui.agentWidth}px` }"
       >
         <div
+          v-if="!ui.agentMaximized"
           class="absolute left-0 top-0 bottom-0 w-1 -ml-0.5 z-20 cursor-col-resize hover:bg-accent/40"
           title="Drag to resize"
           @mousedown.prevent="startAgentResize"

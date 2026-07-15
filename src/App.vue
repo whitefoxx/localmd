@@ -77,8 +77,9 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 /** Esc closes the top-most open layer, one per press: search → settings →
- *  git → review → health → chat history → graph. (SearchPalette also handles
- *  Esc itself while its input has focus — this is the fallback.) */
+ *  git → review → health → chat history → graph → restore maximized agent.
+ *  (SearchPalette also handles Esc itself while its input has focus — this is
+ *  the fallback.) */
 function closeTopLayer(): void {
   const review = useReviewStore()
   const chat = useChatStore()
@@ -89,6 +90,7 @@ function closeTopLayer(): void {
   else if (ui.healthOpen) ui.healthOpen = false
   else if (chat.historyOpen) chat.historyOpen = false
   else if (ui.graphOpen) ui.graphOpen = false
+  else if (ui.agentMaximized) ui.agentMaximized = false
 }
 
 function onBeforeUnload(): void {

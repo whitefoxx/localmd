@@ -460,6 +460,16 @@ watch(
       >
         <span class="codicon codicon-sm codicon-history" />
       </button>
+      <button
+        class="text-fg-3 hover:text-fg-0"
+        :title="ui.agentMaximized ? 'Restore panel' : 'Maximize panel'"
+        @click="ui.agentMaximized = !ui.agentMaximized"
+      >
+        <span
+          class="codicon codicon-sm"
+          :class="ui.agentMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'"
+        />
+      </button>
       <button class="text-fg-3 hover:text-fg-0" title="Close agent panel (⌘J)" @click="emit('close')">
         <span class="codicon codicon-sm codicon-close" />
       </button>
