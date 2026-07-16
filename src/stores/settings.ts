@@ -13,7 +13,12 @@
  */
 import { defineStore } from 'pinia'
 import { reactive, computed, watch } from 'vue'
-import { OPENAI_COMPAT_PRESETS } from '@/lib/providers'
+import {
+  presetFor,
+  providerIdForBaseUrl,
+  isMultimodalProvider,
+  needsBaseUrl,
+} from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 import { isE2eMode } from '@/lib/e2e'
 
@@ -60,11 +65,8 @@ export function newProfileId(): string {
 }
 
 export function autoLabel(p: Pick<LlmProfile, 'provider' | 'model'>): string {
-  const preset =
-    p.provider === 'anthropic'
-      ? 'Anthropic'
-      : (OPENAI_COMPAT_PRESETS.find((x) => x.id === p.provider)?.label ?? p.provider)
-  return p.model ? `${preset} · ${p.model}` : preset
+  const label = presetFor(p.provider)?.label ?? p.provider
+  return p.model ? `${label} · ${p.model}` : label
 }
 
 /** Accepts the current multi-profile shape and the legacy single-provider
@@ -139,12 +141,14 @@ export function normalizeSettings(raw: unknown): SettingsState {
     }
     const openaiKey = String(obj.openaiApiKey ?? '')
     if (openaiKey) {
-      const baseUrl = String(obj.openaiBaseUrl ?? '')
-      const preset = OPENAI_COMPAT_PRESETS.find((x) => x.baseUrl && x.baseUrl === baseUrl)
+      const rawBaseUrl = String(obj.openaiBaseUrl ?? '')
+      const providerId = providerIdForBaseUrl(rawBaseUrl) ?? 'custom'
       const p = {
         id: newProfileId(),
-        provider: preset?.id ?? 'custom',
-        baseUrl,
+        provider: providerId,
+        // Dedicated providers bake in their base URL; keep it only for endpoints
+        // that need one (Custom / preset-URL).
+        baseUrl: needsBaseUrl(providerId) ? rawBaseUrl : '',
         apiKey: openaiKey,
         model: String(obj.openaiModel ?? ''),
       }
@@ -186,13 +190,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const primary = computed(() => byId(state.slots.primary))
   const vision = computed(() => byId(state.slots.vision))
-  /** Images can go straight into the primary's messages: Anthropic models are
-   *  multimodal; an OpenAI-compatible primary is when the user assigned it to
-   *  the vision slot too. */
+  /** Images can go straight into the primary's messages: multimodal providers
+   *  (Anthropic/OpenAI/Google/xAI) take them inline; an OpenAI-compatible
+   *  primary qualifies when the user also assigned it to the vision slot. */
   const visionInline = computed(() => {
     const p = primary.value
     if (!p) return false
-    return p.provider === 'anthropic' || vision.value?.id === p.id
+    return isMultimodalProvider(p.provider) || vision.value?.id === p.id
   })
   /** Some way to understand images exists (inline or sub-call). */
   const visionAvailable = computed(() => visionInline.value || !!vision.value)
@@ -201,7 +205,9 @@ export const useSettingsStore = defineStore('settings', () => {
     const p = primary.value
     if (!p) return false
     if (p.provider === 'mock') return true // E2E provider needs no credentials
-    return !!p.apiKey && !!p.model && (p.provider === 'anthropic' || !!p.baseUrl)
+    // Dedicated packages bake in the base URL; only providers that need one
+    // (Custom / legacy) must have baseUrl filled.
+    return !!p.apiKey && !!p.model && (!needsBaseUrl(p.provider) || !!p.baseUrl)
   }
 
   function upsertProfile(profile: LlmProfile): void {

@@ -10,20 +10,16 @@ import { useGitStore } from '@/stores/git'
 import * as g from '@/lib/git'
 import { withGitLock, GitBusyError } from '@/lib/gitlock'
 import { buildSystemPrompt } from '@/agent/prompt'
-import { runAnthropicTurn } from '@/agent/anthropic'
-import { runOpenAITurn } from '@/agent/openai'
+import { runTurn } from '@/agent/run'
 import { runMockTurn } from '@/agent/mock'
-import { loadKbImage, toDataUrl, imageUrlForProvider } from '@/agent/vision'
+import { loadKbImage, toDataUrl } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
 import {
-  trimAnthropicHistory,
-  trimOpenAIHistory,
+  trimHistory,
   estimateChars,
   COMPACT_AT_CHARS,
-  splitAnthropicForCompaction,
-  splitOpenAIForCompaction,
-  renderAnthropicTranscript,
-  renderOpenAITranscript,
+  splitForCompaction,
+  renderTranscript,
   compactedPrefix,
 } from '@/lib/history'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
@@ -33,8 +29,7 @@ import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
-import type { BetaMessageParam, BetaContentBlockParam } from '@anthropic-ai/sdk/resources/beta'
-import type OpenAI from 'openai'
+import type { ModelMessage } from 'ai'
 
 export type MessagePart =
   | { type: 'text'; text: string }
@@ -84,12 +79,16 @@ interface ChatSession {
   id: string
   kb: string
   title: string
-  /** Primary profile id the histories were built with. */
+  /** Primary profile id the history was built with. */
   profileId: string
+  /** 'mock' for the E2E provider, 'sdk' for every real provider. */
   provider: string
   uiMessages: UiMessage[]
-  anthropicHistory: BetaMessageParam[]
-  openaiHistory: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+  /** Unified AI SDK wire history (all providers share one shape). Opaque to the
+   *  store — passed to runTurn/runMockTurn and stored verbatim. Typed loosely so
+   *  Vue's reactive unwrap doesn't recurse the deep ModelMessage union (TS2589);
+   *  cast to ModelMessage[] at the boundaries. */
+  history: unknown[]
   createdAt: number
   updatedAt: number
 }
@@ -170,8 +169,7 @@ export const useChatStore = defineStore('chat', () => {
       profileId: '',
       provider: '',
       uiMessages: [],
-      anthropicHistory: [],
-      openaiHistory: [],
+      history: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
       running: false,
@@ -238,6 +236,11 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
     const s = reactive({ ...(stored as unknown as ChatSession), running: false }) as OpenSession
+    // Legacy sessions persisted before the unified SDK history have no `history`
+    // field (they carried separate anthropic/openai wire histories). Start their
+    // wire history fresh — the UI transcript is intact; only cross-turn model
+    // context for that old conversation is lost, and rebuilds on the next send.
+    if (!Array.isArray(s.history)) s.history = []
     // A session persisted mid-stream (reload during a turn) can carry unsettled
     // parts: stop forever-spinning tool calls and drop never-written artifacts.
     for (const m of s.uiMessages) {
@@ -379,12 +382,9 @@ export const useChatStore = defineStore('chat', () => {
     const primary = settings.primary
     if (!primary) return
 
-    const providerKind =
-      primary.provider === 'anthropic'
-        ? 'anthropic'
-        : primary.provider === 'mock'
-          ? 'mock'
-          : 'openai'
+    // Every real provider runs through the one AI SDK loop; only the E2E mock
+    // takes a separate path.
+    const providerKind = primary.provider === 'mock' ? 'mock' : 'sdk'
 
     // Send goes to the active tab (creating one if none). Other tabs may be
     // mid-turn; only THIS tab being busy blocks a new send.
@@ -406,8 +406,7 @@ export const useChatStore = defineStore('chat', () => {
     if (session.profileId !== primary.id || session.provider !== providerKind) {
       session.profileId = primary.id
       session.provider = providerKind
-      session.anthropicHistory = []
-      session.openaiHistory = []
+      session.history = []
     }
 
     const mentioned = extractMentions(trimmed, files.allFiles)
@@ -508,85 +507,34 @@ export const useChatStore = defineStore('chat', () => {
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
-        session.openaiHistory = [...session.openaiHistory, { role: 'user', content: modelText }]
-        session.openaiHistory = await runMockTurn({
-          system,
-          messages: [...session.openaiHistory],
-          sessionId: session.id,
-          onEvent,
-          signal: controller.signal,
-        })
-      } else if (providerKind === 'anthropic') {
-        // Old turns' large tool results/images become stubs before replay.
-        session.anthropicHistory = trimAnthropicHistory(session.anthropicHistory)
-        // Still huge after trimming → replace the old prefix with a summary.
-        if (estimateChars(session.anthropicHistory) > COMPACT_AT_CHARS) {
-          const split = splitAnthropicForCompaction(session.anthropicHistory)
-          if (split) {
-            onEvent({ type: 'tool', name: 'compact', detail: '历史过长,压缩上下文…' })
-            try {
-              const summary = await summarizeHistory(
-                primary,
-                renderAnthropicTranscript(split.old),
-                controller.signal,
-              )
-              const prefix = compactedPrefix(summary)
-              session.anthropicHistory = [
-                { role: 'user', content: prefix.user },
-                { role: 'assistant', content: prefix.assistant },
-                ...split.recent,
-              ]
-            } catch {
-              /* summarizer failed — carry on with the full history */
-            }
-          }
-        }
-        const content: BetaContentBlockParam[] = [{ type: 'text', text: modelText }]
-        for (const img of inlineImages) {
-          content.push({
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: img.mediaType as 'image/png',
-              data: img.base64,
-            },
-          })
-        }
-        // Commit the user turn to the wire history BEFORE running, so an
-        // interrupted turn (reload mid-stream) still replays it next time.
-        // Pass a COPY: runAnthropicTurn's SDK runner grows its messages array
-        // in place, so on abort the committed history stays clean (just the
-        // user message, no dangling tool_use).
-        session.anthropicHistory = [
-          ...session.anthropicHistory,
-          { role: 'user', content: inlineImages.length ? content : modelText },
+        const hist: ModelMessage[] = [
+          ...(session.history as ModelMessage[]),
+          { role: 'user', content: modelText },
         ]
-        void persist(session)
-        session.anthropicHistory = await runAnthropicTurn({
-          apiKey: primary.apiKey,
-          model: primary.model,
-          maxTokens: primary.maxTokens,
+        session.history = hist
+        session.history = await runMockTurn({
           system,
-          messages: [...session.anthropicHistory],
+          messages: [...hist],
           sessionId: session.id,
           onEvent,
           signal: controller.signal,
-          allowSubagent: true,
         })
       } else {
-        session.openaiHistory = trimOpenAIHistory(session.openaiHistory)
-        if (estimateChars(session.openaiHistory) > COMPACT_AT_CHARS) {
-          const split = splitOpenAIForCompaction(session.openaiHistory)
+        // Old turns' large tool results/images become stubs before replay.
+        let hist = trimHistory(session.history as ModelMessage[])
+        // Still huge after trimming → replace the old prefix with a summary.
+        if (estimateChars(hist) > COMPACT_AT_CHARS) {
+          const split = splitForCompaction(hist)
           if (split) {
             onEvent({ type: 'tool', name: 'compact', detail: '历史过长,压缩上下文…' })
             try {
               const summary = await summarizeHistory(
                 primary,
-                renderOpenAITranscript(split.old),
+                renderTranscript(split.old),
                 controller.signal,
               )
               const prefix = compactedPrefix(summary)
-              session.openaiHistory = [
+              hist = [
                 { role: 'user', content: prefix.user },
                 { role: 'assistant', content: prefix.assistant },
                 ...split.recent,
@@ -596,27 +544,29 @@ export const useChatStore = defineStore('chat', () => {
             }
           }
         }
-        const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
-          { type: 'text', text: modelText },
-        ]
-        for (const img of inlineImages) {
-          content.push({
-            type: 'image_url',
-            image_url: { url: imageUrlForProvider(primary, toDataUrl(img)) },
-          })
-        }
-        // Commit the user turn to the wire history before running (see the
-        // anthropic branch); runOpenAITurn copies its input, so on abort this
-        // stays clean (just the user message, no dangling tool calls).
-        session.openaiHistory = [
-          ...session.openaiHistory,
-          { role: 'user', content: inlineImages.length ? content : modelText },
-        ]
+        // A multimodal primary gets images inline in the user message; the AI
+        // SDK formats them per provider (Anthropic blocks, OpenAI/Google parts).
+        const content = inlineImages.length
+          ? [
+              { type: 'text' as const, text: modelText },
+              ...inlineImages.map((img) => ({
+                type: 'image' as const,
+                image: toDataUrl(img),
+                mediaType: img.mediaType,
+              })),
+            ]
+          : modelText
+        // Commit the user turn to the wire history BEFORE running, so an
+        // interrupted turn (reload mid-stream) still replays it next time. Pass
+        // a COPY to runTurn so the committed history stays clean on abort (just
+        // the user message, no dangling tool calls).
+        hist = [...hist, { role: 'user', content }]
+        session.history = hist
         void persist(session)
-        session.openaiHistory = await runOpenAITurn({
+        session.history = await runTurn({
           profile: primary,
           system,
-          messages: session.openaiHistory,
+          messages: [...hist],
           vision: settings.vision
             ? { profile: settings.vision, inline }
             : inline

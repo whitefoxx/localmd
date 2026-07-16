@@ -107,7 +107,7 @@ describe('normalizeSettings — multi-profile shape', () => {
 describe('autoLabel', () => {
   it('uses preset labels', () => {
     expect(autoLabel({ provider: 'anthropic', model: 'claude-opus-4-8' })).toBe(
-      'Anthropic · claude-opus-4-8',
+      'Anthropic (Claude) · claude-opus-4-8',
     )
     expect(autoLabel({ provider: 'deepseek', model: 'deepseek-chat' })).toBe(
       'DeepSeek · deepseek-chat',

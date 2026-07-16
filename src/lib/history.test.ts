@@ -1,38 +1,45 @@
 import { describe, it, expect } from 'vitest'
 import {
-  trimAnthropicHistory,
-  trimOpenAIHistory,
+  trimHistory,
   estimateChars,
-  splitAnthropicForCompaction,
-  renderOpenAITranscript,
+  splitForCompaction,
+  renderTranscript,
   compactedPrefix,
 } from './history'
-import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta'
-import type OpenAI from 'openai'
+import type { ModelMessage } from 'ai'
 
 const BIG = 'x'.repeat(5000)
 
-describe('trimAnthropicHistory', () => {
-  const history: BetaMessageParam[] = [
+// Loosely-typed accessors — the AI SDK part unions are validated at the call
+// boundary; the trimmer treats them structurally.
+type Rec = Record<string, unknown>
+const parts = (m: ModelMessage): Rec[] => m.content as unknown as Rec[]
+
+describe('trimHistory', () => {
+  const history: ModelMessage[] = [
     { role: 'user', content: '第一轮问题' },
     {
       role: 'assistant',
       content: [
-        { type: 'tool_use', id: 't1', name: 'read_file', input: { path: 'a.md' } },
-        { type: 'tool_use', id: 't2', name: 'write_file', input: { path: 'b.md', content: BIG } },
+        { type: 'tool-call', toolCallId: 't1', toolName: 'read_file', input: { path: 'a.md' } },
+        { type: 'tool-call', toolCallId: 't2', toolName: 'write_file', input: { path: 'b.md', content: BIG } },
       ],
     },
     {
-      role: 'user',
+      role: 'tool',
       content: [
-        { type: 'tool_result', tool_use_id: 't1', content: BIG },
+        { type: 'tool-result', toolCallId: 't1', toolName: 'read_file', output: { type: 'text', value: BIG } },
         {
-          type: 'tool_result',
-          tool_use_id: 't2',
-          content: [
-            { type: 'text', text: BIG },
-            { type: 'image', source: { type: 'base64', media_type: 'image/png', data: BIG } },
-          ],
+          type: 'tool-result',
+          toolCallId: 't2',
+          toolName: 'view_image',
+          output: {
+            type: 'content',
+            value: [
+              { type: 'text', text: BIG },
+              { type: 'file', data: { type: 'data', data: BIG }, mediaType: 'image/png' },
+            ],
+          },
         },
       ],
     },
@@ -41,75 +48,28 @@ describe('trimAnthropicHistory', () => {
     { role: 'assistant', content: '第二轮回答' },
   ]
 
-  it('stubs old large tool results, images, and tool inputs', () => {
-    const out = trimAnthropicHistory(history, { keepTurns: 1, maxChars: 100 })
-    const toolMsg = out[2]
-    const blocks = toolMsg.content as unknown as Array<Record<string, unknown>>
-    expect(blocks[0].content).toContain('已修剪')
-    const inner = blocks[1].content as unknown as Array<Record<string, unknown>>
+  it('stubs old large tool results, images, and tool-call inputs', () => {
+    const out = trimHistory(history, { keepTurns: 1, maxChars: 100 })
+    const toolParts = parts(out[2])
+    expect((toolParts[0].output as Rec).value).toContain('已修剪')
+    const inner = (toolParts[1].output as Rec).value as Rec[]
     expect(inner[0].text).toContain('已修剪')
-    expect(inner[1].type).toBe('text') // image replaced
-    const assistant = out[1].content as unknown as Array<Record<string, unknown>>
-    expect((assistant[1].input as Record<string, unknown>).content).toBe('[已修剪]')
-    expect((assistant[0].input as Record<string, unknown>).path).toBe('a.md') // small input untouched
+    expect(inner[1].type).toBe('text') // media replaced with a text stub
+    const asst = parts(out[1])
+    expect((asst[1].input as Rec).content).toBe('[已修剪]')
+    expect((asst[0].input as Rec).path).toBe('a.md') // small input untouched
   })
 
   it('keeps the last keepTurns real user turns untouched', () => {
-    const recent: BetaMessageParam[] = [
-      ...history.slice(0, 4),
-      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'x', content: BIG }] },
-    ]
-    // keepTurns=2 → cutoff at the FIRST user turn → nothing before it trimmed… so use keepTurns=1
-    const out = trimAnthropicHistory(recent, { keepTurns: 1, maxChars: 100 })
-    // the trailing tool_result comes after the last real user turn? No — the only real
-    // user turn is index 0, so cutoff=0 and nothing is trimmed.
-    const last = out[4].content as unknown as Array<Record<string, unknown>>
-    expect(last[0].content).toBe(BIG)
+    // keepTurns=2 → cutoff at the first user turn → nothing before it to trim.
+    const out = trimHistory(history, { keepTurns: 2, maxChars: 100 })
+    expect((parts(out[2])[0].output as Rec).value).toBe(BIG)
   })
 
   it('does not modify string-content messages', () => {
-    const out = trimAnthropicHistory(history, { keepTurns: 1, maxChars: 100 })
+    const out = trimHistory(history, { keepTurns: 1, maxChars: 100 })
     expect(out[0].content).toBe('第一轮问题')
     expect(out[3].content).toBe('第一轮回答')
-  })
-})
-
-describe('trimOpenAIHistory', () => {
-  type M = OpenAI.Chat.Completions.ChatCompletionMessageParam
-  const history: M[] = [
-    { role: 'user', content: '第一轮' },
-    {
-      role: 'assistant',
-      content: null,
-      tool_calls: [
-        { id: 'c1', type: 'function', function: { name: 'write_file', arguments: BIG } },
-      ],
-    },
-    { role: 'tool', tool_call_id: 'c1', content: BIG },
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: '(view_image 请求的图片如下)' },
-        { type: 'image_url', image_url: { url: 'data:image/png;base64,AAAA' } },
-      ],
-    },
-    { role: 'assistant', content: '回答一' },
-    { role: 'user', content: '第二轮' },
-  ]
-
-  it('stubs old tool results, image parts, and big tool_call arguments', () => {
-    const out = trimOpenAIHistory(history, { keepTurns: 1, maxChars: 100 })
-    expect(out[2].content).toContain('已修剪')
-    const injected = out[3].content as unknown as Array<Record<string, unknown>>
-    expect(injected[1].type).toBe('text')
-    const calls = (out[1] as M & { tool_calls: Array<{ function: { arguments: string } }> }).tool_calls
-    expect(calls[0].function.arguments).toContain('trimmed')
-  })
-
-  it('injected image messages do not count as real user turns', () => {
-    // keepTurns=2: real turns are 第二轮 (idx5) and 第一轮 (idx0) → cutoff 0 → nothing trimmed
-    const out = trimOpenAIHistory(history, { keepTurns: 2, maxChars: 100 })
-    expect(out[2].content).toBe(BIG)
   })
 })
 
@@ -121,30 +81,34 @@ describe('estimateChars', () => {
 
 describe('compaction helpers', () => {
   it('splits at the keep-turns boundary and refuses when nothing is old', () => {
-    const h = [
-      { role: 'user' as const, content: 'a' },
-      { role: 'assistant' as const, content: 'b' },
-      { role: 'user' as const, content: 'c' },
-      { role: 'assistant' as const, content: 'd' },
-      { role: 'user' as const, content: 'e' },
+    const h: ModelMessage[] = [
+      { role: 'user', content: 'a' },
+      { role: 'assistant', content: 'b' },
+      { role: 'user', content: 'c' },
+      { role: 'assistant', content: 'd' },
+      { role: 'user', content: 'e' },
     ]
-    const split = splitAnthropicForCompaction(h, 2)!
+    const split = splitForCompaction(h, 2)!
     expect(split.old.map((m) => m.content)).toEqual(['a', 'b'])
     expect(split.recent.map((m) => m.content)).toEqual(['c', 'd', 'e'])
-    expect(splitAnthropicForCompaction(h.slice(2), 2)).toBeNull()
+    expect(splitForCompaction(h.slice(2), 2)).toBeNull()
   })
 
   it('renders transcripts with tool calls clipped', () => {
-    const t = renderOpenAITranscript([
+    const t = renderTranscript([
       { role: 'user', content: '找 bug' },
       {
         role: 'assistant',
-        content: null,
-        tool_calls: [
-          { id: '1', type: 'function', function: { name: 'read_file', arguments: '{"path":"a.md"}' } },
+        content: [
+          { type: 'tool-call', toolCallId: '1', toolName: 'read_file', input: { path: 'a.md' } },
         ],
       },
-      { role: 'tool', tool_call_id: '1', content: 'y'.repeat(500) },
+      {
+        role: 'tool',
+        content: [
+          { type: 'tool-result', toolCallId: '1', toolName: 'read_file', output: { type: 'text', value: 'y'.repeat(500) } },
+        ],
+      },
     ])
     expect(t).toContain('用户: 找 bug')
     expect(t).toContain('[调用 read_file')

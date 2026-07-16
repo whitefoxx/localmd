@@ -7,17 +7,15 @@
  *   plan                     exercise update_plan (3 steps, all done)
  *   anything else            stream a fixed reply
  *
- * History uses the OpenAI message shape so session persistence just works.
+ * History uses the AI SDK ModelMessage shape so session persistence just works.
  */
-import type OpenAI from 'openai'
+import type { ModelMessage } from 'ai'
 import { TOOLS } from './tools'
 import type { AgentEventHandler } from './types'
 
-type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam
-
 export interface MockTurnOptions {
   system: string
-  messages: ChatMessage[]
+  messages: ModelMessage[]
   sessionId: string
   onEvent: AgentEventHandler
   signal: AbortSignal
@@ -43,7 +41,7 @@ async function runTool(
   return await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
 }
 
-export async function runMockTurn(opts: MockTurnOptions): Promise<ChatMessage[]> {
+export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]> {
   const history = [...opts.messages]
   const last = history[history.length - 1]
   const text =

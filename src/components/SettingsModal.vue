@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
-import { ALL_PROVIDERS } from '@/lib/providers'
+import { ALL_PROVIDERS, presetFor, needsBaseUrl } from '@/lib/providers'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -120,9 +120,9 @@ function slotBadges(p: LlmProfile): string[] {
               </select>
             </div>
 
-            <div v-if="editing.provider !== 'anthropic'">
+            <div v-if="needsBaseUrl(editing.provider)">
               <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Base URL</label>
-              <input v-model="editing.baseUrl" class="input" placeholder="https://api.openai.com/v1" />
+              <input v-model="editing.baseUrl" class="input" placeholder="https://api.example.com/v1" />
             </div>
 
             <div>
@@ -141,8 +141,12 @@ function slotBadges(p: LlmProfile): string[] {
               <input
                 v-model="editing.model"
                 class="input"
-                :placeholder="editing.provider === 'anthropic' ? 'claude-opus-4-8' : 'e.g. deepseek-chat, qwen-vl-plus'"
+                list="model-suggestions"
+                :placeholder="presetFor(editing.provider)?.defaultModel || 'e.g. gpt-4.1, deepseek-chat'"
               />
+              <datalist id="model-suggestions">
+                <option v-for="m in presetFor(editing.provider)?.models ?? []" :key="m" :value="m" />
+              </datalist>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -156,8 +160,8 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
             </div>
 
-            <p v-if="editing.provider !== 'anthropic'" class="text-xs text-fg-3 leading-relaxed">
-              端点必须允许浏览器（CORS）访问。预设端点已验证可用；自定义网关可能不行。
+            <p class="text-xs text-fg-3 leading-relaxed">
+              选好 provider 后只需填 API key 和模型名——base URL 与接口适配由 SDK 内置。端点须允许浏览器（CORS）访问；连接失败时聊天区会给出提示。
             </p>
 
             <div class="flex gap-2 pt-1">

@@ -1,22 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { imageUrlForProvider, arrayBufferToBase64 } from './vision'
-
-const DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
-
-describe('imageUrlForProvider', () => {
-  it('passes data URLs through for standard providers', () => {
-    expect(imageUrlForProvider({ provider: 'qwen', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' }, DATA_URL)).toBe(DATA_URL)
-    expect(imageUrlForProvider({ provider: 'openai', baseUrl: 'https://api.openai.com/v1' }, DATA_URL)).toBe(DATA_URL)
-  })
-  it('strips the data: prefix for GLM (bigmodel.cn wants raw base64)', () => {
-    expect(imageUrlForProvider({ provider: 'glm', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' }, DATA_URL)).toBe('iVBORw0KGgo=')
-    expect(imageUrlForProvider({ provider: 'custom', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' }, DATA_URL)).toBe('iVBORw0KGgo=')
-  })
-  it('never touches http(s) refs', () => {
-    const url = 'https://example.com/x.png'
-    expect(imageUrlForProvider({ provider: 'glm', baseUrl: 'https://open.bigmodel.cn' }, url)).toBe(url)
-  })
-})
+import { arrayBufferToBase64, toDataUrl } from './vision'
 
 describe('arrayBufferToBase64', () => {
   it('round-trips bytes', () => {
@@ -28,5 +11,13 @@ describe('arrayBufferToBase64', () => {
     const big = new Uint8Array(70000).fill(65)
     const b64 = arrayBufferToBase64(big.buffer)
     expect(atob(b64)).toHaveLength(70000)
+  })
+})
+
+describe('toDataUrl', () => {
+  it('builds a data URL from media type + base64', () => {
+    expect(toDataUrl({ path: 'a.png', mediaType: 'image/png', base64: 'iVBORw0KGgo=' })).toBe(
+      'data:image/png;base64,iVBORw0KGgo=',
+    )
   })
 })

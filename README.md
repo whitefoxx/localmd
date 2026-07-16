@@ -8,7 +8,7 @@ browser-md 是 [trace-app](../trace-app)（Electron 桌面版 AI 知识库）的
 
 - **Markdown 知识库**：文件树、CodeMirror 6 编辑器（自动保存）、预览、可点击的 `[[wikilinks]]`（含路径式目标）、多标签页
 - **AI Agent**：右侧聊天面板驱动一个浏览器内的 agent 循环——它能列出、读取、搜索、索引、写入你打开的文件夹；支持流式输出、思维链（reasoning）折叠显示、会话历史（IndexedDB 持久化，可切换/删除）
-- **多模型配置（能力槽位）**：可配置多个模型 profile（Anthropic / OpenAI 兼容），按「主模型 / 视觉理解」分工——主模型跑 agent 循环，视觉槽给纯文本主模型补上看图能力（agent 通过 `view_image` 工具调用；多模态主模型则图片直接进上下文）
+- **多模型配置（能力槽位）**：底层统一走 [Vercel AI SDK](https://ai-sdk.dev)——Anthropic / OpenAI / DeepSeek / Google Gemini / xAI / Groq 等各家用**各自的 key 直连各自端点**（Base URL 与接口适配由 SDK 内置，无中转/聚合器、无需自己维护）；可配置多个 profile，按「主模型 / 视觉理解」分工——主模型跑 agent 循环，视觉槽给纯文本主模型补上看图能力（agent 通过 `view_image` 工具调用；多模态主模型则图片直接进上下文）
 - **聊天附件与 @ 引用**：输入框可直接粘贴截图 / 上传 / 拖入文件——自动按类型归档进 `raw/`（截图 → `raw/images/`，PDF → `raw/papers/`，与 trace-app 同规则）并随消息告知 agent；输入 `@` 弹出文件补全（Claude Code 式），引用的小文本文件直接内联进消息，大文件/文档指引 agent 用工具读
 - **Claude Code 式 agent 工具**：`edit_file` 精确替换（old/new string，唯一性校验）、`update_plan` 任务清单（聊天面板实时渲染进度）、`run_subagent` 子任务 agent（独立上下文跑同一套工具，只回传最终答案，深度限一层）
 - **变更审查（两种模式）**：默认直接写入 + 事后审查（写前快照、行级 diff、Approve/Discard）；「先询问」模式下每次 write/edit 暂停等你批准，Reject 则完全不落盘
@@ -32,10 +32,11 @@ npm run test:e2e   # 端到端测试(Playwright,用系统 Chrome):
 
 **浏览器要求**：Chrome / Edge（`showDirectoryPicker` 目前仅 Chromium 系支持）。生产部署需 https（File System Access API 要求 secure context）。
 
-**LLM 配置**（右侧面板齿轮）：添加一个或多个模型 profile，再在「模型分工」里指派槽位（web-agent 的多 profile + 能力槽模式）：
-- **Anthropic (Claude)**：官方 SDK 浏览器直连（`anthropic-dangerous-direct-browser-access`），agent 循环由 SDK 的 beta toolRunner 驱动；Claude 天生多模态，无需配置视觉槽
-- **OpenAI-compatible**：手写的 Chat Completions 工具循环，支持自定义 Base URL。内置预设（Qwen/DeepSeek/智谱 GLM/Kimi/MiniMax/OpenAI）均已验证支持浏览器 CORS——**注意**：纯网页只能调用允许跨域的端点，自定义网关（如各类中转/企业代理）多数不支持，会报 connection error
-- **视觉理解槽**：多模态的 OpenAI 兼容主模型（qwen-vl / glm-4v / gpt-4o 等）把视觉槽选成它自己（图片内联进上下文）；纯文本主模型（如 deepseek-chat）则指一个专门的视觉模型，agent 需要看图时通过 `view_image` 工具一次性子调用它
+**LLM 配置**（右侧面板齿轮）：添加一个或多个模型 profile，再在「模型分工」里指派槽位（web-agent 的多 profile + 能力槽模式）。底层统一走 [Vercel AI SDK](https://ai-sdk.dev)——**选好 provider 后只需填 API key 和模型名**，Base URL 与接口适配由各家 `@ai-sdk/*` 包内置（升级/协议漂移由 SDK 维护，不用我们跟）：
+- **内置 provider**：Anthropic (Claude) / OpenAI / DeepSeek / Google Gemini / xAI (Grok) / Groq 各有专用包（Base URL 已内置，无需填写）；Qwen / 智谱 GLM / Kimi / MiniMax 走 OpenAI-compatible 包（Base URL 由预设提供）；另有 **Custom（OpenAI-compatible）** 供任意兼容端点手填 Base URL
+- **一套工具循环**：所有 provider 共用同一个 `streamText` 多步工具循环（用各家自己的 key、直连各家自己的端点，无中转/聚合器）。Anthropic 仍走浏览器直连头 `anthropic-dangerous-direct-browser-access`，并对系统提示做 prompt cache
+- **CORS 仍是硬约束**：纯网页只能调用允许跨域的端点。Anthropic/OpenAI/DeepSeek/Qwen/GLM/Kimi/MiniMax 的标准端点已验证可用；Google/xAI/Groq 按 BYO-key 提供、浏览器 CORS 未逐一核验；自定义网关多数不支持，会报 connection error（聊天区给出提示）
+- **视觉理解槽**：多模态主模型（Anthropic/OpenAI/Google/xAI，或 qwen-vl / glm-4v 这类把视觉槽选成自己的兼容模型）图片直接内联进上下文；纯文本主模型（如 deepseek-chat）则指一个专门的视觉模型，agent 需要看图时通过 `view_image` 工具一次性子调用它
 
 ## 架构
 
@@ -64,11 +65,11 @@ src/
       md/            marked lexer 分块
   agent/
     tools.ts         Zod 定义的工具：list_files / read_file / write_file /
-                     search_files / index_document（两个 provider 共享）
-    anthropic.ts     Anthropic beta toolRunner 集成（+ view_image 原生回图）
-    openai.ts        Chat Completions 手写工具循环（reasoning_content 透出，
-                     view_image 拦截：多模态主模型注入图片 / 子调用视觉槽模型）
-    vision.ts        视觉子调用（KB 图片 → base64，GLM 裸 base64 等厂商差异）
+                     search_files / index_document（所有 provider 共享）
+    model.ts         profile → AI SDK LanguageModel（每 provider 一个 @ai-sdk/* 包）
+    run.ts           统一的 streamText 多步工具循环（替代旧的两套手写循环；
+                     view_image 多模态回图 / 视觉槽子调用；run_subagent 递归）
+    vision.ts        视觉子调用（KB 图片 → base64，经 AI SDK generateText）
     prompt.ts        系统提示词；KB 根目录的 CLAUDE.md 会原文附加
   stores/            Pinia：kb / files（含多标签页）/ chat（会话持久化）/
                      review（写入快照与审查）/ kbIndex（mtime 缓存的内容索引，
@@ -119,7 +120,7 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 
 每个条目支持 `enabled: false` 停用（保留配置）；Settings 里全局条目有停用/删除按钮，KB 条目显示 KB 徽章（编辑文件修改）。连接成功后工具以 `mcp__<名称>__<工具>` 出现在 agent 的工具列表，两个 provider 通用。
 
-**延迟加载（token 控制）**：工具数超过 8 的服务器，其工具 schema 默认不随请求发送——系统提示词只带一行一个的紧凑目录（约省 80%），agent 需要时调 `enable_tools` 按名激活，**当轮立即可用**（OpenAI 路径逐轮重建工具列表；Anthropic 路径经 `setMessagesParams` 热更新）。激活按会话计，新会话重置。`web_task` 类单工具委托入口不参与延迟。为什么必须激活：模型只能调用当次请求携带完整 JSON Schema 的工具，目录行没有参数定义——激活就是把 schema 带进请求的动作（每会话一次 ~200 token，换掉每请求数千 token 的常驻开销）。模型若跳过激活直接按目录名调用也有自愈兜底：自动激活并要求按 schema 重试（猜的参数不执行）。约束与安全：
+**延迟加载（token 控制）**：工具数超过 8 的服务器，其工具 schema 默认不随请求发送——系统提示词只带一行一个的紧凑目录（约省 80%），agent 需要时调 `enable_tools` 按名激活，**当轮立即可用**（全部外部工具在 `streamText` 里预先注册，靠每步 `prepareStep` 的 `activeTools` 门控只把当前激活的那批发给模型；激活后下一步即纳入）。激活按会话计，新会话重置。`web_task` 类单工具委托入口不参与延迟。为什么必须激活：模型只能调用当次请求携带完整 JSON Schema 的工具，目录行没有参数定义——激活就是把 schema 带进请求的动作（每会话一次 ~200 token，换掉每请求数千 token 的常驻开销）。约束与安全：
 
 - 服务器必须允许浏览器 CORS（与 LLM 端点同一约束）；本地起的 server（localhost）天然可用
 - URL 栏填 **32 位 Chrome 扩展 ID** 时自动改走扩展 Port 传输（`externally_connectable`）——这是 web-agent 桥接的接法：配置 web-agent 的扩展 ID 后，agent 获得 `mcp__webagent__web_task` 工具，可把整个网页浏览任务委托给 web-agent 的 agent 引擎执行。通信原理详见 [docs/web-agent-bridge.md](docs/web-agent-bridge.md)

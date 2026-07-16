@@ -525,12 +525,10 @@ export interface ExternalToolSpec {
   run: (args: Record<string, unknown>) => Promise<string>
 }
 
-/** Snapshot of the session's currently-ACTIVE external tools (deferred ones
- *  stay out until enable_tools activates them); called per request iteration
- *  so activation takes effect within the same turn. */
-export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
-  const mcp = useMcpStore()
-  return mcp.activeToolsFor(sessionId).map((t) => ({
+type McpTool = ReturnType<ReturnType<typeof useMcpStore>['activeToolsFor']>[number]
+
+function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): ExternalToolSpec {
+  return {
     name: t.qualifiedName,
     description: `[外部 MCP:${t.serverName}] ${t.def.description}`.slice(0, 1024),
     jsonSchema: t.def.inputSchema,
@@ -542,7 +540,25 @@ export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
         return `Error: ${(err as Error).message}`
       }
     },
-  }))
+  }
+}
+
+/** The session's currently-ACTIVE external tools (deferred ones stay out until
+ *  enable_tools activates them). Used to gate which registered tools are sent
+ *  to the model each step, so activation takes effect within the same turn. */
+export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
+  const mcp = useMcpStore()
+  return mcp.activeToolsFor(sessionId).map((t) => toExternalSpec(mcp, t))
+}
+
+/** ALL of the session's external tools, active AND deferred — registered up
+ *  front with the AI SDK so a deferred tool can be enabled into the active set
+ *  mid-turn (the SDK can only gate a fixed tool set, not grow it per step). */
+export function allExternalToolSpecs(sessionId: string): ExternalToolSpec[] {
+  const mcp = useMcpStore()
+  return [...mcp.activeToolsFor(sessionId), ...mcp.deferredToolsFor(sessionId)].map((t) =>
+    toExternalSpec(mcp, t),
+  )
 }
 
 export const TOOLS: ToolSpec[] = [
