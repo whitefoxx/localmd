@@ -10,8 +10,8 @@ const expanded = ref(true)
 </script>
 
 <template>
-  <div v-if="files.openTabs.length" class="border-b border-border shrink-0">
-    <div class="flex items-center pr-1">
+  <div v-if="files.openTabs.length" class="border-b border-border shrink-0 flex flex-col min-h-0 max-h-[25%]">
+    <div class="flex items-center pr-1 shrink-0">
       <button
         class="flex items-center gap-1.5 pl-3 py-1.5 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"
         @click="expanded = !expanded"
@@ -43,7 +43,7 @@ const expanded = ref(true)
         <span class="codicon codicon-sm codicon-close-all" />
       </button>
     </div>
-    <div v-if="expanded" class="pb-1 max-h-48 overflow-auto panel-scroll">
+    <div v-if="expanded" class="pb-1 overflow-auto panel-scroll min-h-0">
       <button
         v-for="p in files.openTabs"
         :key="p"

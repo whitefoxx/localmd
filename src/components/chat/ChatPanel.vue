@@ -44,6 +44,24 @@ const attachments = ref<Attachment[]>([])
 const importing = ref(false)
 const dragOver = ref(false)
 
+/* Object-URL thumbnails for image attachments, keyed by KB path. Built from the
+ * in-memory File (no disk re-read) and revoked on remove / send / unmount. */
+const thumbs = ref<Map<string, string>>(new Map())
+function thumbFor(path: string): string | undefined {
+  return thumbs.value.get(path)
+}
+function revokeThumb(path: string): void {
+  const u = thumbs.value.get(path)
+  if (u) {
+    URL.revokeObjectURL(u)
+    thumbs.value.delete(path)
+  }
+}
+function revokeAllThumbs(): void {
+  for (const u of thumbs.value.values()) URL.revokeObjectURL(u)
+  thumbs.value.clear()
+}
+
 async function addFiles(list: File[] | FileList): Promise<void> {
   const arr = Array.from(list)
   if (!arr.length) return
@@ -51,7 +69,9 @@ async function addFiles(list: File[] | FileList): Promise<void> {
   try {
     for (const f of arr) {
       const path = await importFile(f)
-      attachments.value.push({ path, image: fileKind(path) === 'image' })
+      const image = fileKind(path) === 'image'
+      attachments.value.push({ path, image })
+      if (image) thumbs.value.set(path, URL.createObjectURL(f))
     }
     await files.refreshTree()
   } finally {
@@ -90,7 +110,8 @@ function onPickFiles(e: Event): void {
 }
 
 function removeAttachment(i: number): void {
-  attachments.value.splice(i, 1)
+  const [a] = attachments.value.splice(i, 1)
+  if (a) revokeThumb(a.path)
 }
 
 function baseName(p: string): string {
@@ -119,7 +140,10 @@ watch(
   },
   { immediate: true },
 )
-onUnmounted(() => clearInterval(clock))
+onUnmounted(() => {
+  clearInterval(clock)
+  revokeAllThumbs()
+})
 
 /* ⌘↑/⌘↓ scroll the transcript to top/bottom while the panel is open — even
  * from the input (jumping the conversation beats moving the caret there).
@@ -326,6 +350,7 @@ async function send(): Promise<void> {
   const atts = [...attachments.value]
   input.value = ''
   attachments.value = []
+  revokeAllThumbs()
   mentionOpen.value = false
   await chat.send(text, atts)
 }
@@ -799,20 +824,37 @@ watch(
         class="rounded-xl border bg-bg-0 focus-within:border-accent transition-colors"
         :class="dragOver ? 'border-accent' : 'border-border'"
       >
-        <!-- Attachment chips -->
+        <!-- Attachment chips / image thumbnails -->
         <div v-if="attachments.length || importing" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
-          <span
-            v-for="(a, i) in attachments"
-            :key="a.path"
-            class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
-            :title="a.path"
-          >
-            <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
-            <span class="truncate max-w-[140px]">{{ baseName(a.path) }}</span>
-            <button class="text-fg-3 hover:text-fg-0" @click="removeAttachment(i)">
-              <span class="codicon codicon-sm codicon-close" />
-            </button>
-          </span>
+          <template v-for="(a, i) in attachments" :key="a.path">
+            <!-- image → thumbnail preview with a hover remove button -->
+            <div
+              v-if="a.image && thumbFor(a.path)"
+              class="group relative w-14 h-14 rounded overflow-hidden border border-border bg-bg-2"
+              :title="a.path"
+            >
+              <img :src="thumbFor(a.path)" class="w-full h-full object-cover" alt="" />
+              <button
+                class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-bg-0/80 text-fg-2 hover:text-fg-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove"
+                @click="removeAttachment(i)"
+              >
+                <span class="codicon codicon-close text-[10px]" />
+              </button>
+            </div>
+            <!-- non-image (or thumbnail not ready) → text chip -->
+            <span
+              v-else
+              class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+              :title="a.path"
+            >
+              <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
+              <span class="truncate max-w-[140px]">{{ baseName(a.path) }}</span>
+              <button class="text-fg-3 hover:text-fg-0" @click="removeAttachment(i)">
+                <span class="codicon codicon-sm codicon-close" />
+              </button>
+            </span>
+          </template>
           <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">saving…</span>
         </div>
 

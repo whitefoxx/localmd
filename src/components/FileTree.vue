@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, computed } from 'vue'
+import { ref, provide, computed, watch, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbStore } from '@/stores/kb'
 import { useKbIndexStore } from '@/stores/kbIndex'
@@ -20,6 +20,21 @@ const kb = useKbStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
 const expanded = ref(true)
+const rootEl = ref<HTMLElement | null>(null)
+
+/* Keep the active file visible: when the open file changes (clicked here, or
+ * opened from backlinks / open-files / @-mention), scroll its row into view
+ * within the tree's scroll container. `block: 'nearest'` only nudges when the
+ * row is actually off-screen — e.g. after the backlinks panel resizes below. */
+watch(
+  () => files.currentPath,
+  async (path) => {
+    if (!path) return
+    await nextTick()
+    const el = rootEl.value?.querySelector(`[data-tree-path="${CSS.escape(path)}"]`)
+    el?.scrollIntoView({ block: 'nearest' })
+  },
+)
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
@@ -159,7 +174,7 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
 </script>
 
 <template>
-  <div class="py-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
+  <div ref="rootEl" class="py-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
     <div class="flex items-center px-3 mb-1">
       <button
         class="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"

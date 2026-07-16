@@ -19,9 +19,9 @@ watch(
 </script>
 
 <template>
-  <div v-if="files.currentPath" class="border-t border-border">
+  <div v-if="files.currentPath" class="border-t border-border shrink-0 flex flex-col min-h-0 max-h-[25%]">
     <button
-      class="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1"
+      class="w-full flex items-center gap-1.5 px-3 py-1.5 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 shrink-0"
       @click="expanded = !expanded"
     >
       <span
@@ -30,7 +30,7 @@ watch(
       />
       Backlinks ({{ links.length }})
     </button>
-    <div v-if="expanded" class="pb-2">
+    <div v-if="expanded" class="pb-2 overflow-auto panel-scroll min-h-0">
       <button
         v-for="p in links"
         :key="p"

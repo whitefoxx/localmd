@@ -360,7 +360,7 @@ function closeKb(): void {
         </div>
 
         <OpenFilesPanel />
-        <div class="flex-1 panel-scroll flex flex-col">
+        <div class="flex-1 min-h-0 panel-scroll flex flex-col">
           <FileTree class="flex-1" />
         </div>
         <BacklinksPanel />

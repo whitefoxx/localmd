@@ -96,6 +96,7 @@ function onDrop(e: DragEvent): void {
         dragOver ? 'ring-1 ring-inset ring-accent bg-accent/10' : '',
       ]"
       :style="indent"
+      :data-tree-path="node.path"
       draggable="true"
       @click="onClick"
       @contextmenu.prevent="onContextMenu"
