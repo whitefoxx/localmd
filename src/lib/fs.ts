@@ -19,6 +19,14 @@ export interface TreeNode {
 /** Entries hidden from the tree and search. */
 const IGNORED = new Set(['.git', '.trace', '.obsidian', 'node_modules', '.DS_Store'])
 
+/** True for entries the UI tree hides. Beyond the dot-dirs above, this covers
+ *  PDF/EPUB annotation sidecars (`*.annotations.json`): they're committed to git
+ *  so highlights sync across machines, but they're noise in the file tree.
+ *  Git status walks the real directory (not readTree), so they stay tracked. */
+function isTreeHidden(name: string): boolean {
+  return IGNORED.has(name) || name.endsWith('.annotations.json')
+}
+
 let root: FileSystemDirectoryHandle | null = null
 
 export function setRoot(handle: FileSystemDirectoryHandle | null): void {
@@ -196,7 +204,7 @@ async function readDirRecursive(
   const nodes: TreeNode[] = []
   for await (const entry of dir.values()) {
     if (entry.name === '.git') continue
-    if (applyIgnore && IGNORED.has(entry.name)) continue
+    if (applyIgnore && isTreeHidden(entry.name)) continue
     const path = prefix ? `${prefix}/${entry.name}` : entry.name
     if (entry.kind === 'directory') {
       nodes.push({

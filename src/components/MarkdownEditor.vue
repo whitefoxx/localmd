@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
-import { EditorState, Compartment } from '@codemirror/state'
+import { EditorState, Compartment, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { syntaxHighlighting, defaultHighlightStyle, LanguageDescription } from '@codemirror/language'
 import {
   autocompletion,
   type CompletionContext,
@@ -22,9 +22,54 @@ const theme = useThemeStore()
 const host = ref<HTMLElement | null>(null)
 let view: EditorView | null = null
 const themeCompartment = new Compartment()
+const languageCompartment = new Compartment()
 
 function themeExt() {
   return theme.isDark ? oneDark : syntaxHighlighting(defaultHighlightStyle)
+}
+
+/** Softer line-number gutter — muted, borderless and transparent so it recedes
+ *  behind the text. Added after the theme compartment so it overrides oneDark. */
+const gutterTheme = EditorView.theme({
+  '.cm-gutters': {
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: 'rgb(var(--c-fg-3) / 0.45)',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    color: 'rgb(var(--c-fg-3) / 0.45)',
+    fontVariantNumeric: 'tabular-nums',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'transparent',
+    color: 'rgb(var(--c-fg-2))',
+  },
+})
+
+/** Language for a file: markdown (with wikilink support) for .md, otherwise the
+ *  CodeMirror language matching the filename, or plain text. Keeps the markdown
+ *  highlighter from italicising/underlining JSON, YAML and other text files. */
+async function langExtFor(path: string | null): Promise<Extension> {
+  if (!path) return []
+  if (/\.md$/i.test(path)) return markdown({ base: markdownLanguage, codeLanguages: languages })
+  const name = path.slice(path.lastIndexOf('/') + 1)
+  const desc = LanguageDescription.matchFilename(languages, name)
+  if (!desc) return []
+  try {
+    return await desc.load()
+  } catch {
+    return []
+  }
+}
+
+/** Reconfigure the language compartment for `path`. Guarded against races so a
+ *  slow async load for a since-closed file can't clobber the current one. */
+let langToken = 0
+async function applyLanguage(path: string | null): Promise<void> {
+  const token = ++langToken
+  const ext = await langExtFor(path)
+  if (token !== langToken || !view) return
+  view.dispatch({ effects: languageCompartment.reconfigure(ext) })
 }
 
 /** [[ triggers wikilink completion over the KB's markdown files: stems for
@@ -63,10 +108,11 @@ function createView(): void {
         highlightActiveLine(),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-        markdown({ base: markdownLanguage, codeLanguages: languages }),
+        languageCompartment.of([]),
         autocompletion({ override: [wikilinkCompletions], icons: false }),
         EditorView.lineWrapping,
         themeCompartment.of(themeExt()),
+        gutterTheme,
         EditorView.updateListener.of((u) => {
           if (u.docChanged) files.onEdited(u.state.doc.toString())
         }),
@@ -77,6 +123,7 @@ function createView(): void {
 
 onMounted(() => {
   createView()
+  void applyLanguage(files.currentPath)
   shownPath = files.currentPath
   const saved = shownPath ? (editorScroll.get(shownPath) ?? 0) : 0
   requestAnimationFrame(() => {
@@ -97,6 +144,7 @@ watch(
   () => [files.currentPath, files.content] as const,
   ([path, content]) => {
     if (!view) return
+    if (path !== shownPath) void applyLanguage(path)
     if (view.state.doc.toString() === content) {
       shownPath = path
       return
