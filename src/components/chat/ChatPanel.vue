@@ -470,8 +470,15 @@ watch(
           :class="ui.agentMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'"
         />
       </button>
-      <button class="text-fg-3 hover:text-fg-0" title="Close agent panel (⌘J)" @click="emit('close')">
-        <span class="codicon codicon-sm codicon-close" />
+      <!-- Double chevron » = collapse the panel away (codicons has no native
+           double-chevron, so two chevrons overlap). -->
+      <button
+        class="text-fg-3 hover:text-fg-0 inline-flex items-center"
+        title="Collapse agent panel (⌘J)"
+        @click="emit('close')"
+      >
+        <span class="codicon codicon-sm codicon-chevron-right" />
+        <span class="codicon codicon-sm codicon-chevron-right -ml-[9px]" />
       </button>
     </div>
 
@@ -505,8 +512,10 @@ watch(
       {{ chat.limitMsg }}
     </div>
 
-    <!-- Session history overlay -->
+    <!-- Session history overlay. Full-width opaque backdrop; the list inside is
+         centered at the same readable width as the transcript when maximized. -->
     <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll">
+      <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
       <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
       <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
       <div
@@ -557,10 +566,17 @@ watch(
           <span class="codicon codicon-sm codicon-trash" />
         </button>
       </div>
+      </div>
     </div>
 
-    <!-- Transcript -->
-    <div ref="scroller" class="flex-1 panel-scroll px-3 py-3 space-y-4" @scroll.passive="onTranscriptScroll">
+    <!-- Transcript. Maximized → center the column at a readable width so long
+         lines don't stretch edge to edge. -->
+    <div
+      ref="scroller"
+      class="flex-1 panel-scroll px-3 py-3 space-y-4 w-full"
+      :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
+      @scroll.passive="onTranscriptScroll"
+    >
       <div v-if="!chat.messages.length" class="text-xs text-fg-3 leading-relaxed">
         Ask questions about your knowledge base, or let the agent maintain it. It can list, read,
         search, index and write files in the opened folder — writes appear in the review panel.
@@ -732,12 +748,15 @@ watch(
 
     <!-- Input -->
     <div
-      class="p-3 border-t shrink-0 relative"
+      class="p-3 border-t shrink-0"
       :class="dragOver ? 'border-accent bg-accent/5' : 'border-border'"
       @dragover.prevent="dragOver = true"
       @dragleave="dragOver = false"
       @drop="onDrop"
     >
+      <!-- Inner wrapper anchors the dropdowns and, when maximized, centers the
+           composer at the same readable width as the transcript. -->
+      <div class="relative w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
       <!-- /skill dropdown -->
       <div
         v-if="slashMatches.length"
@@ -851,6 +870,7 @@ watch(
             <span class="codicon codicon-arrow-up" />
           </button>
         </div>
+      </div>
       </div>
     </div>
   </div>

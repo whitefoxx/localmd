@@ -427,11 +427,15 @@ function closeKb(): void {
       </main>
 
       <!-- Agent panel — docked on the right (left edge resizes), or maximized to
-           fill the whole window as a z-40 overlay above the editor. -->
+           fill the whole window as a z-40 overlay above the editor. The chat's
+           own content is centered at a readable width in maximized mode. -->
       <aside
         v-show="ui.agentOpen"
-        class="relative"
-        :class="ui.agentMaximized ? 'fixed inset-0 z-40' : 'shrink-0 border-l border-border'"
+        :class="
+          ui.agentMaximized
+            ? 'fixed inset-0 z-40 bg-bg-1'
+            : 'relative shrink-0 border-l border-border'
+        "
         :style="ui.agentMaximized ? undefined : { width: `${ui.agentWidth}px` }"
       >
         <div
