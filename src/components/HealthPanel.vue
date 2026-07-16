@@ -20,6 +20,13 @@ async function open(path: string): Promise<void> {
   ui.graphOpen = false
   await files.openFile(path)
 }
+
+/** Open the page in edit mode and jump to the broken link's location. */
+async function revealBroken(path: string, target: string): Promise<void> {
+  ui.healthOpen = false
+  ui.graphOpen = false
+  await files.openAndReveal(path, target)
+}
 </script>
 
 <template>
@@ -39,25 +46,51 @@ async function open(path: string): Promise<void> {
         </div>
 
         <div class="panel-scroll p-4 space-y-5 text-sm">
+          <p class="text-xs leading-relaxed text-fg-3">
+            Structural checks over your wiki's link graph — page contents aren't read.
+            Citations like <code class="rounded bg-bg-2 px-1 font-mono text-fg-2">[[1:b14-3]]</code>
+            are ignored; only real page-to-page
+            <code class="rounded bg-bg-2 px-1 font-mono text-fg-2">[[wikilinks]]</code> count.
+          </p>
+
           <section>
-            <h3 class="text-xs uppercase tracking-wide text-fg-3 mb-2">
+            <h3 class="text-xs uppercase tracking-wide text-fg-3">
               Broken wikilinks ({{ index.health.brokenLinks.length }})
             </h3>
+            <p class="mb-2 text-xs text-fg-3">
+              These pages link to a target with no matching file. Click a target to jump to it in
+              the page and fix or remove the link.
+            </p>
             <div v-if="!index.health.brokenLinks.length" class="text-fg-3">None 🎉</div>
-            <div v-for="b in index.health.brokenLinks" :key="b.path" class="mb-1.5">
-              <button class="text-accent hover:underline" @click="open(b.path)">{{ b.path }}</button>
-              <span class="text-fg-2"> → </span>
-              <span class="text-removed font-mono text-xs">{{ b.targets.join(', ') }}</span>
+            <div v-for="b in index.health.brokenLinks" :key="b.path" class="mb-2">
+              <button class="break-all text-accent hover:underline" @click="open(b.path)">
+                {{ b.path }}
+              </button>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <button
+                  v-for="t in b.targets"
+                  :key="t"
+                  class="rounded bg-removed/10 px-1 py-0.5 font-mono text-xs text-removed hover:bg-removed/20"
+                  :title="`Jump to ${t} in ${b.path}`"
+                  @click="revealBroken(b.path, t)"
+                >
+                  {{ t }}
+                </button>
+              </div>
             </div>
           </section>
 
           <section>
-            <h3 class="text-xs uppercase tracking-wide text-fg-3 mb-2">
-              Orphan pages — no links in or out ({{ index.health.orphans.length }})
+            <h3 class="text-xs uppercase tracking-wide text-fg-3">
+              Orphan pages ({{ index.health.orphans.length }})
             </h3>
+            <p class="mb-2 text-xs text-fg-3">
+              Nothing links to them and they link nowhere — unreachable by navigation.
+              Link them from a related page or an index.
+            </p>
             <div v-if="!index.health.orphans.length" class="text-fg-3">None 🎉</div>
             <div v-for="p in index.health.orphans" :key="p">
-              <button class="text-accent hover:underline" @click="open(p)">{{ p }}</button>
+              <button class="break-all text-accent hover:underline" @click="open(p)">{{ p }}</button>
             </div>
           </section>
         </div>

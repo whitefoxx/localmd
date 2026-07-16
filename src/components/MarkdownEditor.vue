@@ -121,15 +121,44 @@ function createView(): void {
   })
 }
 
+/** Scroll to and select the first occurrence of `target` (a broken link's raw
+ *  text). Used by the health panel to jump straight to the offending link. */
+function revealTarget(target: string): void {
+  if (!view) return
+  const idx = view.state.doc.toString().indexOf(target)
+  if (idx < 0) return
+  view.dispatch({
+    selection: { anchor: idx, head: idx + target.length },
+    effects: EditorView.scrollIntoView(idx, { y: 'center' }),
+  })
+  view.focus()
+}
+
 onMounted(() => {
   createView()
   void applyLanguage(files.currentPath)
   shownPath = files.currentPath
-  const saved = shownPath ? (editorScroll.get(shownPath) ?? 0) : 0
-  requestAnimationFrame(() => {
-    if (view) view.scrollDOM.scrollTop = saved
-  })
+  const rev = files.reveal
+  if (rev && rev.path === files.currentPath) {
+    requestAnimationFrame(() => revealTarget(rev.target))
+  } else {
+    const saved = shownPath ? (editorScroll.get(shownPath) ?? 0) : 0
+    requestAnimationFrame(() => {
+      if (view) view.scrollDOM.scrollTop = saved
+    })
+  }
 })
+
+// A reveal request for the already-mounted editor (file already current, or a
+// fresh file whose content-replace restores scroll — this rAF runs after it).
+watch(
+  () => files.reveal?.nonce,
+  () => {
+    const rev = files.reveal
+    if (!rev || rev.path !== files.currentPath || !view) return
+    requestAnimationFrame(() => revealTarget(rev.target))
+  },
+)
 
 onBeforeUnmount(() => {
   if (shownPath && view) editorScroll.set(shownPath, view.scrollDOM.scrollTop)

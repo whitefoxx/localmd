@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
+import { isCitationToken } from '@/lib/citations'
 import { computeLint, type LintReport } from '@/lib/lint'
 import { useFilesStore } from '@/stores/files'
 
@@ -81,6 +82,10 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         const outgoing: string[] = []
         const broken: string[] = []
         for (const link of parseWikilinks(content)) {
+          // Citation tokens (`[[1:b14-3]]`, `[[pdf1:…]]`) aren't page links — they
+          // resolve at click-time via the doc indexes, exactly as the renderer
+          // consumes them before wikilinks. Don't count them as broken links.
+          if (isCitationToken(link.target)) continue
           const resolved = files.resolveWikilink(link.target)
           if (resolved) outgoing.push(resolved)
           else broken.push(link.target)

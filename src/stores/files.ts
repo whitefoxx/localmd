@@ -130,6 +130,20 @@ export const useFilesStore = defineStore('files', () => {
     }
   }
 
+  /** One-shot request for the editor to scroll to and select a substring —
+   *  used to jump straight to a broken link's location from the health panel.
+   *  The editor consumes it by the monotonic nonce; a stale value is harmless. */
+  const reveal = ref<{ path: string; target: string; nonce: number } | null>(null)
+  let revealNonce = 0
+
+  /** Open `path` in edit mode and reveal the first occurrence of `target`
+   *  (e.g. a broken `[[link]]`) so it can be fixed in place. */
+  async function openAndReveal(path: string, target: string): Promise<void> {
+    await openFile(path)
+    mode.value = 'edit'
+    reveal.value = { path, target, nonce: ++revealNonce }
+  }
+
   async function openFile(path: string): Promise<void> {
     if (!openTabs.value.includes(path)) openTabs.value.push(path)
     if (currentPath.value === path) return
@@ -384,6 +398,8 @@ export const useFilesStore = defineStore('files', () => {
     resolveMarkdownLink,
     refreshTree,
     openFile,
+    reveal,
+    openAndReveal,
     onEdited,
     flush,
     refreshOnFocus,
