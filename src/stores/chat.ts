@@ -29,6 +29,7 @@ import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
+import type { SelectionRef } from '@/stores/composer'
 import type { ModelMessage } from 'ai'
 
 export type MessagePart =
@@ -73,6 +74,8 @@ export interface UiMessage {
   role: 'user' | 'assistant'
   parts: MessagePart[]
   attachments?: Attachment[]
+  /** Passages the user selected in a file and staged as context (see composer). */
+  contexts?: SelectionRef[]
   usage?: TokenUsage
   error?: string
 }
@@ -330,6 +333,7 @@ export const useChatStore = defineStore('chat', () => {
     imagePaths: string[],
     imagesTravelInline: boolean,
     visionAvailable: boolean,
+    selections: SelectionRef[],
   ): Promise<string> {
     let out = trimmed
     const uploaded = attachments.filter((a) => !a.image).map((a) => a.path)
@@ -373,12 +377,26 @@ export const useChatStore = defineStore('chat', () => {
       }
       out += `\n\n<referenced_files>\n${blocks.join('\n\n')}\n</referenced_files>`
     }
+    // Passages the user selected and asked about explicitly — from a file, or
+    // quoted from an earlier reply of yours.
+    if (selections.length) {
+      const blocks = selections.map((s) =>
+        s.file
+          ? `从文件 ${s.file} 中选中的内容:\n\`\`\`\n${s.text}\n\`\`\``
+          : `引用你之前回复中的一段内容:\n\`\`\`\n${s.text}\n\`\`\``,
+      )
+      out += `\n\n<selected_context>\n${blocks.join('\n\n')}\n</selected_context>`
+    }
     return out
   }
 
-  async function send(text: string, attachments: Attachment[] = []): Promise<void> {
+  async function send(
+    text: string,
+    attachments: Attachment[] = [],
+    selections: SelectionRef[] = [],
+  ): Promise<void> {
     const trimmed = text.trim()
-    if ((!trimmed && !attachments.length) || !kb.name) return
+    if ((!trimmed && !attachments.length && !selections.length) || !kb.name) return
     const settings = useSettingsStore()
     const files = useFilesStore()
     const primary = settings.primary
@@ -399,7 +417,7 @@ export const useChatStore = defineStore('chat', () => {
     if (session.running) return
 
     if (!session.uiMessages.length) {
-      session.title = (trimmed || attachments[0]?.path || 'chat').slice(0, 40)
+      session.title = (trimmed || selections[0]?.text || attachments[0]?.path || 'chat').slice(0, 40)
     }
 
     // Switching the primary profile mid-conversation would replay an
@@ -425,6 +443,7 @@ export const useChatStore = defineStore('chat', () => {
       imagePaths,
       inline,
       settings.visionAvailable,
+      selections,
     )
 
     session.uiMessages.push({
@@ -432,6 +451,7 @@ export const useChatStore = defineStore('chat', () => {
       role: 'user',
       parts: [{ type: 'text', text: trimmed }],
       attachments: attachments.length ? [...attachments] : undefined,
+      contexts: selections.length ? [...selections] : undefined,
     })
     // reactive() is load-bearing: onEvent mutates this object from outside the
     // store's proxy — a raw object would render nothing until the turn ends

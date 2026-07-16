@@ -7,6 +7,8 @@ import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { usePlanStore } from '@/stores/plan'
 import { useSkillsStore } from '@/stores/skillsStore'
+import { useComposerStore } from '@/stores/composer'
+import { useFileSelectionCapture } from '@/lib/selectionContext'
 import { renderMarkdown } from '@/lib/markdown'
 import { parseCiteSources } from '@/lib/citations'
 import { importTempFile } from '@/lib/capture'
@@ -24,6 +26,16 @@ const files = useFilesStore()
 const citations = useCitationsStore()
 const plan = usePlanStore()
 const skills = useSkillsStore()
+const composer = useComposerStore()
+
+// Stage text selected in the open file as removable context chips (agent-open).
+useFileSelectionCapture()
+
+/** One-line preview of a staged selection for its chip. */
+function snippet(text: string): string {
+  const first = text.split('\n', 1)[0].trim()
+  return first.length > 60 ? `${first.slice(0, 60)}…` : first
+}
 
 const PLAN_ICONS = {
   pending: 'codicon-circle-large-outline text-fg-3',
@@ -350,11 +362,13 @@ async function send(): Promise<void> {
   }
   const text = input.value
   const atts = [...attachments.value]
+  const sels = [...composer.refs]
   input.value = ''
   attachments.value = []
+  composer.clear()
   revokeAllThumbs()
   mentionOpen.value = false
-  await chat.send(text, atts)
+  await chat.send(text, atts, sels)
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -615,7 +629,20 @@ watch(
           v-if="m.role === 'user'"
           class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable text-fg-0"
         >
-          <div class="whitespace-pre-wrap">{{ userText(m) }}</div>
+          <div v-if="userText(m)" class="whitespace-pre-wrap">{{ userText(m) }}</div>
+          <div v-if="m.contexts?.length" class="flex flex-wrap gap-1.5" :class="{ 'mt-1.5': userText(m) }">
+            <button
+              v-for="(c, i) in m.contexts"
+              :key="`c${i}`"
+              class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+              :class="c.file ? 'hover:text-fg-0' : 'cursor-default'"
+              :title="c.text"
+              @click="c.file && files.openFile(c.file)"
+            >
+              <span class="codicon codicon-sm codicon-quote" />
+              <span class="truncate max-w-[160px]">{{ c.file ? baseName(c.file) : 'Agent 回复' }}</span>
+            </button>
+          </div>
           <div v-if="m.attachments?.length" class="flex flex-wrap gap-1.5 mt-1.5">
             <button
               v-for="(a, i) in m.attachments"
@@ -629,7 +656,9 @@ watch(
             </button>
           </div>
         </div>
-        <div v-else class="space-y-1">
+        <!-- data-reply-selection: selecting text in a reply stages it as a quote
+             chip in the composer (same pin-to-keep behavior as file selections). -->
+        <div v-else class="space-y-1" data-reply-selection>
           <template v-for="(part, i) in m.parts" :key="i">
             <!-- Tool call with params (MCP): expandable disclosure. -->
             <details
@@ -827,6 +856,45 @@ watch(
         class="rounded-xl border bg-bg-0 focus-within:border-accent transition-colors"
         :class="dragOver ? 'border-accent' : 'border-border'"
       >
+        <!-- Selected-text context chips (from the open file or an agent reply).
+             The quote icon is a quiet toggle: gray = transient (clears when the
+             selection is dropped), blue = pinned (stays until ✕). mousedown.prevent
+             keeps the selection alive so a click can pin it. -->
+        <div v-if="composer.refs.length" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
+          <div
+            v-for="r in composer.refs"
+            :key="r.id"
+            class="group flex items-center gap-1 max-w-full text-xs pl-1 pr-1 py-1 rounded-md border"
+            :class="r.pinned ? 'border-accent/40 bg-accent/5' : 'border-border bg-bg-2/60'"
+            :title="r.text"
+          >
+            <button
+              class="shrink-0 flex items-center justify-center w-5 h-5 rounded hover:bg-bg-3 transition-colors"
+              :class="r.pinned ? 'text-accent' : 'text-fg-3 hover:text-fg-1'"
+              @mousedown.prevent="composer.togglePin(r.id)"
+            >
+              <span class="codicon codicon-sm codicon-quote" />
+            </button>
+            <button
+              v-if="r.file"
+              class="shrink-0 font-medium text-fg-1 hover:text-fg-0 hover:underline"
+              @click="files.openFile(r.file)"
+            >
+              {{ baseName(r.file) }}
+            </button>
+            <span v-else class="shrink-0 font-medium text-fg-1">Agent 回复</span>
+            <span class="text-fg-3 shrink-0">·</span>
+            <span class="truncate max-w-[180px] text-fg-3 italic">{{ snippet(r.text) }}</span>
+            <button
+              class="text-fg-3 hover:text-removed shrink-0 ml-0.5"
+              title="Remove"
+              @mousedown.prevent="composer.remove(r.id)"
+            >
+              <span class="codicon codicon-sm codicon-close" />
+            </button>
+          </div>
+        </div>
+
         <!-- Attachment chips / image thumbnails -->
         <div v-if="attachments.length || importing" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
           <template v-for="(a, i) in attachments" :key="a.path">
@@ -909,7 +977,7 @@ watch(
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-accent text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
             title="Send (Enter)"
             aria-label="Send"
-            :disabled="!input.trim() && !attachments.length"
+            :disabled="!input.trim() && !attachments.length && !composer.refs.length"
             @click="send"
           >
             <span class="codicon codicon-arrow-up" />

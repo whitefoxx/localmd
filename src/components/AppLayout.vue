@@ -369,7 +369,9 @@ function closeKb(): void {
       <!-- Main content (always mounted — the graph is an overlay above it) -->
       <main class="flex-1 min-w-0 bg-bg-0 flex flex-col">
         <EditorTabs v-if="ui.editorTabsVisible" />
-        <div class="flex-1 min-h-0 relative">
+        <!-- data-file-selection marks the open-file region: text selected here
+             (and only here) is staged into the agent composer as context. -->
+        <div class="flex-1 min-h-0 relative" data-file-selection>
             <!-- Editor actions (contextual, markdown only) -->
             <button
               v-if="isMarkdown && files.currentPath"
