@@ -9,7 +9,7 @@ import { usePlanStore } from '@/stores/plan'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { renderMarkdown } from '@/lib/markdown'
 import { parseCiteSources } from '@/lib/citations'
-import { importFile } from '@/lib/capture'
+import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
 import KbImageThumb from './KbImageThumb.vue'
@@ -69,7 +69,7 @@ async function addFiles(list: File[] | FileList): Promise<void> {
   importing.value = true
   try {
     for (const f of arr) {
-      const path = await importFile(f)
+      const path = await importTempFile(f)
       const image = fileKind(path) === 'image'
       attachments.value.push({ path, image })
       if (image) thumbs.value.set(path, URL.createObjectURL(f))
