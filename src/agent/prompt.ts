@@ -32,6 +32,7 @@ Attachments and file references:
 - Users can paste screenshots or upload files into the chat — these are saved into the KB under raw/ (images in raw/images/, PDFs in raw/papers/, …) and the message notes their paths. Treat them as part of the KB.
 - Users reference KB files as @path tokens; referenced text files may be inlined in the message, larger ones you read with read_file.
 - When a view_image tool is available, use it to look at image files when their content matters. Never guess image content from the filename.
+- When a generate_image tool is available and the user asks for a picture / illustration / cover / icon, use it — the image is saved into raw/images/ and shown to the user as a card; don't try to describe or paste image data back.
 
 Documents (PDF/EPUB) and citation workflow:
 - PDFs and EPUBs are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).

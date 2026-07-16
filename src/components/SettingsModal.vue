@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
-import { ALL_PROVIDERS, presetFor, needsBaseUrl } from '@/lib/providers'
+import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const store = useSettingsStore()
 const mcp = useMcpStore()
+
+/** Only providers with an AI SDK image model can fill the image-generation slot. */
+const imageCapableProfiles = computed(() =>
+  store.state.profiles.filter((p) => providerHasImageModel(p.provider)),
+)
 
 /** Working copy under edit (null = list view). */
 const editing = ref<LlmProfile | null>(null)
@@ -84,6 +89,7 @@ function slotBadges(p: LlmProfile): string[] {
   const out: string[] = []
   if (store.state.slots.primary === p.id) out.push('主模型')
   if (store.state.slots.vision === p.id) out.push('视觉')
+  if (store.state.slots.image === p.id) out.push('图像')
   return out
 }
 </script>
@@ -232,11 +238,31 @@ function slotBadges(p: LlmProfile): string[] {
                   <option value="">未配置</option>
                   <option v-for="p in store.state.profiles" :key="p.id" :value="p.id">{{ p.label }}</option>
                 </select>
+                <span class="text-xs text-fg-2">图像生成</span>
+                <select
+                  :value="store.state.slots.image ?? ''"
+                  class="input"
+                  @change="store.setSlot('image', ($event.target as HTMLSelectElement).value || null)"
+                >
+                  <option value="">未配置</option>
+                  <option
+                    v-for="p in imageCapableProfiles"
+                    :key="p.id"
+                    :value="p.id"
+                  >
+                    {{ p.label }}
+                  </option>
+                </select>
               </div>
               <p class="text-xs text-fg-3 leading-relaxed">
                 Claude 主模型天生多模态，无需配置视觉槽。OpenAI 兼容主模型：若它本身是多模态（如
                 qwen-vl、glm-4v、gpt-4o），视觉槽选它自己（图片直接进上下文）；若是纯文本模型（如
                 deepseek-chat），视觉槽指一个专门的视觉模型（agent 通过 view_image 工具调用它）。
+              </p>
+              <p class="text-xs text-fg-3 leading-relaxed">
+                图像生成槽可选，配置后主模型可用 generate_image 工具作图（保存进 raw/images/）。支持
+                OpenAI（DALL·E）、Google（Imagen）、xAI，以及 OpenAI 兼容的 /images/generations 端点（智谱
+                CogView、Qwen、自定义等）；模型名填对应的作图模型，端点须允许浏览器 CORS。
               </p>
             </section>
 

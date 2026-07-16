@@ -15,5 +15,8 @@ export type AgentEvent =
    *  show a loading card; the non-pending event (once written) fills in the
    *  title/path and makes the card clickable. */
   | { type: 'artifact'; title: string; path: string; pending?: boolean }
+  /** A generated image saved into the KB (generate_image tool) — the chat shows
+   *  it inline; `path` is its KB location. */
+  | { type: 'image'; path: string }
 
 export type AgentEventHandler = (e: AgentEvent) => void

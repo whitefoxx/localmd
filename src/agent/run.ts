@@ -30,6 +30,7 @@ import { TOOLS, externalToolSpecs, allExternalToolSpecs, type ToolCtx } from './
 import { toLanguageModel } from './model'
 import { mapLimit } from '@/lib/async'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
+import { generateKbImage } from './imagegen'
 import type { LlmProfile } from '@/stores/settings'
 import type { AgentEventHandler } from './types'
 
@@ -49,6 +50,8 @@ export interface RunTurnOptions {
   /** Vision slot: undefined = no image understanding; inline = the primary is
    *  multimodal and gets images back directly from view_image. */
   vision?: { profile: LlmProfile; inline: boolean }
+  /** Image-generation slot: when set, offer the generate_image tool. */
+  image?: LlmProfile
   /** Chat session this turn belongs to — scopes tool side effects. */
   sessionId: string
   onEvent: AgentEventHandler
@@ -98,6 +101,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     })
   }
   if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts)
+  if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts)
   if (opts.allowSubagent) tools['run_subagent'] = buildSubagentTool(opts)
   const staticNames = Object.keys(tools)
 
@@ -287,6 +291,35 @@ function buildViewImageTool(
         return `${desc}${note}`
       } catch (err) {
         return `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+      }
+    },
+  })
+}
+
+/* ── generate_image ──────────────────────────────────────────────────────── */
+
+function buildGenerateImageTool(profile: LlmProfile, opts: RunTurnOptions): ToolSet[string] {
+  return tool({
+    description:
+      'Generate an image from a text prompt and save it into the knowledge base (raw/images/). Use it when the user asks for a picture, illustration, diagram-as-image, icon, cover, etc. The saved image is shown to the user as a card — do not describe or paste it back.',
+    inputSchema: z.object({
+      prompt: z.string().describe('Detailed description of the image to generate'),
+      size: z
+        .string()
+        .optional()
+        .describe('Optional size like "1024x1024" (provider-dependent)'),
+    }),
+    execute: async ({ prompt, size }) => {
+      opts.onEvent({ type: 'tool', name: 'generate_image', detail: `image: ${prompt.slice(0, 60)}` })
+      try {
+        const { path } = await generateKbImage(profile, prompt, { size, signal: opts.signal })
+        // Reflect the new file in the tree, then show the image inline in chat.
+        const { useFilesStore } = await import('@/stores/files')
+        await useFilesStore().refreshTree()
+        opts.onEvent({ type: 'image', path })
+        return `已生成图片并保存到 ${path}(已作为图片卡片展示给用户)。如需可 view_image 查看,勿重复粘贴内容。`
+      } catch (err) {
+        return `图像生成失败(${profile.model}):${(err as Error).message}`
       }
     },
   })

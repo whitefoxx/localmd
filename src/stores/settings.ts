@@ -36,7 +36,7 @@ export interface LlmProfile {
   maxTokens?: number
 }
 
-export type Slot = 'primary' | 'vision'
+export type Slot = 'primary' | 'vision' | 'image'
 
 export interface SettingsState {
   profiles: LlmProfile[]
@@ -117,7 +117,7 @@ export function normalizeSettings(raw: unknown): SettingsState {
     }
     const slots: Partial<Record<Slot, string>> = {}
     const rawSlots = (obj.slots ?? {}) as Record<string, unknown>
-    for (const slot of ['primary', 'vision'] as Slot[]) {
+    for (const slot of ['primary', 'vision', 'image'] as Slot[]) {
       const want = rawSlots[slot]
       if (typeof want === 'string' && profiles.some((p) => p.id === want)) slots[slot] = want
     }
@@ -190,6 +190,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const primary = computed(() => byId(state.slots.primary))
   const vision = computed(() => byId(state.slots.vision))
+  /** Image-generation slot (optional): the model the generate_image tool runs on. */
+  const image = computed(() => byId(state.slots.image))
   /** Images can go straight into the primary's messages: multimodal providers
    *  (Anthropic/OpenAI/Google/xAI) take them inline; an OpenAI-compatible
    *  primary qualifies when the user also assigned it to the vision slot. */
@@ -241,6 +243,7 @@ export const useSettingsStore = defineStore('settings', () => {
     state,
     primary,
     vision,
+    image,
     visionInline,
     visionAvailable,
     isConfigured,

@@ -16,7 +16,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createXai } from '@ai-sdk/xai'
 import { createGroq } from '@ai-sdk/groq'
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
-import type { LanguageModel } from 'ai'
+import type { LanguageModel, ImageModel } from 'ai'
 import { sdkKindFor } from '@/lib/providers'
 import type { LlmProfile } from '@/stores/settings'
 
@@ -46,5 +46,29 @@ export function toLanguageModel(profile: LlmProfile): LanguageModel {
         baseURL: profile.baseUrl,
         apiKey,
       })(model)
+  }
+}
+
+/** Build an AI SDK image-generation model for a profile whose provider supports
+ *  one (see providerHasImageModel). OpenAI/Google/xAI use their native image
+ *  model; every OpenAI-compatible endpoint (GLM CogView, Qwen, Custom) uses the
+ *  openai-compatible `/images/generations` image model. Throws otherwise. */
+export function toImageModel(profile: LlmProfile): ImageModel {
+  const { apiKey, model } = profile
+  switch (sdkKindFor(profile.provider)) {
+    case 'openai':
+      return createOpenAI({ apiKey }).image(model)
+    case 'google':
+      return createGoogleGenerativeAI({ apiKey }).image(model)
+    case 'xai':
+      return createXai({ apiKey }).image(model)
+    case 'openai-compatible':
+      return createOpenAICompatible({
+        name: profile.provider || 'custom',
+        baseURL: profile.baseUrl,
+        apiKey,
+      }).imageModel(model)
+    default:
+      throw new Error(`provider ${profile.provider} 不支持图像生成`)
   }
 }

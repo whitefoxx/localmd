@@ -12,6 +12,7 @@ import { parseCiteSources } from '@/lib/citations'
 import { importFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
+import KbImageThumb from './KbImageThumb.vue'
 import type { MessagePart } from '@/stores/chat'
 
 const emit = defineEmits<{ openSettings: []; close: [] }>()
@@ -185,6 +186,7 @@ const TOOL_ICONS: Record<string, string> = {
   enable_tools: 'codicon-plug',
   run_subagent: 'codicon-run-all',
   view_image: 'codicon-device-camera',
+  generate_image: 'codicon-file-media',
   compact: 'codicon-fold',
   checkpoint: 'codicon-git-commit',
   git_status: 'codicon-source-control',
@@ -697,6 +699,7 @@ watch(
                 class="codicon codicon-sm codicon-arrow-right text-fg-3 shrink-0"
               />
             </button>
+            <KbImageThumb v-else-if="part.type === 'image'" :path="part.path" />
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div v-else class="md-preview text-sm" v-html="renderPart(part)" @click="onPreviewClick" />
           </template>

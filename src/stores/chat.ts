@@ -52,6 +52,8 @@ export type MessagePart =
   /** A created artifact (interactive HTML) — a clickable card that opens the
    *  file at `path`. `pending` = still being generated (loading card). */
   | { type: 'artifact'; title: string; path: string; pending?: boolean }
+  /** A generated image saved into the KB (generate_image tool), shown inline. */
+  | { type: 'image'; path: string }
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
  *  saved into the KB — `path` is its KB location. */
@@ -477,6 +479,8 @@ export const useChatStore = defineStore('chat', () => {
             parts.push({ type: 'artifact', title: e.title, path: e.path })
           }
         }
+      } else if (e.type === 'image') {
+        parts.push({ type: 'image', path: e.path })
       } else {
         // Only id-bearing tool calls get the loading/timer treatment.
         parts.push(
@@ -572,6 +576,7 @@ export const useChatStore = defineStore('chat', () => {
             : inline
               ? { profile: primary, inline }
               : undefined,
+          image: settings.image ?? undefined,
           sessionId: session.id,
           onEvent,
           signal: controller.signal,

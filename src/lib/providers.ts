@@ -183,3 +183,14 @@ export function isMultimodalProvider(providerId: string): boolean {
   const kind = sdkKindFor(providerId)
   return kind === 'anthropic' || kind === 'openai' || kind === 'google' || kind === 'xai'
 }
+
+/** Providers that can fill the image slot: OpenAI (DALL·E), Google (Imagen),
+ *  xAI (Grok image), and any OpenAI-compatible endpoint exposing
+ *  `/images/generations` (GLM CogView, Qwen, custom). Anthropic / DeepSeek /
+ *  Groq have no image generation, so they're excluded. */
+export function providerHasImageModel(providerId: string): boolean {
+  const kind = sdkKindFor(providerId)
+  return (
+    kind === 'openai' || kind === 'google' || kind === 'xai' || kind === 'openai-compatible'
+  )
+}
