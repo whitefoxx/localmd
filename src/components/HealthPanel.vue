@@ -63,7 +63,7 @@ async function revealBroken(path: string, target: string): Promise<void> {
             </p>
             <div v-if="!index.health.brokenLinks.length" class="text-fg-3">None 🎉</div>
             <div v-for="b in index.health.brokenLinks" :key="b.path" class="mb-2">
-              <button class="break-all text-accent hover:underline" @click="open(b.path)">
+              <button class="block text-left break-all text-accent hover:underline" @click="open(b.path)">
                 {{ b.path }}
               </button>
               <div class="mt-1 flex flex-wrap gap-1">
@@ -90,7 +90,7 @@ async function revealBroken(path: string, target: string): Promise<void> {
             </p>
             <div v-if="!index.health.orphans.length" class="text-fg-3">None 🎉</div>
             <div v-for="p in index.health.orphans" :key="p">
-              <button class="break-all text-accent hover:underline" @click="open(p)">{{ p }}</button>
+              <button class="block text-left break-all text-accent hover:underline" @click="open(p)">{{ p }}</button>
             </div>
           </section>
         </div>
