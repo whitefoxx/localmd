@@ -425,7 +425,10 @@ async function openSource(s: Source): Promise<void> {
     return
   }
   const rel = files.resolveMarkdownLink('', s.target) ?? s.target
-  if (rel) await files.openFile(rel)
+  if (rel) {
+    await files.openFile(rel)
+    revealEditor()
+  }
 }
 
 /** Compact display of a URL for the Sources list (host + path, no scheme). */
@@ -535,6 +538,13 @@ function preset(text: string): void {
   input.value = text
 }
 
+/** Opening a file navigates the main editor, which sits *behind* the maximized
+ *  agent overlay — restore the panel so the just-opened file is actually
+ *  visible. No-op when not maximized. */
+function revealEditor(): void {
+  if (ui.agentMaximized) ui.agentMaximized = false
+}
+
 async function onPreviewClick(e: MouseEvent): Promise<void> {
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
@@ -543,6 +553,7 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
     const path = a.dataset.citePath
     if (path) await citations.openCitation(path, a.dataset.block ?? null)
     else if (a.dataset.block) await citations.openByBlock(a.dataset.block)
+    revealEditor()
     return
   }
   // Injected reply-citation superscript → jump to its source.
@@ -553,6 +564,7 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {
     await files.openFile(a.dataset.target)
+    revealEditor()
     return
   }
   const href = a.getAttribute('href') ?? ''
@@ -564,7 +576,10 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   // so resolve against the KB (bundle) root — absolute /… and bare paths both
   // land correctly there.
   const rel = files.resolveMarkdownLink('', href)
-  if (rel) await files.openFile(rel)
+  if (rel) {
+    await files.openFile(rel)
+    revealEditor()
+  }
 }
 
 // Keep the transcript pinned to the bottom while streaming — but ONLY while
@@ -926,7 +941,8 @@ watch(
     <!-- Agent plan (update_plan tool, per session) -->
     <div
       v-if="planItems.length"
-      class="mx-3 mb-2 rounded-md border border-border bg-bg-2/50 px-3 py-2 shrink-0 max-h-40 overflow-y-auto"
+      class="mb-2 rounded-md border border-border bg-bg-2/50 px-3 py-2 shrink-0 max-h-40 overflow-y-auto"
+      :class="ui.agentMaximized ? 'max-w-3xl w-full mx-auto' : 'mx-3'"
     >
       <div class="flex items-center gap-1.5 text-xs text-fg-3 uppercase tracking-wide mb-1.5">
         <span class="codicon codicon-sm codicon-checklist" />
@@ -955,7 +971,11 @@ watch(
     </div>
 
     <!-- Presets: KB skills when present, built-in prompts otherwise -->
-    <div v-if="!chat.messages.length" class="px-3 pb-2 flex gap-2 shrink-0 flex-wrap">
+    <div
+      v-if="!chat.messages.length"
+      class="px-3 pb-2 flex gap-2 shrink-0 flex-wrap w-full"
+      :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
+    >
       <template v-if="skills.all.length">
         <button
           v-for="s in skills.all.slice(0, 4)"
