@@ -58,6 +58,10 @@ export interface RunTurnOptions {
   signal: AbortSignal
   /** Offer run_subagent (disabled inside subagents — depth 1 only). */
   allowSubagent?: boolean
+  /** Peek whether the user has queued a mid-turn steer message. When it returns
+   *  true the step loop stops at the next clean boundary (tool results settled,
+   *  no dangling call) so the caller can append the steer and continue. */
+  steerPending?: () => boolean
 }
 
 /** Extract the plain text of the last assistant message (for subagent replies). */
@@ -152,7 +156,10 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     activeTools: activeToolNames(),
     // Re-gate before each step so an enable_tools activation takes effect now.
     prepareStep: () => ({ activeTools: activeToolNames() }),
-    stopWhen: stepCountIs(MAX_ITERATIONS),
+    // Stop at the iteration cap, or early when the user queues a steer message —
+    // evaluated after each completed step, so the turn ends cleanly (all tool
+    // results present) and the caller can append the steer and run another turn.
+    stopWhen: [stepCountIs(MAX_ITERATIONS), () => opts.steerPending?.() ?? false],
     maxOutputTokens: opts.profile.maxTokens ?? DEFAULT_MAX_TOKENS,
     abortSignal: opts.signal,
     onError: ({ error }) => {

@@ -48,6 +48,10 @@ const PLAN_ICONS = {
 const planItems = computed(() => plan.itemsFor(chat.currentSessionId))
 
 const input = ref('')
+/** Anything to send? Also gates steering — an interjection needs real content. */
+const canSend = computed(
+  () => !!input.value.trim() || attachments.value.length > 0 || composer.refs.length > 0,
+)
 const scroller = ref<HTMLElement | null>(null)
 const textarea = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -998,15 +1002,33 @@ watch(
             <span class="codicon codicon-add" />
           </button>
           <span class="text-xs text-fg-3 flex-1 truncate">
-            {{ settingsStore.primary?.model || 'not configured' }}
-            <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
-            <span
-              v-if="chat.sessionUsage.input || chat.sessionUsage.output"
-              :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
-            >
-              · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
-            </span>
+            <template v-if="chat.running">
+              <span class="text-accent">agent 工作中</span> · 回车插话,下一步生效
+            </template>
+            <template v-else>
+              {{ settingsStore.primary?.model || 'not configured' }}
+              <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
+              <span
+                v-if="chat.sessionUsage.input || chat.sessionUsage.output"
+                :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
+              >
+                · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
+              </span>
+            </template>
           </span>
+          <!-- While running: a filled send button appears once there's text to
+               interject (steer) — clicking it does NOT stop the turn; the message
+               is injected into the running agent loop at its next step. -->
+          <button
+            v-if="!chat.running || canSend"
+            class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-accent text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
+            :title="chat.running ? '插话:发送给正在工作的 agent(不打断,下一步读取)' : 'Send (Enter)'"
+            :aria-label="chat.running ? 'Steer' : 'Send'"
+            :disabled="!canSend"
+            @click="send"
+          >
+            <span class="codicon" :class="chat.running ? 'codicon-comment-discussion' : 'codicon-arrow-up'" />
+          </button>
           <button
             v-if="chat.running"
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-bg-3 text-fg-0 hover:bg-removed/20 hover:text-removed transition-colors"
@@ -1015,16 +1037,6 @@ watch(
             @click="chat.stop()"
           >
             <span class="codicon codicon-sm codicon-primitive-square" />
-          </button>
-          <button
-            v-else
-            class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-accent text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
-            title="Send (Enter)"
-            aria-label="Send"
-            :disabled="!input.trim() && !attachments.length && !composer.refs.length"
-            @click="send"
-          >
-            <span class="codicon codicon-arrow-up" />
           </button>
         </div>
       </div>

@@ -33,6 +33,16 @@ import type { AgentEvent } from '@/agent/types'
 import type { SelectionRef } from '@/stores/composer'
 import type { ModelMessage } from 'ai'
 
+/** A user message's model-facing content: plain enriched text, or that text
+ *  plus inline image parts (multimodal primary). Kept minimal to avoid Vue's
+ *  reactive unwrap recursing the deep ModelMessage union (TS2589). */
+type UserContent =
+  | string
+  | Array<
+      | { type: 'text'; text: string }
+      | { type: 'image'; image: string; mediaType?: string }
+    >
+
 export type MessagePart =
   | { type: 'text'; text: string }
   | { type: 'thinking'; text: string }
@@ -135,6 +145,14 @@ export const useChatStore = defineStore('chat', () => {
 
   const controllers = new Map<string, AbortController>()
 
+  // Mid-turn steering: messages the user submits WHILE a tab's turn is running.
+  // The running turn stops at its next step boundary (via steerPending), then
+  // the send loop appends these to the wire history and continues in a fresh
+  // assistant bubble — so an interjection lands in the very next model step
+  // instead of being dropped or starting a competing turn. Non-reactive.
+  const steerQueue = new Map<string, ModelMessage[]>()
+  const steerPending = (id: string): boolean => (steerQueue.get(id)?.length ?? 0) > 0
+
   const active = computed(() => tabs.value.find((t) => t.id === activeId.value) ?? null)
   const messages = computed<UiMessage[]>(() => active.value?.uiMessages ?? [])
   const running = computed(() => active.value?.running ?? false)
@@ -206,6 +224,7 @@ export const useChatStore = defineStore('chat', () => {
   function closeTab(id: string): void {
     controllers.get(id)?.abort()
     controllers.delete(id)
+    steerQueue.delete(id)
     // Release the session's per-subsystem state (paused approvals, plan,
     // deferred-tool activations, turn-write collection).
     useReviewStore().rejectAwaiting(id)
@@ -305,6 +324,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!id) return
     controllers.get(id)?.abort()
     controllers.delete(id)
+    steerQueue.delete(id) // a stopped turn must not later consume queued steers
     const t = tabs.value.find((x) => x.id === id)
     if (t) t.running = false
     // Writes paused for approval must not dangle after the turn dies.
@@ -314,6 +334,7 @@ export const useChatStore = defineStore('chat', () => {
   function stopAll(): void {
     for (const c of controllers.values()) c.abort()
     controllers.clear()
+    steerQueue.clear()
     for (const t of tabs.value) t.running = false
     useReviewStore().rejectAwaiting()
   }
@@ -402,6 +423,59 @@ export const useChatStore = defineStore('chat', () => {
     return out
   }
 
+  /** Model-facing user content (enriched text + optional inline images for a
+   *  multimodal primary) plus the matching UI bubble. Shared by a normal send
+   *  and a mid-turn steer so both enrich identically (@mentions, selections,
+   *  attachments, current view). */
+  async function prepareUserMessage(
+    trimmed: string,
+    attachments: Attachment[],
+    selections: SelectionRef[],
+  ): Promise<{ content: UserContent; ui: UiMessage }> {
+    const settings = useSettingsStore()
+    const files = useFilesStore()
+    const mentioned = extractMentions(trimmed, files.allFiles)
+    const imagePaths = [
+      ...attachments.filter((a) => a.image).map((a) => a.path),
+      ...mentioned.filter((p) => fileKind(p) === 'image' && !/\.svg$/i.test(p)),
+    ].filter((p, i, arr) => arr.indexOf(p) === i)
+    const inline = settings.visionInline
+    const modelText = await buildModelText(
+      await expandSlashSkill(trimmed),
+      attachments,
+      mentioned,
+      imagePaths,
+      inline,
+      settings.visionAvailable,
+      selections,
+    )
+    // A multimodal primary gets images inline; the AI SDK formats them per
+    // provider. A text-only primary sees only the path notes (view_image tool).
+    const inlineImages = inline
+      ? (await Promise.all(imagePaths.map((p) => loadKbImage(p)))).filter(
+          (i): i is NonNullable<typeof i> => i !== null,
+        )
+      : []
+    const content: UserContent = inlineImages.length
+      ? [
+          { type: 'text', text: modelText },
+          ...inlineImages.map((img) => ({
+            type: 'image' as const,
+            image: toDataUrl(img),
+            mediaType: img.mediaType,
+          })),
+        ]
+      : modelText
+    const ui: UiMessage = {
+      id: nextId++,
+      role: 'user',
+      parts: [{ type: 'text', text: trimmed }],
+      attachments: attachments.length ? [...attachments] : undefined,
+      contexts: selections.length ? [...selections] : undefined,
+    }
+    return { content, ui }
+  }
+
   async function send(
     text: string,
     attachments: Attachment[] = [],
@@ -410,7 +484,6 @@ export const useChatStore = defineStore('chat', () => {
     const trimmed = text.trim()
     if ((!trimmed && !attachments.length && !selections.length) || !kb.name) return
     const settings = useSettingsStore()
-    const files = useFilesStore()
     const primary = settings.primary
     if (!primary) return
 
@@ -426,7 +499,19 @@ export const useChatStore = defineStore('chat', () => {
       if (!addTab(session)) return
       activeId.value = session.id
     }
-    if (session.running) return
+    // STEER: a message submitted while THIS tab's turn is running is injected
+    // into that turn at its next step boundary — not dropped, not a competing
+    // turn. The running send loop drains the queue between segments.
+    if (session.running) {
+      if (providerKind === 'mock') return // the E2E mock path takes no steers
+      const { content: steerContent, ui } = await prepareUserMessage(trimmed, attachments, selections)
+      session.uiMessages.push(ui)
+      const q = steerQueue.get(session.id) ?? []
+      q.push({ role: 'user', content: steerContent } as ModelMessage)
+      steerQueue.set(session.id, q)
+      void persist(session)
+      return
+    }
 
     if (!session.uiMessages.length) {
       session.title = (trimmed || selections[0]?.text || attachments[0]?.path || 'chat').slice(0, 40)
@@ -441,34 +526,14 @@ export const useChatStore = defineStore('chat', () => {
       session.history = []
     }
 
-    const mentioned = extractMentions(trimmed, files.allFiles)
-    const imagePaths = [
-      ...attachments.filter((a) => a.image).map((a) => a.path),
-      ...mentioned.filter((p) => fileKind(p) === 'image' && !/\.svg$/i.test(p)),
-    ].filter((p, i, arr) => arr.indexOf(p) === i)
-
-    const inline = settings.visionInline
-    const modelText = await buildModelText(
-      await expandSlashSkill(trimmed),
-      attachments,
-      mentioned,
-      imagePaths,
-      inline,
-      settings.visionAvailable,
-      selections,
-    )
-
-    session.uiMessages.push({
-      id: nextId++,
-      role: 'user',
-      parts: [{ type: 'text', text: trimmed }],
-      attachments: attachments.length ? [...attachments] : undefined,
-      contexts: selections.length ? [...selections] : undefined,
-    })
+    const { content, ui } = await prepareUserMessage(trimmed, attachments, selections)
+    session.uiMessages.push(ui)
     // reactive() is load-bearing: onEvent mutates this object from outside the
-    // store's proxy — a raw object would render nothing until the turn ends
-    // (no streaming). Mutating through the proxy triggers per-delta updates.
-    const assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
+    // store's proxy — a raw object would render nothing until the turn ends (no
+    // streaming). Mutating through the proxy triggers per-delta updates. `let`
+    // (not const): each steer segment opens a fresh assistant bubble below the
+    // interjection, which onEvent then streams into.
+    let assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
     session.uiMessages.push(assistant)
     void persist(session)
     // Throttle streaming persistence so a reload mid-turn keeps the partial
@@ -534,18 +599,12 @@ export const useChatStore = defineStore('chat', () => {
     useReviewStore().beginTurn(session.id) // collect this turn's writes for checkpointing
     try {
       const system = await buildSystemPrompt(session.id)
-      // Inline images: load bytes fresh from the KB at send time.
-      const inlineImages = inline
-        ? (await Promise.all(imagePaths.map((p) => loadKbImage(p)))).filter(
-            (i): i is NonNullable<typeof i> => i !== null,
-          )
-        : []
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
         const hist: ModelMessage[] = [
           ...(session.history as ModelMessage[]),
-          { role: 'user', content: modelText },
+          { role: 'user', content: content as string },
         ]
         session.history = hist
         session.history = await runMockTurn({
@@ -580,40 +639,46 @@ export const useChatStore = defineStore('chat', () => {
             }
           }
         }
-        // A multimodal primary gets images inline in the user message; the AI
-        // SDK formats them per provider (Anthropic blocks, OpenAI/Google parts).
-        const content = inlineImages.length
-          ? [
-              { type: 'text' as const, text: modelText },
-              ...inlineImages.map((img) => ({
-                type: 'image' as const,
-                image: toDataUrl(img),
-                mediaType: img.mediaType,
-              })),
-            ]
-          : modelText
         // Commit the user turn to the wire history BEFORE running, so an
-        // interrupted turn (reload mid-stream) still replays it next time. Pass
-        // a COPY to runTurn so the committed history stays clean on abort (just
-        // the user message, no dangling tool calls).
-        hist = [...hist, { role: 'user', content }]
+        // interrupted turn (reload mid-stream) still replays it next time.
+        hist = [...hist, { role: 'user', content } as ModelMessage]
         session.history = hist
         void persist(session)
-        session.history = await runTurn({
-          profile: primary,
-          system,
-          messages: [...hist],
-          vision: settings.vision
-            ? { profile: settings.vision, inline }
-            : inline
-              ? { profile: primary, inline }
-              : undefined,
-          image: settings.image ?? undefined,
-          sessionId: session.id,
-          onEvent,
-          signal: controller.signal,
-          allowSubagent: true,
-        })
+
+        // Multi-segment turn for steering. runTurn stops at a step boundary
+        // whenever an interjection is queued (steerPending); the agent loop does
+        // NOT stop — we append the steer to the history, open a fresh assistant
+        // bubble below it, and immediately continue, so the message lands in the
+        // very next model step. A copy is passed so the committed history stays
+        // clean on abort (no dangling tool calls).
+        let messages: ModelMessage[] = [...hist]
+        for (;;) {
+          const next = await runTurn({
+            profile: primary,
+            system,
+            messages,
+            vision: settings.vision
+              ? { profile: settings.vision, inline: settings.visionInline }
+              : settings.visionInline
+                ? { profile: primary, inline: true }
+                : undefined,
+            image: settings.image ?? undefined,
+            sessionId: session.id,
+            onEvent,
+            signal: controller.signal,
+            allowSubagent: true,
+            steerPending: () => steerPending(session.id),
+          })
+          session.history = next
+          const steers = steerQueue.get(session.id)
+          if (!steers?.length) break
+          steerQueue.delete(session.id)
+          messages = [...(next as ModelMessage[]), ...steers]
+          session.history = messages
+          void persist(session)
+          assistant = reactive({ id: nextId++, role: 'assistant', parts: [] })
+          session.uiMessages.push(assistant)
+        }
       }
     } catch (err) {
       const name = (err as Error).name
@@ -631,6 +696,7 @@ export const useChatStore = defineStore('chat', () => {
     } finally {
       session.running = false
       controllers.delete(session.id)
+      steerQueue.delete(session.id) // drop any interjection the ended turn never consumed
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever.
       for (const p of assistant.parts) {
