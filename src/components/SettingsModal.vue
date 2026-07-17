@@ -332,33 +332,21 @@ function slotBadges(p: LlmProfile): string[] {
             </div>
 
             <!-- ▸ Agent behavior -->
-            <div v-else-if="section === 'agent'" class="space-y-6">
-              <div>
-                <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
-                  <div class="flex items-center justify-between gap-4 px-3 py-3">
-                    <div class="min-w-0">
-                      <div class="text-sm text-fg-1">写入模式</div>
-                      <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                        先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里 Approve 或 Reject。
-                      </div>
+            <div v-else-if="section === 'agent'" class="space-y-2">
+              <div class="rounded-lg border border-border overflow-hidden">
+                <div class="flex items-center justify-between gap-4 px-3 py-3">
+                  <div class="min-w-0">
+                    <div class="text-sm text-fg-1">写入模式</div>
+                    <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                      先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
+                      Approve 或 Reject。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、
+                      如何提交由你在 Git 面板自行决定。
                     </div>
-                    <select v-model="store.state.writeMode" class="input w-56 shrink-0">
-                      <option value="auto">直接写入（事后审查）</option>
-                      <option value="ask">先询问（每次批准）</option>
-                    </select>
                   </div>
-                  <div class="flex items-center justify-between gap-4 px-3 py-3">
-                    <div class="min-w-0">
-                      <div class="text-sm text-fg-1">回合 checkpoint</div>
-                      <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                        开启后（需 KB 为 git 仓库），每个写过文件的回合自动提交为 “checkpoint: …”，可在 Git 面板一键回滚。只提交 agent 改的文件。
-                      </div>
-                    </div>
-                    <select v-model="store.state.checkpointMode" class="input w-56 shrink-0">
-                      <option value="off">关闭</option>
-                      <option value="auto">自动</option>
-                    </select>
-                  </div>
+                  <select v-model="store.state.writeMode" class="input w-56 shrink-0">
+                    <option value="auto">直接写入（事后审查）</option>
+                    <option value="ask">先询问（每次批准）</option>
+                  </select>
                 </div>
               </div>
             </div>

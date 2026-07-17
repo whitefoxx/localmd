@@ -2,8 +2,8 @@
  * App-wide async mutex for .git-mutating operations. isomorphic-git has no
  * internal locking — two concurrent operations that write .git/index (status
  * cache write-back, add/commit, checkout) interleave and corrupt state. With
- * concurrent chat sessions each checkpointing at turn end, plus user-driven
- * panel actions, every mutating sequence must go through this lock.
+ * concurrent chat sessions running git tools, plus user-driven panel actions,
+ * every mutating sequence must go through this lock.
  *
  * Waiters queue FIFO. An optional acquisition timeout lets callers give up
  * with a clear message (GitBusyError) instead of stalling forever behind a

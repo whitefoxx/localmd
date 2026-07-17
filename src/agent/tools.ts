@@ -50,13 +50,12 @@ async function approved(
 }
 
 async function performWrite(
-  ctx: ToolCtx,
   path: string,
   before: string | null,
   content: string,
 ): Promise<void> {
   await fs.writeFile(path, content)
-  useReviewStore().recordWrite(ctx.sessionId, path, before, content)
+  useReviewStore().recordWrite(path, before, content)
   const files = useFilesStore()
   await files.refreshTree()
   await files.reloadIfClean(path)
@@ -143,7 +142,7 @@ const writeFile = defineTool({
     if (!(await approved(ctx, path, before, content))) {
       return `User declined the write to ${path}. Ask them how to proceed instead of retrying.`
     }
-    await performWrite(ctx, path, before, content)
+    await performWrite(path, before, content)
     return `Wrote ${path} (${content.length} chars)`
   },
 })
@@ -167,7 +166,7 @@ const editFile = defineTool({
     if (!(await approved(ctx, path, before, result.content))) {
       return `User declined the edit to ${path}. Ask them how to proceed instead of retrying.`
     }
-    await performWrite(ctx, path, before, result.content)
+    await performWrite(path, before, result.content)
     return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
   },
 })
@@ -196,7 +195,7 @@ const createArtifact = defineTool({
     if (!(await approved(ctx, path, null, html))) {
       return `User declined the artifact ${path}. Ask them how to proceed instead of retrying.`
     }
-    await performWrite(ctx, path, null, html)
+    await performWrite(path, null, html)
     ctx.emit?.({ type: 'artifact', title, path })
     return `Created artifact "${title}" at ${path} (${html.length} chars). It opens in a sandboxed viewer; a clickable card was shown to the user — do not paste the HTML back.`
   },
@@ -367,7 +366,7 @@ async function lockedGit(fn: () => Promise<string>): Promise<string> {
     return await withGitLock(fn, { timeoutMs: 15_000 })
   } catch (err) {
     if (err instanceof GitBusyError) {
-      return 'Error: 另一个会话正在执行 git 操作(checkpoint/commit/sync),稍后重试。请告知用户当前 git 被占用。'
+      return 'Error: 另一个会话正在执行 git 操作(commit/sync),稍后重试。请告知用户当前 git 被占用。'
     }
     throw err
   }
