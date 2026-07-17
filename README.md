@@ -70,7 +70,7 @@ src/
     run.ts           统一的 streamText 多步工具循环（替代旧的两套手写循环；
                      view_image 多模态回图 / 视觉槽子调用；run_subagent 递归）
     vision.ts        视觉子调用（KB 图片 → base64，经 AI SDK generateText）
-    prompt.ts        系统提示词；KB 根目录的 CLAUDE.md 会原文附加
+    prompt.ts        系统提示词；KB 根目录的 AGENTS.md/CLAUDE.md、MEMORY.md 会原文附加
   stores/            Pinia：kb / files（含多标签页）/ chat（会话持久化）/
                      review（写入快照与审查）/ kbIndex（mtime 缓存的内容索引，
                      供搜索、backlinks、图谱、健康检查共用）/ citations / ui
@@ -107,6 +107,15 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 - **沉淀新技能**：对 agent 说「把刚才的流程存成 skill」，它会写入 `.agents/skills/`——git 版本管理、review 面板审查都天然适用
 - **与终端 Claude Code 共享**：一次性 `ln -s ../.agents/skills .claude/skills`（建议把 `.claude/skills` 加进 `.gitignore`——FS Access API 会把软链接当真目录，应用内 git 会看到重复文件）
 - KB 指令文件同样中立化：**AGENTS.md 优先，CLAUDE.md 兜底**（常见做法是 `CLAUDE.md` 软链接到 `AGENTS.md`）
+
+## Memory（持久记忆）
+
+记忆是知识库根目录下一个**固定名字**的普通 markdown 文件——`MEMORY.md`，存放要跨会话长期记住的东西：用户的稳定偏好、项目当前状态、值得留存的决策。和 skill 不同，它**不做渐进披露**——存在时**全文注入**系统提示词（放在 `<kb_memory>` 块里，和 `AGENTS.md` 的 `<kb_schema>` 并列），agent 每轮都带着它，无需再调工具加载。
+
+- **就是一个普通文件**：在文件树里可见，用户可以像编辑任何页面一样直接改;跟 git、review 面板天然兼容
+- **让 agent 记**：对 agent 说「记住我……」「把这条写进 memory」，它会用 `write_file`/`edit_file` 创建(不存在就新建)或更新 `MEMORY.md`——先读后改、条目精简、保留原有内容
+- **不自动总结**：agent **不会**主动往 `MEMORY.md` 写东西,也**不会**自动把会话历史蒸馏进去——只有用户明确要求时才动它
+- 区别于 `AGENTS.md`(KB 的结构/工作流约定,偏静态)：`MEMORY.md` 是随用随记、不断累积的事实与偏好
 
 ## 外部工具(MCP servers)
 

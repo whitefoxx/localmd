@@ -17,6 +17,7 @@ raw/conversations/ ← 保存下来的会话记录(type: chat),就是普通 md �
 wiki/   ← LLM 维护的 markdown 页面。用 [[wikilinks]] 互相链接
 wiki/index.md ← 入口页,新页面要从这里可达
 .agents/skills/ ← 可复用的工作流(SKILL.md)
+MEMORY.md ← 跨会话的持久记忆(用户偏好、项目状态、重要决策)。可选:用户自己写,或让 agent 记录/更新;不主动自动总结
 \`\`\`
 
 ## 规则
