@@ -2,26 +2,117 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
+import { useFilesStore } from '@/stores/files'
 import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
+import {
+  HOTKEYS,
+  HOTKEY_BY_ID,
+  formatBinding,
+  bindingsEqual,
+  findConflict,
+  type HotkeyDef,
+  type HotkeyId,
+  type Binding,
+} from '@/lib/hotkeys'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-// Esc closes the modal while it's open.
+// Esc closes the modal while it's open (unless we're mid-recording — see below).
 function onKey(e: KeyboardEvent): void {
   if (e.key === 'Escape' && props.open) emit('close')
 }
-onMounted(() => window.addEventListener('keydown', onKey))
-onUnmounted(() => window.removeEventListener('keydown', onKey))
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  // Capture phase so the recorder intercepts the combo before the app's global
+  // shortcut handler (and CodeMirror etc.) can act on it.
+  window.addEventListener('keydown', onRecordKey, true)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('keydown', onRecordKey, true)
+})
 
 const store = useSettingsStore()
 const mcp = useMcpStore()
+const files = useFilesStore()
+
+/* KB health scope — pick which top-level dirs the health check covers. */
+const kbDirs = computed(() => {
+  const set = new Set<string>()
+  for (const p of files.mdFiles) {
+    const i = p.indexOf('/')
+    if (i > 0) set.add(p.slice(0, i))
+  }
+  return [...set].sort()
+})
+function toggleHealthDir(d: string): void {
+  const list = store.state.healthDirs
+  const i = list.indexOf(d)
+  if (i >= 0) list.splice(i, 1)
+  else list.push(d)
+}
+
+/* ── Hotkey rebinding ─────────────────────────────────────────────────── */
+const recordingId = ref<HotkeyId | null>(null)
+const hotkeyError = ref('')
+const MODIFIER_KEYS = ['Meta', 'Control', 'Shift', 'Alt', 'CapsLock']
+
+function effectiveBinding(def: HotkeyDef): Binding {
+  return store.state.hotkeys[def.id] ?? def.defaultBinding
+}
+function isOverridden(id: HotkeyId): boolean {
+  return !!store.state.hotkeys[id]
+}
+function startRecording(id: HotkeyId): void {
+  hotkeyError.value = ''
+  recordingId.value = recordingId.value === id ? null : id
+}
+function cancelRecording(): void {
+  recordingId.value = null
+  hotkeyError.value = ''
+}
+function resetHotkey(id: HotkeyId): void {
+  delete store.state.hotkeys[id]
+  hotkeyError.value = ''
+}
+function resetAllHotkeys(): void {
+  for (const k of Object.keys(store.state.hotkeys)) delete store.state.hotkeys[k as HotkeyId]
+  cancelRecording()
+}
+
+/** While recording, fully sandbox keydown: capture the combo, block the app. */
+function onRecordKey(e: KeyboardEvent): void {
+  const id = recordingId.value
+  if (!id) return
+  e.preventDefault()
+  e.stopImmediatePropagation()
+  if (e.key === 'Escape') return cancelRecording()
+  if (MODIFIER_KEYS.includes(e.key)) return // wait for the non-modifier key
+  if (!(e.metaKey || e.ctrlKey)) {
+    hotkeyError.value = '快捷键需配合 ⌘ 或 Ctrl'
+    return
+  }
+  const b: Binding = { code: e.code, mod: true, ...(e.shiftKey ? { shift: true } : {}) }
+  const conflict = findConflict(id, b, store.state.hotkeys)
+  if (conflict) {
+    hotkeyError.value = `与「${conflict.label}」冲突，请换一个`
+    return
+  }
+  // Recording the default again just clears the override.
+  if (bindingsEqual(b, HOTKEY_BY_ID[id].defaultBinding)) delete store.state.hotkeys[id]
+  else store.state.hotkeys[id] = b
+  recordingId.value = null
+  hotkeyError.value = ''
+}
 
 /** Left-nav sections (ChatGPT-style). */
-type SectionId = 'models' | 'agent' | 'tools' | 'git'
+type SectionId = 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
 const NAV: { id: SectionId; label: string; icon: string }[] = [
   { id: 'models', label: '模型', icon: 'codicon-sparkle' },
   { id: 'agent', label: 'Agent 行为', icon: 'codicon-settings-gear' },
+  { id: 'hotkeys', label: '快捷键', icon: 'codicon-keyboard' },
+  { id: 'health', label: 'KB 健康', icon: 'codicon-pulse' },
   { id: 'tools', label: '外部工具', icon: 'codicon-plug' },
   { id: 'git', label: 'Git & GitHub', icon: 'codicon-github' },
 ]
@@ -30,6 +121,8 @@ const sectionTitle = computed(() => NAV.find((n) => n.id === section.value)?.lab
 function goSection(id: SectionId): void {
   section.value = id
   editing.value = null // leaving the models pane cancels an in-progress edit
+  cancelRecording()
+  resetMcpForm()
 }
 
 /** Only providers with an AI SDK image model can fill the image-generation slot. */
@@ -43,26 +136,51 @@ const isExistingProfile = computed(
   () => !!editing.value && store.state.profiles.some((p) => p.id === editing.value!.id),
 )
 
-/* MCP server add form */
+/* MCP server add / edit form (editMcpId set = editing that server in place) */
 const mcpName = ref('')
 const mcpUrl = ref('')
 const mcpToken = ref('')
+const editMcpId = ref<string | null>(null)
 
-function addMcpServer(): void {
-  if (!mcpUrl.value.trim()) return
-  store.state.mcpServers.push({
-    id: newProfileId(),
-    name: mcpName.value.trim() || 'server',
-    url: mcpUrl.value.trim(),
-    ...(mcpToken.value.trim() ? { token: mcpToken.value.trim() } : {}),
-  })
+function resetMcpForm(): void {
+  editMcpId.value = null
   mcpName.value = ''
   mcpUrl.value = ''
   mcpToken.value = ''
 }
 
+function startEditMcp(s: { id: string; name: string; url: string; token?: string }): void {
+  editMcpId.value = s.id
+  mcpName.value = s.name
+  mcpUrl.value = s.url
+  mcpToken.value = s.token ?? ''
+}
+
+function submitMcpServer(): void {
+  if (!mcpUrl.value.trim()) return
+  const token = mcpToken.value.trim()
+  if (editMcpId.value) {
+    const s = store.state.mcpServers.find((x) => x.id === editMcpId.value)
+    if (s) {
+      s.name = mcpName.value.trim() || 'server'
+      s.url = mcpUrl.value.trim()
+      if (token) s.token = token
+      else delete s.token
+    }
+  } else {
+    store.state.mcpServers.push({
+      id: newProfileId(),
+      name: mcpName.value.trim() || 'server',
+      url: mcpUrl.value.trim(),
+      ...(token ? { token } : {}),
+    })
+  }
+  resetMcpForm()
+}
+
 function removeMcpServer(id: string): void {
   store.state.mcpServers = store.state.mcpServers.filter((s) => s.id !== id)
+  if (editMcpId.value === id) resetMcpForm()
 }
 
 function toggleMcpServer(id: string): void {
@@ -127,7 +245,7 @@ function slotBadges(p: LlmProfile): string[] {
       @click.self="emit('close')"
     >
       <div
-        class="w-[800px] max-w-[95vw] h-[620px] max-h-[88vh] rounded-xl border border-border bg-bg-1 shadow-2xl flex overflow-hidden"
+        class="w-[720px] max-w-[95vw] h-[620px] max-h-[88vh] rounded-xl border border-border bg-bg-1 shadow-2xl flex overflow-hidden"
       >
         <!-- ── Sidebar ─────────────────────────────────────────────────── -->
         <aside class="w-52 shrink-0 border-r border-border bg-bg-2/40 flex flex-col">
@@ -216,15 +334,13 @@ function slotBadges(p: LlmProfile): string[] {
                 </datalist>
               </div>
 
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Label（可选）</label>
-                  <input v-model="editing.label" class="input" :placeholder="autoLabel(editing)" />
-                </div>
-                <div>
-                  <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Max tokens（可选）</label>
-                  <input v-model.number="editing.maxTokens" type="number" class="input" placeholder="默认" />
-                </div>
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Label（可选）</label>
+                <input v-model="editing.label" class="input" :placeholder="autoLabel(editing)" />
+              </div>
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Max tokens（可选）</label>
+                <input v-model.number="editing.maxTokens" type="number" class="input" placeholder="默认" />
               </div>
 
               <p class="text-xs text-fg-3 leading-relaxed">
@@ -334,21 +450,112 @@ function slotBadges(p: LlmProfile): string[] {
             <!-- ▸ Agent behavior -->
             <div v-else-if="section === 'agent'" class="space-y-2">
               <div class="rounded-lg border border-border overflow-hidden">
-                <div class="flex items-center justify-between gap-4 px-3 py-3">
-                  <div class="min-w-0">
-                    <div class="text-sm text-fg-1">写入模式</div>
-                    <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                      先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
-                      Approve 或 Reject。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、
-                      如何提交由你在 Git 面板自行决定。
-                    </div>
+                <div class="px-3 py-3">
+                  <div class="text-sm text-fg-1">写入模式</div>
+                  <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                    先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
+                    Approve 或 Reject。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、
+                    如何提交由你在 Git 面板自行决定。
                   </div>
-                  <select v-model="store.state.writeMode" class="input w-56 shrink-0">
+                  <select v-model="store.state.writeMode" class="input mt-2.5">
                     <option value="auto">直接写入（事后审查）</option>
                     <option value="ask">先询问（每次批准）</option>
                   </select>
                 </div>
               </div>
+            </div>
+
+            <!-- ▸ Hotkeys -->
+            <div v-else-if="section === 'hotkeys'" class="space-y-4">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wide text-fg-3">键盘快捷键</span>
+                <button class="text-xs text-accent hover:underline" @click="resetAllHotkeys">
+                  恢复默认
+                </button>
+              </div>
+              <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                <div
+                  v-for="def in HOTKEYS"
+                  :key="def.id"
+                  class="flex items-center gap-3 px-3 py-2.5"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm text-fg-1">{{ def.label }}</div>
+                    <div v-if="def.hint" class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                      {{ def.hint }}
+                    </div>
+                  </div>
+                  <button
+                    class="shrink-0 min-w-[76px] px-2 py-1 rounded-md border text-xs font-mono text-center transition-colors"
+                    :class="
+                      recordingId === def.id
+                        ? 'border-accent text-accent bg-accent/10'
+                        : 'border-border text-fg-1 hover:bg-bg-2'
+                    "
+                    :title="recordingId === def.id ? '按下新组合键，Esc 取消' : '点击后录制新键位'"
+                    @click="startRecording(def.id)"
+                  >
+                    {{ recordingId === def.id ? '录制中…' : formatBinding(effectiveBinding(def)) }}
+                  </button>
+                  <button
+                    class="shrink-0 text-fg-3 hover:text-fg-0 transition-colors"
+                    :class="{ 'opacity-25 pointer-events-none': !isOverridden(def.id) }"
+                    title="重置为默认"
+                    @click="resetHotkey(def.id)"
+                  >
+                    <span class="codicon codicon-sm codicon-discard" />
+                  </button>
+                </div>
+              </div>
+              <p v-if="hotkeyError" class="text-xs text-removed">{{ hotkeyError }}</p>
+              <p class="text-xs text-fg-3 leading-relaxed">
+                点击右侧键位后按下新组合键（需含 ⌘/Ctrl）。⌘N、⌘M、⌘` 等被浏览器或系统占用时，改用
+                ⌥⌘N、⌥⌘M、⌃` 触发同一命令。改动即时保存。
+              </p>
+            </div>
+
+            <!-- ▸ KB health scope -->
+            <div v-else-if="section === 'health'" class="space-y-4">
+              <div>
+                <span class="text-xs uppercase tracking-wide text-fg-3">检测范围</span>
+                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
+                  KB 健康检查（断链、孤立页）扫描哪些目录。默认检测整个知识库；也可只选某些顶层目录，
+                  比如只查 wiki/、忽略 raw/ 里的对话记录。
+                </p>
+              </div>
+              <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                <button
+                  class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-bg-2 transition-colors"
+                  @click="store.state.healthDirs = []"
+                >
+                  <span
+                    class="codicon codicon-sm shrink-0"
+                    :class="
+                      !store.state.healthDirs.length
+                        ? 'codicon-pass-filled text-accent'
+                        : 'codicon-circle-large-outline text-fg-3'
+                    "
+                  />
+                  <span class="text-fg-1">全部目录</span>
+                </button>
+                <button
+                  v-for="d in kbDirs"
+                  :key="d"
+                  class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-bg-2 transition-colors"
+                  @click="toggleHealthDir(d)"
+                >
+                  <span
+                    class="codicon codicon-sm shrink-0"
+                    :class="
+                      store.state.healthDirs.includes(d)
+                        ? 'codicon-pass-filled text-accent'
+                        : 'codicon-circle-large-outline text-fg-3'
+                    "
+                  />
+                  <span class="font-mono text-xs text-fg-1">{{ d }}/</span>
+                </button>
+              </div>
+              <p v-if="!kbDirs.length" class="text-xs text-fg-3">此知识库暂无子目录。</p>
             </div>
 
             <!-- ▸ External tools (MCP) -->
@@ -375,6 +582,14 @@ function slotBadges(p: LlmProfile): string[] {
                   </span>
                   <template v-if="s.source === 'global'">
                     <button
+                      class="shrink-0"
+                      :class="editMcpId === s.config.id ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
+                      title="编辑"
+                      @click="startEditMcp(s.config)"
+                    >
+                      <span class="codicon codicon-sm codicon-edit" />
+                    </button>
+                    <button
                       class="text-fg-3 hover:text-fg-0 shrink-0"
                       :title="s.config.enabled === false ? '启用' : '停用(保留配置)'"
                       @click="toggleMcpServer(s.config.id)"
@@ -392,11 +607,22 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
               <div v-else class="text-sm text-fg-3">还没有全局工具服务器。</div>
 
-              <div class="grid grid-cols-[100px_1fr_110px_auto] gap-2">
-                <input v-model="mcpName" class="input text-xs" placeholder="名称" />
-                <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp 或 Chrome 扩展 ID" />
-                <input v-model="mcpToken" type="password" class="input text-xs" placeholder="token(可选)" autocomplete="off" />
-                <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="addMcpServer">添加</button>
+              <div>
+                <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent mb-1.5">
+                  <span class="codicon codicon-sm codicon-edit" />
+                  正在编辑「{{ mcpName || 'server' }}」
+                </div>
+                <div class="space-y-2">
+                  <input v-model="mcpName" class="input text-xs" placeholder="名称" />
+                  <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp 或 Chrome 扩展 ID" />
+                  <input v-model="mcpToken" type="password" class="input text-xs" placeholder="token(可选)" autocomplete="off" />
+                  <div class="flex gap-2 pt-0.5">
+                    <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
+                      {{ editMcpId ? '保存' : '添加' }}
+                    </button>
+                    <button v-if="editMcpId" class="btn text-xs" @click="resetMcpForm">取消</button>
+                  </div>
+                </div>
               </div>
               <p class="text-xs text-fg-3 leading-relaxed">
                 服务器必须允许浏览器 CORS;URL 栏填 32 位 Chrome 扩展 ID 则走扩展桥接。这里是
@@ -408,15 +634,13 @@ function slotBadges(p: LlmProfile): string[] {
 
             <!-- ▸ Git & GitHub -->
             <div v-else-if="section === 'git'" class="space-y-4 max-w-md">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 作者名</label>
-                  <input v-model="store.state.gitName" class="input" placeholder="（默认读仓库 git config）" />
-                </div>
-                <div>
-                  <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 邮箱</label>
-                  <input v-model="store.state.gitEmail" class="input" placeholder="you@example.com" />
-                </div>
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 作者名</label>
+                <input v-model="store.state.gitName" class="input" placeholder="（默认读仓库 git config）" />
+              </div>
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 邮箱</label>
+                <input v-model="store.state.gitEmail" class="input" placeholder="you@example.com" />
               </div>
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">GitHub Token（push 需要；pull 公开仓库可不填）</label>

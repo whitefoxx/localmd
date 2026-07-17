@@ -20,6 +20,7 @@ import {
   needsBaseUrl,
 } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
+import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
 
 export interface LlmProfile {
@@ -52,6 +53,10 @@ export interface SettingsState {
   writeMode: 'auto' | 'ask'
   /** Remote MCP servers (Streamable HTTP; must allow browser CORS). */
   mcpServers: McpServerConfig[]
+  /** User keyboard-shortcut overrides (id → binding); absent = registry default. */
+  hotkeys: HotkeyOverrides
+  /** Top-level dirs the KB health check is scoped to; empty = whole KB. */
+  healthDirs: string[]
 }
 
 const STORAGE_KEY = 'browser-md:settings'
@@ -74,6 +79,8 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   githubToken: '',
   writeMode: 'auto',
   mcpServers: [],
+  hotkeys: {},
+  healthDirs: [],
 }
 
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
@@ -83,6 +90,10 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     githubToken: String(obj.githubToken ?? ''),
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
     mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
+    hotkeys: normalizeHotkeyOverrides(obj.hotkeys),
+    healthDirs: Array.isArray(obj.healthDirs)
+      ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
+      : [],
   }
 }
 
