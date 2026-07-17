@@ -84,9 +84,11 @@ const viewImageSchema = z.object({
 export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   const model = toLanguageModel(opts.profile)
   const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent }
-  // Monotonic id per turn correlating an external tool's start with its result
-  // so the UI can show a spinner + timer. Subagents wrap onEvent and drop ids.
+  // Monotonic id per turn correlating a tool's start with its result so the UI
+  // can show a spinner + timer (git push / image gen etc. can be slow — the user
+  // needs to see it's working). Subagents wrap onEvent and drop ids.
   let toolSeq = 0
+  const nextToolId = (): number => toolSeq++
 
   // Built-in + view_image + run_subagent tools (always active).
   const tools: ToolSet = {}
@@ -95,18 +97,24 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
       description: t.description,
       inputSchema: t.schema,
       execute: async (input) => {
-        opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(input) })
+        const id = nextToolId()
+        opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(input), id })
+        let ok = false
         try {
-          return await t.run(input, ctx)
+          const result = await t.run(input, ctx)
+          ok = !(typeof result === 'string' && result.startsWith('Error'))
+          return result
         } catch (err) {
           return `Error: ${(err as Error).message}`
+        } finally {
+          opts.onEvent({ type: 'tool_result', id, ok })
         }
       },
     })
   }
-  if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts)
-  if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts)
-  if (opts.allowSubagent) tools['run_subagent'] = buildSubagentTool(opts)
+  if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts, nextToolId)
+  if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts, nextToolId)
+  if (opts.allowSubagent) tools['run_subagent'] = buildSubagentTool(opts, nextToolId)
   const staticNames = Object.keys(tools)
 
   // Register EVERY external tool (active + deferred) so a deferred one can be
@@ -117,7 +125,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
       inputSchema: jsonSchema(ext.jsonSchema),
       execute: async (input) => {
         const args = (input ?? {}) as Record<string, unknown>
-        const id = toolSeq++
+        const id = nextToolId()
         opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(args), id, args })
         let ok = false
         try {
@@ -241,6 +249,7 @@ async function loadImages(paths: string[]): Promise<{ images: KbImage[]; missing
 function buildViewImageTool(
   vision: { profile: LlmProfile; inline: boolean },
   opts: RunTurnOptions,
+  nextToolId: () => number,
 ): ToolSet[string] {
   if (vision.inline) {
     // Multimodal primary: return the images as file tool-result parts; the AI
@@ -251,16 +260,23 @@ function buildViewImageTool(
         'Look at image files from the knowledge base (screenshots, figures, photos). Pass KB-relative paths; the images are returned to you visually. Only call this when you actually need to see image content.',
       inputSchema: viewImageSchema,
       execute: async ({ paths }) => {
-        opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}` })
-        const { images, missing } = await loadImages(paths)
-        if (!images.length) {
-          return {
-            error: `no readable images (not found or unsupported format): ${missing.join(', ')}`,
+        const id = nextToolId()
+        opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}`, id })
+        let ok = false
+        try {
+          const { images, missing } = await loadImages(paths)
+          if (!images.length) {
+            return {
+              error: `no readable images (not found or unsupported format): ${missing.join(', ')}`,
+            }
           }
-        }
-        return {
-          images,
-          note: missing.length ? `(unreadable, skipped: ${missing.join(', ')})` : '',
+          ok = true
+          return {
+            images,
+            note: missing.length ? `(unreadable, skipped: ${missing.join(', ')})` : '',
+          }
+        } finally {
+          opts.onEvent({ type: 'tool_result', id, ok })
         }
       },
       toModelOutput: ({ output }) => {
@@ -287,17 +303,24 @@ function buildViewImageTool(
       '查看知识库中图片文件的实际内容(视觉理解)。传 KB 相对路径,如 ["raw/images/capture-123.png"]。仅当需要分析图片内容时调用。',
     inputSchema: viewImageSchema,
     execute: async ({ paths, purpose }) => {
-      opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}` })
-      const { images, missing } = await loadImages(paths)
-      if (!images.length) {
-        return `Error: no readable images (not found or unsupported format): ${missing.join(', ')}`
-      }
-      const note = missing.length ? `\n\n(unreadable, skipped: ${missing.join(', ')})` : ''
+      const id = nextToolId()
+      opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}`, id })
+      let ok = false
       try {
-        const desc = await visionDescribe(vision.profile, images, purpose ?? '', opts.signal)
-        return `${desc}${note}`
-      } catch (err) {
-        return `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+        const { images, missing } = await loadImages(paths)
+        if (!images.length) {
+          return `Error: no readable images (not found or unsupported format): ${missing.join(', ')}`
+        }
+        const note = missing.length ? `\n\n(unreadable, skipped: ${missing.join(', ')})` : ''
+        try {
+          const desc = await visionDescribe(vision.profile, images, purpose ?? '', opts.signal)
+          ok = true
+          return `${desc}${note}`
+        } catch (err) {
+          return `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+        }
+      } finally {
+        opts.onEvent({ type: 'tool_result', id, ok })
       }
     },
   })
@@ -305,7 +328,11 @@ function buildViewImageTool(
 
 /* ── generate_image ──────────────────────────────────────────────────────── */
 
-function buildGenerateImageTool(profile: LlmProfile, opts: RunTurnOptions): ToolSet[string] {
+function buildGenerateImageTool(
+  profile: LlmProfile,
+  opts: RunTurnOptions,
+  nextToolId: () => number,
+): ToolSet[string] {
   return tool({
     description:
       'Generate an image from a text prompt and save it into the knowledge base (raw/images/). Use it when the user asks for a picture, illustration, diagram-as-image, icon, cover, etc. The saved image is shown to the user as a card — do not describe or paste it back.',
@@ -317,16 +344,21 @@ function buildGenerateImageTool(profile: LlmProfile, opts: RunTurnOptions): Tool
         .describe('Optional size like "1024x1024" (provider-dependent)'),
     }),
     execute: async ({ prompt, size }) => {
-      opts.onEvent({ type: 'tool', name: 'generate_image', detail: `image: ${prompt.slice(0, 60)}` })
+      const id = nextToolId()
+      opts.onEvent({ type: 'tool', name: 'generate_image', detail: `image: ${prompt.slice(0, 60)}`, id })
+      let ok = false
       try {
         const { path } = await generateKbImage(profile, prompt, { size, signal: opts.signal })
         // Reflect the new file in the tree, then show the image inline in chat.
         const { useFilesStore } = await import('@/stores/files')
         await useFilesStore().refreshTree()
         opts.onEvent({ type: 'image', path })
+        ok = true
         return `已生成图片并保存到 ${path}(已作为图片卡片展示给用户)。如需可 view_image 查看,勿重复粘贴内容。`
       } catch (err) {
         return `图像生成失败(${profile.model}):${(err as Error).message}`
+      } finally {
+        opts.onEvent({ type: 'tool_result', id, ok })
       }
     },
   })
@@ -334,7 +366,7 @@ function buildGenerateImageTool(profile: LlmProfile, opts: RunTurnOptions): Tool
 
 /* ── run_subagent ────────────────────────────────────────────────────────── */
 
-function buildSubagentTool(opts: RunTurnOptions): ToolSet[string] {
+function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): ToolSet[string] {
   return tool({
     description:
       'Delegate scoped, self-contained subtasks to subagents with fresh contexts and the same KB tools (they cannot spawn subagents). Use it for work that would flood your context — surveying many files, summarizing long documents, independent research questions. INDEPENDENT tasks run in parallel — pass them together in one call. Each task description must be complete and self-contained; you receive only the final answers.',
@@ -346,41 +378,51 @@ function buildSubagentTool(opts: RunTurnOptions): ToolSet[string] {
         .describe('1-5 self-contained subtask descriptions; independent tasks run concurrently'),
     }),
     execute: async ({ tasks }) => {
+      const id = nextToolId()
       opts.onEvent({
         type: 'tool',
         name: 'run_subagent',
         detail: tasks.length === 1 ? `subagent: ${tasks[0].slice(0, 80)}` : `subagents ×${tasks.length}`,
+        id,
       })
-      const results = await mapLimit(tasks, 3, async (task: string, i: number) => {
-        const tag = tasks.length > 1 ? `[${i + 1}]` : ''
-        const history = await runTurn({
-          ...opts,
-          system: opts.system + SUBAGENT_SYSTEM_SUFFIX,
-          messages: [{ role: 'user', content: task }],
-          allowSubagent: false,
-          onEvent: (e) => {
-            // Surface tool activity (indented) and usage; the subagent's text
-            // comes back as this tool's result.
-            if (e.type === 'tool') {
-              opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
-            } else if (e.type === 'usage') {
-              opts.onEvent(e)
-            }
-          },
+      let ok = false
+      try {
+        const results = await mapLimit(tasks, 3, async (task: string, i: number) => {
+          const tag = tasks.length > 1 ? `[${i + 1}]` : ''
+          const history = await runTurn({
+            ...opts,
+            system: opts.system + SUBAGENT_SYSTEM_SUFFIX,
+            messages: [{ role: 'user', content: task }],
+            allowSubagent: false,
+            onEvent: (e) => {
+              // Surface tool activity (indented) and usage; the subagent's text
+              // comes back as this tool's result.
+              if (e.type === 'tool') {
+                opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
+              } else if (e.type === 'usage') {
+                opts.onEvent(e)
+              }
+            },
+          })
+          return lastAssistantText(history) || '(subagent returned no text)'
         })
-        return lastAssistantText(history) || '(subagent returned no text)'
-      })
-      if (tasks.length === 1) {
-        const r = results[0]
-        return r instanceof Error ? `Subagent failed: ${r.message}` : r
+        // Per-task failures come back embedded in the text, so reaching here is
+        // a successful tool call.
+        ok = true
+        if (tasks.length === 1) {
+          const r = results[0]
+          return r instanceof Error ? `Subagent failed: ${r.message}` : r
+        }
+        return tasks
+          .map((t, i) => {
+            const r = results[i]
+            const body = r instanceof Error ? `(failed: ${r.message})` : r
+            return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
+          })
+          .join('\n\n')
+      } finally {
+        opts.onEvent({ type: 'tool_result', id, ok })
       }
-      return tasks
-        .map((t, i) => {
-          const r = results[i]
-          const body = r instanceof Error ? `(failed: ${r.message})` : r
-          return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
-        })
-        .join('\n\n')
     },
   })
 }

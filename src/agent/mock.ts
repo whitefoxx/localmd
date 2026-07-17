@@ -23,6 +23,8 @@ export interface MockTurnOptions {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+let mockToolSeq = 0
+
 async function streamText(text: string, onEvent: AgentEventHandler): Promise<void> {
   for (const chunk of text.match(/.{1,8}/gs) ?? []) {
     onEvent({ type: 'text', delta: chunk })
@@ -37,8 +39,16 @@ async function runTool(
 ): Promise<string> {
   const spec = TOOLS.find((t) => t.name === name)
   if (!spec) return `Error: unknown tool ${name}`
-  opts.onEvent({ type: 'tool', name, detail: spec.describeCall(args) })
-  return await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
+  const id = mockToolSeq++
+  opts.onEvent({ type: 'tool', name, detail: spec.describeCall(args), id })
+  let ok = false
+  try {
+    const result = await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
+    ok = !(typeof result === 'string' && result.startsWith('Error'))
+    return result
+  } finally {
+    opts.onEvent({ type: 'tool_result', id, ok })
+  }
 }
 
 export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]> {

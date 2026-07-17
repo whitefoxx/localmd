@@ -189,8 +189,8 @@ function toolTime(part: ToolPart): string {
 }
 
 /** Per-tool glyph so the transcript reads at a glance instead of a wall of
- *  identical wrenches. External MCP tools carry a status, so they keep the
- *  spinner/check/error markers; built-in (status-less) tools map by name. */
+ *  identical wrenches. While a tool runs it shows a spinner; once done, built-in
+ *  tools settle back to their own glyph (below) and MCP tools show a check. */
 const TOOL_ICONS: Record<string, string> = {
   list_files: 'codicon-list-tree',
   read_file: 'codicon-file',
@@ -217,8 +217,9 @@ const TOOL_ICONS: Record<string, string> = {
 function toolIcon(part: ToolPart): string {
   if (part.status === 'running') return 'codicon-loading codicon-modifier-spin'
   if (part.status === 'error') return 'codicon-error'
-  if (part.status === 'done') return 'codicon-pass'
-  if (part.name.startsWith('mcp__')) return 'codicon-plug'
+  // MCP tools have no per-name glyph, so a finished one shows a check; built-in
+  // tools fall through to their own icon (spinner only shows while running).
+  if (part.name.startsWith('mcp__')) return part.status === 'done' ? 'codicon-pass' : 'codicon-plug'
   return TOOL_ICONS[part.name] ?? 'codicon-tools'
 }
 
