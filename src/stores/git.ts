@@ -124,27 +124,6 @@ export const useGitStore = defineStore('git', () => {
     await refresh()
   }
 
-  /** Restore the files a checkpoint commit touched to their pre-checkpoint
-   *  state (worktree only — the user reviews and commits the revert). */
-  async function revertCheckpoint(oid: string): Promise<void> {
-    if (busy.value) return
-    busy.value = 'revert'
-    error.value = ''
-    try {
-      const paths = await withGitLock(() => g.revertCommitInWorktree(oid), { onWait: noteWait })
-      lastSync.value = `已还原 ${paths.length} 个文件到 ${oid.slice(0, 7)} 之前(未提交,可在 Changes 里确认)`
-      const files = useFilesStore()
-      await files.refreshTree()
-      for (const p of paths) await files.reloadIfClean(p)
-    } catch (err) {
-      error.value = (err as Error).message
-    } finally {
-      busy.value = null
-      progress.value = ''
-    }
-    await refresh()
-  }
-
   async function sync(direction: 'push' | 'pull'): Promise<void> {
     if (busy.value) return
     const settings = useSettingsStore()
@@ -200,7 +179,6 @@ export const useGitStore = defineStore('git', () => {
     dirStatus,
     refresh,
     commit,
-    revertCheckpoint,
     sync,
   }
 })

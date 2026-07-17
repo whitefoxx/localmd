@@ -201,7 +201,6 @@ const TOOL_ICONS: Record<string, string> = {
   view_image: 'codicon-device-camera',
   generate_image: 'codicon-file-media',
   compact: 'codicon-fold',
-  checkpoint: 'codicon-git-commit',
   git_status: 'codicon-source-control',
   git_diff: 'codicon-diff',
   git_log: 'codicon-history',

@@ -14,7 +14,6 @@ export async function bootstrapE2e(): Promise<void> {
   ]
   settings.state.slots = { primary: 'mock' }
   settings.state.mcpServers = []
-  settings.state.checkpointMode = 'off'
   settings.state.writeMode = 'auto'
 
   const kb = useKbStore()

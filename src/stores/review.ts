@@ -33,26 +33,7 @@ export const useReviewStore = defineStore('review', () => {
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
 
-  /** Paths written during each session's CURRENT turn (for git checkpoints).
-   *  Keyed by session so concurrent turns don't pollute each other's set. */
-  const turnWrites = ref(new Map<string, Set<string>>())
-
-  function beginTurn(sessionId: string): void {
-    turnWrites.value.set(sessionId, new Set())
-  }
-
-  function turnWritesFor(sessionId: string): string[] {
-    return [...(turnWrites.value.get(sessionId) ?? [])]
-  }
-
-  function clearTurn(sessionId: string): void {
-    turnWrites.value.delete(sessionId)
-  }
-
-  function recordWrite(sessionId: string, path: string, before: string | null, after: string): void {
-    let set = turnWrites.value.get(sessionId)
-    if (!set) turnWrites.value.set(sessionId, (set = new Set()))
-    set.add(path)
+  function recordWrite(path: string, before: string | null, after: string): void {
     const existing = pending.value.get(path)
     if (existing) {
       existing.after = after // keep the original `before` snapshot
@@ -149,9 +130,6 @@ export const useReviewStore = defineStore('review', () => {
     panelOpen,
     changes,
     count,
-    beginTurn,
-    turnWritesFor,
-    clearTurn,
     recordWrite,
     askApproval,
     decide,
