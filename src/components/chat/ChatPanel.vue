@@ -14,6 +14,7 @@ import { parseCiteSources } from '@/lib/citations'
 import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
+import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
 import type { MessagePart } from '@/stores/chat'
 
@@ -355,6 +356,33 @@ function userText(m: { parts: MessagePart[] }): string {
   return p?.type === 'text' ? p.text : ''
 }
 
+/** Save the current conversation as a KB file. The user picks the location and
+ *  can rename it in the browser's save dialog; the default name is the session's
+ *  own title. If saved inside the open KB, refresh the tree so it shows up. */
+const sessionSaved = ref('')
+async function saveSession(): Promise<void> {
+  const r = chat.renderSession()
+  if (!r) return
+  const root = fs.getRoot()
+  let handle: FileSystemFileHandle
+  try {
+    handle = await window.showSaveFilePicker({
+      suggestedName: r.name,
+      startIn: root,
+      types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+    })
+  } catch (e) {
+    if ((e as DOMException).name === 'AbortError') return // user cancelled
+    throw e
+  }
+  const w = await handle.createWritable()
+  await w.write(r.content)
+  await w.close()
+  if (await root.resolve(handle)) void files.refreshTree()
+  sessionSaved.value = handle.name
+  window.setTimeout(() => (sessionSaved.value = ''), 2500)
+}
+
 async function send(): Promise<void> {
   if (!settingsStore.isConfigured()) {
     emit('openSettings')
@@ -490,6 +518,14 @@ watch(
     <div class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
       <span class="codicon codicon-sm codicon-sparkle text-accent" />
       <span class="text-xs uppercase tracking-wide text-fg-3 flex-1">Agent</span>
+      <button
+        class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
+        title="保存会话到文件(可选目录、可改名)"
+        :disabled="!chat.messages.length"
+        @click="saveSession"
+      >
+        <span class="codicon codicon-sm codicon-download" />
+      </button>
       <button class="text-fg-3 hover:text-fg-0" title="New chat" @click="chat.newSession()">
         <span class="codicon codicon-sm codicon-add" />
       </button>
@@ -521,6 +557,14 @@ watch(
         <span class="codicon codicon-sm codicon-chevron-right" />
         <span class="codicon codicon-sm codicon-chevron-right -ml-[9px]" />
       </button>
+    </div>
+
+    <!-- Session-saved toast -->
+    <div
+      v-if="sessionSaved"
+      class="absolute top-11 left-1/2 -translate-x-1/2 z-20 rounded-md border border-border bg-bg-3 px-3 py-1.5 text-xs text-fg-1 shadow-lg"
+    >
+      已保存会话 · {{ sessionSaved }}
     </div>
 
     <!-- Session tabs (concurrent chats). Tabs shrink evenly to fit the panel

@@ -13,6 +13,7 @@ const AGENTS_MD = `# 知识库说明(AGENTS.md)
 
 \`\`\`
 raw/    ← 不可变的源文件(文章、书、图片、数据)。只读,不要修改
+raw/conversations/ ← 保存下来的会话记录(type: chat),就是普通 md 文件(保存位置可自选)。蒸馏时把讨论里的结论提炼进 wiki
 wiki/   ← LLM 维护的 markdown 页面。用 [[wikilinks]] 互相链接
 wiki/index.md ← 入口页,新页面要从这里可达
 .agents/skills/ ← 可复用的工作流(SKILL.md)
@@ -67,11 +68,29 @@ description: 检查知识库健康度——孤儿页、断链、缺失索引项�
 4. 先列出全部问题再动手修;修复需逐项说明。
 `
 
+const SKILL_HARVEST = `---
+name: harvest
+description: 蒸馏一段讨论——把其中的结论、决策、想法提炼进 wiki 笔记
+---
+
+# Harvest 流程
+
+对象:一段讨论。可以是**当前对话**的内容,也可以是用户 @ 指定的任意文件(比如之前保存的会话文件——当普通文件处理即可,无需特殊对待)。
+
+1. 通读要蒸馏的内容,提炼值得留存的结论、决策、想法——是提炼,不是复述对话。
+2. 按主题合并进 wiki 已有页面(优先),必要时新建页面并链入索引。
+3. 若来源是 KB 里的文件,在写入的笔记里用 [[链接]] 指回来源,方便日后复核。
+4. 汇报:蒸馏出了什么、写进了哪里、跳过了什么。
+
+没有值得蒸馏的内容也是正常结果,如实说明即可。
+`
+
 const FILES: Array<[string, string]> = [
   ['AGENTS.md', AGENTS_MD],
   ['wiki/index.md', INDEX_MD],
   ['.agents/skills/ingest/SKILL.md', SKILL_INGEST],
   ['.agents/skills/lint/SKILL.md', SKILL_LINT],
+  ['.agents/skills/harvest/SKILL.md', SKILL_HARVEST],
   ['raw/articles/.gitkeep', ''],
   ['raw/books/.gitkeep', ''],
   ['raw/images/.gitkeep', ''],

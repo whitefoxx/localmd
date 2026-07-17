@@ -24,6 +24,7 @@ import {
 } from '@/lib/history'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
 import { loadSkill } from '@/lib/skills'
+import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib/transcript'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
@@ -285,6 +286,17 @@ export const useChatStore = defineStore('chat', () => {
     delete snapshot.running
     await idb.saveSession(snapshot)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
+  }
+
+  /** Render the current (or given) session as a markdown snapshot plus a default
+   *  file name. The UI's "save session" button writes it wherever the user picks;
+   *  the agent's save_transcript tool writes it into the KB. Null when empty. */
+  function renderSession(
+    id: string | null = activeId.value,
+  ): { name: string; content: string } | null {
+    const s = tabs.value.find((t) => t.id === id)
+    if (!s || !s.uiMessages.length) return null
+    return { name: sessionFileName(s.title, s.createdAt), content: renderTranscriptFile(s) }
   }
 
   /** Stop a single session's turn (the active one by default). Only that
@@ -746,5 +758,6 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     activateTab,
     closeTab,
+    renderSession,
   }
 })

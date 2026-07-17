@@ -291,6 +291,29 @@ const indexDocument = defineTool({
   },
 })
 
+const saveTranscript = defineTool({
+  name: 'save_transcript',
+  description:
+    'Save THIS conversation as a markdown file in the knowledge base. Use when the user asks to save, record, or archive the chat. It is a plain snapshot — a normal KB file. Defaults to raw/conversations/browser-md/<session title>.md; pass `path` to save elsewhere. Returns the saved path.',
+  schema: z.object({
+    path: z
+      .string()
+      .optional()
+      .describe('KB-relative destination, e.g. "wiki/notes/chat.md". Defaults under raw/conversations/browser-md/.'),
+  }),
+  describeCall: (a) => `save session${a.path ? ` → ${a.path}` : ''}`,
+  run: async ({ path }, ctx) => {
+    const { useChatStore } = await import('@/stores/chat')
+    const { TRANSCRIPT_DIR } = await import('@/lib/transcript')
+    const r = useChatStore().renderSession(ctx.sessionId)
+    if (!r) return 'Nothing to save — the conversation is empty.'
+    const target = path ?? `${TRANSCRIPT_DIR}/${r.name}`
+    await fs.writeFile(target, r.content)
+    await useFilesStore().refreshTree()
+    return `Session saved to ${target}`
+  },
+})
+
 const enableTools = defineTool({
   name: 'enable_tools',
   description:
@@ -570,6 +593,7 @@ export const TOOLS: ToolSpec[] = [
   searchFiles,
   kbHealth,
   indexDocument,
+  saveTranscript,
   updatePlan,
   useSkill,
   enableTools,
