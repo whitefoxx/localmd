@@ -766,20 +766,29 @@ watch(
           v-if="m.role === 'user'"
           class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable text-fg-0"
         >
-          <div v-if="userText(m)" class="whitespace-pre-wrap">{{ userText(m) }}</div>
-          <div v-if="m.contexts?.length" class="flex flex-wrap gap-1.5" :class="{ 'mt-1.5': userText(m) }">
-            <button
-              v-for="(c, i) in m.contexts"
-              :key="`c${i}`"
-              class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
-              :class="c.file ? 'hover:text-fg-0' : 'cursor-default'"
-              :title="c.text"
-              @click="c.file && files.openFile(c.file)"
-            >
-              <span class="codicon codicon-sm codicon-quote" />
-              <span class="truncate max-w-[160px]">{{ c.file ? baseName(c.file) : 'Agent 回复' }}</span>
-            </button>
+          <!-- Quoted passages the user attached — shown above the message. Each
+               chip carries a snippet of the selected text; hovering reveals the
+               full passage (the agent always received the full text). -->
+          <div v-if="m.contexts?.length" class="flex flex-wrap gap-1.5" :class="{ 'mb-1.5': userText(m) }">
+            <div v-for="(c, i) in m.contexts" :key="`c${i}`" class="group/ctx relative max-w-full">
+              <button
+                class="flex items-center gap-1 max-w-full text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+                :class="c.file ? 'hover:text-fg-0' : 'cursor-default'"
+                @click="c.file && files.openFile(c.file)"
+              >
+                <span class="codicon codicon-sm codicon-quote shrink-0" />
+                <span class="shrink-0 font-medium">{{ c.file ? baseName(c.file) : 'Agent 回复' }}</span>
+                <span class="text-fg-3 shrink-0">·</span>
+                <span class="truncate max-w-[220px] text-fg-3 italic">{{ snippet(c.text) }}</span>
+              </button>
+              <div
+                class="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden group-hover/ctx:block w-max max-w-[320px] max-h-[360px] overflow-hidden rounded-md border border-border bg-bg-0 px-2.5 py-2 text-xs text-fg-1 shadow-lg whitespace-pre-wrap break-words"
+              >
+                {{ c.text }}
+              </div>
+            </div>
           </div>
+          <div v-if="userText(m)" class="whitespace-pre-wrap">{{ userText(m) }}</div>
           <div v-if="m.attachments?.length" class="flex flex-wrap gap-1.5 mt-1.5">
             <button
               v-for="(a, i) in m.attachments"
@@ -1022,8 +1031,11 @@ watch(
       </div>
 
       <!-- ChatGPT-style composer: one rounded frame holding the attachment
-           chips, the borderless textarea, and the +/model/send action row. -->
+           chips, the borderless textarea, and the +/model/send action row.
+           data-composer marks it so focusing here (clicking the input box) never
+           drops a staged quote — see useFileSelectionCapture. -->
       <div
+        data-composer
         class="rounded-xl border bg-bg-0 focus-within:border-accent transition-colors"
         :class="dragOver ? 'border-accent' : 'border-border'"
       >

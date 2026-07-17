@@ -30,6 +30,21 @@ export function useFileSelectionCapture(): void {
     return undefined
   }
 
+  /** True when focus (or the collapsed selection) has moved into the composer —
+   *  the input box, its action row, or a staged chip. Clicking there collapses
+   *  the page selection but must NOT drop the staged quote: the user is about to
+   *  type their question about it. Only a deselect that lands *outside* the
+   *  composer clears transient chips. */
+  function inComposer(): boolean {
+    const inside = (n: Node | null | undefined): boolean => {
+      const el = n instanceof Element ? n : n?.parentElement
+      return !!el?.closest('[data-composer]')
+    }
+    if (inside(document.activeElement)) return true
+    const sel = window.getSelection()
+    return inside(sel?.anchorNode) || inside(sel?.focusNode)
+  }
+
   function onSelectionChange(): void {
     if (!ui.agentOpen) return
     clearTimeout(timer)
@@ -43,7 +58,7 @@ export function useFileSelectionCapture(): void {
       src = f !== undefined ? f : sourceOf(sel.anchorNode)
     }
     if (src === undefined) {
-      composer.clearTransient()
+      if (!inComposer()) composer.clearTransient()
       return
     }
     const source = src
