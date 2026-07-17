@@ -213,6 +213,22 @@
   @apply text-accent hover:underline cursor-pointer font-mono text-[0.9em];
 }
 
+/* Injected reply-citation superscript — the numbered marker after a file/URL
+ * reference in an agent answer, matching the Sources list under the message. */
+.md-preview sup.src-cite {
+  @apply align-super;
+  line-height: 0;
+}
+.md-preview sup.src-cite a.src-cite-ref {
+  @apply inline-flex items-center justify-center no-underline cursor-pointer;
+  @apply ml-0.5 px-1 rounded text-[0.7em] font-medium leading-none;
+  @apply bg-accent/15 text-accent;
+  text-decoration: none;
+}
+.md-preview sup.src-cite a.src-cite-ref:hover {
+  @apply bg-accent/30;
+}
+
 /* pdf.js text layer — minimal version of pdf.js's official text_layer CSS. */
 .textLayer {
   position: absolute;

@@ -11,6 +11,7 @@ import { useComposerStore } from '@/stores/composer'
 import { useFileSelectionCapture } from '@/lib/selectionContext'
 import { renderMarkdown } from '@/lib/markdown'
 import { parseCiteSources } from '@/lib/citations'
+import { classifyAnchor, createSourceCollector, type Source } from '@/lib/sources'
 import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
@@ -355,6 +356,89 @@ function renderPart(part: MessagePart & { type: 'text' }): string {
   )
 }
 
+/* ── reply citations (superscripts + Sources footer) ─────────────────────────
+ * The references an agent leaves in a reply — [[wikilinks]] to KB files and
+ * links to external URLs — become numbered citations: a superscript after each
+ * reference, plus a Sources list under the message. Numbering is shared across
+ * a message's text parts. Result is memoized per message (keyed by the reactive
+ * object, invalidated by a content signature) so replies above a streaming one
+ * aren't re-parsed on every delta. */
+interface ReplyRender {
+  html: Map<number, string>
+  sources: Source[]
+}
+const citeCache = new WeakMap<UiMessage, { sig: string; value: ReplyRender }>()
+
+/** Inject a numbered superscript after every citable anchor in one part's HTML,
+ *  registering each source with the shared collector. */
+function annotateHtml(html: string, collector: ReturnType<typeof createSourceCollector>): string {
+  if (!html.includes('<a')) return html
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.body.querySelectorAll('a').forEach((a) => {
+      const src = classifyAnchor({
+        classes: Array.from(a.classList),
+        href: a.getAttribute('href'),
+        dataTarget: a.dataset.target,
+        dataResolved: a.dataset.resolved,
+        text: a.textContent ?? '',
+      })
+      if (!src) return
+      const n = collector.collect(src)
+      const sup = doc.createElement('sup')
+      sup.className = 'src-cite'
+      const ref = doc.createElement('a')
+      ref.href = '#'
+      ref.className = 'src-cite-ref'
+      ref.textContent = String(n)
+      ref.title = src.target
+      if (src.kind === 'url') ref.dataset.srcUrl = src.target
+      else ref.dataset.srcPath = src.target
+      sup.appendChild(ref)
+      a.after(sup)
+    })
+    return doc.body.innerHTML
+  } catch {
+    return html // never let a parse hiccup drop the reply
+  }
+}
+
+function annotateAssistant(m: UiMessage): ReplyRender {
+  const sig =
+    m.parts.map((p) => (p.type === 'text' ? p.text : ` ${p.type}`)).join('') +
+    `|${[...sessionCiteSources.value.keys()].join(',')}|${files.allFiles.length}`
+  const cached = citeCache.get(m)
+  if (cached && cached.sig === sig) return cached.value
+  const collector = createSourceCollector()
+  const html = new Map<number, string>()
+  m.parts.forEach((part, i) => {
+    if (part.type === 'text') html.set(i, annotateHtml(renderPart(part), collector))
+  })
+  const value: ReplyRender = { html, sources: collector.sources }
+  citeCache.set(m, { sig, value })
+  return value
+}
+
+/** Open a footer/superscript source: a URL in a new tab, a KB file in the app. */
+async function openSource(s: Source): Promise<void> {
+  if (s.kind === 'url') {
+    window.open(s.target, '_blank', 'noopener')
+    return
+  }
+  const rel = files.resolveMarkdownLink('', s.target) ?? s.target
+  if (rel) await files.openFile(rel)
+}
+
+/** Compact display of a URL for the Sources list (host + path, no scheme). */
+function prettyUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    return u.host + (u.pathname && u.pathname !== '/' ? u.pathname : '')
+  } catch {
+    return url
+  }
+}
+
 function userText(m: { parts: MessagePart[] }): string {
   const p = m.parts[0]
   return p?.type === 'text' ? p.text : ''
@@ -460,6 +544,12 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
     const path = a.dataset.citePath
     if (path) await citations.openCitation(path, a.dataset.block ?? null)
     else if (a.dataset.block) await citations.openByBlock(a.dataset.block)
+    return
+  }
+  // Injected reply-citation superscript → jump to its source.
+  if (a.classList.contains('src-cite-ref')) {
+    if (a.dataset.srcUrl) window.open(a.dataset.srcUrl, '_blank', 'noopener')
+    else if (a.dataset.srcPath) await openSource({ kind: 'file', target: a.dataset.srcPath, n: 0, label: '' })
     return
   }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {
@@ -778,8 +868,42 @@ watch(
             </button>
             <KbImageThumb v-else-if="part.type === 'image'" :path="part.path" />
             <!-- eslint-disable-next-line vue/no-v-html -->
-            <div v-else class="md-preview text-sm" v-html="renderPart(part)" @click="onPreviewClick" />
+            <div
+              v-else
+              class="md-preview text-sm"
+              v-html="annotateAssistant(m).html.get(i) ?? ''"
+              @click="onPreviewClick"
+            />
           </template>
+          <!-- Sources: files / URLs the reply referenced, numbered to match the
+               inline superscripts. Click jumps to the file or opens the URL. -->
+          <div
+            v-if="annotateAssistant(m).sources.length"
+            class="mt-2 pt-2 border-t border-border/60"
+          >
+            <div class="text-[11px] uppercase tracking-wide text-fg-3 mb-1">来源</div>
+            <div class="flex flex-col gap-1">
+              <button
+                v-for="s in annotateAssistant(m).sources"
+                :key="s.n"
+                class="group flex items-baseline gap-1.5 text-left text-xs text-fg-2 hover:text-fg-0"
+                :title="s.target"
+                @click="openSource(s)"
+              >
+                <span
+                  class="shrink-0 w-4 h-4 inline-flex items-center justify-center rounded bg-accent/15 text-accent text-[10px] font-medium leading-none"
+                >{{ s.n }}</span>
+                <span class="min-w-0 truncate">
+                  {{ s.label }}
+                  <span class="text-fg-3 group-hover:text-fg-2">· {{ s.kind === 'url' ? prettyUrl(s.target) : s.target }}</span>
+                </span>
+                <span
+                  class="codicon codicon-sm shrink-0 opacity-0 group-hover:opacity-60"
+                  :class="s.kind === 'url' ? 'codicon-link-external' : 'codicon-go-to-file'"
+                />
+              </button>
+            </div>
+          </div>
           <div v-if="m.error" class="text-xs text-removed">{{ m.error }}</div>
           <div
             v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length"
