@@ -6,8 +6,9 @@ export type AgentEvent =
    *  (spinner + live timer) until the matching `tool_result` arrives — used for
    *  external MCP tools, which can take anywhere from instant to minutes. */
   | { type: 'tool'; name: string; detail: string; id?: number; args?: Record<string, unknown> }
-  /** A previously-started (id-bearing) tool call finished. */
-  | { type: 'tool_result'; id: number; ok: boolean }
+  /** A previously-started (id-bearing) tool call finished. `result` is the raw
+   *  output string (the UI caps it) so the transcript can show what it returned. */
+  | { type: 'tool_result'; id: number; ok: boolean; result?: string }
   /** Per-API-request token usage (a turn with tool calls emits several). */
   | { type: 'usage'; input: number; output: number; cacheRead: number }
   /** An artifact (self-contained interactive HTML). `pending` fires when the

@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { renderMarkdown } from '@/lib/markdown'
+import { handleCodeCopy } from '@/lib/copyCode'
 import { splitFrontmatter } from '@/lib/wiki'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
@@ -42,6 +43,7 @@ const html = computed(() =>
 )
 
 async function onClick(e: MouseEvent): Promise<void> {
+  if (handleCodeCopy(e)) return
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   // Citation tokens: [[N:blockid]] chips and [[pdfN:path]] source links.

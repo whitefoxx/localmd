@@ -129,10 +129,29 @@
   @apply px-1 py-0.5 rounded bg-bg-2 text-accent text-[0.9em] font-mono;
 }
 .md-preview pre {
-  @apply p-3 rounded bg-bg-1 border border-border my-3 overflow-x-auto;
+  @apply p-3 rounded bg-bg-1 border border-border overflow-x-auto;
 }
 .md-preview pre code {
   @apply p-0 bg-transparent text-fg-1;
+}
+/* Code block wrapper: the pre's margin moves here so the copy button can sit in
+   the corner; the button reveals on hover and flips to a check once copied. */
+.md-preview .code-block {
+  @apply relative my-3;
+}
+.md-preview .code-copy {
+  @apply absolute top-2 right-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded
+         border border-border bg-bg-2 text-fg-3 opacity-0 transition-opacity;
+}
+.md-preview .code-block:hover .code-copy,
+.md-preview .code-copy:focus-visible {
+  @apply opacity-100;
+}
+.md-preview .code-copy:hover {
+  @apply bg-bg-3 text-fg-0;
+}
+.md-preview .code-copy.code-copied {
+  @apply opacity-100 text-added;
 }
 .md-preview a {
   @apply text-accent hover:underline;

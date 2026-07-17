@@ -10,6 +10,7 @@ import { useSkillsStore } from '@/stores/skillsStore'
 import { useComposerStore } from '@/stores/composer'
 import { useFileSelectionCapture } from '@/lib/selectionContext'
 import { renderMarkdown } from '@/lib/markdown'
+import { copyText, flashCopy, handleCodeCopy } from '@/lib/copyCode'
 import { parseCiteSources } from '@/lib/citations'
 import { classifyAnchor, createSourceCollector, type Source } from '@/lib/sources'
 import { importTempFile } from '@/lib/capture'
@@ -229,12 +230,25 @@ function toolHasArgs(part: ToolPart): boolean {
   return !!part.args && Object.keys(part.args).length > 0
 }
 
+/** Expandable once there's anything to inspect — the call's args and/or its
+ *  result (the result arrives with tool_result, so no-arg tools gain the
+ *  chevron on completion). */
+function toolExpandable(part: ToolPart): boolean {
+  return toolHasArgs(part) || !!part.result
+}
+
 function formatArgs(part: ToolPart): string {
   try {
     return JSON.stringify(part.args, null, 2)
   } catch {
     return String(part.args)
   }
+}
+
+/** Copy a tool call's args/result; flashes the clicked button's icon. */
+async function copyBlock(e: MouseEvent, text: string): Promise<void> {
+  const ok = await copyText(text)
+  flashCopy(e.currentTarget as HTMLElement, ok)
 }
 
 /* A thinking block auto-expands while it is actively streaming (the tail of the
@@ -547,6 +561,7 @@ function revealEditor(): void {
 }
 
 async function onPreviewClick(e: MouseEvent): Promise<void> {
+  if (handleCodeCopy(e)) return
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   e.preventDefault()
@@ -822,9 +837,9 @@ watch(
              chip in the composer (same pin-to-keep behavior as file selections). -->
         <div v-else class="space-y-1" data-reply-selection>
           <template v-for="(part, i) in m.parts" :key="i">
-            <!-- Tool call with params (MCP): expandable disclosure. -->
+            <!-- Tool call with args and/or a result: expandable disclosure. -->
             <details
-              v-if="part.type === 'tool' && toolHasArgs(part)"
+              v-if="part.type === 'tool' && toolExpandable(part)"
               class="group text-xs font-mono"
               :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
             >
@@ -838,9 +853,38 @@ watch(
                 <span class="truncate">{{ part.detail }}</span>
                 <span v-if="part.status" class="shrink-0 tabular-nums text-fg-3">{{ toolTime(part) }}</span>
               </summary>
-              <pre
-                class="mt-1 ml-5 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
-              >{{ formatArgs(part) }}</pre>
+              <div class="mt-1 ml-5 space-y-1.5">
+                <div v-if="toolHasArgs(part)">
+                  <div class="mb-0.5 flex items-center justify-between">
+                    <span class="text-[10px] uppercase tracking-wide text-fg-3">参数</span>
+                    <button
+                      class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
+                      title="复制"
+                      @click.stop.prevent="copyBlock($event, formatArgs(part))"
+                    >
+                      <span class="codicon codicon-sm codicon-copy" />
+                    </button>
+                  </div>
+                  <pre
+                    class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
+                  >{{ formatArgs(part) }}</pre>
+                </div>
+                <div v-if="part.result">
+                  <div class="mb-0.5 flex items-center justify-between">
+                    <span class="text-[10px] uppercase tracking-wide text-fg-3">结果</span>
+                    <button
+                      class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
+                      title="复制"
+                      @click.stop.prevent="copyBlock($event, part.result ?? '')"
+                    >
+                      <span class="codicon codicon-sm codicon-copy" />
+                    </button>
+                  </div>
+                  <pre
+                    class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
+                  >{{ part.result }}</pre>
+                </div>
+              </div>
             </details>
             <!-- Tool call without params: plain one-liner. -->
             <div

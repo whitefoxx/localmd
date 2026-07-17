@@ -42,12 +42,14 @@ async function runTool(
   const id = mockToolSeq++
   opts.onEvent({ type: 'tool', name, detail: spec.describeCall(args), id })
   let ok = false
+  let out = ''
   try {
     const result = await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
     ok = !(typeof result === 'string' && result.startsWith('Error'))
+    out = typeof result === 'string' ? result : JSON.stringify(result)
     return result
   } finally {
-    opts.onEvent({ type: 'tool_result', id, ok })
+    opts.onEvent({ type: 'tool_result', id, ok, result: out })
   }
 }
 

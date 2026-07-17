@@ -62,17 +62,26 @@ const LANG_ALIASES: Record<string, string> = {
   md: 'markdown',
 }
 
+// A hover copy button in the corner of every rendered code block. The click is
+// handled by a delegated listener (handleCodeCopy) on the preview container.
+const CODE_COPY_BTN =
+  '<button class="code-copy" type="button" title="复制" aria-label="复制代码"><span class="codicon codicon-copy"></span></button>'
+
+function wrapCodeBlock(pre: string): string {
+  return `<div class="code-block">${CODE_COPY_BTN}${pre}</div>`
+}
+
 function highlightCode(code: string, infostring?: string): string {
   const lang = LANG_ALIASES[infostring ?? ''] ?? infostring ?? ''
   if (lang && hljs.getLanguage(lang)) {
     try {
       const html = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
-      return `<pre><code class="hljs language-${escapeHtml(lang)}">${html}</code></pre>`
+      return wrapCodeBlock(`<pre><code class="hljs language-${escapeHtml(lang)}">${html}</code></pre>`)
     } catch {
       /* fall through to plain */
     }
   }
-  return `<pre><code class="hljs">${escapeHtml(code)}</code></pre>`
+  return wrapCodeBlock(`<pre><code class="hljs">${escapeHtml(code)}</code></pre>`)
 }
 
 export interface WikilinkResolver {

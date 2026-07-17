@@ -57,12 +57,21 @@ export type MessagePart =
       /** Raw call arguments, kept for MCP tools so the UI can expand the full
        *  params (describeCall truncates them to a one-line summary). */
       args?: Record<string, unknown>
+      /** The tool's output (capped), shown when the call is expanded. */
+      result?: string
     }
   /** A created artifact (interactive HTML) — a clickable card that opens the
    *  file at `path`. `pending` = still being generated (loading card). */
   | { type: 'artifact'; title: string; path: string; pending?: boolean }
   /** A generated image saved into the KB (generate_image tool), shown inline. */
   | { type: 'image'; path: string }
+
+/** Tool results (file contents, diffs, tab dumps) can be large; keep only a
+ *  preview in the transcript so persisted sessions don't balloon. */
+function capToolResult(s: string): string {
+  const MAX = 4000
+  return s.length > MAX ? `${s.slice(0, MAX)}\n… (+${s.length - MAX} 字符已截断)` : s
+}
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
  *  saved into the KB — `path` is its KB location. */
@@ -557,6 +566,7 @@ export const useChatStore = defineStore('chat', () => {
         if (p) {
           p.status = e.ok ? 'done' : 'error'
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
+          if (e.result != null) p.result = capToolResult(e.result)
         }
       } else if (e.type === 'artifact') {
         if (e.pending) {

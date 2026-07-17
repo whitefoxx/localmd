@@ -100,14 +100,17 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         const id = nextToolId()
         opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(input), id })
         let ok = false
+        let out = ''
         try {
           const result = await t.run(input, ctx)
           ok = !(typeof result === 'string' && result.startsWith('Error'))
+          out = typeof result === 'string' ? result : JSON.stringify(result)
           return result
         } catch (err) {
-          return `Error: ${(err as Error).message}`
+          out = `Error: ${(err as Error).message}`
+          return out
         } finally {
-          opts.onEvent({ type: 'tool_result', id, ok })
+          opts.onEvent({ type: 'tool_result', id, ok, result: out })
         }
       },
     })
@@ -128,12 +131,14 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         const id = nextToolId()
         opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(args), id, args })
         let ok = false
+        let out = ''
         try {
           const result = await ext.run(args)
           ok = !result.startsWith('Error')
+          out = result
           return result
         } finally {
-          opts.onEvent({ type: 'tool_result', id, ok })
+          opts.onEvent({ type: 'tool_result', id, ok, result: out })
         }
       },
     })
@@ -263,20 +268,24 @@ function buildViewImageTool(
         const id = nextToolId()
         opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}`, id })
         let ok = false
+        let out = ''
         try {
           const { images, missing } = await loadImages(paths)
           if (!images.length) {
+            out = `no readable images: ${missing.join(', ')}`
             return {
               error: `no readable images (not found or unsupported format): ${missing.join(', ')}`,
             }
           }
           ok = true
+          // Don't put base64 in the transcript — just a summary of what was sent.
+          out = `已把 ${images.length} 张图片返回给模型${missing.length ? `(跳过 ${missing.length} 个无法读取)` : ''}`
           return {
             images,
             note: missing.length ? `(unreadable, skipped: ${missing.join(', ')})` : '',
           }
         } finally {
-          opts.onEvent({ type: 'tool_result', id, ok })
+          opts.onEvent({ type: 'tool_result', id, ok, result: out })
         }
       },
       toModelOutput: ({ output }) => {
@@ -306,21 +315,25 @@ function buildViewImageTool(
       const id = nextToolId()
       opts.onEvent({ type: 'tool', name: 'view_image', detail: `view ${paths.join(', ')}`, id })
       let ok = false
+      let out = ''
       try {
         const { images, missing } = await loadImages(paths)
         if (!images.length) {
+          out = `Error: no readable images: ${missing.join(', ')}`
           return `Error: no readable images (not found or unsupported format): ${missing.join(', ')}`
         }
         const note = missing.length ? `\n\n(unreadable, skipped: ${missing.join(', ')})` : ''
         try {
           const desc = await visionDescribe(vision.profile, images, purpose ?? '', opts.signal)
           ok = true
-          return `${desc}${note}`
+          out = `${desc}${note}`
+          return out
         } catch (err) {
-          return `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+          out = `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+          return out
         }
       } finally {
-        opts.onEvent({ type: 'tool_result', id, ok })
+        opts.onEvent({ type: 'tool_result', id, ok, result: out })
       }
     },
   })
@@ -347,6 +360,7 @@ function buildGenerateImageTool(
       const id = nextToolId()
       opts.onEvent({ type: 'tool', name: 'generate_image', detail: `image: ${prompt.slice(0, 60)}`, id })
       let ok = false
+      let out = ''
       try {
         const { path } = await generateKbImage(profile, prompt, { size, signal: opts.signal })
         // Reflect the new file in the tree, then show the image inline in chat.
@@ -354,11 +368,13 @@ function buildGenerateImageTool(
         await useFilesStore().refreshTree()
         opts.onEvent({ type: 'image', path })
         ok = true
+        out = `已生成图片并保存到 ${path}`
         return `已生成图片并保存到 ${path}(已作为图片卡片展示给用户)。如需可 view_image 查看,勿重复粘贴内容。`
       } catch (err) {
-        return `图像生成失败(${profile.model}):${(err as Error).message}`
+        out = `图像生成失败(${profile.model}):${(err as Error).message}`
+        return out
       } finally {
-        opts.onEvent({ type: 'tool_result', id, ok })
+        opts.onEvent({ type: 'tool_result', id, ok, result: out })
       }
     },
   })
@@ -386,6 +402,7 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
         id,
       })
       let ok = false
+      let out = ''
       try {
         const results = await mapLimit(tasks, 3, async (task: string, i: number) => {
           const tag = tasks.length > 1 ? `[${i + 1}]` : ''
@@ -411,17 +428,19 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
         ok = true
         if (tasks.length === 1) {
           const r = results[0]
-          return r instanceof Error ? `Subagent failed: ${r.message}` : r
+          out = r instanceof Error ? `Subagent failed: ${r.message}` : r
+        } else {
+          out = tasks
+            .map((t, i) => {
+              const r = results[i]
+              const body = r instanceof Error ? `(failed: ${r.message})` : r
+              return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
+            })
+            .join('\n\n')
         }
-        return tasks
-          .map((t, i) => {
-            const r = results[i]
-            const body = r instanceof Error ? `(failed: ${r.message})` : r
-            return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
-          })
-          .join('\n\n')
+        return out
       } finally {
-        opts.onEvent({ type: 'tool_result', id, ok })
+        opts.onEvent({ type: 'tool_result', id, ok, result: out })
       }
     },
   })
