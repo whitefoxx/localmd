@@ -10,11 +10,17 @@ const files = useFilesStore()
 const supported = computed(() => isSupported())
 
 async function open(): Promise<void> {
-  if (await kb.pickAndOpen()) await files.refreshTree()
+  if (await kb.pickAndOpen()) {
+    await files.refreshTree()
+    await files.restoreTabs()
+  }
 }
 
 async function openRecent(entry: RecentKb): Promise<void> {
-  if (await kb.openRecent(entry)) await files.refreshTree()
+  if (await kb.openRecent(entry)) {
+    await files.refreshTree()
+    await files.restoreTabs()
+  }
 }
 </script>
 

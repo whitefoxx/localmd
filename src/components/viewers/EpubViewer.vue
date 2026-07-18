@@ -7,7 +7,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
-import { epubLocation } from '@/lib/viewMemory'
+import { epubLocation, rememberEpubLocation } from '@/lib/viewMemory'
 import {
   HIGHLIGHT_COLORS,
   loadEpubSidecar,
@@ -49,11 +49,12 @@ function destroy(): void {
   if (docPath && rendition) {
     try {
       const loc = rendition.currentLocation() as unknown as { start?: { cfi?: string } }
-      if (loc?.start?.cfi) epubLocation.set(docPath, loc.start.cfi)
+      if (loc?.start?.cfi) rememberEpubLocation(docPath, loc.start.cfi)
     } catch {
       /* not displayed yet */
     }
   }
+  window.removeEventListener('keydown', onWindowKey)
   ro?.disconnect()
   ro = null
   if (resizeTimer) {
@@ -94,6 +95,17 @@ async function load(path: string | null): Promise<void> {
   })
   registerThemes()
   rendition.themes.fontSize(`${fontPct.value}%`)
+  // epub.js renders chapters in iframes; keydowns there never reach our window.
+  // Register the content hook BEFORE display so the FIRST chapter's iframe also
+  // gets the listener — hooks only apply to chapters rendered after they're
+  // registered, so a late registration leaves the opening chapter unbound and
+  // arrow-key paging dies once focus is inside it (trace-app fix).
+  rendition.hooks.content.register((contents: { document: Document }) => {
+    contents.document.addEventListener('keydown', onKey)
+  })
+  // Also page on left/right arrows when the iframe isn't focused (e.g. right
+  // after clicking a toolbar button). Skipped while typing / with modifiers.
+  window.addEventListener('keydown', onWindowKey)
   await rendition.display(epubLocation.get(path))
 
   // The container can change width without a window resize (e.g. toggling or
@@ -120,19 +132,17 @@ async function load(path: string | null): Promise<void> {
   // epub.js computes highlight positions at insert time only — re-apply after
   // every relocation so they don't drift as the user pages around. Also track
   // reading progress and the current chapter label (trace-app behavior).
-  rendition.on('relocated', (loc: { start: { percentage: number; href: string } }) => {
+  rendition.on('relocated', (loc: { start: { percentage: number; href: string; cfi: string } }) => {
     progressPct.value = Math.round((loc.start.percentage || 0) * 100)
     const entry = toc.value.find(
       (t) => t.href.split('#')[0] === loc.start.href || t.href.split('#')[0].endsWith(loc.start.href),
     )
     if (entry) chapterLabel.value = entry.title
+    // Persist on each page turn: a hard reload may skip destroy(), so saving
+    // only on unmount would lose the latest page.
+    if (docPath && loc.start.cfi) rememberEpubLocation(docPath, loc.start.cfi)
     reapplyHighlights()
     popup.value = null
-  })
-  // epub.js renders chapters in iframes; keydowns there never reach our
-  // window. Attach per-chapter listeners via the content hook (trace-app fix).
-  rendition.hooks.content.register((contents: { document: Document }) => {
-    contents.document.addEventListener('keydown', onKey)
   })
 
   annotations = await loadEpubSidecar(path)
@@ -146,12 +156,18 @@ async function load(path: string | null): Promise<void> {
 
 function registerThemes(): void {
   if (!rendition) return
+  // Scope each theme's rules under the body class epub.js toggles in select()
+  // (it adds `light`/`dark` to <body>). Unscoped `body {}` rules from both
+  // themes otherwise coexist in the iframe, and the later-injected stylesheet
+  // always wins regardless of the selected class — so switching back to a
+  // previously-shown theme wouldn't re-apply (epub.js 0.3.93 select() only
+  // appends rules + toggles a class nothing keys off).
   rendition.themes.register('light', {
-    body: { background: '#ffffff', color: '#1f2328' },
+    'body.light': { background: '#ffffff', color: '#1f2328' },
   })
   rendition.themes.register('dark', {
-    body: { background: '#161b22', color: '#c9d1d9' },
-    'a, a *': { color: '#58a6ff' },
+    'body.dark': { background: '#161b22', color: '#c9d1d9' },
+    'body.dark a, body.dark a *': { color: '#58a6ff' },
   })
   rendition.themes.select(theme.isDark ? 'dark' : 'light')
 }
@@ -164,6 +180,30 @@ watch(
 function onKey(e: KeyboardEvent): void {
   if (e.key === 'ArrowRight' || e.key === 'PageDown') next()
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp') prev()
+}
+
+function isTypingTarget(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null
+  if (!el) return false
+  return (
+    el.tagName === 'INPUT' ||
+    el.tagName === 'TEXTAREA' ||
+    el.tagName === 'SELECT' ||
+    el.isContentEditable
+  )
+}
+
+function onWindowKey(e: KeyboardEvent): void {
+  if (!rendition) return
+  if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return
+  if (isTypingTarget(e.target)) return
+  if (e.key === 'ArrowRight') {
+    e.preventDefault()
+    next()
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault()
+    prev()
+  }
 }
 
 /* ───────── highlights ───────── */

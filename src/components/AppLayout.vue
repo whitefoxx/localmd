@@ -195,9 +195,11 @@ async function switchKb(pick: () => Promise<boolean>, scaffold = false): Promise
     await scaffoldKb()
     await files.refreshTree()
     await useSkillsStore().refresh()
+    await files.restoreTabs() // no saved tabs for a new KB; just enables persistence
     await files.openFile('wiki/index.md')
   } else {
     await files.refreshTree()
+    await files.restoreTabs()
   }
 }
 

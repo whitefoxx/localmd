@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { invalidateGitFsCache } from '@/lib/gitfs'
 import { fileStem, dirName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
+import { readTabs, writeTabs } from '@/lib/tabsMemory'
 import type { TreeNode } from '@/lib/fs'
 
 function isTextual(path: string): boolean {
@@ -52,6 +53,9 @@ export const useFilesStore = defineStore('files', () => {
   /** Seed top-level folders open exactly once per KB — not on every refresh, so
    *  collapse-all survives a later refresh/focus. */
   let expansionSeeded = false
+  /** Gate for tab persistence: false until restoreTabs() has run for the open
+   *  KB, so the empty state during a KB switch/close can't clobber saved tabs. */
+  let tabsReady = false
 
   function toggleDir(path: string): void {
     const s = expandedDirs.value
@@ -129,6 +133,43 @@ export const useFilesStore = defineStore('files', () => {
       expansionSeeded = true
     }
   }
+
+  function currentKbName(): string | null {
+    return fs.hasRoot() ? fs.getRoot().name : null
+  }
+
+  /**
+   * Reopen the tabs persisted for the current KB, dropping any whose file no
+   * longer exists, then focus the previously-active tab. Call once after the
+   * tree has loaded; it also enables tab persistence for this session.
+   */
+  async function restoreTabs(): Promise<void> {
+    const kb = currentKbName()
+    const saved = kb ? readTabs(kb) : null
+    if (saved) {
+      const exist = new Set(allFiles.value)
+      const survivors = saved.tabs.filter((p) => exist.has(p))
+      openTabs.value = survivors
+      const active =
+        saved.active && survivors.includes(saved.active) ? saved.active : (survivors[0] ?? null)
+      if (active) {
+        currentPath.value = null // force a load even if it equals a stale value
+        await openFile(active)
+      }
+    }
+    tabsReady = true
+  }
+
+  // Persist the working set whenever it changes (once restoreTabs has run, so a
+  // KB switch's transient empty state can't overwrite the saved tabs).
+  watch(
+    () => JSON.stringify({ t: openTabs.value, a: currentPath.value }),
+    () => {
+      if (!tabsReady) return
+      const kb = currentKbName()
+      if (kb) writeTabs(kb, { tabs: openTabs.value, active: currentPath.value })
+    },
+  )
 
   /** One-shot request for the editor to scroll to and select a substring —
    *  used to jump straight to a broken link's location from the health panel.
@@ -361,6 +402,7 @@ export const useFilesStore = defineStore('files', () => {
   }
 
   function reset(): void {
+    tabsReady = false // off until the next restoreTabs, so we don't persist [] over saved tabs
     tree.value = []
     openTabs.value = []
     clearSelection()
@@ -397,6 +439,7 @@ export const useFilesStore = defineStore('files', () => {
     resolveWikilink,
     resolveMarkdownLink,
     refreshTree,
+    restoreTabs,
     openFile,
     reveal,
     openAndReveal,

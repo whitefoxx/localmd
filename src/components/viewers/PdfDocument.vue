@@ -16,7 +16,7 @@ import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadPdfLocations } from '@/lib/docindex/pdf'
 import { useCitationsStore, type PendingJump } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
-import { pdfPage as pageMemory } from '@/lib/viewMemory'
+import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
 
 const props = defineProps<{ path: string }>()
 
@@ -25,6 +25,8 @@ const theme = useThemeStore()
 
 const absoluteWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
 const blobUrl = ref<string | null>(null)
+/** Shown while we scroll to the remembered page, to mask the page-1 flash. */
+const restoring = ref(false)
 let disposed = false
 
 const config = computed(() => ({
@@ -78,27 +80,51 @@ function getScrollApi(): ScrollApi | undefined {
 }
 
 /* ── Page memory (per path, survives tab switches and reopen) ────────────── */
+// The saved page is captured once in onReady, before any page-change event can
+// fire — the initial page-1 render would otherwise overwrite it (and now that
+// it persists to localStorage, clobber the stored value) before restore runs.
+// Recording is gated on `restoreDone` so those pre-restore events are ignored.
+
+let pendingRestorePage: number | null = null
+let restoreDone = false
 
 function subscribePageChanges(): void {
   const scroll = getScrollApi()
   if (!scroll?.onPageChange) return
   pageUnsub = scroll.onPageChange(() => {
     const page = scroll.getCurrentPage?.()
-    if (page) pageMemory.set(props.path, page)
+    if (!restoreDone) {
+      // Reveal as soon as we actually land on the target, so it feels snappy.
+      if (restoring.value && page === pendingRestorePage) finishRestore()
+      return
+    }
+    if (page) rememberPdfPage(props.path, page)
   })
+}
+
+function finishRestore(): void {
+  restoring.value = false
+  restoreDone = true
 }
 
 /** Restore the saved page; retried because layout settles shortly after load. */
 function restoreSavedPage(): void {
-  const page = pageMemory.get(props.path)
-  if (!page || page <= 1) return
+  const page = pendingRestorePage
   const scroll = getScrollApi()
-  if (!scroll?.scrollToPage) return
-  for (const delay of [80, 250, 600, 1200]) {
+  if (!page || page <= 1 || !scroll?.scrollToPage) {
+    finishRestore()
+    return
+  }
+  restoring.value = true
+  const attempts = [60, 180, 400, 800, 1400]
+  for (const delay of attempts) {
     window.setTimeout(() => {
-      if (!disposed) scroll.scrollToPage({ pageNumber: page, behavior: 'auto' })
+      if (!disposed && restoring.value) scroll.scrollToPage({ pageNumber: page, behavior: 'auto' })
     }, delay)
   }
+  // Fallback: reveal even if a page-change event for the exact target never
+  // arrives (e.g. the last page, or virtualization rounding).
+  window.setTimeout(finishRestore, attempts[attempts.length - 1] + 400)
 }
 
 /* ── Annotation persistence (trace-app sidecar format) ───────────────────── */
@@ -144,7 +170,10 @@ function handleEvent(api: AnnotationApi, e: AnnotationEvent, saved: Promise<Tran
     })
     const hadReveal = !!pendingReveal
     flushReveal()
-    if (!hadReveal) restoreSavedPage()
+    // A citation jump wins over page restore; drop any restore overlay and
+    // enable recording so later user scrolls are remembered.
+    if (hadReveal) finishRestore()
+    else restoreSavedPage()
     return
   }
   if (!initialLoadDone) return
@@ -163,6 +192,11 @@ function handleEvent(api: AnnotationApi, e: AnnotationEvent, saved: Promise<Tran
 
 function onReady(r: PluginRegistry): void {
   viewerRegistry = r
+  // Capture the remembered page now, before the first page-change fires. Skip
+  // the restore overlay when a citation jump is pending — that wins instead.
+  pendingRestorePage = pageMemory.get(props.path) ?? null
+  const willReveal = citations.pending?.path === props.path && !!citations.pending?.blockId
+  if (!willReveal && pendingRestorePage && pendingRestorePage > 1) restoring.value = true
   subscribePageChanges()
   void initIndexStatus()
   const plugin = r.getPlugin('annotation') as undefined | { provides?: () => unknown }
@@ -347,13 +381,21 @@ onBeforeUnmount(() => {
   <div class="h-full w-full flex flex-col">
     <!-- No chrome bar: filename shows in the editor tab, and (re)indexing lives
          in the file-tree right-click menu. PDFs still auto-index on open. -->
-    <div class="flex-1 min-h-0">
+    <div class="flex-1 min-h-0 relative">
       <PDFViewer
         v-if="blobUrl"
         :config="config"
         :style="{ width: '100%', height: '100%' }"
         @ready="onReady"
       />
+      <!-- Masks the page-1 flash while we scroll to the remembered page. -->
+      <div
+        v-if="restoring"
+        class="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-bg-1/50 text-sm text-fg-3"
+      >
+        <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
+        跳转到上次阅读位置…
+      </div>
     </div>
   </div>
 </template>

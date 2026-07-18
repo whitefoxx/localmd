@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import * as fs from '@/lib/fs'
 import { isE2eMode } from '@/lib/e2e'
 import { saveRecent, listRecents, removeRecent, type RecentKb } from '@/lib/idb'
+import { hydrateReadingPositions } from '@/lib/viewMemory'
 
 export const useKbStore = defineStore('kb', () => {
   const name = ref<string | null>(null)
@@ -58,6 +59,7 @@ export const useKbStore = defineStore('kb', () => {
     fs.setRoot(handle)
     name.value = handle.name
     isOpen.value = true
+    hydrateReadingPositions(handle.name)
     await acquireLock(handle.name)
     if (!isE2eMode()) {
       // Memory handles from E2E runs must not pollute the real recents list.
@@ -94,6 +96,7 @@ export const useKbStore = defineStore('kb', () => {
     fs.setRoot(null)
     name.value = null
     isOpen.value = false
+    hydrateReadingPositions(null)
   }
 
   return {
