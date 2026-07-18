@@ -82,6 +82,8 @@ describe('normalizeSettings — multi-profile shape', () => {
       gitEmail: '',
       githubToken: '',
       writeMode: 'auto',
+      agentMultiTab: false,
+      agentMaxTabs: 3,
       mcpServers: [],
       hotkeys: {},
       healthDirs: [],

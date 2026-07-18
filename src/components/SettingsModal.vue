@@ -110,7 +110,7 @@ function onRecordKey(e: KeyboardEvent): void {
 type SectionId = 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
 const NAV: { id: SectionId; label: string; icon: string }[] = [
   { id: 'models', label: '模型', icon: 'codicon-sparkle' },
-  { id: 'agent', label: 'Agent 行为', icon: 'codicon-settings-gear' },
+  { id: 'agent', label: 'Agent', icon: 'codicon-settings-gear' },
   { id: 'hotkeys', label: '快捷键', icon: 'codicon-keyboard' },
   { id: 'health', label: 'KB 健康', icon: 'codicon-pulse' },
   { id: 'tools', label: '外部工具', icon: 'codicon-plug' },
@@ -461,6 +461,42 @@ function slotBadges(p: LlmProfile): string[] {
                     <option value="auto">直接写入（事后审查）</option>
                     <option value="ask">先询问（每次批准）</option>
                   </select>
+                </div>
+              </div>
+
+              <div class="rounded-lg border border-border overflow-hidden">
+                <div class="px-3 py-3">
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="min-w-0">
+                      <div class="text-sm text-fg-1">多标签页会话</div>
+                      <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                        允许 agent 面板同时开多个会话标签；关闭时最多一个会话。运行中的会话，切换标签或
+                        关闭它的标签都不会中断——只有输入框的 stop 按钮、删除会话或关闭网页才会停止。
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="store.state.agentMultiTab"
+                      class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                      :class="store.state.agentMultiTab ? 'bg-accent' : 'bg-bg-3'"
+                      @click="store.state.agentMultiTab = !store.state.agentMultiTab"
+                    >
+                      <span
+                        class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                        :class="store.state.agentMultiTab ? 'translate-x-4' : 'translate-x-0.5'"
+                      />
+                    </button>
+                  </div>
+                  <div
+                    v-if="store.state.agentMultiTab"
+                    class="mt-3 flex items-center justify-between gap-4 border-t border-border pt-3"
+                  >
+                    <div class="text-sm text-fg-1">最多标签数</div>
+                    <select v-model.number="store.state.agentMaxTabs" class="input w-24">
+                      <option v-for="n in [2, 3, 4, 5, 6, 7, 8]" :key="n" :value="n">{{ n }}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>

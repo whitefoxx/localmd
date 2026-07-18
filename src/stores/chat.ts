@@ -136,9 +136,13 @@ let nextId = 1
 export const useChatStore = defineStore('chat', () => {
   const kb = useKbStore()
 
-  /** Max concurrent chat tabs. Creating/opening past this recycles the oldest
-   *  idle tab; if every tab is running, the action is refused (with a flash). */
-  const MAX_TABS = 6
+  /** Max concurrent chat tabs — 1 unless the user turned on multi-tab in
+   *  settings (then their cap, 2-8). Creating/opening past this recycles the
+   *  oldest idle tab; if every tab is running, the action is refused. */
+  function maxTabs(): number {
+    const s = useSettingsStore().state
+    return s.agentMultiTab ? Math.min(8, Math.max(2, s.agentMaxTabs || 2)) : 1
+  }
 
   // Open chat tabs run concurrently. Each carries its own `running` flag; the
   // per-session AbortController lives in a non-reactive map. Switching the
@@ -150,6 +154,12 @@ export const useChatStore = defineStore('chat', () => {
   const limitMsg = ref('')
 
   const controllers = new Map<string, AbortController>()
+
+  // Sessions detached from the tab bar while their turn is still running (the
+  // user switched away or closed the tab). They keep streaming via their
+  // send-loop closure and persist on finish; re-opening one re-attaches it live.
+  // A plain reference keeps the (already reactive) session object alive.
+  const background = new Map<string, OpenSession>()
 
   // Mid-turn steering: messages the user submits WHILE a tab's turn is running.
   // The running turn stops at its next step boundary (via steerPending), then
@@ -206,17 +216,16 @@ export const useChatStore = defineStore('chat', () => {
     }) as OpenSession
   }
 
-  /** Add a tab, honoring MAX_TABS by recycling the oldest idle tab. Returns
+  /** Add a tab, honoring the tab cap by recycling the oldest idle tab. Returns
    *  false (and flashes a message) when every existing tab is busy. */
   function addTab(s: OpenSession): boolean {
-    if (tabs.value.length >= MAX_TABS) {
-      const victim = tabs.value.find((t) => !t.running)
-      if (!victim) {
-        limitMsg.value = `最多同时打开 ${MAX_TABS} 个会话`
-        window.setTimeout(() => (limitMsg.value = ''), 3000)
-        return false
-      }
-      closeTab(victim.id)
+    const max = maxTabs()
+    if (tabs.value.length >= max) {
+      // Recycle a tab to stay within the cap: prefer an idle one; otherwise
+      // detach the oldest. closeTab keeps a running turn alive in the
+      // background, so recycling never interrupts anything.
+      const victim = tabs.value.find((t) => !t.running) ?? tabs.value[0]
+      if (victim) closeTab(victim.id)
     }
     tabs.value.push(s)
     return true
@@ -228,15 +237,28 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function closeTab(id: string): void {
-    controllers.get(id)?.abort()
-    controllers.delete(id)
-    steerQueue.delete(id)
-    // Release the session's per-subsystem state (paused approvals, plan,
-    // deferred-tool activations).
-    useReviewStore().rejectAwaiting(id)
-    usePlanStore().clear(id)
-    useMcpStore().clearActivated(id)
-    const i = tabs.value.findIndex((t) => t.id === id)
+    // A running turn must SURVIVE tab close — only the stop button, deleting the
+    // session, a KB switch, or a full page close may abort it. When it's running
+    // we just detach the tab; the send loop's closure keeps streaming into the
+    // (now off-screen) session and persists it on finish, so it reappears in
+    // history. When idle, tear down its per-subsystem state as before.
+    const t = tabs.value.find((x) => x.id === id)
+    if (t?.running) {
+      // Keep the live object so re-opening resumes its stream; its own finally
+      // drops it from `background` once the turn ends.
+      background.set(id, t)
+    } else {
+      controllers.get(id)?.abort()
+      controllers.delete(id)
+      steerQueue.delete(id)
+      background.delete(id)
+      // Release the session's per-subsystem state (paused approvals, plan,
+      // deferred-tool activations).
+      useReviewStore().rejectAwaiting(id)
+      usePlanStore().clear(id)
+      useMcpStore().clearActivated(id)
+    }
+    const i = tabs.value.findIndex((x) => x.id === id)
     if (i < 0) return
     tabs.value.splice(i, 1)
     if (activeId.value === id) {
@@ -291,12 +313,26 @@ export const useChatStore = defineStore('chat', () => {
       historyOpen.value = false
       return
     }
+    // A still-running session that was switched away from lives in `background`,
+    // not IDB (which only has its last snapshot). Re-attach the live object so
+    // its stream keeps rendering, rather than loading a frozen copy.
+    const detached = background.get(id)
+    if (detached) {
+      background.delete(id)
+      addTab(detached)
+      activeId.value = detached.id
+      historyOpen.value = false
+      return
+    }
     const stored = await idb.getSession(id)
     if (!stored) return
     adoptSession(stored)
   }
 
   async function removeSession(id: string): Promise<void> {
+    // Deleting the session must abort its turn first — otherwise closeTab would
+    // leave it running and it would re-persist itself right after we delete it.
+    stop(id)
     closeTab(id)
     await idb.deleteSession(id)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
@@ -330,6 +366,7 @@ export const useChatStore = defineStore('chat', () => {
     controllers.get(id)?.abort()
     controllers.delete(id)
     steerQueue.delete(id) // a stopped turn must not later consume queued steers
+    background.delete(id)
     const t = tabs.value.find((x) => x.id === id)
     if (t) t.running = false
     // Writes paused for approval must not dangle after the turn dies.
@@ -340,6 +377,7 @@ export const useChatStore = defineStore('chat', () => {
     for (const c of controllers.values()) c.abort()
     controllers.clear()
     steerQueue.clear()
+    background.clear()
     for (const t of tabs.value) t.running = false
     useReviewStore().rejectAwaiting()
   }
@@ -702,6 +740,7 @@ export const useChatStore = defineStore('chat', () => {
       session.running = false
       controllers.delete(session.id)
       steerQueue.delete(session.id) // drop any interjection the ended turn never consumed
+      background.delete(session.id) // a detached turn that just ended is a plain stored session now
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever.
       for (const p of assistant.parts) {

@@ -51,6 +51,10 @@ export interface SettingsState {
   /** auto: agent writes land immediately (reviewable after the fact).
    *  ask: every write/edit pauses until approved in the review panel. */
   writeMode: 'auto' | 'ask'
+  /** Allow more than one concurrent agent chat tab. Off = a single session. */
+  agentMultiTab: boolean
+  /** Max concurrent chat tabs when multi-tab is on (clamped 2-8). */
+  agentMaxTabs: number
   /** Remote MCP servers (Streamable HTTP; must allow browser CORS). */
   mcpServers: McpServerConfig[]
   /** User keyboard-shortcut overrides (id → binding); absent = registry default. */
@@ -73,11 +77,19 @@ export function autoLabel(p: Pick<LlmProfile, 'provider' | 'model'>): string {
 /** Accepts the current multi-profile shape and the legacy single-provider
  *  shape ({provider, anthropicApiKey, openaiApiKey, …}); anything else →
  *  empty store. Slot ids are clamped to existing profiles. */
+/** Chat-tab cap: valid when 2-8, else the default of 3. */
+function clampMaxTabs(v: unknown): number {
+  const n = Math.floor(Number(v))
+  return Number.isFinite(n) ? Math.min(8, Math.max(2, n)) : 3
+}
+
 const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   gitName: '',
   gitEmail: '',
   githubToken: '',
   writeMode: 'auto',
+  agentMultiTab: false,
+  agentMaxTabs: 3,
   mcpServers: [],
   hotkeys: {},
   healthDirs: [],
@@ -89,6 +101,8 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     gitEmail: String(obj.gitEmail ?? ''),
     githubToken: String(obj.githubToken ?? ''),
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
+    agentMultiTab: obj.agentMultiTab === true,
+    agentMaxTabs: clampMaxTabs(obj.agentMaxTabs),
     mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
     hotkeys: normalizeHotkeyOverrides(obj.hotkeys),
     healthDirs: Array.isArray(obj.healthDirs)
