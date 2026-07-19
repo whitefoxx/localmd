@@ -409,7 +409,13 @@ function annotateHtml(html: string, collector: ReturnType<typeof createSourceCol
       if (src.kind === 'url') ref.dataset.srcUrl = src.target
       else ref.dataset.srcPath = src.target
       sup.appendChild(ref)
-      a.after(sup)
+      // A bare URL (the link text is the URL itself) clutters the reply — drop
+      // it and keep only the citation superscript. A link with a real title (or
+      // a KB wikilink) keeps its clickable label. The URL stays reachable via
+      // the superscript (click/hover) and the Sources list either way.
+      const bareUrl = src.kind === 'url' && /^https?:\/\//i.test((a.textContent ?? '').trim())
+      if (bareUrl) a.replaceWith(sup)
+      else a.after(sup)
     })
     return doc.body.innerHTML
   } catch {
@@ -944,13 +950,21 @@ watch(
             />
           </template>
           <!-- Sources: files / URLs the reply referenced, numbered to match the
-               inline superscripts. Click jumps to the file or opens the URL. -->
-          <div
+               inline superscripts. Collapsed by default; click a row to jump to
+               the file or open the URL. -->
+          <details
             v-if="annotateAssistant(m).sources.length"
-            class="mt-2 pt-2 border-t border-border/60"
+            class="group/src mt-2 pt-2 border-t border-border/60"
           >
-            <div class="text-[11px] uppercase tracking-wide text-fg-3 mb-1">来源</div>
-            <div class="flex flex-col gap-1">
+            <summary
+              class="flex items-center gap-1 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden text-[11px] uppercase tracking-wide text-fg-3 hover:text-fg-2"
+            >
+              <span
+                class="codicon codicon-sm codicon-chevron-right transition-transform group-open/src:rotate-90"
+              />
+              来源 · {{ annotateAssistant(m).sources.length }}
+            </summary>
+            <div class="flex flex-col gap-1 mt-1.5">
               <button
                 v-for="s in annotateAssistant(m).sources"
                 :key="s.n"
@@ -971,7 +985,7 @@ watch(
                 />
               </button>
             </div>
-          </div>
+          </details>
           <div v-if="m.error" class="text-xs text-removed">{{ m.error }}</div>
           <div
             v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length"
