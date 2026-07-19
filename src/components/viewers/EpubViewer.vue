@@ -25,7 +25,7 @@ const indexDetail = ref('')
 const tocOpen = ref(false)
 const fontPct = ref(110)
 const selCfi = ref<string | null>(null)
-const popup = ref<{ x: number; y: number; cfi: string } | null>(null)
+const popup = ref<{ x: number; y: number; cfi: string; existing: boolean } | null>(null)
 const progressPct = ref(0)
 const chapterLabel = ref('')
 
@@ -55,6 +55,7 @@ function destroy(): void {
     }
   }
   window.removeEventListener('keydown', onWindowKey)
+  window.removeEventListener('mousedown', onWindowMousedown)
   ro?.disconnect()
   ro = null
   if (resizeTimer) {
@@ -102,10 +103,16 @@ async function load(path: string | null): Promise<void> {
   // arrow-key paging dies once focus is inside it (trace-app fix).
   rendition.hooks.content.register((contents: { document: Document }) => {
     contents.document.addEventListener('keydown', onKey)
+    // A mousedown on the page body (never on a highlight — those live in an
+    // overlay in the top document) dismisses the floating popup / citation mark.
+    contents.document.addEventListener('mousedown', onContentMousedown)
   })
   // Also page on left/right arrows when the iframe isn't focused (e.g. right
   // after clicking a toolbar button). Skipped while typing / with modifiers.
   window.addEventListener('keydown', onWindowKey)
+  // Dismiss the popup / citation highlight when clicking anywhere in the top
+  // document that isn't the popup or an existing highlight.
+  window.addEventListener('mousedown', onWindowMousedown)
   await rendition.display(epubLocation.get(path))
 
   // The container can change width without a window resize (e.g. toggling or
@@ -128,6 +135,9 @@ async function load(path: string | null): Promise<void> {
   rendition.on('selected', (cfiRange: string, contents: { window: Window }) => {
     selCfi.value = cfiRange
     selText = contents?.window?.getSelection?.()?.toString().trim() ?? ''
+    // Pop the color bar right at the selection so highlighting no longer needs
+    // a trip to the toolbar (the toolbar swatches still work as a fallback).
+    if (selText) showSelectionPopup(cfiRange, contents)
   })
   // epub.js computes highlight positions at insert time only — re-apply after
   // every relocation so they don't drift as the user pages around. Also track
@@ -142,6 +152,9 @@ async function load(path: string | null): Promise<void> {
     // only on unmount would lose the latest page.
     if (docPath && loc.start.cfi) rememberEpubLocation(docPath, loc.start.cfi)
     reapplyHighlights()
+    // A page turn closes the popup. Don't clear the citation highlight here:
+    // maybeJump()'s own display() also fires 'relocated', and doing so would
+    // race with — and wipe — the highlight it just added. Clicks dismiss it.
     popup.value = null
   })
 
@@ -230,23 +243,61 @@ function reapplyHighlights(): void {
   }
 }
 
-async function highlightSelection(color: string): Promise<void> {
-  if (!rendition || !selCfi.value || !docPath) return
-  const cfi = selCfi.value
+/** Add a highlight for `cfi`, or recolor the existing one — the single path
+ *  shared by the toolbar swatches, the selection popup, and the recolor popup. */
+async function applyColor(cfi: string, color: string): Promise<void> {
+  if (!rendition || !docPath) return
   const existing = annotations.find((a) => a.cfi === cfi)
   if (existing) {
-    rendition.annotations.remove(cfi, 'highlight')
+    try {
+      rendition.annotations.remove(cfi, 'highlight')
+    } catch {
+      /* not currently rendered */
+    }
     existing.color = color
   } else {
     annotations.push({ cfi, color, text: selText, createdAt: new Date().toISOString() })
   }
   applyOne(cfi, color)
-  // Clear the in-iframe selection so the user sees the highlight commit.
+  clearSelectionRanges()
+  selCfi.value = null
+  popup.value = null
+  await saveEpubSidecar(docPath, annotations)
+}
+
+/** Toolbar swatches act on the current text selection. */
+function highlightSelection(color: string): void {
+  if (selCfi.value) void applyColor(selCfi.value, color)
+}
+
+/** Popup swatches act on whatever it's anchored to — a fresh selection or an
+ *  existing highlight; applyColor handles both. */
+function pickColor(color: string): void {
+  if (popup.value) void applyColor(popup.value.cfi, color)
+}
+
+/** Drop the in-iframe selection so the user sees the highlight commit. */
+function clearSelectionRanges(): void {
   ;(rendition as unknown as { getContents?: () => Array<{ window: Window }> })
     .getContents?.()
     .forEach((c) => c.window.getSelection?.()?.removeAllRanges())
-  selCfi.value = null
-  await saveEpubSidecar(docPath, annotations)
+}
+
+/** Anchor the color bar to a text selection. epub.js renders inside an iframe,
+ *  so shift the in-iframe selection rect by the iframe's offset in the top
+ *  document to get page coordinates for the teleported popup. */
+function showSelectionPopup(cfiRange: string, contents: { window: Window }): void {
+  const sel = contents.window.getSelection?.()
+  if (!sel || sel.rangeCount === 0) return
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  const off = host.value?.querySelector('iframe')?.getBoundingClientRect()
+  if (!off || rect.width === 0) return
+  popup.value = {
+    x: off.left + rect.left + rect.width / 2,
+    y: off.top + rect.bottom,
+    cfi: cfiRange,
+    existing: annotations.some((a) => a.cfi === cfiRange),
+  }
 }
 
 /**
@@ -257,18 +308,7 @@ function onHighlightClick(cfi: string, e: MouseEvent): void {
   const target = (e.target ?? e.currentTarget) as Element | null
   const rect = target?.getBoundingClientRect()
   if (!rect || rect.width === 0) return
-  popup.value = { x: rect.left + rect.width / 2, y: rect.bottom, cfi }
-}
-
-async function recolor(color: string): Promise<void> {
-  if (!rendition || !popup.value || !docPath) return
-  const { cfi } = popup.value
-  const ann = annotations.find((a) => a.cfi === cfi)
-  if (!ann) return
-  rendition.annotations.remove(cfi, 'highlight')
-  ann.color = color
-  applyOne(cfi, color)
-  await saveEpubSidecar(docPath, annotations)
+  popup.value = { x: rect.left + rect.width / 2, y: rect.bottom, cfi, existing: true }
 }
 
 async function deleteAnnot(): Promise<void> {
@@ -278,6 +318,37 @@ async function deleteAnnot(): Promise<void> {
   annotations = annotations.filter((a) => a.cfi !== cfi)
   popup.value = null
   await saveEpubSidecar(docPath, annotations)
+}
+
+/** Remove the transient citation-jump highlight (the blue block shown when a
+ *  `[[N]]` chip is clicked), if present. */
+function clearCitationHighlight(): void {
+  if (!lastHighlight || !rendition) return
+  try {
+    rendition.annotations.remove(lastHighlight, 'highlight')
+  } catch {
+    /* already gone */
+  }
+  lastHighlight = null
+}
+
+/** Dismiss both floating layers: the highlight popup and the citation mark. */
+function dismissOverlays(): void {
+  popup.value = null
+  clearCitationHighlight()
+}
+
+/** A mousedown on the page body (text, not a highlight) dismisses overlays. */
+function onContentMousedown(): void {
+  dismissOverlays()
+}
+
+/** A mousedown in the top document dismisses overlays, unless it lands on the
+ *  popup itself or on an existing highlight (which opens its own popup). */
+function onWindowMousedown(e: MouseEvent): void {
+  const t = e.target as Element | null
+  if (t?.closest?.('.bm-popup') || t?.closest?.('.bm-highlight')) return
+  dismissOverlays()
 }
 
 /* ───────── zoom (font size) ───────── */
@@ -309,13 +380,10 @@ async function maybeJump(): Promise<void> {
     const cfi = locs?.blocks[pend.blockId]?.cfi
     if (cfi) {
       await rendition.display(cfi)
-      if (lastHighlight) {
-        try {
-          rendition.annotations.remove(lastHighlight, 'highlight')
-        } catch {
-          /* already gone */
-        }
-      }
+      // A tab switch / unmount during the async display() can destroy the
+      // rendition out from under us — bail rather than deref null.
+      if (!rendition) return
+      clearCitationHighlight()
       rendition.annotations.highlight(cfi, {}, undefined, 'epub-hl', {
         fill: 'rgb(88 166 255)',
         'fill-opacity': '0.35',
@@ -423,17 +491,23 @@ function next(): void {
     <Teleport to="body">
       <div
         v-if="popup"
-        class="fixed z-50 flex items-center gap-1.5 px-2 py-1.5 rounded border border-border bg-bg-1 shadow-lg"
-        :style="{ left: `${popup.x - 60}px`, top: `${popup.y + 8}px` }"
+        class="bm-popup fixed z-50 flex items-center gap-1.5 px-2 py-1.5 rounded border border-border bg-bg-1 shadow-lg"
+        :style="{ left: `${popup.x - 64}px`, top: `${popup.y + 8}px` }"
       >
         <button
           v-for="c in HIGHLIGHT_COLORS"
           :key="c.value"
-          class="w-4 h-4 rounded-full border border-border"
+          class="w-5 h-5 rounded-full border border-border transition-transform hover:scale-110"
           :style="{ backgroundColor: c.value }"
-          @click="recolor(c.value)"
+          :title="`Highlight ${c.name}`"
+          @click="pickColor(c.value)"
         />
-        <button class="text-fg-3 hover:text-removed ml-1" title="Delete highlight" @click="deleteAnnot">
+        <button
+          v-if="popup.existing"
+          class="text-fg-3 hover:text-removed ml-1"
+          title="Delete highlight"
+          @click="deleteAnnot"
+        >
           <span class="codicon codicon-sm codicon-trash" />
         </button>
       </div>
