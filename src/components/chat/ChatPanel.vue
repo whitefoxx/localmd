@@ -180,6 +180,7 @@ onMounted(() => window.addEventListener('keydown', onScrollHotkey))
 onUnmounted(() => window.removeEventListener('keydown', onScrollHotkey))
 
 type ToolPart = Extract<MessagePart, { type: 'tool' }>
+type ThinkPart = Extract<MessagePart, { type: 'thinking' }>
 
 function toolTime(part: ToolPart): string {
   if (part.status === 'running') {
@@ -187,6 +188,17 @@ function toolTime(part: ToolPart): string {
   }
   const ms = part.elapsedMs ?? 0
   return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
+}
+
+/** Thinking duration: live-ticking while the block streams, frozen once sealed.
+ *  Empty for pre-timing transcripts (no startedAt). */
+function thinkTime(part: ThinkPart): string {
+  if (part.elapsedMs != null) {
+    const ms = part.elapsedMs
+    return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
+  }
+  if (part.startedAt == null) return ''
+  return `${Math.floor((now.value - part.startedAt) / 1000)}s`
 }
 
 /** Per-tool glyph so the transcript reads at a glance instead of a wall of
@@ -910,6 +922,7 @@ watch(
             >
               <summary class="cursor-pointer select-none hover:text-fg-2">
                 <span class="codicon codicon-sm codicon-lightbulb mr-1" />Thinking
+                <span v-if="thinkTime(part)" class="ml-1 tabular-nums text-fg-3">· {{ thinkTime(part) }}</span>
               </summary>
               <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">
                 {{ part.text }}

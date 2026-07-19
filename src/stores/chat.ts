@@ -42,7 +42,9 @@ type UserContent =
 
 export type MessagePart =
   | { type: 'text'; text: string }
-  | { type: 'thinking'; text: string }
+  /** `startedAt`/`elapsedMs` let the UI show how long the model thought.
+   *  `elapsedMs` is stamped when the block ends (other content begins / turn ends). */
+  | { type: 'thinking'; text: string; startedAt?: number; elapsedMs?: number }
   /** `status`/`startedAt`/`elapsedMs` are set only for id-bearing tool calls
    *  (external MCP tools) so the UI can show a loading spinner + timer;
    *  instant built-in tools stay status-less and render as a plain line. */
@@ -586,12 +588,23 @@ export const useChatStore = defineStore('chat', () => {
     const onEvent = (e: AgentEvent): void => {
       const parts = assistant.parts
       const last = parts[parts.length - 1]
+      // A thinking block ends the moment any other content begins — stamp its
+      // duration so the UI can show "thought for Ns".
+      if (
+        e.type !== 'thinking' &&
+        e.type !== 'usage' &&
+        last?.type === 'thinking' &&
+        last.startedAt != null &&
+        last.elapsedMs == null
+      ) {
+        last.elapsedMs = Date.now() - last.startedAt
+      }
       if (e.type === 'text') {
         if (last?.type === 'text') last.text += e.delta
         else parts.push({ type: 'text', text: e.delta })
       } else if (e.type === 'thinking') {
         if (last?.type === 'thinking') last.text += e.delta
-        else parts.push({ type: 'thinking', text: e.delta })
+        else parts.push({ type: 'thinking', text: e.delta, startedAt: Date.now() })
       } else if (e.type === 'usage') {
         const u = (assistant.usage ??= { input: 0, output: 0, cacheRead: 0 })
         u.input += e.input
@@ -747,6 +760,8 @@ export const useChatStore = defineStore('chat', () => {
         if (p.type === 'tool' && p.status === 'running') {
           p.status = assistant.error ? 'error' : 'done'
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
+        } else if (p.type === 'thinking' && p.startedAt != null && p.elapsedMs == null) {
+          p.elapsedMs = Date.now() - p.startedAt
         }
       }
       // A still-pending artifact means the turn died before the file was
