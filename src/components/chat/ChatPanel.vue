@@ -872,7 +872,7 @@ watch(
                     </button>
                   </div>
                   <pre
-                    class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
+                    class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
                   >{{ formatArgs(part) }}</pre>
                 </div>
                 <div v-if="part.result">
@@ -887,7 +887,7 @@ watch(
                     </button>
                   </div>
                   <pre
-                    class="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
+                    class="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-bg-2 px-2 py-1.5 text-fg-2 selectable"
                   >{{ part.result }}</pre>
                 </div>
               </div>
