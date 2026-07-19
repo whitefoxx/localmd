@@ -23,11 +23,16 @@ export const previewScroll = new Map<string, number>()
 export const pdfPage = new Map<string, number>()
 /** Last epub.js CFI per EPUB path. */
 export const epubLocation = new Map<string, string>()
+/** Cached epub.js locations JSON per EPUB path (for page numbers). Session-only
+ *  and not persisted — it's derivable by regenerating, just slow to compute. */
+export const epubLocations = new Map<string, string>()
 
 const LS_KEY = 'browser-md:reading-position:v1'
 interface KbPositions {
   pdf: Record<string, number>
   epub: Record<string, string>
+  /** epub.js locations JSON per path (page-number index; slow to regenerate). */
+  epubLocs?: Record<string, string>
 }
 type PersistStore = Record<string, KbPositions>
 
@@ -50,6 +55,7 @@ function persist(): void {
   store[currentKb] = {
     pdf: Object.fromEntries(pdfPage),
     epub: Object.fromEntries(epubLocation),
+    epubLocs: Object.fromEntries(epubLocations),
   }
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(store))
@@ -73,11 +79,19 @@ export function hydrateReadingPositions(kb: string | null): void {
   currentKb = kb
   pdfPage.clear()
   epubLocation.clear()
+  epubLocations.clear()
   if (!kb) return
   const bucket = readStore()[kb]
   if (!bucket) return
   for (const [path, page] of Object.entries(bucket.pdf ?? {})) pdfPage.set(path, page)
   for (const [path, cfi] of Object.entries(bucket.epub ?? {})) epubLocation.set(path, cfi)
+  for (const [path, json] of Object.entries(bucket.epubLocs ?? {})) epubLocations.set(path, json)
+}
+
+/** Persist a book's generated locations JSON so page numbers survive reloads. */
+export function rememberEpubLocations(path: string, json: string): void {
+  epubLocations.set(path, json)
+  scheduleSave()
 }
 
 export function rememberPdfPage(path: string, page: number): void {

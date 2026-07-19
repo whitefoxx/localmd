@@ -9,13 +9,18 @@
  */
 import * as fs from '@/lib/fs'
 
+// macOS Books-style palette — deeper/more saturated than the old pastels.
+// Highlights render at ~0.4 fill-opacity.
 export const HIGHLIGHT_COLORS: Array<{ name: string; value: string }> = [
-  { name: 'yellow', value: '#FFFF98' },
-  { name: 'green', value: '#B6F2C4' },
-  { name: 'blue', value: '#9CD7FF' },
-  { name: 'pink', value: '#FFCBE6' },
-  { name: 'red', value: '#FFA9AE' },
+  { name: 'yellow', value: '#FFD633' },
+  { name: 'green', value: '#7ED67E' },
+  { name: 'blue', value: '#57B7F0' },
+  { name: 'pink', value: '#FF8AAE' },
+  { name: 'purple', value: '#BB8AEA' },
 ]
+
+/** Underlines are always a single red — no color choice is offered for them. */
+export const UNDERLINE_COLOR = '#FF3B30'
 
 export function sidecarPath(source: string): string {
   return `${source}.annotations.json`
@@ -138,6 +143,8 @@ export interface EpubAnnotation {
   color: string
   text: string
   createdAt: string
+  /** Mark style. Absent = highlight (back-compat with older sidecars). */
+  style?: 'highlight' | 'underline'
 }
 
 export async function loadEpubSidecar(source: string): Promise<EpubAnnotation[]> {
