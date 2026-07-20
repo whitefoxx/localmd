@@ -9,10 +9,13 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { previewScroll } from '@/lib/viewMemory'
+import { useTtsHighlight } from '@/composables/useTtsHighlight'
 
 const files = useFilesStore()
 const scroller = ref<HTMLElement | null>(null)
 let shownPath: string | null = null
+
+useTtsHighlight(scroller) // highlight-follow the sentence being read aloud
 
 function saveScroll(): void {
   if (shownPath && scroller.value) previewScroll.set(shownPath, scroller.value.scrollTop)

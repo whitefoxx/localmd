@@ -7,12 +7,15 @@ import { handleCodeCopy } from '@/lib/copyCode'
 import { splitFrontmatter } from '@/lib/wiki'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
+import { useTtsHighlight } from '@/composables/useTtsHighlight'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
 
 const root = ref<HTMLElement | null>(null)
 const scroller = ref<HTMLElement | null>(null)
+
+useTtsHighlight(root) // highlight-follow the sentence being read aloud
 
 let shownPath: string | null = null
 

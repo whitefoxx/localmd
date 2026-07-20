@@ -31,6 +31,9 @@ import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind, isProseText } from '@/lib/filetypes'
+import { stripMarkdown } from '@/lib/tts'
+import { useTtsStore } from '@/stores/tts'
+import { baseName, splitFrontmatter } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
 
@@ -40,6 +43,7 @@ const actBtn =
 
 const kb = useKbStore()
 const files = useFilesStore()
+const tts = useTtsStore()
 const theme = useThemeStore()
 const review = useReviewStore()
 const git = useGitStore()
@@ -153,6 +157,21 @@ const isPlainText = computed(() => (files.currentPath ? isProseText(files.curren
 /* Annotation sidecars (*.annotations.json) always render as the annotations
    page — no raw-JSON view in-app. */
 const isAnnotations = computed(() => !!files.currentPath && isAnnotationsPath(files.currentPath))
+
+/** Read aloud: the current text selection if there is one, else the whole
+   markdown/plain-text file (markdown stripped to prose first). The button uses
+   mousedown.prevent so pressing it doesn't collapse the selection. */
+function readAloud(): void {
+  const path = files.currentPath
+  if (!path) return
+  const sel = window.getSelection()?.toString().trim()
+  if (sel) {
+    tts.speak(sel, '选中内容')
+    return
+  }
+  const body = splitFrontmatter(files.content).body
+  tts.speak(isMarkdown.value ? stripMarkdown(body) : body, baseName(path))
+}
 
 const saveLabel = computed(
   () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
@@ -384,17 +403,29 @@ function closeKb(): void {
              (and only here) is staged into the agent composer as context. -->
         <div class="flex-1 min-h-0 relative" data-file-selection>
             <!-- Editor actions (contextual: markdown + plain-text reading) -->
-            <button
+            <div
               v-if="(isMarkdown || isPlainText) && files.currentPath"
-              class="btn text-xs absolute top-2 right-3 z-10 shadow-sm"
-              @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
+              class="absolute top-2 right-3 z-10 flex gap-1"
             >
-              <span
-                class="codicon codicon-sm mr-1"
-                :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
-              />
-              {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
-            </button>
+              <button
+                class="btn text-xs shadow-sm"
+                title="朗读(有选中读选中)"
+                @mousedown.prevent
+                @click="readAloud"
+              >
+                <span class="codicon codicon-sm codicon-unmute" />
+              </button>
+              <button
+                class="btn text-xs shadow-sm"
+                @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
+              >
+                <span
+                  class="codicon codicon-sm mr-1"
+                  :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
+                />
+                {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
+              </button>
+            </div>
 
             <!-- PDFs stay mounted per open tab (trace-app pattern) — switching
                  tabs only toggles visibility, never reloads the document. -->

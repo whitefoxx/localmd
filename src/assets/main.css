@@ -112,6 +112,13 @@
   letter-spacing: 0.01em;
 }
 
+/* Read-aloud (TTS) highlight-follow: the sentence being spoken, via the CSS
+   Custom Highlight API (see composables/useTtsHighlight.ts). */
+::highlight(tts-sentence) {
+  background-color: rgb(var(--c-accent) / 0.22);
+  color: inherit;
+}
+
 /* Markdown preview styles (ported from trace-app) */
 .md-preview {
   @apply text-fg-1 leading-relaxed;

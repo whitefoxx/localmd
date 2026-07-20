@@ -50,3 +50,47 @@ export async function loadPdfLocations(source: string): Promise<PdfLocations | n
     return null
   }
 }
+
+/**
+ * Speech segments of a PDF from `fromPage` to the end, in reading order — text
+ * pulled from the section markdown files, page numbers from the block→page map
+ * so read-aloud can follow along page by page. Consecutive blocks on the same
+ * page merge into one segment. [] when unindexed.
+ */
+export async function loadPdfSpeechSegments(
+  source: string,
+  fromPage: number,
+): Promise<{ text: string; page?: number }[]> {
+  const indexDir = indexDirFor('pdf', source)
+  const raw = await fs.tryReadFile(`${indexDir}/manifest.json`)
+  if (!raw) return []
+  let manifest: PdfIndexManifest
+  try {
+    manifest = JSON.parse(raw) as PdfIndexManifest
+  } catch {
+    return []
+  }
+  const blocks = (await loadPdfLocations(source))?.blocks
+  const segments: { text: string; page?: number }[] = []
+  const push = (text: string, page: number | undefined): void => {
+    const last = segments[segments.length - 1]
+    if (last && last.page === page) last.text += `\n${text}`
+    else segments.push({ text, page })
+  }
+  for (const sec of manifest.sections) {
+    if (sec.endPage < fromPage) continue // whole section is behind us
+    const md = await fs.tryReadFile(`${indexDir}/${sec.file}`)
+    if (!md) continue
+    for (const line of md.split('\n')) {
+      // Section lines are "[[id]] text" (optionally "## [[id]] heading").
+      const m = /^(?:#{1,3}\s+)?\[\[([^\]]+)\]\]\s*(.*)$/.exec(line)
+      if (!m) continue
+      const text = m[2].trim()
+      if (!text) continue
+      const page = blocks?.[m[1]]?.page
+      if (page !== undefined && page < fromPage) continue // block before current page
+      push(text, page)
+    }
+  }
+  return segments
+}

@@ -64,6 +64,10 @@ export interface SettingsState {
   /** Built-in web_search / web_fetch via Jina AI Reader (no key). On by default;
    *  a fallback when the web-agent browser extension isn't connected. */
   jinaReader: boolean
+  /** Read-aloud (TTS): chosen Web Speech voice name (empty = auto-pick a Google
+   *  voice for the content language) and speech rate (0.5–2). */
+  ttsVoice: string
+  ttsRate: number
 }
 
 const STORAGE_KEY = 'browser-md:settings'
@@ -86,6 +90,12 @@ function clampMaxTabs(v: unknown): number {
   return Number.isFinite(n) ? Math.min(8, Math.max(2, n)) : 3
 }
 
+/** Speech rate: clamped to the Web Speech sane range, else 1×. */
+function clampRate(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? Math.min(2, Math.max(0.5, n)) : 1
+}
+
 const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   gitName: '',
   gitEmail: '',
@@ -97,6 +107,8 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   hotkeys: {},
   healthDirs: [],
   jinaReader: true,
+  ttsVoice: '',
+  ttsRate: 1,
 }
 
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
@@ -113,6 +125,8 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
       ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
       : [],
     jinaReader: obj.jinaReader !== false, // default on; only an explicit false disables
+    ttsVoice: String(obj.ttsVoice ?? ''),
+    ttsRate: clampRate(obj.ttsRate),
   }
 }
 

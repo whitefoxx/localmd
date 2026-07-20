@@ -88,6 +88,8 @@ describe('normalizeSettings — multi-profile shape', () => {
       hotkeys: {},
       healthDirs: [],
       jinaReader: true,
+      ttsVoice: '',
+      ttsRate: 1,
     }
     expect(normalizeSettings(null)).toEqual(empty)
     expect(normalizeSettings('x')).toEqual(empty)

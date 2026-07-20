@@ -6,6 +6,8 @@ import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
+import { useTtsStore } from '@/stores/tts'
+import { highlightSentence } from '@/composables/useTtsHighlight'
 import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
@@ -24,6 +26,7 @@ const files = useFilesStore()
 const citations = useCitationsStore()
 const theme = useThemeStore()
 const settings = useSettingsStore()
+const tts = useTtsStore()
 
 const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -131,6 +134,11 @@ async function load(path: string | null): Promise<void> {
   // registered, so a late registration leaves the opening chapter unbound and
   // arrow-key paging dies once focus is inside it (trace-app fix).
   rendition.hooks.content.register((contents: { document: Document }) => {
+    // Read-aloud highlight style — the CSS Highlight API is scoped per document,
+    // so each chapter iframe needs its own copy of the rule.
+    const hl = contents.document.createElement('style')
+    hl.textContent = '::highlight(tts-sentence){background-color:rgba(250,204,21,.4);color:inherit}'
+    contents.document.head?.appendChild(hl)
     contents.document.addEventListener('keydown', onKey)
     // A mousedown on the page body (never on a highlight — those live in an
     // overlay in the top document) dismisses the floating popup / citation mark.
@@ -599,6 +607,70 @@ function prev(): void {
 function next(): void {
   void rendition?.next()
 }
+
+/** The chapter iframes currently attached (spread mode can hold two). epub.js
+ *  renders same-origin, so we can read their text and highlight inside them. */
+function getContentsList(): Array<{ document: Document }> {
+  return (
+    (rendition as unknown as { getContents?: () => Array<{ document: Document }> })?.getContents?.() ??
+    []
+  )
+}
+
+/** Speak the currently displayed chapter (whole spine item). Returns false when
+ *  it has no text (image-only section). On natural finish, continue with the
+ *  next chapter — continuous listening through the book. */
+function speakCurrentChapter(): boolean {
+  const doc = getContentsList()[0]?.document
+  const text = doc?.body?.innerText?.trim()
+  if (!text) return false
+  tts.speak(text, chapterLabel.value || 'EPUB', { onFinish: () => void advanceAndContinue() })
+  return true
+}
+function readAloud(): void {
+  speakCurrentChapter()
+}
+
+/** Speak the passage selected in the chapter (from the selection popup). */
+function speakSelection(): void {
+  if (selText) tts.speak(selText, '选中内容')
+  popup.value = null
+}
+
+/** Turn to the next spine section (skipping text-less ones) and keep reading. */
+async function advanceAndContinue(): Promise<void> {
+  if (!book || !rendition) return
+  const cur = (rendition.currentLocation() as unknown as { start?: { href?: string } })?.start?.href
+  if (!cur) return
+  const items = (book.spine as unknown as { spineItems: Array<{ href: string }> }).spineItems
+  const at = items.findIndex((it) => it.href === cur || it.href.endsWith(cur))
+  if (at < 0) return
+  for (let i = at + 1; i < items.length; i++) {
+    await rendition.display(items[i].href)
+    if (speakCurrentChapter()) return
+  }
+}
+
+// Highlight-follow inside the chapter iframes as each sentence is spoken (no
+// scrollIntoView — epub.js owns the paginated layout). When the sentence sits on
+// a later column/page of the chapter, page forward so listening follows along;
+// paginated columns run horizontally, so "off-right" means "on a later page".
+watch(
+  () => tts.chunkText,
+  (c) => {
+    for (const ct of getContentsList()) {
+      const doc = ct.document
+      const range = highlightSentence(doc, doc.body, c || '', { scroll: false })
+      if (range && c) {
+        const win = doc.defaultView
+        const rect = range.getBoundingClientRect()
+        if (win && rect.width + rect.height > 0 && rect.left >= win.innerWidth) {
+          void rendition?.next()
+        }
+      }
+    }
+  },
+)
 </script>
 
 <template>
@@ -629,6 +701,9 @@ function next(): void {
       <span class="text-xs text-fg-3 w-9 text-center">{{ fontPct }}%</span>
       <button class="btn text-xs" title="Larger text" @click="setFont(fontPct + 10)">
         <span class="codicon codicon-sm codicon-zoom-in" />
+      </button>
+      <button class="btn text-xs" title="朗读本章" @click="readAloud">
+        <span class="codicon codicon-sm codicon-unmute" />
       </button>
 
       <!-- Chapter title, centered. Paging is arrow-keys only (no prev/next buttons). -->
@@ -719,6 +794,13 @@ function next(): void {
           @click="pickColor(c.value)"
         />
         <span class="w-px h-4 bg-border mx-0.5" />
+        <button
+          class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
+          title="朗读选中"
+          @click="speakSelection"
+        >
+          <span class="codicon codicon-sm codicon-unmute" />
+        </button>
         <button
           class="w-6 h-5 rounded flex items-center justify-center leading-none text-fg-3 hover:text-fg-1"
           title="Underline (red)"

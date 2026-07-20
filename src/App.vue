@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, watch } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -8,8 +8,10 @@ import { useGitStore } from '@/stores/git'
 import { useReviewStore } from '@/stores/review'
 import { useChatStore } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
+import { useTtsStore } from '@/stores/tts'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
+import TtsBar from '@/components/TtsBar.vue'
 import {
   newFileInteractive,
   moveInteractive,
@@ -22,7 +24,12 @@ const files = useFilesStore()
 const ui = useUiStore()
 const git = useGitStore()
 const settings = useSettingsStore()
+const tts = useTtsStore()
 useThemeStore() // instantiate so the html[data-theme] effect runs
+
+// Switching the open file stops any read-aloud in progress (it was reading the
+// previous document).
+watch(() => files.currentPath, () => tts.stop())
 
 function onFocus(): void {
   void files.refreshOnFocus()
@@ -98,5 +105,6 @@ onBeforeUnmount(() => {
   <div class="h-full bg-bg-0 text-fg-1">
     <AppLayout v-if="kb.isOpen" />
     <OpenKbScreen v-else />
+    <TtsBar />
   </div>
 </template>

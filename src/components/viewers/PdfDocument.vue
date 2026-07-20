@@ -13,16 +13,21 @@ import { PdfAnnotationSubtype, type PdfHighlightAnnoObject } from '@embedpdf/mod
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument } from '@/lib/docindex'
-import { loadPdfLocations } from '@/lib/docindex/pdf'
+import { loadPdfLocations, loadPdfSpeechSegments } from '@/lib/docindex/pdf'
 import { useCitationsStore, type AnnotationTarget, type PendingJump } from '@/stores/citations'
 import { sidecarRevision } from '@/lib/annotations'
 import { useThemeStore } from '@/stores/theme'
 import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
+import { useTtsStore } from '@/stores/tts'
+import { useFilesStore } from '@/stores/files'
+import { baseName } from '@/lib/wiki'
 
 const props = defineProps<{ path: string }>()
 
 const citations = useCitationsStore()
 const theme = useThemeStore()
+const tts = useTtsStore()
+const files = useFilesStore()
 
 const absoluteWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
 const blobUrl = ref<string | null>(null)
@@ -79,6 +84,55 @@ function getScrollApi(): ScrollApi | undefined {
   return (viewerRegistry?.getPlugin('scroll') as undefined | { provides?: () => ScrollApi })
     ?.provides?.()
 }
+
+/** Selected text from the engine's selection layer, '' when nothing selected. */
+async function getEngineSelection(): Promise<string> {
+  const api = (
+    viewerRegistry?.getPlugin('selection') as
+      | undefined
+      | { provides?: () => { getSelectedText?: () => { toPromise: () => Promise<string[]> } } }
+  )?.provides?.()
+  const lines = await api?.getSelectedText?.()
+    ?.toPromise()
+    .catch(() => [] as string[])
+  return (lines ?? []).join('\n').trim()
+}
+
+/** Read aloud: the engine selection if there is one, else the current page
+ *  onward (text comes from the doc-index, so it needs the PDF to have finished
+ *  indexing — which it auto-does on open). */
+let readingThis = false // this instance started the current playback
+async function readAloud(): Promise<void> {
+  const sel = await getEngineSelection()
+  if (sel) {
+    tts.speak(sel, '选中内容')
+    return
+  }
+  const page = getScrollApi()?.getCurrentPage?.() ?? 1
+  const segments = await loadPdfSpeechSegments(props.path, page)
+  if (!segments.length) return
+  readingThis = true
+  tts.speak(segments, baseName(props.path))
+}
+
+// Follow along: as playback crosses onto a new page, scroll the viewer there.
+// Gated on this instance having started the read AND being the visible tab.
+watch(
+  () => tts.chunkPage,
+  (page) => {
+    if (!readingThis || !page || files.currentPath !== props.path) return
+    const scroll = getScrollApi()
+    if (scroll && scroll.getCurrentPage?.() !== page) {
+      scroll.scrollToPage({ pageNumber: page, behavior: 'smooth' })
+    }
+  },
+)
+watch(
+  () => tts.playing,
+  (v) => {
+    if (!v) readingThis = false
+  },
+)
 
 /* ── Page memory (per path, survives tab switches and reopen) ────────────── */
 // The saved page is captured once in onReady, before any page-change event can
@@ -449,6 +503,15 @@ onBeforeUnmount(() => {
         <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
         跳转到上次阅读位置…
       </div>
+      <!-- Read aloud: selection if any, else the current page onward. -->
+      <button
+        class="btn text-xs absolute top-2 right-3 z-20 shadow-sm"
+        title="朗读(有选中读选中,否则从当前页起)"
+        @mousedown.prevent
+        @click="readAloud"
+      >
+        <span class="codicon codicon-sm codicon-unmute" />
+      </button>
     </div>
   </div>
 </template>
