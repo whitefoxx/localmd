@@ -102,6 +102,7 @@ async function getEngineSelection(): Promise<string> {
  *  onward (text comes from the doc-index, so it needs the PDF to have finished
  *  indexing — which it auto-does on open). */
 let readingThis = false // this instance started the current playback
+let ttsLocations: Awaited<ReturnType<typeof loadPdfLocations>> = null
 async function readAloud(): Promise<void> {
   const sel = await getEngineSelection()
   if (sel) {
@@ -111,26 +112,89 @@ async function readAloud(): Promise<void> {
   const page = getScrollApi()?.getCurrentPage?.() ?? 1
   const segments = await loadPdfSpeechSegments(props.path, page)
   if (!segments.length) return
+  ttsLocations = await loadPdfLocations(props.path) // cached for highlight-follow
   readingThis = true
   tts.speak(segments, baseName(props.path))
 }
 
-// Follow along: as playback crosses onto a new page, scroll the viewer there.
-// Gated on this instance having started the read AND being the visible tab.
+/* TTS follow: highlight the block being spoken as a native highlight annotation
+   (same mechanism as citation reveal — it tracks scroll/zoom for free) and
+   bring its page into view when playback crosses onto a new one. Gated on this
+   instance having started the read AND being the visible tab. */
+let ttsHighlightId: string | null = null
+let ttsHighlightPage: number | null = null
+let ttsCounter = 0
+
+function clearTtsHighlight(): void {
+  if (ttsHighlightId !== null && ttsHighlightPage !== null) {
+    annotationApi?.deleteAnnotation(ttsHighlightPage, ttsHighlightId)
+  }
+  ttsHighlightId = null
+  ttsHighlightPage = null
+}
+
 watch(
-  () => tts.chunkPage,
-  (page) => {
-    if (!readingThis || !page || files.currentPath !== props.path) return
+  () => tts.chunkBlock,
+  (blockId) => {
+    if (!readingThis) return
+    if (!blockId) {
+      clearTtsHighlight()
+      return
+    }
+    if (files.currentPath !== props.path || !annotationApi) return
+    const block = ttsLocations?.blocks[blockId]
+    const pageSize = block ? ttsLocations?.pageSizes?.[block.page - 1] : undefined
+    if (!block || !pageSize || block.rects.length === 0) return
+
+    const segmentRects = block.rects.map((r) => ({
+      origin: { x: r.x * pageSize.w, y: r.y * pageSize.h },
+      size: { width: r.w * pageSize.w, height: r.h * pageSize.h },
+    }))
+    const rect = segmentRects.reduce((a, s) => {
+      const x0 = Math.min(a.origin.x, s.origin.x)
+      const y0 = Math.min(a.origin.y, s.origin.y)
+      const x1 = Math.max(a.origin.x + a.size.width, s.origin.x + s.size.width)
+      const y1 = Math.max(a.origin.y + a.size.height, s.origin.y + s.size.height)
+      return { origin: { x: x0, y: y0 }, size: { width: x1 - x0, height: y1 - y0 } }
+    })
+
+    clearTtsHighlight()
+    const pageIndex = block.page - 1
+    const id = `bm-tts-${(ttsCounter += 1)}`
+    annotationApi.createAnnotation(pageIndex, {
+      type: PdfAnnotationSubtype.HIGHLIGHT,
+      id,
+      pageIndex,
+      rect,
+      segmentRects,
+      strokeColor: '#facc15',
+      opacity: 0.4,
+    } as PdfHighlightAnnoObject)
+    ttsHighlightId = id
+    ttsHighlightPage = pageIndex
+
     const scroll = getScrollApi()
-    if (scroll && scroll.getCurrentPage?.() !== page) {
-      scroll.scrollToPage({ pageNumber: page, behavior: 'smooth' })
+    if (scroll && scroll.getCurrentPage?.() !== block.page) {
+      scroll.scrollToPage({
+        pageNumber: block.page,
+        pageCoordinates: {
+          x: rect.origin.x + rect.size.width / 2,
+          y: rect.origin.y + rect.size.height / 2,
+        },
+        behavior: 'auto',
+        alignX: 50,
+        alignY: 50,
+      })
     }
   },
 )
 watch(
   () => tts.playing,
   (v) => {
-    if (!v) readingThis = false
+    if (!v) {
+      readingThis = false
+      clearTtsHighlight()
+    }
   },
 )
 
@@ -232,7 +296,8 @@ function handleEvent(api: AnnotationApi, e: AnnotationEvent, saved: Promise<Tran
     return
   }
   if (!initialLoadDone) return
-  if (e.annotation.id.startsWith('bm-cite-')) return // app-managed, never persisted
+  // App-managed overlays (citation flash, TTS follow) are never persisted.
+  if (e.annotation.id.startsWith('bm-cite-') || e.annotation.id.startsWith('bm-tts-')) return
   if (e.annotation.type === LINK_ANNOTATION_TYPE) return
   if (e.type === 'delete') {
     userAnnotations.delete(e.annotation.id)

@@ -30,11 +30,14 @@ export const useTtsStore = defineStore('tts', () => {
   const title = ref('') // label of what's being read, shown on the bar
   const chunkText = ref('') // the sentence currently being spoken (for highlight-follow)
   const chunkPage = ref<number | null>(null) // its source page, when segments carry one (PDF)
+  const chunkBlock = ref<string | null>(null) // its source block id (PDF highlight-follow)
 
   const available = computed(() => !!synth)
-  // Only Google voices in the picker (the user asked for those); local voices
-  // stay off the list but still power the automatic offline fallback.
+  // The picker groups Google voices (network, best quality) and local system
+  // voices (offline / zero-wait where Google is unreachable, e.g. mainland
+  // China). Local voices also power the automatic fallback.
   const googleVoices = computed(() => voices.value.filter((v) => v.name.startsWith('Google')))
+  const localVoices = computed(() => voices.value.filter((v) => v.localService))
 
   function loadVoices(): void {
     if (synth) voices.value = synth.getVoices()
@@ -62,6 +65,7 @@ export const useTtsStore = defineStore('tts', () => {
     }
     chunkText.value = chunks[idx].text // drives highlight-follow in the reading views
     chunkPage.value = chunks[idx].page ?? null
+    chunkBlock.value = chunks[idx].block ?? null
     const u = new SpeechSynthesisUtterance(chunks[idx].text)
     // Per-chunk language: mixed documents switch voice sentence by sentence.
     const v = pickVoice(voices.value, {
@@ -74,12 +78,30 @@ export const useTtsStore = defineStore('tts', () => {
       u.lang = v.lang
     }
     u.rate = settings.state.ttsRate || 1
+    // Watchdog: a network (Google) voice on a connection that can't reach Google
+    // (e.g. mainland China — navigator.onLine is TRUE but google.com is blocked)
+    // often hangs silently: no onstart, no onerror. If speech hasn't started in
+    // time, cancel and retry this chunk with a local voice.
+    const watchdog =
+      v && !v.localService && !fellBack
+        ? setTimeout(() => {
+            if (myGen !== gen) return
+            fellBack = true
+            synth.cancel() // its onerror('interrupted') is ignored below
+            speakChunk(myGen)
+          }, 4000)
+        : null
+    u.onstart = () => {
+      if (watchdog) clearTimeout(watchdog)
+    }
     u.onend = () => {
+      if (watchdog) clearTimeout(watchdog)
       if (myGen !== gen) return
       idx++
       speakChunk(myGen)
     }
     u.onerror = (e: SpeechSynthesisErrorEvent) => {
+      if (watchdog) clearTimeout(watchdog)
       if (myGen !== gen) return
       // cancel() during stop/replace surfaces here — already invalidated by gen.
       if (e.error === 'interrupted' || e.error === 'canceled') return
@@ -105,6 +127,7 @@ export const useTtsStore = defineStore('tts', () => {
     title.value = ''
     chunkText.value = ''
     chunkPage.value = null
+    chunkBlock.value = null
     const cb = onFinishCb
     onFinishCb = null
     if (natural) cb?.()
@@ -113,7 +136,7 @@ export const useTtsStore = defineStore('tts', () => {
   /** Start reading (label shown on the bar). Replaces any current read. Input is
    *  plain text, or segments carrying page metadata for follow-along. */
   function speak(
-    input: string | { text: string; page?: number }[],
+    input: string | { text: string; page?: number; block?: string }[],
     label = '',
     opts: { onFinish?: () => void } = {},
   ): void {
@@ -169,11 +192,13 @@ export const useTtsStore = defineStore('tts', () => {
     available,
     voices,
     googleVoices,
+    localVoices,
     playing,
     paused,
     title,
     chunkText,
     chunkPage,
+    chunkBlock,
     speak,
     pause,
     resume,

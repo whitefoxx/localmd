@@ -26,15 +26,20 @@ const settings = useSettingsStore()
       <span v-if="tts.title" class="text-xs text-fg-2 max-w-[160px] truncate" :title="tts.title">
         {{ tts.title }}
       </span>
-      <select
-        v-model="settings.state.ttsVoice"
-        class="input text-xs !w-auto py-0.5"
-        title="音色（Google）"
-      >
+      <select v-model="settings.state.ttsVoice" class="input text-xs !w-auto py-0.5" title="音色">
         <option value="">自动 · 按语言</option>
-        <option v-for="v in tts.googleVoices" :key="v.name" :value="v.name">
-          {{ v.name.replace(/^Google\s*/, '') }} · {{ v.lang }}
-        </option>
+        <optgroup v-if="tts.googleVoices.length" label="Google · 在线">
+          <option v-for="v in tts.googleVoices" :key="v.name" :value="v.name">
+            {{ v.name.replace(/^Google\s*/, '') }} · {{ v.lang }}
+          </option>
+        </optgroup>
+        <!-- Local system voices: offline-capable, zero-wait where Google is
+             unreachable (e.g. mainland China). -->
+        <optgroup v-if="tts.localVoices.length" label="本地 · 离线">
+          <option v-for="v in tts.localVoices" :key="v.name" :value="v.name">
+            {{ v.name }} · {{ v.lang }}
+          </option>
+        </optgroup>
       </select>
       <select
         v-model.number="settings.state.ttsRate"

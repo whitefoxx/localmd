@@ -41,19 +41,23 @@ export function splitIntoChunks(text: string, max = 220): string[] {
   return chunks
 }
 
-/** A speakable chunk with optional source metadata (PDF page) so playback can
- *  follow along in the viewer. */
+/** A speakable chunk with optional source metadata (PDF page / block id) so
+ *  playback can follow along — scroll to the page, highlight the block. */
 export interface SpeechChunk {
   text: string
   page?: number
+  block?: string
 }
 
-/** Chunk a list of segments, tagging every chunk with its segment's page. Used
- *  by the PDF reader so "which page is being spoken" survives the chunking. */
-export function chunkSegments(segments: { text: string; page?: number }[]): SpeechChunk[] {
+/** Chunk a list of segments, tagging every chunk with its segment's page/block.
+ *  Used by the PDF reader so "what is being spoken" survives the chunking. */
+export function chunkSegments(
+  segments: { text: string; page?: number; block?: string }[],
+): SpeechChunk[] {
   const out: SpeechChunk[] = []
   for (const seg of segments) {
-    for (const text of splitIntoChunks(seg.text)) out.push({ text, page: seg.page })
+    for (const text of splitIntoChunks(seg.text))
+      out.push({ text, page: seg.page, block: seg.block })
   }
   return out
 }
@@ -118,9 +122,14 @@ export function pickVoice(
   const chosen = opts.name ? voices.find((v) => v.name === opts.name) : undefined
   if (chosen && langMatch(chosen) && usable(chosen)) return chosen
   const pool = voices.filter(usable)
+  const matches = pool.filter(langMatch)
+  // A LOCAL explicit pick signals "stay offline-fast" (e.g. Google unreachable):
+  // auto-switching to another language then prefers local voices over Google.
+  const preferLocal = !!chosen?.localService
   return (
-    pool.find((v) => langMatch(v) && v.name.startsWith('Google')) ??
-    pool.find((v) => langMatch(v)) ??
+    (preferLocal ? matches.find((v) => v.localService) : undefined) ??
+    matches.find((v) => v.name.startsWith('Google')) ??
+    matches[0] ??
     (chosen && usable(chosen) ? chosen : null) ??
     pool.find((v) => v.name.startsWith('Google')) ??
     pool[0] ??

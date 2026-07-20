@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
-import ePub, { type Book, type Rendition, type NavItem } from 'epubjs'
+import ePub, { EpubCFI, type Book, type Rendition, type NavItem } from 'epubjs'
 import * as fs from '@/lib/fs'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
@@ -609,20 +609,48 @@ function next(): void {
 }
 
 /** The chapter iframes currently attached (spread mode can hold two). epub.js
- *  renders same-origin, so we can read their text and highlight inside them. */
-function getContentsList(): Array<{ document: Document }> {
-  return (
-    (rendition as unknown as { getContents?: () => Array<{ document: Document }> })?.getContents?.() ??
-    []
-  )
+ *  renders same-origin, so we can read their text, highlight inside them, and
+ *  map DOM Ranges to CFIs for follow-paging. */
+interface EpubContents {
+  document: Document
+  cfiFromRange?: (r: Range) => string
+  range?: (cfi: string) => Range
+}
+function getContentsList(): EpubContents[] {
+  return (rendition as unknown as { getContents?: () => EpubContents[] })?.getContents?.() ?? []
 }
 
-/** Speak the currently displayed chapter (whole spine item). Returns false when
- *  it has no text (image-only section). On natural finish, continue with the
+/** Chapter text from the top of the VISIBLE page to the chapter's end — reading
+ *  starts where the reader is, not at the chapter start. Falls back to the whole
+ *  chapter when the location CFI can't be resolved into the DOM. */
+function chapterTextFromHere(): string {
+  const ct = getContentsList()[0]
+  const doc = ct?.document
+  if (!doc?.body) return ''
+  const startCfi = (rendition?.currentLocation() as unknown as { start?: { cfi?: string } })?.start
+    ?.cfi
+  if (startCfi && ct.range) {
+    try {
+      const at = ct.range(startCfi)
+      if (at) {
+        const r = doc.createRange()
+        r.setStart(at.startContainer, at.startOffset)
+        r.setEndAfter(doc.body.lastChild ?? doc.body)
+        const text = r.toString().trim()
+        if (text) return text
+      }
+    } catch {
+      /* fall back to the whole chapter */
+    }
+  }
+  return doc.body.innerText?.trim() ?? ''
+}
+
+/** Speak the current chapter from the visible page onward. Returns false when
+ *  there's no text (image-only section). On natural finish, continue with the
  *  next chapter — continuous listening through the book. */
 function speakCurrentChapter(): boolean {
-  const doc = getContentsList()[0]?.document
-  const text = doc?.body?.innerText?.trim()
+  const text = chapterTextFromHere()
   if (!text) return false
   tts.speak(text, chapterLabel.value || 'EPUB', { onFinish: () => void advanceAndContinue() })
   return true
@@ -651,22 +679,24 @@ async function advanceAndContinue(): Promise<void> {
   }
 }
 
-// Highlight-follow inside the chapter iframes as each sentence is spoken (no
-// scrollIntoView — epub.js owns the paginated layout). When the sentence sits on
-// a later column/page of the chapter, page forward so listening follows along;
-// paginated columns run horizontally, so "off-right" means "on a later page".
+// Highlight-follow inside the chapter iframes as each sentence is spoken, and
+// page forward when the spoken sentence lies beyond the visible page. Geometry
+// can't tell us that — the iframe holds the WHOLE chapter and epub.js clips and
+// translates it (iframe innerWidth spans every column) — so compare the
+// sentence's CFI against the visible range's end CFI instead.
 watch(
   () => tts.chunkText,
   (c) => {
     for (const ct of getContentsList()) {
       const doc = ct.document
       const range = highlightSentence(doc, doc.body, c || '', { scroll: false })
-      if (range && c) {
-        const win = doc.defaultView
-        const rect = range.getBoundingClientRect()
-        if (win && rect.width + rect.height > 0 && rect.left >= win.innerWidth) {
-          void rendition?.next()
-        }
+      if (!range || !c || !rendition) continue
+      try {
+        const cfi = ct.cfiFromRange?.(range)
+        const end = (rendition.currentLocation() as unknown as { end?: { cfi?: string } })?.end?.cfi
+        if (cfi && end && new EpubCFI().compare(cfi, end) > 0) void rendition.display(cfi)
+      } catch {
+        /* highlight still shows; follow-paging is best-effort */
       }
     }
   },

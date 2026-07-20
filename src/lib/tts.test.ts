@@ -44,6 +44,12 @@ describe('chunkSegments', () => {
     expect(chunks.length).toBeGreaterThan(1)
     expect(chunks.every((c) => c.page === 7)).toBe(true)
   })
+
+  it('carries the block id through chunking', () => {
+    const chunks = chunkSegments([{ text: '一个文本块。', page: 3, block: 'b3-1' }])
+    expect(chunks[0].block).toBe('b3-1')
+    expect(chunks[0].page).toBe(3)
+  })
 })
 
 describe('guessLang', () => {
@@ -95,6 +101,14 @@ describe('pickVoice', () => {
     expect(
       pickVoice(voices, { name: 'Google 普通话（中国大陆）', lang: 'en', online: true })?.name,
     ).toBe('Google US English')
+  })
+
+  it('stays local when auto-switching from an explicitly LOCAL pick', () => {
+    // Local zh voice picked (user avoiding Google) → an English chunk gets the
+    // local en voice, not a Google one.
+    expect(pickVoice(voices, { name: 'Ting-Ting', lang: 'en', online: true })?.name).toBe(
+      'Samantha',
+    )
   })
 
   it('defaults to a Google voice for the language', () => {
