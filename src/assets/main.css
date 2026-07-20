@@ -96,6 +96,22 @@
   }
 }
 
+/* Plain-text (.txt) reading view — a serif reading column that keeps the file's
+   own whitespace and line breaks (no reflow) while wrapping over-long lines to
+   the measure. Comfortable for both prose and CJK; theme-aware color. */
+.txt-reader {
+  @apply text-fg-1;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Palatino LT STD', Georgia,
+    'Songti SC', 'Noto Serif SC', 'Noto Serif CJK SC', serif;
+  font-size: 17px;
+  line-height: 1.9;
+  letter-spacing: 0.01em;
+}
+
 /* Markdown preview styles (ported from trace-app) */
 .md-preview {
   @apply text-fg-1 leading-relaxed;
