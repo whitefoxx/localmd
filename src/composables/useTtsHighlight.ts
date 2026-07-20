@@ -25,33 +25,90 @@ function ctorFor(doc: Document): (new (r: Range) => unknown) | undefined {
   return (doc.defaultView as unknown as { Highlight?: new (r: Range) => unknown } | null)?.Highlight
 }
 
+/* Text index of a root element, cached per root: the concatenated text plus
+   each text node's cumulative start offset. Built ONCE per document and reused
+   for every sentence — the previous implementation rebuilt it (one object per
+   CHARACTER) and re-scanned from the top on every spoken sentence, janking the
+   main thread at exactly each utterance boundary. `lastEnd` makes consecutive
+   sentences resume the search where the previous one ended (spoken text runs in
+   document order), with a full-scan fallback for jumps and re-reads. */
+interface TextIndex {
+  full: string
+  nodes: Text[]
+  starts: number[]
+  lastEnd: number
+}
+const indexCache = new WeakMap<Node, TextIndex>()
+
+function buildIndex(doc: Document, root: Node): TextIndex {
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const nodes: Text[] = []
+  const starts: number[] = []
+  let full = ''
+  let n: Node | null
+  while ((n = walker.nextNode())) {
+    const t = n as Text
+    nodes.push(t)
+    starts.push(full.length)
+    full += t.data
+  }
+  return { full, nodes, starts, lastEnd: 0 }
+}
+
+/** Map a character offset in `full` back to (text node, in-node offset). */
+function locate(ix: TextIndex, offset: number): { node: Text; offset: number } | null {
+  let lo = 0
+  let hi = ix.starts.length - 1
+  let k = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1
+    if (ix.starts[mid] <= offset) {
+      k = mid
+      lo = mid + 1
+    } else hi = mid - 1
+  }
+  if (k < 0) return null
+  return { node: ix.nodes[k], offset: offset - ix.starts[k] }
+}
+
 /** Locate `needle` within `root`, tolerant of whitespace differences, and return
  *  a Range spanning it — possibly across element boundaries. Null when not
  *  found. Needle whitespace matches ZERO or more DOM whitespace ("\s*"): the
  *  sentence chunker joins sentences with a space, but CJK prose has none after
- *  。！？ — requiring one ("\s+") made every CJK chunk miss. */
+ *  。！？ — requiring one ("\s+") made every CJK chunk miss. A stale cache
+ *  (document mutated) self-heals: on any miss the index is rebuilt once. */
 function findTextRange(doc: Document, root: Node, needle: string): Range | null {
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  const map: { node: Text; offset: number }[] = []
-  let full = ''
-  let node: Node | null
-  while ((node = walker.nextNode())) {
-    const t = node as Text
-    for (let i = 0; i < t.data.length; i++) map.push({ node: t, offset: i })
-    full += t.data
-  }
   const trimmed = needle.trim()
   if (!trimmed) return null
   const pattern = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')
-  const m = new RegExp(pattern).exec(full)
-  if (!m) return null
-  const start = map[m.index]
-  const end = map[m.index + m[0].length - 1]
-  if (!start || !end) return null
-  const range = doc.createRange()
-  range.setStart(start.node, start.offset)
-  range.setEnd(end.node, end.offset + 1)
-  return range
+
+  const attempt = (ix: TextIndex): Range | null => {
+    const re = new RegExp(pattern, 'g')
+    re.lastIndex = ix.lastEnd
+    let m = re.exec(ix.full)
+    if (!m && ix.lastEnd > 0) {
+      re.lastIndex = 0
+      m = re.exec(ix.full)
+    }
+    if (!m) return null
+    const start = locate(ix, m.index)
+    const end = locate(ix, m.index + m[0].length - 1)
+    if (!start || !end || !start.node.isConnected || !end.node.isConnected) return null
+    ix.lastEnd = m.index + m[0].length
+    const range = doc.createRange()
+    range.setStart(start.node, start.offset)
+    range.setEnd(end.node, end.offset + 1)
+    return range
+  }
+
+  const cached = indexCache.get(root)
+  if (cached) {
+    const r = attempt(cached)
+    if (r) return r
+  }
+  const fresh = buildIndex(doc, root)
+  indexCache.set(root, fresh)
+  return attempt(fresh)
 }
 
 /** Highlight `chunk` within `root` of `doc`. Passing an empty chunk clears it.

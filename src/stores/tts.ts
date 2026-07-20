@@ -51,26 +51,64 @@ export const useTtsStore = defineStore('tts', () => {
   // Playback state (non-reactive; a generation token invalidates the callbacks
   // of a superseded/stopped run so a stray onend/onerror can't advance it).
   let chunks: SpeechChunk[] = []
-  let idx = 0
   let docLang: TtsLang = 'en' // whole-input language; fallback for signal-less chunks
   let fellBack = false
   let gen = 0
   let onFinishCb: (() => void) | null = null
+  let queuedUpTo = -1 // highest chunk index handed to the synth's queue
+  let watchdog: ReturnType<typeof setTimeout> | null = null
+  // Chrome GC-collects utterances the page no longer references and silently
+  // drops their events — a stalled queue mid-read. Hold in-flight ones strongly.
+  const live = new Set<SpeechSynthesisUtterance>()
 
-  function speakChunk(myGen: number): void {
-    if (!synth || myGen !== gen) return
-    if (idx >= chunks.length) {
-      finish(true)
-      return
+  function clearWatchdog(): void {
+    if (watchdog) {
+      clearTimeout(watchdog)
+      watchdog = null
     }
-    chunkText.value = chunks[idx].text // drives highlight-follow in the reading views
-    chunkPage.value = chunks[idx].page ?? null
-    chunkBlock.value = chunks[idx].block ?? null
-    const u = new SpeechSynthesisUtterance(chunks[idx].text)
+  }
+
+  /** Arm the silent-hang watchdog for chunk `i` (due to start now): a network
+   *  (Google) voice on a connection that can't reach Google (e.g. mainland
+   *  China — navigator.onLine is TRUE but google.com is blocked) often hangs
+   *  with no onstart and no onerror. After the fallback this is unnecessary:
+   *  restartFrom rebuilds the queue with local voices, which start instantly. */
+  function armWatchdog(i: number, myGen: number): void {
+    clearWatchdog()
+    if (fellBack) return
+    watchdog = setTimeout(() => {
+      watchdog = null
+      if (myGen !== gen || paused.value) return
+      fellBack = true
+      restartFrom(i, myGen)
+    }, 4000)
+  }
+
+  /** Cancel everything queued and rebuild from chunk `i`. Used when falling back
+   *  to local voices — the queued-ahead utterance still carries the dead network
+   *  voice, so it must be purged along with the current one. */
+  function restartFrom(i: number, myGen: number): void {
+    if (!synth || myGen !== gen) return
+    synth.cancel() // queued utterances surface onerror('interrupted') — ignored
+    queuedUpTo = i - 1
+    // cancel()+speak() in the same tick can wedge Chrome's synth — settle first.
+    setTimeout(() => queueAhead(i, myGen), 0)
+  }
+
+  /** Hand chunk `i` to the synth's queue. The queue always holds the playing
+   *  utterance PLUS the next one (queued from onstart), so the engine
+   *  transitions between sentences natively — no audible JS round-trip gap.
+   *  Voice and rate are locked in at queue time (one sentence ahead), so a bar
+   *  change takes effect within two sentences. */
+  function queueAhead(i: number, myGen: number): void {
+    if (!synth || myGen !== gen || i >= chunks.length || i <= queuedUpTo) return
+    queuedUpTo = i
+    const chunk = chunks[i]
+    const u = new SpeechSynthesisUtterance(chunk.text)
     // Per-chunk language: mixed documents switch voice sentence by sentence.
     const v = pickVoice(voices.value, {
       name: settings.state.ttsVoice || undefined,
-      lang: guessLang(chunks[idx].text, docLang),
+      lang: guessLang(chunk.text, docLang),
       online: navigator.onLine && !fellBack,
     })
     if (v) {
@@ -78,43 +116,43 @@ export const useTtsStore = defineStore('tts', () => {
       u.lang = v.lang
     }
     u.rate = settings.state.ttsRate || 1
-    // Watchdog: a network (Google) voice on a connection that can't reach Google
-    // (e.g. mainland China — navigator.onLine is TRUE but google.com is blocked)
-    // often hangs silently: no onstart, no onerror. If speech hasn't started in
-    // time, cancel and retry this chunk with a local voice.
-    const watchdog =
-      v && !v.localService && !fellBack
-        ? setTimeout(() => {
-            if (myGen !== gen) return
-            fellBack = true
-            synth.cancel() // its onerror('interrupted') is ignored below
-            speakChunk(myGen)
-          }, 4000)
-        : null
     u.onstart = () => {
-      if (watchdog) clearTimeout(watchdog)
+      if (myGen !== gen) return
+      clearWatchdog()
+      chunkText.value = chunk.text // drives highlight-follow in the viewers
+      chunkPage.value = chunk.page ?? null
+      chunkBlock.value = chunk.block ?? null
+      queueAhead(i + 1, myGen) // keep the next sentence buffered behind this one
     }
     u.onend = () => {
-      if (watchdog) clearTimeout(watchdog)
+      live.delete(u)
       if (myGen !== gen) return
-      idx++
-      speakChunk(myGen)
+      if (i + 1 >= chunks.length) {
+        finish(true)
+        return
+      }
+      armWatchdog(i + 1, myGen) // the queued next is due to start immediately
+      if (queuedUpTo < i + 1) queueAhead(i + 1, myGen) // edge: never got queued
     }
     u.onerror = (e: SpeechSynthesisErrorEvent) => {
-      if (watchdog) clearTimeout(watchdog)
+      live.delete(u)
+      clearWatchdog()
       if (myGen !== gen) return
-      // cancel() during stop/replace surfaces here — already invalidated by gen.
+      // cancel() during stop/replace/fallback surfaces here — already handled.
       if (e.error === 'interrupted' || e.error === 'canceled') return
-      // A network (Google) voice failed → retry this chunk once with a local one.
+      // A network (Google) voice failed → rebuild from this chunk with local
+      // voices (the queued-ahead utterance carries the same dead voice).
       if (!fellBack && (e.error === 'network' || e.error.startsWith('synthesis'))) {
         fellBack = true
-        speakChunk(myGen)
+        restartFrom(i, myGen)
         return
       }
       // Otherwise skip the bad chunk so one failure can't stall the whole read.
-      idx++
-      speakChunk(myGen)
+      if (i + 1 >= chunks.length) finish(true)
+      else if (queuedUpTo < i + 1) queueAhead(i + 1, myGen)
+      // (when the next chunk is already queued, the engine advances on its own)
     }
+    live.add(u)
     synth.speak(u)
   }
 
@@ -122,6 +160,8 @@ export const useTtsStore = defineStore('tts', () => {
    *  fires the onFinish callback — that's what lets the EPUB reader chain the
    *  next chapter without a stop button triggering runaway auto-advance. */
   function finish(natural = false): void {
+    clearWatchdog()
+    live.clear()
     playing.value = false
     paused.value = false
     title.value = ''
@@ -153,8 +193,8 @@ export const useTtsStore = defineStore('tts', () => {
       return
     }
     chunks = cs
-    idx = 0
     fellBack = false
+    queuedUpTo = -1
     docLang = guessLang(cs.map((c) => c.text).join(' '))
     title.value = label
     playing.value = true
@@ -163,7 +203,10 @@ export const useTtsStore = defineStore('tts', () => {
     // cancel()+speak() in the same tick can wedge Chrome's synth — let the
     // cancel settle first. myGen guards against a stop/replace landing meanwhile.
     const myGen = gen
-    setTimeout(() => speakChunk(myGen), 0)
+    setTimeout(() => {
+      armWatchdog(0, myGen)
+      queueAhead(0, myGen)
+    }, 0)
   }
 
   function pause(): void {
