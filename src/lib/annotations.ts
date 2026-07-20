@@ -69,9 +69,10 @@ export interface RawPdfAnnotation {
     pageIndex: number
     created?: string
     id: string
-    /** `text` = the highlighted excerpt (EmbedPDF fills it); `note` = the
-     *  user's own comment, edited on the annotations page. */
-    custom?: { text?: string; note?: string }
+    /** Standard PDF comment field — the user's note on any annotation. */
+    contents?: string
+    /** `text` = the marked passage, stashed by EmbedPDF for text markups. */
+    custom?: { text?: string }
     author?: string
     [k: string]: unknown
   }
@@ -206,6 +207,101 @@ export function compareCfi(a: string, b: string): number {
   return 0
 }
 
+/* ───────── categories (shared by the viewer + the agent digest) ───────── */
+
+/** PDF/EmbedPDF annotation subtype numbers → display names (from the engine's
+ *  PdfAnnotationSubtype enum). Used to label 'other' marks. */
+export const PDF_SUBTYPE_NAMES: Record<number, string> = {
+  1: 'Text', 2: 'Link', 3: 'FreeText', 4: 'Line', 5: 'Square', 6: 'Circle',
+  7: 'Polygon', 8: 'Polyline', 9: 'Highlight', 10: 'Underline', 11: 'Squiggly',
+  12: 'Strikeout', 13: 'Stamp', 14: 'Caret', 15: 'Ink', 16: 'Popup',
+  17: 'FileAttachment', 18: 'Sound', 19: 'Movie', 20: 'Widget', 21: 'Screen',
+  22: 'PrinterMark', 23: 'TrapNet', 24: 'Watermark', 25: '3D', 26: 'RichMedia',
+  27: 'XFAWidget', 28: 'Redact',
+}
+
+/** Highlight, underline and note/comment are first-class; every other subtype
+ *  (strikeout, ink, shapes, …) collapses to 'other'. */
+export type AnnotationCategory = 'highlight' | 'underline' | 'note' | 'other'
+
+export function pdfCategory(type: number): AnnotationCategory {
+  if (type === 9) return 'highlight'
+  if (type === 10) return 'underline'
+  if (type === 1 || type === 3) return 'note' // Text / FreeText = a standalone comment
+  return 'other'
+}
+
+/** Normalized annotation, unified across PDF and EPUB sidecars. `origIndex` is
+ *  the entry's position in the sidecar's `annotations` array — the edit handle. */
+export interface AnnotationItem {
+  id: string
+  category: AnnotationCategory
+  /** Subtype name, surfaced for 'other' marks (e.g. 'Ink', 'Strikeout'). */
+  typeLabel: string
+  color: string
+  /** The marked passage (empty for standalone notes). */
+  excerpt: string
+  /** The user's own comment. */
+  comment: string
+  createdAt: string
+  /** PDF: 1-based page + region (for the jump). */
+  page?: number
+  rects?: { x: number; y: number; w: number; h: number }[]
+  /** EPUB: range CFI (for the jump). */
+  cfi?: string
+  origIndex: number
+}
+
+function pdfRects(a: RawPdfAnnotation['annotation']): { x: number; y: number; w: number; h: number }[] {
+  const segs = a.segmentRects?.length ? a.segmentRects : a.rect ? [a.rect] : []
+  return segs.map((r) => ({ x: r.origin.x, y: r.origin.y, w: r.size.width, h: r.size.height }))
+}
+
+/** Build the display/edit model for a sidecar, sorted into reading order. */
+export function buildAnnotationItems(source: string, annotations: unknown[]): AnnotationItem[] {
+  const kind = fileKind(source)
+  const items: AnnotationItem[] = []
+  annotations.forEach((entry, i) => {
+    if (kind === 'pdf') {
+      const a = (entry as RawPdfAnnotation)?.annotation
+      if (!a || typeof a.pageIndex !== 'number' || !a.id) return
+      items.push({
+        id: a.id,
+        category: pdfCategory(a.type),
+        typeLabel: PDF_SUBTYPE_NAMES[a.type] ?? `Type ${a.type}`,
+        color: a.color ?? a.strokeColor ?? HIGHLIGHT_COLORS[0].value,
+        excerpt: a.custom?.text ?? '',
+        comment: a.contents ?? '',
+        createdAt: a.created ?? '',
+        page: a.pageIndex + 1,
+        rects: pdfRects(a),
+        origIndex: i,
+      })
+    } else {
+      const a = entry as EpubAnnotation
+      if (typeof a?.cfi !== 'string') return
+      const category: AnnotationCategory = a.style === 'underline' ? 'underline' : 'highlight'
+      items.push({
+        id: a.cfi,
+        category,
+        typeLabel: category,
+        color: category === 'underline' ? UNDERLINE_COLOR : a.color,
+        excerpt: a.text ?? '',
+        comment: a.note ?? '',
+        createdAt: a.createdAt ?? '',
+        cfi: a.cfi,
+        origIndex: i,
+      })
+    }
+  })
+  if (kind === 'pdf') {
+    items.sort((x, y) => x.page! - y.page! || (x.rects?.[0]?.y ?? 0) - (y.rects?.[0]?.y ?? 0))
+  } else {
+    items.sort((x, y) => compareCfi(x.cfi!, y.cfi!))
+  }
+  return items
+}
+
 /* ───────── agent-facing digest ───────── */
 
 function colorName(hex: string): string {
@@ -213,12 +309,21 @@ function colorName(hex: string): string {
   return known?.name ?? hex
 }
 
-function digestEntry(color: string, style: string, date: string, text: string, note: string): string {
-  const when = date ? ` · ${date.slice(0, 10)}` : ''
-  const excerpt = text.replace(/\s+/g, ' ').trim()
-  let line = `- [${colorName(color)} ${style}${when}] "${excerpt || '(no text captured)'}"`
-  if (note.trim()) line += `\n  Note: ${note.trim()}`
-  return line
+function digestLine(it: AnnotationItem): string {
+  const when = it.createdAt ? ` · ${it.createdAt.slice(0, 10)}` : ''
+  const label =
+    it.category === 'highlight'
+      ? `${colorName(it.color)} highlight`
+      : it.category === 'other'
+        ? it.typeLabel.toLowerCase()
+        : it.category
+  if (it.excerpt.trim()) {
+    let line = `- [${label}${when}] "${it.excerpt.replace(/\s+/g, ' ').trim()}"`
+    if (it.comment.trim()) line += `\n  Note: ${it.comment.trim()}`
+    return line
+  }
+  // Standalone note / mark with no captured passage.
+  return `- [${label}${when}] ${it.comment.trim() || '(no text)'}`
 }
 
 /**
@@ -228,7 +333,6 @@ function digestEntry(color: string, style: string, date: string, text: string, n
  */
 export function renderAnnotationsDigest(sidecar: string, json: string): string | null {
   const source = annotationSource(sidecar)
-  const kind = fileKind(source)
   let parsed: { annotations?: unknown[] }
   try {
     parsed = JSON.parse(json) as { annotations?: unknown[] }
@@ -236,33 +340,25 @@ export function renderAnnotationsDigest(sidecar: string, json: string): string |
     return null
   }
   if (!Array.isArray(parsed.annotations)) return null
+  const items = buildAnnotationItems(source, parsed.annotations)
   const name = source.slice(source.lastIndexOf('/') + 1)
   const head =
-    `# Annotations — ${name} (${parsed.annotations.length})\n\n` +
+    `# Annotations — ${name} (${items.length})\n\n` +
     `Source book: ${source} · sidecar: ${sidecar} (JSON, rendered here for readability)\n`
-  if (kind === 'pdf') {
-    const highlights = (parsed.annotations as RawPdfAnnotation[])
-      .map((raw) => ({ h: toPdfHighlight(raw), note: raw.annotation?.custom?.note ?? '', created: raw.annotation?.created ?? '' }))
-      .filter((x): x is { h: PdfHighlight; note: string; created: string } => x.h !== null)
-      .sort((a, b) => a.h.pageIndex - b.h.pageIndex || (a.h.rects[0]?.y ?? 0) - (b.h.rects[0]?.y ?? 0))
+  if (fileKind(source) === 'pdf') {
     const byPage = new Map<number, string[]>()
-    for (const { h, note, created } of highlights) {
-      const lines = byPage.get(h.pageIndex) ?? []
-      lines.push(digestEntry(h.color, 'highlight', created, h.text, note))
-      byPage.set(h.pageIndex, lines)
+    for (const it of items) {
+      const lines = byPage.get(it.page!) ?? []
+      lines.push(digestLine(it))
+      byPage.set(it.page!, lines)
     }
     const body = [...byPage.entries()]
-      .map(([page, lines]) => `\n## Page ${page + 1}\n${lines.join('\n')}`)
+      .sort((a, b) => a[0] - b[0])
+      .map(([page, lines]) => `\n## Page ${page}\n${lines.join('\n')}`)
       .join('\n')
     return head + body
   }
-  const items = (parsed.annotations as EpubAnnotation[])
-    .filter((a) => typeof a?.cfi === 'string')
-    .sort((a, b) => compareCfi(a.cfi, b.cfi))
-    .map((a) =>
-      digestEntry(a.color ?? '', a.style ?? 'highlight', a.createdAt ?? '', a.text ?? '', a.note ?? ''),
-    )
-  return `${head}\n${items.join('\n')}`
+  return `${head}\n${items.map(digestLine).join('\n')}`
 }
 
 export async function loadEpubSidecar(source: string): Promise<EpubAnnotation[]> {

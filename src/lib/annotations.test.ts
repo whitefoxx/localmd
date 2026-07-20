@@ -4,6 +4,8 @@ import {
   isAnnotationsPath,
   annotationSource,
   compareCfi,
+  pdfCategory,
+  buildAnnotationItems,
   renderAnnotationsDigest,
   toPdfHighlight,
   makeRawPdfAnnotation,
@@ -47,8 +49,81 @@ describe('compareCfi', () => {
   })
 })
 
+describe('pdfCategory', () => {
+  it('maps subtype numbers to first-class categories', () => {
+    expect(pdfCategory(9)).toBe('highlight')
+    expect(pdfCategory(10)).toBe('underline')
+    expect(pdfCategory(3)).toBe('note') // FreeText
+    expect(pdfCategory(1)).toBe('note') // Text
+    expect(pdfCategory(12)).toBe('other') // Strikeout
+    expect(pdfCategory(28)).toBe('other') // Redact
+  })
+})
+
+describe('buildAnnotationItems', () => {
+  const pdf = [
+    {
+      annotation: {
+        type: 9,
+        strokeColor: '#FFD633',
+        segmentRects: [{ origin: { x: 5, y: 30 }, size: { width: 10, height: 10 } }],
+        pageIndex: 4,
+        created: '2026-05-19T00:00:00Z',
+        id: 'hl',
+        custom: { text: 'the highlight' },
+        contents: 'a comment',
+      },
+    },
+    {
+      annotation: {
+        type: 10,
+        strokeColor: '#E44234',
+        rect: { origin: { x: 0, y: 10 }, size: { width: 4, height: 4 } },
+        pageIndex: 4,
+        id: 'ul',
+        custom: { text: 'underlined bit' },
+      },
+    },
+    {
+      annotation: {
+        type: 3,
+        rect: { origin: { x: 0, y: 0 }, size: { width: 4, height: 4 } },
+        pageIndex: 0,
+        id: 'note',
+        contents: 'a standalone note',
+      },
+    },
+  ]
+
+  it('categorizes, extracts excerpt/comment, and sorts by page then y', () => {
+    const items = buildAnnotationItems('raw/b.pdf', pdf)
+    expect(items.map((i) => i.category)).toEqual(['note', 'underline', 'highlight'])
+    const hl = items.find((i) => i.id === 'hl')!
+    expect(hl.excerpt).toBe('the highlight')
+    expect(hl.comment).toBe('a comment')
+    expect(hl.page).toBe(5)
+    const note = items.find((i) => i.id === 'note')!
+    expect(note.excerpt).toBe('')
+    expect(note.comment).toBe('a standalone note')
+  })
+
+  it('reports the subtype name for other marks', () => {
+    const items = buildAnnotationItems('raw/b.pdf', [
+      { annotation: { type: 15, rect: { origin: { x: 0, y: 0 }, size: { width: 1, height: 1 } }, pageIndex: 0, id: 'ink' } },
+    ])
+    expect(items[0].category).toBe('other')
+    expect(items[0].typeLabel).toBe('Ink')
+  })
+
+  it('carries origIndex through the sort (edit handle)', () => {
+    const items = buildAnnotationItems('raw/b.pdf', pdf)
+    expect(items.find((i) => i.id === 'note')!.origIndex).toBe(2)
+    expect(items.find((i) => i.id === 'hl')!.origIndex).toBe(0)
+  })
+})
+
 describe('renderAnnotationsDigest', () => {
-  it('renders PDF sidecars grouped by page, with notes', () => {
+  it('renders PDF sidecars grouped by page, with categories and comments', () => {
     const json = JSON.stringify({
       version: 1,
       annotations: [
@@ -60,7 +135,8 @@ describe('renderAnnotationsDigest', () => {
             pageIndex: 4,
             created: '2026-05-19T13:09:39.101Z',
             id: 'a1',
-            custom: { text: 'excerpt one', note: 'my thought' },
+            custom: { text: 'excerpt one' },
+            contents: 'my thought',
           },
         },
       ],
@@ -69,7 +145,7 @@ describe('renderAnnotationsDigest', () => {
     expect(out).toContain('## Page 5')
     expect(out).toContain('"excerpt one"')
     expect(out).toContain('Note: my thought')
-    expect(out).toContain('yellow')
+    expect(out).toContain('yellow highlight')
     expect(out).toContain('Source book: raw/b.pdf')
   })
 

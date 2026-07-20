@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -25,7 +25,7 @@ import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
 import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
 import AnnotationsViewer from '@/components/viewers/AnnotationsViewer.vue'
-import { isAnnotationsPath, annotationSource, notifySidecarChanged } from '@/lib/annotations'
+import { isAnnotationsPath } from '@/lib/annotations'
 import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
@@ -147,27 +147,9 @@ async function onDrop(e: DragEvent): Promise<void> {
 const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
 const isMarkdown = computed(() => kind.value === 'markdown')
 
-/* Annotation sidecars open as a rendered page by default; a floating toggle
-   (same slot as markdown's Edit/Preview) switches to the raw JSON editor. */
-const isAnnotations = computed(
-  () => !!files.currentPath && isAnnotationsPath(files.currentPath),
-)
-const annotationsRaw = ref(false)
-watch(
-  () => files.currentPath,
-  (_now, prev) => {
-    annotationsRaw.value = false
-    // Leaving a sidecar tab (possibly after raw edits): let live viewers re-sync.
-    if (prev && isAnnotationsPath(prev)) notifySidecarChanged(annotationSource(prev))
-  },
-)
-async function toggleAnnotationsRaw(): Promise<void> {
-  if (annotationsRaw.value && files.currentPath) {
-    await files.flush() // commit raw edits before re-rendering the page
-    notifySidecarChanged(annotationSource(files.currentPath))
-  }
-  annotationsRaw.value = !annotationsRaw.value
-}
+/* Annotation sidecars (*.annotations.json) always render as the annotations
+   page — no raw-JSON view in-app. */
+const isAnnotations = computed(() => !!files.currentPath && isAnnotationsPath(files.currentPath))
 
 const saveLabel = computed(
   () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
@@ -398,7 +380,7 @@ function closeKb(): void {
         <!-- data-file-selection marks the open-file region: text selected here
              (and only here) is staged into the agent composer as context. -->
         <div class="flex-1 min-h-0 relative" data-file-selection>
-            <!-- Editor actions (contextual: markdown edit/preview, annotations raw) -->
+            <!-- Editor actions (contextual, markdown only) -->
             <button
               v-if="isMarkdown && files.currentPath"
               class="btn text-xs absolute top-2 right-3 z-10 shadow-sm"
@@ -410,17 +392,6 @@ function closeKb(): void {
               />
               {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
             </button>
-            <button
-              v-else-if="isAnnotations"
-              class="btn text-xs absolute top-2 right-3 z-10 shadow-sm"
-              @click="toggleAnnotationsRaw"
-            >
-              <span
-                class="codicon codicon-sm mr-1"
-                :class="annotationsRaw ? 'codicon-open-preview' : 'codicon-json'"
-              />
-              {{ annotationsRaw ? '渲染' : 'Raw' }}
-            </button>
 
             <!-- PDFs stay mounted per open tab (trace-app pattern) — switching
                  tabs only toggles visibility, never reloads the document. -->
@@ -428,7 +399,7 @@ function closeKb(): void {
             <template v-if="files.currentPath && kind !== 'pdf'">
               <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
               <MarkdownPreview v-else-if="isMarkdown" />
-              <AnnotationsViewer v-else-if="isAnnotations && !annotationsRaw" />
+              <AnnotationsViewer v-else-if="isAnnotations" />
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
               <EpubViewer v-else-if="kind === 'epub'" />

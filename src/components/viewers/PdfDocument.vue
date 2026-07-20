@@ -392,9 +392,11 @@ async function reloadFromSidecar(): Promise<void> {
   if (!annotationApi || !initialLoadDone) return
   const items = await readSidecar()
   const next = new Map(items.map((it) => [it.annotation.id, it]))
-  for (const [id, it] of userAnnotations) {
+  // Snapshot keys first: deleteAnnotation fires a 'delete' event that mutates
+  // userAnnotations, which would corrupt a live iteration.
+  for (const id of [...userAnnotations.keys()]) {
     if (next.has(id)) continue
-    const pageIndex = (it.annotation as { pageIndex?: unknown }).pageIndex
+    const pageIndex = (userAnnotations.get(id)!.annotation as { pageIndex?: unknown }).pageIndex
     if (typeof pageIndex === 'number') annotationApi.deleteAnnotation(pageIndex, id)
   }
   const added = items.filter((it) => !userAnnotations.has(it.annotation.id))
