@@ -5,6 +5,8 @@ import * as fs from '@/lib/fs'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
+import { useSettingsStore } from '@/stores/settings'
+import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
 import { epubLocation, epubLocations, rememberEpubLocation, rememberEpubLocations } from '@/lib/viewMemory'
@@ -21,6 +23,7 @@ type MarkStyle = 'highlight' | 'underline'
 const files = useFilesStore()
 const citations = useCitationsStore()
 const theme = useThemeStore()
+const settings = useSettingsStore()
 
 const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -226,8 +229,33 @@ watch(
 )
 
 function onKey(e: KeyboardEvent): void {
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') next()
-  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') prev()
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+    next()
+    return
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    prev()
+    return
+  }
+  // Focus is inside the chapter iframe, so global shortcuts (⌘S/⌘K/…) fire in
+  // the iframe's document and never reach App.vue's window listener — the reason
+  // hotkeys go dead the moment you click into the page. Forward only the combos
+  // that are real app hotkeys: kill the browser default (⌘S save dialog, ⌘P
+  // print) and re-dispatch on window so the single registry in App.vue runs the
+  // command. Non-hotkey combos (⌘C copy, ⌘A select-all, ⌘F find) are left alone.
+  if (resolveHotkey(e, settings.state.hotkeys)) {
+    e.preventDefault()
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: e.key,
+        code: e.code,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+      }),
+    )
+  }
 }
 
 function isTypingTarget(t: EventTarget | null): boolean {
