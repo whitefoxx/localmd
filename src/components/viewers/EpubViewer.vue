@@ -7,6 +7,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
 import { useTtsStore } from '@/stores/tts'
+import { highlightSentence } from '@/composables/useTtsHighlight'
 import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
@@ -133,6 +134,11 @@ async function load(path: string | null): Promise<void> {
   // registered, so a late registration leaves the opening chapter unbound and
   // arrow-key paging dies once focus is inside it (trace-app fix).
   rendition.hooks.content.register((contents: { document: Document }) => {
+    // Read-aloud highlight style — the CSS Highlight API is scoped per document,
+    // so each chapter iframe needs its own copy of the rule.
+    const hl = contents.document.createElement('style')
+    hl.textContent = '::highlight(tts-sentence){background-color:rgba(250,204,21,.4);color:inherit}'
+    contents.document.head?.appendChild(hl)
     contents.document.addEventListener('keydown', onKey)
     // A mousedown on the page body (never on a highlight — those live in an
     // overlay in the top document) dismisses the floating popup / citation mark.
@@ -602,19 +608,31 @@ function next(): void {
   void rendition?.next()
 }
 
-/** Read the current chapter aloud: epub.js renders each chapter in a same-origin
- *  iframe, so its Contents give us the chapter's plain text (whole spine item,
- *  not just the visible page) to hand to the TTS controller. */
-function readAloud(): void {
+/** The current chapter's iframe document — epub.js renders chapters same-origin,
+ *  so we can read their text and highlight inside them. */
+function currentChapterDoc(): Document | null {
   const contents =
     (rendition as unknown as { getContents?: () => Array<{ document: Document }> })?.getContents?.() ??
     []
-  const text = contents
-    .map((c) => c.document?.body?.innerText ?? '')
-    .join('\n')
-    .trim()
+  return contents[0]?.document ?? null
+}
+
+/** Read the current chapter aloud (whole spine item, not just the visible page). */
+function readAloud(): void {
+  const text = currentChapterDoc()?.body?.innerText?.trim()
   if (text) tts.speak(text, chapterLabel.value || 'EPUB')
 }
+
+// Highlight-follow inside the chapter iframe as each sentence is spoken. No
+// auto-scroll: epub.js owns the paginated layout, so we must not scroll it — the
+// highlight shows while the spoken sentence is on the current page.
+watch(
+  () => tts.chunkText,
+  (c) => {
+    const doc = currentChapterDoc()
+    if (doc) highlightSentence(doc, doc.body, c || '', { scroll: false })
+  },
+)
 </script>
 
 <template>
