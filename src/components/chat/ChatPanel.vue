@@ -668,6 +668,18 @@ watch(
       >
         <span class="codicon codicon-sm codicon-download" />
       </button>
+      <button
+        class="disabled:opacity-40 disabled:hover:!text-fg-3"
+        :class="chat.currentFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-fg-3 hover:text-fg-0'"
+        :title="chat.currentFavorite ? '取消收藏此会话' : '收藏此会话'"
+        :disabled="!chat.messages.length"
+        @click="chat.currentSessionId && chat.toggleFavorite(chat.currentSessionId)"
+      >
+        <span
+          class="codicon codicon-sm"
+          :class="chat.currentFavorite ? 'codicon-star-full' : 'codicon-star-empty'"
+        />
+      </button>
       <button class="text-fg-3 hover:text-fg-0" title="New chat" @click="chat.newSession()">
         <span class="codicon codicon-sm codicon-add" />
       </button>
@@ -785,6 +797,21 @@ watch(
         <span class="text-xs text-fg-3 shrink-0">
           {{ new Date(s.updatedAt).toLocaleDateString() }}
         </span>
+        <button
+          class="shrink-0"
+          :class="
+            s.favorite
+              ? 'text-yellow-500 hover:text-yellow-400'
+              : 'text-fg-3 hover:text-fg-1 opacity-0 group-hover:opacity-100'
+          "
+          :title="s.favorite ? '取消收藏' : '收藏'"
+          @click.stop="chat.toggleFavorite(s.id)"
+        >
+          <span
+            class="codicon codicon-sm"
+            :class="s.favorite ? 'codicon-star-full' : 'codicon-star-empty'"
+          />
+        </button>
         <button
           class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 shrink-0"
           title="Delete"

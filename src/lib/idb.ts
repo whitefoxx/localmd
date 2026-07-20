@@ -27,6 +27,8 @@ export interface StoredSession {
   openaiHistory: unknown[]
   createdAt: number
   updatedAt: number
+  /** Starred by the user. Optional so pre-favorite sessions load as unstarred. */
+  favorite?: boolean
 }
 
 function openDb(): Promise<IDBDatabase> {

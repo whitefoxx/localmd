@@ -115,6 +115,9 @@ interface ChatSession {
   history: unknown[]
   createdAt: number
   updatedAt: number
+  /** Starred by the user: sorts to the top of history and is spared first when
+   *  the tab cap recycles an idle tab. */
+  favorite: boolean
 }
 
 /** An open chat tab: a session plus its runtime `running` flag. Multiple tabs
@@ -127,6 +130,7 @@ export interface SessionSummary {
   id: string
   title: string
   updatedAt: number
+  favorite: boolean
 }
 
 /** Text files this small are inlined into the message when @-mentioned;
@@ -200,7 +204,16 @@ export const useChatStore = defineStore('chat', () => {
   )
 
   function summarize(list: idb.StoredSession[]): SessionSummary[] {
-    return list.map((s) => ({ id: s.id, title: s.title, updatedAt: s.updatedAt }))
+    // Favorites float to the top; within each group, newest-first (idb already
+    // sorts by updatedAt, and the comparator preserves that as the tiebreak).
+    return list
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        updatedAt: s.updatedAt,
+        favorite: s.favorite ?? false,
+      }))
+      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt)
   }
 
   function makeEmptySession(): OpenSession {
@@ -214,6 +227,7 @@ export const useChatStore = defineStore('chat', () => {
       history: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      favorite: false,
       running: false,
     }) as OpenSession
   }
@@ -223,10 +237,14 @@ export const useChatStore = defineStore('chat', () => {
   function addTab(s: OpenSession): boolean {
     const max = maxTabs()
     if (tabs.value.length >= max) {
-      // Recycle a tab to stay within the cap: prefer an idle one; otherwise
-      // detach the oldest. closeTab keeps a running turn alive in the
-      // background, so recycling never interrupts anything.
-      const victim = tabs.value.find((t) => !t.running) ?? tabs.value[0]
+      // Recycle a tab to stay within the cap: prefer an idle NON-favorite one,
+      // then any idle tab, else detach the oldest. closeTab keeps a running turn
+      // alive in the background, so recycling never interrupts anything. (The
+      // session itself survives in IDB regardless — this only frees a tab slot.)
+      const victim =
+        tabs.value.find((t) => !t.running && !t.favorite) ??
+        tabs.value.find((t) => !t.running) ??
+        tabs.value[0]
       if (victim) closeTab(victim.id)
     }
     tabs.value.push(s)
@@ -295,6 +313,7 @@ export const useChatStore = defineStore('chat', () => {
     // wire history fresh — the UI transcript is intact; only cross-turn model
     // context for that old conversation is lost, and rebuilds on the next send.
     if (!Array.isArray(s.history)) s.history = []
+    if (typeof s.favorite !== 'boolean') s.favorite = false // pre-favorite sessions
     // A session persisted mid-stream (reload during a turn) can carry unsettled
     // parts: stop forever-spinning tool calls and drop never-written artifacts.
     for (const m of s.uiMessages) {
@@ -347,6 +366,22 @@ export const useChatStore = defineStore('chat', () => {
     const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & { running?: boolean }
     delete snapshot.running
     await idb.saveSession(snapshot)
+    if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
+  }
+
+  /** Star/unstar a session. Works whether it's an open tab, a detached running
+   *  session, or only in IDB. For an open tab not yet persisted, the flag rides
+   *  along on its next persist; for a stored session we patch IDB in place
+   *  (without bumping updatedAt, so starring doesn't reorder by recency). */
+  async function toggleFavorite(id: string): Promise<void> {
+    const open = tabs.value.find((t) => t.id === id) ?? background.get(id)
+    const stored = await idb.getSession(id)
+    const next = !(stored?.favorite ?? open?.favorite ?? false)
+    if (open) open.favorite = next
+    if (stored) {
+      stored.favorite = next
+      await idb.saveSession(stored)
+    }
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
@@ -815,11 +850,13 @@ export const useChatStore = defineStore('chat', () => {
     limitMsg,
     sessionUsage,
     currentSessionId: computed(() => active.value?.id ?? null),
+    currentFavorite: computed(() => active.value?.favorite ?? false),
     send,
     stop,
     newSession,
     openSession,
     removeSession,
+    toggleFavorite,
     activateTab,
     closeTab,
     renderSession,
