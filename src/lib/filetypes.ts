@@ -17,6 +17,13 @@ export function fileKind(path: string): FileKind {
   return 'binary'
 }
 
+/** True for plain-text prose (.txt) that should get a serif reading view rather
+ *  than the code editor. Code/config text (.json, .ts, .log, …) stays in
+ *  CodeMirror — reflowing them as prose would be wrong. */
+export function isProseText(path: string): boolean {
+  return /\.txt$/i.test(path)
+}
+
 export function mimeFor(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
   const map: Record<string, string> = {

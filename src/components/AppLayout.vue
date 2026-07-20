@@ -24,10 +24,11 @@ import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
 import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
+import TextPreview from '@/components/viewers/TextPreview.vue'
 import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
-import { fileKind } from '@/lib/filetypes'
+import { fileKind, isProseText } from '@/lib/filetypes'
 import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
 
@@ -144,6 +145,8 @@ async function onDrop(e: DragEvent): Promise<void> {
 
 const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
 const isMarkdown = computed(() => kind.value === 'markdown')
+// .txt gets a serif reading view with the same Edit/Preview toggle as markdown.
+const isPlainText = computed(() => (files.currentPath ? isProseText(files.currentPath) : false))
 
 const saveLabel = computed(
   () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
@@ -374,9 +377,9 @@ function closeKb(): void {
         <!-- data-file-selection marks the open-file region: text selected here
              (and only here) is staged into the agent composer as context. -->
         <div class="flex-1 min-h-0 relative" data-file-selection>
-            <!-- Editor actions (contextual, markdown only) -->
+            <!-- Editor actions (contextual: markdown + plain-text reading) -->
             <button
-              v-if="isMarkdown && files.currentPath"
+              v-if="(isMarkdown || isPlainText) && files.currentPath"
               class="btn text-xs absolute top-2 right-3 z-10 shadow-sm"
               @click="files.mode = files.mode === 'edit' ? 'preview' : 'edit'"
             >
@@ -393,6 +396,7 @@ function closeKb(): void {
             <template v-if="files.currentPath && kind !== 'pdf'">
               <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />
               <MarkdownPreview v-else-if="isMarkdown" />
+              <TextPreview v-else-if="isPlainText && files.mode === 'preview'" />
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
               <EpubViewer v-else-if="kind === 'epub'" />
