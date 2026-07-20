@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
   sidecarPath,
+  isAnnotationsPath,
+  annotationSource,
+  compareCfi,
+  renderAnnotationsDigest,
   toPdfHighlight,
   makeRawPdfAnnotation,
   HIGHLIGHT_COLORS,
@@ -10,6 +14,80 @@ import {
 describe('sidecarPath', () => {
   it('appends .annotations.json (trace-app convention)', () => {
     expect(sidecarPath('raw/books/x.pdf')).toBe('raw/books/x.pdf.annotations.json')
+  })
+
+  it('round-trips through isAnnotationsPath / annotationSource', () => {
+    const sc = sidecarPath('raw/books/x.epub')
+    expect(isAnnotationsPath(sc)).toBe(true)
+    expect(isAnnotationsPath('raw/books/x.epub')).toBe(false)
+    expect(isAnnotationsPath('notes/annotations.json.md')).toBe(false)
+    expect(annotationSource(sc)).toBe('raw/books/x.epub')
+  })
+})
+
+describe('compareCfi', () => {
+  it('orders range CFIs by their base + start steps', () => {
+    const a = 'epubcfi(/6/38!/4/4,/1:106,/1:144)'
+    const b = 'epubcfi(/6/38!/4/20,/1:106,/1:144)'
+    expect(compareCfi(a, b)).toBeLessThan(0)
+    expect(compareCfi(b, a)).toBeGreaterThan(0)
+    expect(compareCfi(a, a)).toBe(0)
+  })
+
+  it('orders across spine items and by text offset', () => {
+    expect(compareCfi('epubcfi(/6/8!/4/2/1:0)', 'epubcfi(/6/38!/4/2/1:0)')).toBeLessThan(0)
+    expect(compareCfi('epubcfi(/6/8!/4/2/1:5)', 'epubcfi(/6/8!/4/2/1:40)')).toBeLessThan(0)
+  })
+
+  it('ignores [assertions] and survives junk input', () => {
+    expect(
+      compareCfi('epubcfi(/6/8[chap01]!/4/2/1:0)', 'epubcfi(/6/8!/4/2/1:0)'),
+    ).toBe(0)
+    expect(compareCfi('not-a-cfi', 'not-a-cfi')).toBe(0)
+  })
+})
+
+describe('renderAnnotationsDigest', () => {
+  it('renders PDF sidecars grouped by page, with notes', () => {
+    const json = JSON.stringify({
+      version: 1,
+      annotations: [
+        {
+          annotation: {
+            type: 9,
+            strokeColor: '#FFD633',
+            rect: { origin: { x: 0, y: 0 }, size: { width: 10, height: 10 } },
+            pageIndex: 4,
+            created: '2026-05-19T13:09:39.101Z',
+            id: 'a1',
+            custom: { text: 'excerpt one', note: 'my thought' },
+          },
+        },
+      ],
+    })
+    const out = renderAnnotationsDigest('raw/b.pdf.annotations.json', json)!
+    expect(out).toContain('## Page 5')
+    expect(out).toContain('"excerpt one"')
+    expect(out).toContain('Note: my thought')
+    expect(out).toContain('yellow')
+    expect(out).toContain('Source book: raw/b.pdf')
+  })
+
+  it('renders EPUB sidecars in reading order', () => {
+    const json = JSON.stringify({
+      version: 1,
+      annotations: [
+        { cfi: 'epubcfi(/6/38!/4/20,/1:0,/1:9)', color: '#7ED67E', text: 'later', createdAt: '' },
+        { cfi: 'epubcfi(/6/8!/4/2,/1:0,/1:9)', color: '#57B7F0', text: 'earlier', createdAt: '' },
+      ],
+    })
+    const out = renderAnnotationsDigest('raw/b.epub.annotations.json', json)!
+    expect(out.indexOf('"earlier"')).toBeLessThan(out.indexOf('"later"'))
+    expect(out).toContain('(2)')
+  })
+
+  it('returns null on unparseable JSON', () => {
+    expect(renderAnnotationsDigest('raw/b.pdf.annotations.json', '{oops')).toBeNull()
   })
 })
 

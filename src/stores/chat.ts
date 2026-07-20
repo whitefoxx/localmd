@@ -24,6 +24,7 @@ import { loadSkill } from '@/lib/skills'
 import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib/transcript'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
+import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
@@ -443,6 +444,15 @@ export const useChatStore = defineStore('chat', () => {
         if (kind === 'pdf' || kind === 'epub') {
           blocks.push(`@${p}: ${kind.toUpperCase()} 文档 — 通过 read_file 走结构化索引读取。`)
           continue
+        }
+        if (isAnnotationsPath(p)) {
+          // Sidecar JSON is rect/CFI noise — inline the readable digest instead.
+          const raw = await fs.tryReadFile(p)
+          const digest = raw !== null ? renderAnnotationsDigest(p, raw) : null
+          if (digest) {
+            blocks.push(`@${p} 的内容(标注渲染视图):\n${digest}`)
+            continue
+          }
         }
         const content = await fs.tryReadFile(p)
         if (content === null) {

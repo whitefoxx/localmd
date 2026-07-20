@@ -7,7 +7,9 @@
  * verbatim and only derive the fields we render, so fields we don't model
  * survive a round-trip. EPUB entries are simple {cfi, color, text, createdAt}.
  */
+import { ref } from 'vue'
 import * as fs from '@/lib/fs'
+import { fileKind } from '@/lib/filetypes'
 
 // macOS Books-style palette — deeper/more saturated than the old pastels.
 // Highlights render at ~0.4 fill-opacity.
@@ -24,6 +26,27 @@ export const UNDERLINE_COLOR = '#FF3B30'
 
 export function sidecarPath(source: string): string {
   return `${source}.annotations.json`
+}
+
+/** True for annotation sidecar files themselves. */
+export function isAnnotationsPath(path: string): boolean {
+  return /\.annotations\.json$/i.test(path)
+}
+
+/** The book a sidecar belongs to: `foo.pdf.annotations.json` → `foo.pdf`. */
+export function annotationSource(sidecar: string): string {
+  return sidecar.replace(/\.annotations\.json$/i, '')
+}
+
+/**
+ * One-shot signal that a sidecar changed on disk outside its book viewer (the
+ * annotations page or the raw JSON editor saved it). Live viewers watch this
+ * and re-sync — needed for PDFs, which stay mounted across tab switches.
+ */
+export const sidecarRevision = ref<{ source: string; nonce: number } | null>(null)
+let revNonce = 0
+export function notifySidecarChanged(source: string): void {
+  sidecarRevision.value = { source, nonce: ++revNonce }
 }
 
 /* ───────── PDF ───────── */
@@ -46,7 +69,9 @@ export interface RawPdfAnnotation {
     pageIndex: number
     created?: string
     id: string
-    custom?: { text?: string }
+    /** `text` = the highlighted excerpt (EmbedPDF fills it); `note` = the
+     *  user's own comment, edited on the annotations page. */
+    custom?: { text?: string; note?: string }
     author?: string
     [k: string]: unknown
   }
@@ -145,6 +170,99 @@ export interface EpubAnnotation {
   createdAt: string
   /** Mark style. Absent = highlight (back-compat with older sidecars). */
   style?: 'highlight' | 'underline'
+  /** User's own comment, edited on the annotations page. */
+  note?: string
+}
+
+/**
+ * Order two `epubcfi(...)` strings by document position, without epub.js.
+ * Compares the numeric steps (range CFIs use base+start); `[assertions]` are
+ * ignored. Good enough to sort a book's own annotations into reading order.
+ */
+export function compareCfi(a: string, b: string): number {
+  const steps = (cfi: string): number[] => {
+    let body = /^epubcfi\((.*)\)$/.exec(cfi.trim())?.[1] ?? cfi
+    const parts = body.split(',')
+    if (parts.length === 3) body = parts[0] + parts[1] // range → base + start
+    const out: number[] = []
+    for (const token of body.split('/')) {
+      if (!token) continue
+      const t = token.replace(/\[[^\]]*\]/g, '').replace(/!/g, '')
+      const [step, offset] = t.split(':')
+      const n = parseInt(step, 10)
+      if (!Number.isNaN(n)) out.push(n)
+      const o = parseInt(offset ?? '', 10)
+      if (!Number.isNaN(o)) out.push(o)
+    }
+    return out
+  }
+  const sa = steps(a)
+  const sb = steps(b)
+  for (let i = 0; i < Math.max(sa.length, sb.length); i++) {
+    const x = sa[i] ?? -1
+    const y = sb[i] ?? -1
+    if (x !== y) return x - y
+  }
+  return 0
+}
+
+/* ───────── agent-facing digest ───────── */
+
+function colorName(hex: string): string {
+  const known = HIGHLIGHT_COLORS.find((c) => c.value.toLowerCase() === hex.toLowerCase())
+  return known?.name ?? hex
+}
+
+function digestEntry(color: string, style: string, date: string, text: string, note: string): string {
+  const when = date ? ` · ${date.slice(0, 10)}` : ''
+  const excerpt = text.replace(/\s+/g, ' ').trim()
+  let line = `- [${colorName(color)} ${style}${when}] "${excerpt || '(no text captured)'}"`
+  if (note.trim()) line += `\n  Note: ${note.trim()}`
+  return line
+}
+
+/**
+ * Render a sidecar's JSON as compact markdown for the agent (and @-mentions):
+ * the raw JSON is rect/CFI-heavy noise for Q&A. Returns null when the JSON
+ * doesn't parse — callers fall back to the raw content.
+ */
+export function renderAnnotationsDigest(sidecar: string, json: string): string | null {
+  const source = annotationSource(sidecar)
+  const kind = fileKind(source)
+  let parsed: { annotations?: unknown[] }
+  try {
+    parsed = JSON.parse(json) as { annotations?: unknown[] }
+  } catch {
+    return null
+  }
+  if (!Array.isArray(parsed.annotations)) return null
+  const name = source.slice(source.lastIndexOf('/') + 1)
+  const head =
+    `# Annotations — ${name} (${parsed.annotations.length})\n\n` +
+    `Source book: ${source} · sidecar: ${sidecar} (JSON, rendered here for readability)\n`
+  if (kind === 'pdf') {
+    const highlights = (parsed.annotations as RawPdfAnnotation[])
+      .map((raw) => ({ h: toPdfHighlight(raw), note: raw.annotation?.custom?.note ?? '', created: raw.annotation?.created ?? '' }))
+      .filter((x): x is { h: PdfHighlight; note: string; created: string } => x.h !== null)
+      .sort((a, b) => a.h.pageIndex - b.h.pageIndex || (a.h.rects[0]?.y ?? 0) - (b.h.rects[0]?.y ?? 0))
+    const byPage = new Map<number, string[]>()
+    for (const { h, note, created } of highlights) {
+      const lines = byPage.get(h.pageIndex) ?? []
+      lines.push(digestEntry(h.color, 'highlight', created, h.text, note))
+      byPage.set(h.pageIndex, lines)
+    }
+    const body = [...byPage.entries()]
+      .map(([page, lines]) => `\n## Page ${page + 1}\n${lines.join('\n')}`)
+      .join('\n')
+    return head + body
+  }
+  const items = (parsed.annotations as EpubAnnotation[])
+    .filter((a) => typeof a?.cfi === 'string')
+    .sort((a, b) => compareCfi(a.cfi, b.cfi))
+    .map((a) =>
+      digestEntry(a.color ?? '', a.style ?? 'highlight', a.createdAt ?? '', a.text ?? '', a.note ?? ''),
+    )
+  return `${head}\n${items.join('\n')}`
 }
 
 export async function loadEpubSidecar(source: string): Promise<EpubAnnotation[]> {

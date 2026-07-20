@@ -562,6 +562,10 @@ async function maybeJump(): Promise<void> {
     const locs = await loadEpubLocations(pend.path)
     const cfi = locs?.blocks[pend.blockId]?.cfi
     if (cfi) await flashCfi(cfi)
+  } else if (pend.annotation?.cfi) {
+    // Annotations-page jump: the mark itself is already rendered; the flash
+    // overlay just draws the eye to it (dismissed by any click).
+    await flashCfi(pend.annotation.cfi)
   }
   citations.clear()
 }

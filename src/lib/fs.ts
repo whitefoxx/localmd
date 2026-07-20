@@ -19,12 +19,12 @@ export interface TreeNode {
 /** Entries hidden from the tree and search. */
 const IGNORED = new Set(['.git', '.trace', '.obsidian', 'node_modules', '.DS_Store'])
 
-/** True for entries the UI tree hides. Beyond the dot-dirs above, this covers
- *  PDF/EPUB annotation sidecars (`*.annotations.json`): they're committed to git
- *  so highlights sync across machines, but they're noise in the file tree.
- *  Git status walks the real directory (not readTree), so they stay tracked. */
+/** True for entries the UI tree hides. PDF/EPUB annotation sidecars
+ *  (`*.annotations.json`) are NOT hidden: they open as a rendered annotations
+ *  page (AnnotationsViewer), and showing them makes them @-mentionable and
+ *  readable by the agent. */
 function isTreeHidden(name: string): boolean {
-  return IGNORED.has(name) || name.endsWith('.annotations.json')
+  return IGNORED.has(name)
 }
 
 let root: FileSystemDirectoryHandle | null = null

@@ -14,6 +14,7 @@ import * as g from '@/lib/git'
 import { withGitLock, GitBusyError } from '@/lib/gitlock'
 import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
+import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { formatLintReport } from '@/lib/lint'
@@ -108,7 +109,15 @@ const readFile = defineTool({
   describeCall: (a) => `read ${a.path}`,
   run: async ({ path }) => {
     let content: string | null
-    if (/\.(pdf|epub)$/i.test(path)) {
+    if (isAnnotationsPath(path)) {
+      // Highlight sidecars are rect/CFI-heavy JSON — serve the rendered digest,
+      // which is what annotation Q&A actually needs. Unparseable → raw JSON.
+      const raw = await fs.tryReadFile(path)
+      if (raw === null) return `Error: file not found: ${path}`
+      const digest = renderAnnotationsDigest(path, raw)
+      if (digest) return digest
+      content = raw
+    } else if (/\.(pdf|epub)$/i.test(path)) {
       // Binary documents go through the structured index (block ids, citeable).
       const { hasIndex, indexDirFor, indexableKind } = await import('@/lib/docindex')
       const kind = indexableKind(path)!

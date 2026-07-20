@@ -14,7 +14,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadPdfLocations } from '@/lib/docindex/pdf'
-import { useCitationsStore, type PendingJump } from '@/stores/citations'
+import { useCitationsStore, type AnnotationTarget, type PendingJump } from '@/stores/citations'
+import { sidecarRevision } from '@/lib/annotations'
 import { useThemeStore } from '@/stores/theme'
 import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
 
@@ -195,7 +196,9 @@ function onReady(r: PluginRegistry): void {
   // Capture the remembered page now, before the first page-change fires. Skip
   // the restore overlay when a citation jump is pending — that wins instead.
   pendingRestorePage = pageMemory.get(props.path) ?? null
-  const willReveal = citations.pending?.path === props.path && !!citations.pending?.blockId
+  const willReveal =
+    citations.pending?.path === props.path &&
+    !!(citations.pending?.blockId || citations.pending?.annotation)
   if (!willReveal && pendingRestorePage && pendingRestorePage > 1) restoring.value = true
   subscribePageChanges()
   void initIndexStatus()
@@ -308,15 +311,22 @@ async function showCitation(blockId: string, nonce: number): Promise<void> {
   citationHighlightId = id
   citationHighlightPage = pageIndex
 
-  // Scroll to the block's centre; retried while the viewport settles.
+  scrollToPoint(
+    block.page,
+    rect.origin.x + rect.size.width / 2,
+    rect.origin.y + rect.size.height / 2,
+    nonce,
+  )
+}
+
+/** Scroll a page-point to the viewport centre; retried while layout settles. */
+function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number): void {
   const scroll = getScrollApi()
-  const cx = rect.origin.x + rect.size.width / 2
-  const cy = rect.origin.y + rect.size.height / 2
   const until = Date.now() + 2500
   const doScroll = (): void => {
     if (disposed || nonce !== lastDoneNonce) return
     scroll?.scrollToPage({
-      pageNumber: block.page,
+      pageNumber,
       pageCoordinates: { x: cx, y: cy },
       behavior: 'auto',
       alignX: 50,
@@ -325,6 +335,19 @@ async function showCitation(blockId: string, nonce: number): Promise<void> {
     if (Date.now() < until) window.setTimeout(doScroll, 150)
   }
   doScroll()
+}
+
+/** Annotations-page jump: centre the annotation's own region. The highlight is
+ *  already rendered by EmbedPDF, so no transient citation mark is drawn. */
+function showAnnotationTarget(t: AnnotationTarget, nonce: number): void {
+  const rects = t.rects ?? []
+  if (!t.page || rects.length === 0) return
+  clearCitationHighlight()
+  const x0 = Math.min(...rects.map((r) => r.x))
+  const y0 = Math.min(...rects.map((r) => r.y))
+  const x1 = Math.max(...rects.map((r) => r.x + r.w))
+  const y1 = Math.max(...rects.map((r) => r.y + r.h))
+  scrollToPoint(t.page, (x0 + x1) / 2, (y0 + y1) / 2, nonce)
 }
 
 function maybeReveal(r: PendingJump | null): void {
@@ -340,7 +363,7 @@ function maybeReveal(r: PendingJump | null): void {
 
 function flushReveal(): void {
   const r = pendingReveal
-  if (!r || !r.blockId) {
+  if (!r || (!r.blockId && !r.annotation)) {
     pendingReveal = null
     return
   }
@@ -351,10 +374,38 @@ function flushReveal(): void {
   if (!viewerRegistry || !annotationApi || !initialLoadDone) return
   pendingReveal = null
   lastDoneNonce = r.nonce
-  void showCitation(r.blockId, r.nonce)
+  if (r.blockId) void showCitation(r.blockId, r.nonce)
+  else if (r.annotation) showAnnotationTarget(r.annotation, r.nonce)
 }
 
 watch(() => citations.pending, maybeReveal)
+
+/* ── Sidecar re-sync ─────────────────────────────────────────────────────── */
+// PdfDocument instances stay mounted across tab switches (v-show), so edits
+// made on the annotations page (or in the raw JSON editor) must be pulled in:
+// diff by id — removed ids are deleted from EmbedPDF, new ids imported.
+// Note-only edits change no id and need no EmbedPDF call; color edits arrive
+// as delete+add because the annotations page assigns a fresh id (reusing an
+// id across delete/create crashes EmbedPDF's async delete-commit).
+
+async function reloadFromSidecar(): Promise<void> {
+  if (!annotationApi || !initialLoadDone) return
+  const items = await readSidecar()
+  const next = new Map(items.map((it) => [it.annotation.id, it]))
+  for (const [id, it] of userAnnotations) {
+    if (next.has(id)) continue
+    const pageIndex = (it.annotation as { pageIndex?: unknown }).pageIndex
+    if (typeof pageIndex === 'number') annotationApi.deleteAnnotation(pageIndex, id)
+  }
+  const added = items.filter((it) => !userAnnotations.has(it.annotation.id))
+  userAnnotations.clear()
+  for (const [id, it] of next) userAnnotations.set(id, it)
+  if (added.length) annotationApi.importAnnotations(added)
+}
+
+watch(sidecarRevision, (rev) => {
+  if (rev && rev.source === props.path) void reloadFromSidecar()
+})
 
 /* ── lifecycle ───────────────────────────────────────────────────────────── */
 

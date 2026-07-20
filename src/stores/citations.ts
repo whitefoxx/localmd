@@ -10,10 +10,21 @@ import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useUiStore } from '@/stores/ui'
 
+/** Direct jump target from the annotations page — no doc-index involved.
+ *  EPUB sets `cfi`; PDF sets `page` (1-based) + region `rects` (PDF points,
+ *  top-left origin, the annotation's own segmentRects). */
+export interface AnnotationTarget {
+  cfi?: string
+  page?: number
+  rects?: { x: number; y: number; w: number; h: number }[]
+}
+
 export interface PendingJump {
   path: string
   /** Block id like `b14-3`, or null when just opening the document. */
   blockId: string | null
+  /** Set when jumping to a user annotation instead of an indexed block. */
+  annotation?: AnnotationTarget
   /** Monotonic — lets viewers react to repeat jumps to the same block. */
   nonce: number
 }
@@ -28,6 +39,15 @@ export const useCitationsStore = defineStore('citations', () => {
     const files = useFilesStore()
     ui.graphOpen = false
     pending.value = { path, blockId, nonce: ++nonce }
+    await files.openFile(path)
+  }
+
+  /** Jump from the annotations page to a highlight's position in the book. */
+  async function openAnnotation(path: string, target: AnnotationTarget): Promise<void> {
+    const ui = useUiStore()
+    const files = useFilesStore()
+    ui.graphOpen = false
+    pending.value = { path, blockId: null, annotation: target, nonce: ++nonce }
     await files.openFile(path)
   }
 
@@ -54,5 +74,5 @@ export const useCitationsStore = defineStore('citations', () => {
     pending.value = null
   }
 
-  return { pending, openCitation, openByBlock, clear }
+  return { pending, openCitation, openAnnotation, openByBlock, clear }
 })
