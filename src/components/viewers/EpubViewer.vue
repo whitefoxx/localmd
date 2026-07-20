@@ -6,6 +6,7 @@ import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
+import { useTtsStore } from '@/stores/tts'
 import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
@@ -24,6 +25,7 @@ const files = useFilesStore()
 const citations = useCitationsStore()
 const theme = useThemeStore()
 const settings = useSettingsStore()
+const tts = useTtsStore()
 
 const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -599,6 +601,20 @@ function prev(): void {
 function next(): void {
   void rendition?.next()
 }
+
+/** Read the current chapter aloud: epub.js renders each chapter in a same-origin
+ *  iframe, so its Contents give us the chapter's plain text (whole spine item,
+ *  not just the visible page) to hand to the TTS controller. */
+function readAloud(): void {
+  const contents =
+    (rendition as unknown as { getContents?: () => Array<{ document: Document }> })?.getContents?.() ??
+    []
+  const text = contents
+    .map((c) => c.document?.body?.innerText ?? '')
+    .join('\n')
+    .trim()
+  if (text) tts.speak(text, chapterLabel.value || 'EPUB')
+}
 </script>
 
 <template>
@@ -629,6 +645,9 @@ function next(): void {
       <span class="text-xs text-fg-3 w-9 text-center">{{ fontPct }}%</span>
       <button class="btn text-xs" title="Larger text" @click="setFont(fontPct + 10)">
         <span class="codicon codicon-sm codicon-zoom-in" />
+      </button>
+      <button class="btn text-xs" title="朗读本章" @click="readAloud">
+        <span class="codicon codicon-sm codicon-unmute" />
       </button>
 
       <!-- Chapter title, centered. Paging is arrow-keys only (no prev/next buttons). -->
