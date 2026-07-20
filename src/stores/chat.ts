@@ -116,8 +116,8 @@ interface ChatSession {
   history: unknown[]
   createdAt: number
   updatedAt: number
-  /** Starred by the user: sorts to the top of history and is spared first when
-   *  the tab cap recycles an idle tab. */
+  /** Starred by the user. A visual marker that also spares the session first
+   *  when the tab cap recycles an idle tab. Does NOT reorder history. */
   favorite: boolean
 }
 
@@ -205,16 +205,15 @@ export const useChatStore = defineStore('chat', () => {
   )
 
   function summarize(list: idb.StoredSession[]): SessionSummary[] {
-    // Favorites float to the top; within each group, newest-first (idb already
-    // sorts by updatedAt, and the comparator preserves that as the tiebreak).
-    return list
-      .map((s) => ({
-        id: s.id,
-        title: s.title,
-        updatedAt: s.updatedAt,
-        favorite: s.favorite ?? false,
-      }))
-      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.updatedAt - a.updatedAt)
+    // Order is recency only (idb already sorts newest-first). Favorite is NOT a
+    // sort key — starring/unstarring must leave a row exactly where it is, so
+    // the list order stays put across toggles.
+    return list.map((s) => ({
+      id: s.id,
+      title: s.title,
+      updatedAt: s.updatedAt,
+      favorite: s.favorite ?? false,
+    }))
   }
 
   function makeEmptySession(): OpenSession {

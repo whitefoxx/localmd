@@ -777,14 +777,35 @@ watch(
           v-if="s.id === chat.currentSessionId"
           class="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
         />
-        <span
-          class="codicon codicon-sm shrink-0"
-          :class="
-            chat.tabs.some((t) => t.id === s.id)
-              ? `codicon-circle-filled ${s.id === chat.currentSessionId ? 'text-accent' : 'text-fg-2'}`
-              : 'codicon-comment-discussion text-fg-3'
-          "
-        />
+        <!-- Left slot: chat/open status icon by default; on row hover a star
+             toggle replaces it. A favorited session shows the lit star in place
+             of the status icon entirely. -->
+        <div class="relative w-4 h-4 shrink-0">
+          <span
+            v-if="!s.favorite"
+            class="codicon codicon-sm absolute inset-0 flex items-center justify-center group-hover:hidden"
+            :class="
+              chat.tabs.some((t) => t.id === s.id)
+                ? `codicon-circle-filled ${s.id === chat.currentSessionId ? 'text-accent' : 'text-fg-2'}`
+                : 'codicon-comment-discussion text-fg-3'
+            "
+          />
+          <button
+            class="absolute inset-0 items-center justify-center"
+            :class="
+              s.favorite
+                ? 'flex text-yellow-500 hover:text-yellow-400'
+                : 'hidden group-hover:flex text-fg-3 hover:text-fg-1'
+            "
+            :title="s.favorite ? '取消收藏' : '收藏'"
+            @click.stop="chat.toggleFavorite(s.id)"
+          >
+            <span
+              class="codicon codicon-sm"
+              :class="s.favorite ? 'codicon-star-full' : 'codicon-star-empty'"
+            />
+          </button>
+        </div>
         <span
           class="flex-1 truncate text-sm"
           :class="s.id === chat.currentSessionId ? 'text-fg-0 font-medium' : 'text-fg-1'"
@@ -801,27 +822,17 @@ watch(
           {{ new Date(s.updatedAt).toLocaleDateString() }}
         </span>
         <button
-          class="shrink-0"
-          :class="
-            s.favorite
-              ? 'text-yellow-500 hover:text-yellow-400'
-              : 'text-fg-3 hover:text-fg-1 opacity-0 group-hover:opacity-100'
-          "
-          :title="s.favorite ? '取消收藏' : '收藏'"
-          @click.stop="chat.toggleFavorite(s.id)"
-        >
-          <span
-            class="codicon codicon-sm"
-            :class="s.favorite ? 'codicon-star-full' : 'codicon-star-empty'"
-          />
-        </button>
-        <button
           class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 shrink-0"
           title="Delete"
           @click.stop="chat.removeSession(s.id)"
         >
           <span class="codicon codicon-sm codicon-trash" />
         </button>
+        <!-- Full title on hover — row titles truncate. pointer-events-none so it
+             never intercepts the row's click. -->
+        <div
+          class="pointer-events-none absolute left-9 top-full -mt-1 z-30 hidden max-w-[280px] break-words rounded-md border border-border bg-bg-0 px-2 py-1 text-xs text-fg-0 shadow-lg group-hover:block"
+        >{{ s.title }}</div>
       </div>
       </div>
     </div>
