@@ -50,3 +50,39 @@ export async function loadPdfLocations(source: string): Promise<PdfLocations | n
     return null
   }
 }
+
+/**
+ * Plain text of a PDF from `fromPage` to the end, in reading order — pulled from
+ * the section markdown files (which hold the extracted text) and filtered by the
+ * block→page map so it starts precisely at the current page. '' when unindexed.
+ * Used by read-aloud (TTS).
+ */
+export async function loadPdfTextFrom(source: string, fromPage: number): Promise<string> {
+  const indexDir = indexDirFor('pdf', source)
+  const raw = await fs.tryReadFile(`${indexDir}/manifest.json`)
+  if (!raw) return ''
+  let manifest: PdfIndexManifest
+  try {
+    manifest = JSON.parse(raw) as PdfIndexManifest
+  } catch {
+    return ''
+  }
+  const blocks = (await loadPdfLocations(source))?.blocks
+  const parts: string[] = []
+  for (const sec of manifest.sections) {
+    if (sec.endPage < fromPage) continue // whole section is behind us
+    const md = await fs.tryReadFile(`${indexDir}/${sec.file}`)
+    if (!md) continue
+    for (const line of md.split('\n')) {
+      // Section lines are "[[id]] text" (optionally "## [[id]] heading").
+      const m = /^(?:#{1,3}\s+)?\[\[([^\]]+)\]\]\s*(.*)$/.exec(line)
+      if (!m) continue
+      const text = m[2].trim()
+      if (!text) continue
+      const page = blocks?.[m[1]]?.page
+      if (page !== undefined && page < fromPage) continue // block before current page
+      parts.push(text)
+    }
+  }
+  return parts.join('\n')
+}

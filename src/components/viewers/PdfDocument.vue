@@ -13,16 +13,19 @@ import { PdfAnnotationSubtype, type PdfHighlightAnnoObject } from '@embedpdf/mod
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument } from '@/lib/docindex'
-import { loadPdfLocations } from '@/lib/docindex/pdf'
+import { loadPdfLocations, loadPdfTextFrom } from '@/lib/docindex/pdf'
 import { useCitationsStore, type AnnotationTarget, type PendingJump } from '@/stores/citations'
 import { sidecarRevision } from '@/lib/annotations'
 import { useThemeStore } from '@/stores/theme'
 import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
+import { useTtsStore } from '@/stores/tts'
+import { baseName } from '@/lib/wiki'
 
 const props = defineProps<{ path: string }>()
 
 const citations = useCitationsStore()
 const theme = useThemeStore()
+const tts = useTtsStore()
 
 const absoluteWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
 const blobUrl = ref<string | null>(null)
@@ -78,6 +81,14 @@ let annotationApi: AnnotationApi | null = null
 function getScrollApi(): ScrollApi | undefined {
   return (viewerRegistry?.getPlugin('scroll') as undefined | { provides?: () => ScrollApi })
     ?.provides?.()
+}
+
+/** Read the current page onward aloud (text comes from the doc-index, so it
+ *  needs the PDF to have finished indexing — which it auto-does on open). */
+async function readAloud(): Promise<void> {
+  const page = getScrollApi()?.getCurrentPage?.() ?? 1
+  const text = await loadPdfTextFrom(props.path, page)
+  if (text) tts.speak(text, baseName(props.path))
 }
 
 /* ── Page memory (per path, survives tab switches and reopen) ────────────── */
@@ -449,6 +460,14 @@ onBeforeUnmount(() => {
         <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
         跳转到上次阅读位置…
       </div>
+      <!-- Read the current page onward aloud. -->
+      <button
+        class="btn text-xs absolute top-2 right-3 z-20 shadow-sm"
+        title="朗读(从当前页起)"
+        @click="readAloud"
+      >
+        <span class="codicon codicon-sm codicon-unmute" />
+      </button>
     </div>
   </div>
 </template>
