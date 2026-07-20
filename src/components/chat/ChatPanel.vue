@@ -753,7 +753,10 @@ watch(
 
     <!-- Session history overlay. Full-width opaque backdrop; the list inside is
          centered at the same readable width as the transcript when maximized. -->
-    <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll">
+    <div
+      v-if="chat.historyOpen"
+      class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll overscroll-contain"
+    >
       <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
       <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
       <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
