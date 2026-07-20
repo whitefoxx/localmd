@@ -608,29 +608,67 @@ function next(): void {
   void rendition?.next()
 }
 
-/** The current chapter's iframe document — epub.js renders chapters same-origin,
- *  so we can read their text and highlight inside them. */
-function currentChapterDoc(): Document | null {
-  const contents =
+/** The chapter iframes currently attached (spread mode can hold two). epub.js
+ *  renders same-origin, so we can read their text and highlight inside them. */
+function getContentsList(): Array<{ document: Document }> {
+  return (
     (rendition as unknown as { getContents?: () => Array<{ document: Document }> })?.getContents?.() ??
     []
-  return contents[0]?.document ?? null
+  )
 }
 
-/** Read the current chapter aloud (whole spine item, not just the visible page). */
+/** Speak the currently displayed chapter (whole spine item). Returns false when
+ *  it has no text (image-only section). On natural finish, continue with the
+ *  next chapter — continuous listening through the book. */
+function speakCurrentChapter(): boolean {
+  const doc = getContentsList()[0]?.document
+  const text = doc?.body?.innerText?.trim()
+  if (!text) return false
+  tts.speak(text, chapterLabel.value || 'EPUB', { onFinish: () => void advanceAndContinue() })
+  return true
+}
 function readAloud(): void {
-  const text = currentChapterDoc()?.body?.innerText?.trim()
-  if (text) tts.speak(text, chapterLabel.value || 'EPUB')
+  speakCurrentChapter()
 }
 
-// Highlight-follow inside the chapter iframe as each sentence is spoken. No
-// auto-scroll: epub.js owns the paginated layout, so we must not scroll it — the
-// highlight shows while the spoken sentence is on the current page.
+/** Speak the passage selected in the chapter (from the selection popup). */
+function speakSelection(): void {
+  if (selText) tts.speak(selText, '选中内容')
+  popup.value = null
+}
+
+/** Turn to the next spine section (skipping text-less ones) and keep reading. */
+async function advanceAndContinue(): Promise<void> {
+  if (!book || !rendition) return
+  const cur = (rendition.currentLocation() as unknown as { start?: { href?: string } })?.start?.href
+  if (!cur) return
+  const items = (book.spine as unknown as { spineItems: Array<{ href: string }> }).spineItems
+  const at = items.findIndex((it) => it.href === cur || it.href.endsWith(cur))
+  if (at < 0) return
+  for (let i = at + 1; i < items.length; i++) {
+    await rendition.display(items[i].href)
+    if (speakCurrentChapter()) return
+  }
+}
+
+// Highlight-follow inside the chapter iframes as each sentence is spoken (no
+// scrollIntoView — epub.js owns the paginated layout). When the sentence sits on
+// a later column/page of the chapter, page forward so listening follows along;
+// paginated columns run horizontally, so "off-right" means "on a later page".
 watch(
   () => tts.chunkText,
   (c) => {
-    const doc = currentChapterDoc()
-    if (doc) highlightSentence(doc, doc.body, c || '', { scroll: false })
+    for (const ct of getContentsList()) {
+      const doc = ct.document
+      const range = highlightSentence(doc, doc.body, c || '', { scroll: false })
+      if (range && c) {
+        const win = doc.defaultView
+        const rect = range.getBoundingClientRect()
+        if (win && rect.width + rect.height > 0 && rect.left >= win.innerWidth) {
+          void rendition?.next()
+        }
+      }
+    }
   },
 )
 </script>
@@ -756,6 +794,13 @@ watch(
           @click="pickColor(c.value)"
         />
         <span class="w-px h-4 bg-border mx-0.5" />
+        <button
+          class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
+          title="朗读选中"
+          @click="speakSelection"
+        >
+          <span class="codicon codicon-sm codicon-unmute" />
+        </button>
         <button
           class="w-6 h-5 rounded flex items-center justify-center leading-none text-fg-3 hover:text-fg-1"
           title="Underline (red)"

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitIntoChunks, guessLang, stripMarkdown, pickVoice } from './tts'
+import { splitIntoChunks, chunkSegments, guessLang, stripMarkdown, pickVoice } from './tts'
 
 describe('splitIntoChunks', () => {
   it('splits on Latin and CJK sentence enders', () => {
@@ -27,10 +27,37 @@ describe('splitIntoChunks', () => {
   })
 })
 
+describe('chunkSegments', () => {
+  it('tags every chunk with its segment page', () => {
+    const chunks = chunkSegments([
+      { text: '第一页的内容。', page: 3 },
+      { text: 'Second page text here.', page: 4 },
+      { text: 'No page metadata.' },
+    ])
+    expect(chunks.map((c) => c.page)).toEqual([3, 4, undefined])
+    expect(chunks[0].text).toContain('第一页')
+  })
+
+  it('splits a long segment into several chunks, all on the same page', () => {
+    const long = Array.from({ length: 30 }, (_, i) => `Sentence number ${i} right here.`).join(' ')
+    const chunks = chunkSegments([{ text: long, page: 7 }])
+    expect(chunks.length).toBeGreaterThan(1)
+    expect(chunks.every((c) => c.page === 7)).toBe(true)
+  })
+})
+
 describe('guessLang', () => {
-  it('detects Chinese vs English', () => {
+  it('detects languages by script', () => {
     expect(guessLang('这是一段中文测试文本内容')).toBe('zh')
     expect(guessLang('This is an English sentence.')).toBe('en')
+    expect(guessLang('これは日本語の文です。漢字も含む。')).toBe('ja') // kana beats han
+    expect(guessLang('한국어 문장입니다.')).toBe('ko')
+    expect(guessLang('Это русское предложение.')).toBe('ru')
+  })
+
+  it('falls back to the document language when a chunk has no script signal', () => {
+    expect(guessLang('42.', 'zh')).toBe('zh')
+    expect(guessLang('42.')).toBe('en')
   })
 })
 
@@ -61,6 +88,13 @@ describe('pickVoice', () => {
     expect(pickVoice(voices, { name: 'Google US English', lang: 'en', online: true })?.name).toBe(
       'Google US English',
     )
+  })
+
+  it('auto-switches voice for a chunk in a different language than the pick', () => {
+    // zh voice picked, but this chunk is English → matching Google en voice.
+    expect(
+      pickVoice(voices, { name: 'Google 普通话（中国大陆）', lang: 'en', online: true })?.name,
+    ).toBe('Google US English')
   })
 
   it('defaults to a Google voice for the language', () => {

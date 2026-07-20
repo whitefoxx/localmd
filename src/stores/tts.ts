@@ -11,7 +11,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useSettingsStore } from './settings'
-import { splitIntoChunks, guessLang, pickVoice } from '@/lib/tts'
+import {
+  splitIntoChunks,
+  chunkSegments,
+  guessLang,
+  pickVoice,
+  type SpeechChunk,
+  type TtsLang,
+} from '@/lib/tts'
 
 export const useTtsStore = defineStore('tts', () => {
   const settings = useSettingsStore()
@@ -22,6 +29,7 @@ export const useTtsStore = defineStore('tts', () => {
   const paused = ref(false)
   const title = ref('') // label of what's being read, shown on the bar
   const chunkText = ref('') // the sentence currently being spoken (for highlight-follow)
+  const chunkPage = ref<number | null>(null) // its source page, when segments carry one (PDF)
 
   const available = computed(() => !!synth)
   // Only Google voices in the picker (the user asked for those); local voices
@@ -39,23 +47,26 @@ export const useTtsStore = defineStore('tts', () => {
 
   // Playback state (non-reactive; a generation token invalidates the callbacks
   // of a superseded/stopped run so a stray onend/onerror can't advance it).
-  let chunks: string[] = []
+  let chunks: SpeechChunk[] = []
   let idx = 0
-  let lang: 'zh' | 'en' = 'en'
+  let docLang: TtsLang = 'en' // whole-input language; fallback for signal-less chunks
   let fellBack = false
   let gen = 0
+  let onFinishCb: (() => void) | null = null
 
   function speakChunk(myGen: number): void {
     if (!synth || myGen !== gen) return
     if (idx >= chunks.length) {
-      finish()
+      finish(true)
       return
     }
-    chunkText.value = chunks[idx] // drives highlight-follow in the reading views
-    const u = new SpeechSynthesisUtterance(chunks[idx])
+    chunkText.value = chunks[idx].text // drives highlight-follow in the reading views
+    chunkPage.value = chunks[idx].page ?? null
+    const u = new SpeechSynthesisUtterance(chunks[idx].text)
+    // Per-chunk language: mixed documents switch voice sentence by sentence.
     const v = pickVoice(voices.value, {
       name: settings.state.ttsVoice || undefined,
-      lang,
+      lang: guessLang(chunks[idx].text, docLang),
       online: navigator.onLine && !fellBack,
     })
     if (v) {
@@ -85,19 +96,35 @@ export const useTtsStore = defineStore('tts', () => {
     synth.speak(u)
   }
 
-  function finish(): void {
+  /** `natural` = ran out of chunks (vs stopped/replaced). Only a natural finish
+   *  fires the onFinish callback — that's what lets the EPUB reader chain the
+   *  next chapter without a stop button triggering runaway auto-advance. */
+  function finish(natural = false): void {
     playing.value = false
     paused.value = false
     title.value = ''
     chunkText.value = ''
+    chunkPage.value = null
+    const cb = onFinishCb
+    onFinishCb = null
+    if (natural) cb?.()
   }
 
-  /** Start reading `text` (label shown on the bar). Replaces any current read. */
-  function speak(text: string, label = ''): void {
+  /** Start reading (label shown on the bar). Replaces any current read. Input is
+   *  plain text, or segments carrying page metadata for follow-along. */
+  function speak(
+    input: string | { text: string; page?: number }[],
+    label = '',
+    opts: { onFinish?: () => void } = {},
+  ): void {
     if (!synth) return
-    const cs = splitIntoChunks(text)
+    const cs =
+      typeof input === 'string'
+        ? splitIntoChunks(input).map((text) => ({ text }) as SpeechChunk)
+        : chunkSegments(input)
     gen++ // invalidate any in-flight run before cancelling it
     synth.cancel()
+    onFinishCb = null
     if (!cs.length) {
       finish()
       return
@@ -105,10 +132,11 @@ export const useTtsStore = defineStore('tts', () => {
     chunks = cs
     idx = 0
     fellBack = false
-    lang = guessLang(text)
+    docLang = guessLang(cs.map((c) => c.text).join(' '))
     title.value = label
     playing.value = true
     paused.value = false
+    onFinishCb = opts.onFinish ?? null
     // cancel()+speak() in the same tick can wedge Chrome's synth — let the
     // cancel settle first. myGen guards against a stop/replace landing meanwhile.
     const myGen = gen
@@ -145,6 +173,7 @@ export const useTtsStore = defineStore('tts', () => {
     paused,
     title,
     chunkText,
+    chunkPage,
     speak,
     pause,
     resume,

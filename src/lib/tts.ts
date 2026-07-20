@@ -41,11 +41,42 @@ export function splitIntoChunks(text: string, max = 220): string[] {
   return chunks
 }
 
-/** Guess a coarse language for default-voice selection: 'zh' when the text has a
- *  meaningful share of CJK, else 'en'. Only used to pick a sensible default. */
-export function guessLang(text: string): 'zh' | 'en' {
-  const cjk = (text.match(/[一-鿿぀-ヿ]/g) || []).length
-  return cjk >= 8 || cjk / Math.max(1, text.length) > 0.1 ? 'zh' : 'en'
+/** A speakable chunk with optional source metadata (PDF page) so playback can
+ *  follow along in the viewer. */
+export interface SpeechChunk {
+  text: string
+  page?: number
+}
+
+/** Chunk a list of segments, tagging every chunk with its segment's page. Used
+ *  by the PDF reader so "which page is being spoken" survives the chunking. */
+export function chunkSegments(segments: { text: string; page?: number }[]): SpeechChunk[] {
+  const out: SpeechChunk[] = []
+  for (const seg of segments) {
+    for (const text of splitIntoChunks(seg.text)) out.push({ text, page: seg.page })
+  }
+  return out
+}
+
+export type TtsLang = 'zh' | 'ja' | 'ko' | 'ru' | 'en'
+
+/** Guess the language of `text` by script, for voice selection. Kana is checked
+ *  before Han (Japanese uses both); text with no script signal at all (numbers,
+ *  punctuation) falls back to `fallback` — callers pass the document's language
+ *  so a stray "42." chunk doesn't flip the voice. */
+export function guessLang(text: string, fallback: TtsLang = 'en'): TtsLang {
+  const n = (re: RegExp): number => (text.match(re) || []).length
+  const kana = n(/[぀-ヿ]/g)
+  const hangul = n(/[가-힣]/g)
+  const cyrillic = n(/[Ѐ-ӿ]/g)
+  const han = n(/[一-鿿]/g)
+  const latin = n(/[A-Za-z]/g)
+  if (kana >= 2) return 'ja'
+  if (hangul >= 2) return 'ko'
+  if (cyrillic >= 2 && cyrillic > latin) return 'ru'
+  if (han >= 2 && han * 4 >= latin) return 'zh'
+  if (latin >= 4) return 'en'
+  return fallback
 }
 
 /** Strip Markdown to plain readable text so TTS never voices `#`, `*`, backticks,
@@ -69,24 +100,28 @@ export function stripMarkdown(md: string): string {
 }
 
 /**
- * Choose a voice. Prefer the user's picked voice by name; otherwise a Google
- * voice for the target language, then any voice for that language, then anything.
+ * Choose a voice for a chunk in language `lang`. The user's explicit pick wins
+ * while it speaks that language; for a chunk in a DIFFERENT language, auto-pick
+ * a matching voice — so mixed-language documents (Chinese prose quoting English)
+ * read each part with the right voice. Preference: Google voice for the
+ * language, any voice for the language, the explicit pick, then anything.
  * When offline (or after a network voice failed), restrict to LOCAL voices so
  * speech still works — the offline fallback.
  */
 export function pickVoice(
   voices: SpeechSynthesisVoice[],
-  opts: { name?: string; lang: 'zh' | 'en'; online: boolean },
+  opts: { name?: string; lang: TtsLang; online: boolean },
 ): SpeechSynthesisVoice | null {
   if (!voices.length) return null
-  const chosen = opts.name ? voices.find((v) => v.name === opts.name) : undefined
-  // Honor the explicit pick unless we're offline and it's a network voice.
-  if (chosen && (opts.online || chosen.localService)) return chosen
-  const pool = opts.online ? voices : voices.filter((v) => v.localService)
+  const usable = (v: SpeechSynthesisVoice) => opts.online || v.localService
   const langMatch = (v: SpeechSynthesisVoice) => v.lang.toLowerCase().startsWith(opts.lang)
+  const chosen = opts.name ? voices.find((v) => v.name === opts.name) : undefined
+  if (chosen && langMatch(chosen) && usable(chosen)) return chosen
+  const pool = voices.filter(usable)
   return (
     pool.find((v) => langMatch(v) && v.name.startsWith('Google')) ??
     pool.find((v) => langMatch(v)) ??
+    (chosen && usable(chosen) ? chosen : null) ??
     pool.find((v) => v.name.startsWith('Google')) ??
     pool[0] ??
     voices[0] ??

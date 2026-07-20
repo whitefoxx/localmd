@@ -158,11 +158,17 @@ const isPlainText = computed(() => (files.currentPath ? isProseText(files.curren
    page — no raw-JSON view in-app. */
 const isAnnotations = computed(() => !!files.currentPath && isAnnotationsPath(files.currentPath))
 
-/** Read the current markdown/plain-text file aloud. Markdown is stripped to prose
-   (no #, links, wikilinks) first; plain text is read verbatim. */
+/** Read aloud: the current text selection if there is one, else the whole
+   markdown/plain-text file (markdown stripped to prose first). The button uses
+   mousedown.prevent so pressing it doesn't collapse the selection. */
 function readAloud(): void {
   const path = files.currentPath
   if (!path) return
+  const sel = window.getSelection()?.toString().trim()
+  if (sel) {
+    tts.speak(sel, '选中内容')
+    return
+  }
   const body = splitFrontmatter(files.content).body
   tts.speak(isMarkdown.value ? stripMarkdown(body) : body, baseName(path))
 }
@@ -401,7 +407,12 @@ function closeKb(): void {
               v-if="(isMarkdown || isPlainText) && files.currentPath"
               class="absolute top-2 right-3 z-10 flex gap-1"
             >
-              <button class="btn text-xs shadow-sm" title="朗读" @click="readAloud">
+              <button
+                class="btn text-xs shadow-sm"
+                title="朗读(有选中读选中)"
+                @mousedown.prevent
+                @click="readAloud"
+              >
                 <span class="codicon codicon-sm codicon-unmute" />
               </button>
               <button

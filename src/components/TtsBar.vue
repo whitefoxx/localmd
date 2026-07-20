@@ -31,7 +31,7 @@ const settings = useSettingsStore()
         class="input text-xs !w-auto py-0.5"
         title="音色（Google）"
       >
-        <option value="">默认音色</option>
+        <option value="">自动 · 按语言</option>
         <option v-for="v in tts.googleVoices" :key="v.name" :value="v.name">
           {{ v.name.replace(/^Google\s*/, '') }} · {{ v.lang }}
         </option>

@@ -56,28 +56,32 @@ function findTextRange(doc: Document, root: Node, needle: string): Range | null 
 
 /** Highlight `chunk` within `root` of `doc`. Passing an empty chunk clears it.
  *  `scroll` brings the sentence into view — leave it OFF for paginated EPUB,
- *  whose iframe layout must not be scrolled from under epub.js. */
+ *  whose iframe layout must not be scrolled from under epub.js. Returns the
+ *  highlighted Range (callers use its geometry for follow-along), null if the
+ *  sentence wasn't found or the API is unavailable. */
 export function highlightSentence(
   doc: Document,
   root: Element | null,
   chunk: string,
   opts: { scroll?: boolean } = {},
-): void {
+): Range | null {
   const registry = registryFor(doc)
   const Ctor = ctorFor(doc)
-  if (!registry || !Ctor) return
+  if (!registry || !Ctor) return null
   registry.delete(TTS_HIGHLIGHT_NAME)
-  if (!root || !chunk) return
+  if (!root || !chunk) return null
   const range = findTextRange(doc, root, chunk)
-  if (!range) return
+  if (!range) return null
   registry.set(TTS_HIGHLIGHT_NAME, new Ctor(range))
-  if (opts.scroll === false) return
-  const target = range.startContainer.parentElement
-  const rect = target?.getBoundingClientRect()
-  const viewH = doc.defaultView?.innerHeight ?? window.innerHeight
-  if (rect && (rect.top < 0 || rect.bottom > viewH)) {
-    target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  if (opts.scroll !== false) {
+    const target = range.startContainer.parentElement
+    const rect = target?.getBoundingClientRect()
+    const viewH = doc.defaultView?.innerHeight ?? window.innerHeight
+    if (rect && (rect.top < 0 || rect.bottom > viewH)) {
+      target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
   }
+  return range
 }
 
 export function clearHighlight(doc: Document): void {
