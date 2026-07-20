@@ -15,6 +15,7 @@ import { withGitLock, GitBusyError } from '@/lib/gitlock'
 import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
+import { jinaRead, jinaSearch } from '@/lib/webread'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { formatLintReport } from '@/lib/lint'
@@ -591,6 +592,50 @@ export function allExternalToolSpecs(sessionId: string): ExternalToolSpec[] {
     toExternalSpec(mcp, t),
   )
 }
+
+const MAX_WEB_CHARS = 60_000
+
+/* Built-in web access via Jina AI Reader — NOT in TOOLS; run.ts adds them only
+ * when the setting is on (a fallback for when the browser extension is absent).
+ * They carry no login/cookies, so the prompt tells the model to prefer the
+ * mcp__* browser tools when connected. */
+export const webFetch = defineTool({
+  name: 'web_fetch',
+  description:
+    "Fetch a single web page by URL and return its main content as markdown (via Jina AI Reader — no login or cookies). Use to read a page you have the URL for. Login-walled or heavily bot-protected pages may fail. If mcp__* browser tools are connected, prefer those — they carry the user's real session.",
+  schema: z.object({
+    url: z.string().describe('Full URL to read, e.g. "https://example.com/article"'),
+  }),
+  describeCall: (a) => `fetch ${a.url}`,
+  run: async ({ url }) => {
+    try {
+      const text = await jinaRead(url)
+      if (!text) return `Error: empty response reading ${url}`
+      return text.length > MAX_WEB_CHARS
+        ? text.slice(0, MAX_WEB_CHARS) + `\n\n[truncated: page is ${text.length} chars]`
+        : text
+    } catch (err) {
+      return `Error: could not fetch ${url} — ${(err as Error).message}`
+    }
+  },
+})
+
+export const webSearch = defineTool({
+  name: 'web_search',
+  description:
+    'Search the web and return result titles, URLs and snippets as markdown (DuckDuckGo, read via Jina AI Reader). Use when you need to FIND pages and have no URL; then read a promising result with web_fetch (or a browser tool). Prefer connected mcp__* browser tools when available.',
+  schema: z.object({ query: z.string().describe('Search query') }),
+  describeCall: (a) => `search "${a.query}"`,
+  run: async ({ query }) => {
+    try {
+      const text = await jinaSearch(query)
+      if (!text) return `Error: no results for "${query}"`
+      return text.length > MAX_WEB_CHARS ? text.slice(0, MAX_WEB_CHARS) + '\n\n[truncated]' : text
+    } catch (err) {
+      return `Error: search failed for "${query}" — ${(err as Error).message}`
+    }
+  },
+})
 
 export const TOOLS: ToolSpec[] = [
   listFiles,

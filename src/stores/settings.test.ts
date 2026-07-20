@@ -87,6 +87,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       mcpServers: [],
       hotkeys: {},
       healthDirs: [],
+      jinaReader: true,
     }
     expect(normalizeSettings(null)).toEqual(empty)
     expect(normalizeSettings('x')).toEqual(empty)

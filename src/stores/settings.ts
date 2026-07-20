@@ -61,6 +61,9 @@ export interface SettingsState {
   hotkeys: HotkeyOverrides
   /** Top-level dirs the KB health check is scoped to; empty = whole KB. */
   healthDirs: string[]
+  /** Built-in web_search / web_fetch via Jina AI Reader (no key). On by default;
+   *  a fallback when the web-agent browser extension isn't connected. */
+  jinaReader: boolean
 }
 
 const STORAGE_KEY = 'browser-md:settings'
@@ -93,6 +96,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   mcpServers: [],
   hotkeys: {},
   healthDirs: [],
+  jinaReader: true,
 }
 
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
@@ -108,6 +112,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     healthDirs: Array.isArray(obj.healthDirs)
       ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
       : [],
+    jinaReader: obj.jinaReader !== false, // default on; only an explicit false disables
   }
 }
 

@@ -11,6 +11,7 @@ import { listSkills } from '@/lib/skills'
 import { readMemory, MEMORY_FILE } from '@/lib/memory'
 import { catalogEntry } from '@/lib/mcp'
 import { useMcpStore } from '@/stores/mcp'
+import { useSettingsStore } from '@/stores/settings'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools (list_files, read_file, write_file, search_files). All paths are relative to the KB root.
 
@@ -69,7 +70,8 @@ export async function buildSystemPrompt(sessionId: string): Promise<string> {
   const mcpTools = mcpStore.allTools
   const webTask = mcpTools.find((t) => t.qualifiedName.endsWith('__web_task'))
   const hasGeneric = mcpTools.some((t) => t.qualifiedName.includes('__generic__'))
-  if (webTask || hasGeneric) {
+  const hasExtension = !!(webTask || hasGeneric)
+  if (hasExtension) {
     prompt += `
 
 Browser access: never guess live web content — use the connected browser tools. Two modes; pick per step:`
@@ -81,6 +83,22 @@ Browser access: never guess live web content — use the connected browser tools
       prompt += `
 - DELEGATE (${webTask.qualifiedName}): hands a whole errand to a browser agent with its own model. Each call is a fresh session with NO memory — write complete, self-contained descriptions (URLs, steps, exactly what to return). Prefer this for long multi-step errands (research a topic, operate an unfamiliar site) where step-by-step driving would flood your context. It's slow and costs money: batch related needs into ONE task, and ask for verbatim excerpts + source URLs when capturing into the KB.`
     }
+  }
+
+  // Built-in Jina web tools + the fallback ordering between them and the
+  // extension. Four states (extension × jina reader) → the right guidance.
+  const jinaOn = useSettingsStore().state.jinaReader
+  if (jinaOn && hasExtension) {
+    prompt += `
+- FALLBACK (web_search, web_fetch): built-in web search (DuckDuckGo) and page reader (Jina AI Reader), no login/cookies. Use these only when the browser tools above are unavailable or a call fails — the browser tools carry the user's real session and should come first.`
+  } else if (jinaOn) {
+    prompt += `
+
+Browser access: web_search (find pages via DuckDuckGo) and web_fetch (read a URL) are available, powered by Jina AI Reader — use them for anything about live web content instead of guessing. They carry no login or cookies, so pages behind a sign-in or aggressive bot-protection may fail; say so if one does. A URL you cite MUST be one you actually fetched this session.`
+  } else if (!hasExtension) {
+    prompt += `
+
+Browser access: NONE this session — the browser extension isn't connected and the built-in web tools (Jina AI Reader) are disabled. You cannot search the web or fetch pages. If the user needs that, tell them to connect the web-agent browser extension or enable "内置网页工具 (Jina AI Reader)" in Settings → 外部工具 — and never fabricate web content or URLs in the meantime.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))

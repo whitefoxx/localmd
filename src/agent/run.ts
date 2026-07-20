@@ -26,7 +26,15 @@ import {
   type LanguageModelUsage,
 } from 'ai'
 import { z } from 'zod'
-import { TOOLS, externalToolSpecs, allExternalToolSpecs, type ToolCtx } from './tools'
+import {
+  TOOLS,
+  webSearch,
+  webFetch,
+  externalToolSpecs,
+  allExternalToolSpecs,
+  type ToolSpec,
+  type ToolCtx,
+} from './tools'
 import { toLanguageModel } from './model'
 import { mapLimit } from '@/lib/async'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
@@ -58,6 +66,8 @@ export interface RunTurnOptions {
   signal: AbortSignal
   /** Offer run_subagent (disabled inside subagents — depth 1 only). */
   allowSubagent?: boolean
+  /** Offer the built-in web_search / web_fetch tools (Jina AI Reader fallback). */
+  jinaReader?: boolean
   /** Peek whether the user has queued a mid-turn steer message. When it returns
    *  true the step loop stops at the next clean boundary (tool results settled,
    *  no dangling call) so the caller can append the steer and continue. */
@@ -90,9 +100,12 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   let toolSeq = 0
   const nextToolId = (): number => toolSeq++
 
-  // Built-in + view_image + run_subagent tools (always active).
+  // Built-in + view_image + run_subagent tools (always active). The Jina web
+  // tools ride along only when enabled (a fallback for when the browser
+  // extension isn't connected).
   const tools: ToolSet = {}
-  for (const t of TOOLS) {
+  const builtins: ToolSpec[] = opts.jinaReader ? [...TOOLS, webSearch, webFetch] : TOOLS
+  for (const t of builtins) {
     tools[t.name] = tool({
       description: t.description,
       inputSchema: t.schema,

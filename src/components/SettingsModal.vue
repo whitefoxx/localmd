@@ -596,6 +596,32 @@ function slotBadges(p: LlmProfile): string[] {
 
             <!-- ▸ External tools (MCP) -->
             <div v-else-if="section === 'tools'" class="space-y-4">
+              <!-- Built-in web access (Jina AI Reader) -->
+              <div class="rounded-lg border border-border overflow-hidden">
+                <div class="px-3 py-3 flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="text-sm text-fg-1">内置网页工具 (Jina AI Reader)</div>
+                    <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                      给 agent 提供 web_search / web_fetch，免 key、无需扩展。优先使用下方连接的浏览器
+                      扩展（能带上你的登录态）；扩展不可用时回退到它。关闭后，未连接扩展时 agent 将没有联网能力。
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="store.state.jinaReader"
+                    class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    :class="store.state.jinaReader ? 'bg-accent' : 'bg-bg-3'"
+                    @click="store.state.jinaReader = !store.state.jinaReader"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                      :class="store.state.jinaReader ? 'translate-x-4' : 'translate-x-0.5'"
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div class="flex items-center justify-between">
                 <span class="text-xs uppercase tracking-wide text-fg-3">已连接的服务器</span>
                 <button class="text-xs text-accent hover:underline" @click="mcp.refresh()">重连</button>
