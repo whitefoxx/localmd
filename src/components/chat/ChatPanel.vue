@@ -751,12 +751,14 @@ watch(
       {{ chat.limitMsg }}
     </div>
 
-    <!-- Session history overlay. Full-width opaque backdrop; the list inside is
-         centered at the same readable width as the transcript when maximized. -->
-    <div
-      v-if="chat.historyOpen"
-      class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 panel-scroll overscroll-contain"
-    >
+    <!-- Session history overlay. An opaque, NON-scrolling backdrop covers the
+         transcript; a separate inner element does the scrolling. Keeping the
+         opaque background off the scrolling layer is what stops fast/momentum
+         scroll from bleeding the transcript through — a composited scroll-layer
+         artifact that overscroll-behavior alone can't fix. The list is centered
+         at the transcript's readable width when maximized. -->
+    <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1">
+      <div class="h-full panel-scroll overscroll-contain">
       <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
       <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
       <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
@@ -833,6 +835,7 @@ watch(
         <div
           class="pointer-events-none absolute left-9 top-full -mt-1 z-30 hidden max-w-[280px] break-words rounded-md border border-border bg-bg-0 px-2 py-1 text-xs text-fg-0 shadow-lg group-hover:block"
         >{{ s.title }}</div>
+      </div>
       </div>
       </div>
     </div>
