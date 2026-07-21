@@ -66,6 +66,8 @@ let selText = ''
 let annotations: EpubAnnotation[] = []
 let ro: ResizeObserver | null = null
 let resizeTimer = 0
+// Auto-clears the transient pulse flashCfi() puts on an existing mark.
+let flashTimer = 0
 // Set right before a programmatic jump so 'relocated' can offer a "back" button.
 let jumpFrom: { cfi: string; page: number } | null = null
 
@@ -85,6 +87,10 @@ function destroy(): void {
   if (resizeTimer) {
     clearTimeout(resizeTimer)
     resizeTimer = 0
+  }
+  if (flashTimer) {
+    clearTimeout(flashTimer)
+    flashTimer = 0
   }
   rendition?.destroy()
   book?.destroy()
@@ -570,11 +576,38 @@ async function flashCfi(cfi: string): Promise<void> {
   // out from under us — bail rather than deref null.
   if (!rendition) return
   clearCitationHighlight()
+  // When we're jumping TO an annotation (from the annotations page), that CFI
+  // already carries a mark. epub.js keys marks by cfi+type, so adding a second
+  // 'highlight' here would clobber the annotation's bookkeeping and strand its
+  // element as an orphan you can no longer delete. Pulse the existing mark
+  // instead — same visual "here it is" cue, no overlay, no collision.
+  if (annotations.some((a) => a.cfi === cfi)) {
+    pulseMark(cfi)
+    return
+  }
   rendition.annotations.highlight(cfi, {}, undefined, 'epub-hl', {
     fill: 'rgb(88 166 255)',
     'fill-opacity': '0.35',
   })
   lastHighlight = cfi
+}
+
+/** Briefly emphasize an already-rendered annotation mark without touching
+ *  epub.js's annotation store (see flashCfi). The class is dropped after the
+ *  pulse, or naturally when a page turn re-renders the mark. */
+function pulseMark(cfi: string): void {
+  const root = host.value
+  if (!root) return
+  const els = [...root.querySelectorAll<SVGGElement>('g.bm-highlight, g.bm-underline')].filter(
+    (el) => el.dataset.epubcfi === cfi,
+  )
+  if (!els.length) return
+  els.forEach((el) => el.classList.add('bm-flash'))
+  if (flashTimer) clearTimeout(flashTimer)
+  flashTimer = window.setTimeout(() => {
+    flashTimer = 0
+    els.forEach((el) => el.classList.remove('bm-flash'))
+  }, 1400)
 }
 
 function flattenNav(items: NavItem[], level = 1, out: FlatTocEntry[] = []): FlatTocEntry[] {
@@ -892,5 +925,31 @@ watch(
   stroke: #ff3b30;
   stroke-width: 2px;
   stroke-opacity: 1;
+}
+/* Transient "here it is" pulse for a jumped-to annotation (see flashCfi/pulseMark).
+   Highlights deepen their fill; underlines thicken their stroke. */
+.bm-flash rect {
+  animation: bm-flash-hl 0.45s ease-in-out 3;
+}
+.bm-flash line {
+  animation: bm-flash-ul 0.45s ease-in-out 3;
+}
+@keyframes bm-flash-hl {
+  0%,
+  100% {
+    fill-opacity: 0.4;
+  }
+  50% {
+    fill-opacity: 0.9;
+  }
+}
+@keyframes bm-flash-ul {
+  0%,
+  100% {
+    stroke-width: 2px;
+  }
+  50% {
+    stroke-width: 5px;
+  }
 }
 </style>
