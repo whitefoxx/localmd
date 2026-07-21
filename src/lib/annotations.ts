@@ -71,8 +71,9 @@ export interface RawPdfAnnotation {
     id: string
     /** Standard PDF comment field — the user's note on any annotation. */
     contents?: string
-    /** `text` = the marked passage, stashed by EmbedPDF for text markups. */
-    custom?: { text?: string }
+    /** `text` = the marked passage, stashed by EmbedPDF for text markups.
+     *  `bmNoteFor` tags our note-icon annotation (paired to a highlight). */
+    custom?: { text?: string; bmNoteFor?: string }
     author?: string
     [k: string]: unknown
   }
@@ -265,6 +266,9 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
     if (kind === 'pdf') {
       const a = (entry as RawPdfAnnotation)?.annotation
       if (!a || typeof a.pageIndex !== 'number' || !a.id) return
+      // Our 📝 note-icon markers are visual-only — the note lives on the
+      // highlight they're paired to, so don't list them separately.
+      if (a.custom?.bmNoteFor) return
       items.push({
         id: a.id,
         category: pdfCategory(a.type),

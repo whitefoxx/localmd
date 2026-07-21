@@ -17,8 +17,10 @@ import {
   UNDERLINE_COLOR,
   loadEpubSidecar,
   saveEpubSidecar,
+  sidecarPath,
   type EpubAnnotation,
 } from '@/lib/annotations'
+import NoteDialog from '@/components/NoteDialog.vue'
 
 type MarkStyle = 'highlight' | 'underline'
 
@@ -44,6 +46,39 @@ const curPage = ref(0)
 const totalPages = ref(0)
 // "← page N" button, shown after a non-sequential jump (citation / TOC / search).
 const backTarget = ref<{ cfi: string; page: number } | null>(null)
+// The bottom page bar shows while the cursor is in the lower part of the page.
+// The move events come from inside the chapter iframe (see the content hook),
+// where clientY is already relative to the visible page (the iframe fills the
+// host). `barHovered` keeps it up while the pointer is on the bar itself — the
+// bar sits in the top document, so hovering it leaves the iframe and would
+// otherwise flip `nearBottom` off, flickering the button.
+const nearBottom = ref(false)
+const barHovered = ref(false)
+// Left/right paging buttons surface as the cursor approaches either edge — a
+// mouse-only fallback for arrow paging.
+const nearLeft = ref(false)
+const nearRight = ref(false)
+function onContentMouseMove(e: MouseEvent): void {
+  // The chapter iframe spans every column (epub.js clips + translates it), so the
+  // event's clientX is in full-content space. Map the pointer into the visible
+  // host box via the iframe element's rect so edge detection tracks the page.
+  const frame = (e.view as (Window & { frameElement?: Element | null }) | null)?.frameElement
+  const hostEl = host.value
+  if (!frame || !hostEl) return
+  const fr = frame.getBoundingClientRect()
+  const hr = hostEl.getBoundingClientRect()
+  const x = fr.left + e.clientX - hr.left
+  const y = fr.top + e.clientY - hr.top
+  nearBottom.value = hr.height > 0 && y >= hr.height - 140
+  nearLeft.value = x < 150
+  nearRight.value = hr.width > 0 && x > hr.width - 150
+}
+function hideBottomBar(): void {
+  nearBottom.value = false
+  barHovered.value = false
+  nearLeft.value = false
+  nearRight.value = false
+}
 
 // In-book search.
 const searchOpen = ref(false)
@@ -149,6 +184,11 @@ async function load(path: string | null): Promise<void> {
     // A mousedown on the page body (never on a highlight — those live in an
     // overlay in the top document) dismisses the floating popup / citation mark.
     contents.document.addEventListener('mousedown', onContentMousedown)
+    // Reveal the bottom page bar when the cursor is in the lower page. The book
+    // is in an iframe, so its mousemoves never reach the top document — listen
+    // here. (No mouseleave: moving onto the bar leaves the iframe, and hiding on
+    // that would make the bar flicker — the wrapper's mouseleave handles exit.)
+    contents.document.addEventListener('mousemove', onContentMouseMove)
   })
   // Also page on left/right arrows when the iframe isn't focused (e.g. right
   // after clicking a toolbar button). Skipped while typing / with modifiers.
@@ -157,6 +197,10 @@ async function load(path: string | null): Promise<void> {
   // document that isn't the popup or an existing mark.
   window.addEventListener('mousedown', onWindowMousedown)
   await rendition.display(epubLocation.get(path))
+  // Focus the book so arrow paging works immediately — e.g. after switching back
+  // from another file tab (this component remounts, so focus would otherwise sit
+  // in the app chrome until the user clicks into the page).
+  void nextTick(refocusReader)
 
   // The container can change width without a window resize (e.g. toggling or
   // dragging the agent panel). epub.js only auto-handles window resizes, so
@@ -352,6 +396,7 @@ function reapplyHighlights(): void {
     removeMark(a.cfi, a.style)
     applyOne(a.cfi, a.color, a.style ?? 'highlight')
   }
+  void nextTick(decorateNotes)
 }
 
 /** Create/update a mark, then close the popup/selection. A highlight carries a
@@ -412,6 +457,12 @@ function showSelectionPopup(cfiRange: string, contents: { window: Window }): voi
  * clientX/Y arrive as 0 — anchor the popup to the mark's bounding rect.
  */
 function onMarkClick(cfi: string, e: MouseEvent): void {
+  // A mark that carries a note edits its note on click; a plain mark shows the
+  // recolour/delete popup.
+  if (annotations.find((a) => a.cfi === cfi)?.note) {
+    openNoteEditor(cfi)
+    return
+  }
   const target = (e.target ?? e.currentTarget) as Element | null
   const rect = target?.getBoundingClientRect()
   if (!rect || rect.width === 0) return
@@ -429,6 +480,106 @@ async function deleteAnnot(): Promise<void> {
   annotations = annotations.filter((a) => a.cfi !== cfi)
   popup.value = null
   await saveEpubSidecar(docPath, annotations)
+}
+
+/* ───────── notes ───────── */
+// A note is a yellow highlight carrying `note` text, marked in the margin with a
+// 📝 badge. Editing/deleting go through the shared NoteDialog. Same model as PDF.
+
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const noteEditor = ref<{
+  cfi: string
+  excerpt: string
+  note: string
+  color: string
+  style: MarkStyle
+} | null>(null)
+
+/** Open the note dialog. The mark exists while the dialog is open (created now
+ *  for a fresh selection), so colour/underline act live; only the text is saved
+ *  explicitly. */
+function openNoteEditor(cfi: string): void {
+  popup.value = null
+  const existing = annotations.find((a) => a.cfi === cfi)
+  if (!existing) void applyMark(cfi, HIGHLIGHT_COLORS[0].value, 'highlight')
+  noteEditor.value = {
+    cfi,
+    excerpt: existing?.text ?? selText,
+    note: existing?.note ?? '',
+    color: existing && existing.style !== 'underline' ? existing.color : HIGHLIGHT_COLORS[0].value,
+    style: existing?.style ?? 'highlight',
+  }
+}
+
+/** Read the note's passage aloud (the dialog's speaker button). */
+function readNoteExcerpt(): void {
+  if (noteEditor.value?.excerpt) tts.speak(noteEditor.value.excerpt, '选中内容')
+}
+
+/** Live: recolour / restyle the open note's mark (no save button needed). */
+function noteRecolor(color: string): void {
+  const cfi = noteEditor.value?.cfi
+  if (!cfi) return
+  void applyMark(cfi, color, 'highlight')
+  noteEditor.value = { ...noteEditor.value!, color, style: 'highlight' }
+  void nextTick(decorateNotes)
+}
+function noteUnderline(): void {
+  const ed = noteEditor.value
+  if (!ed) return
+  void applyMark(ed.cfi, ed.color, 'underline')
+  noteEditor.value = { ...ed, style: 'underline' }
+  void nextTick(decorateNotes)
+}
+
+/** Save just the note text onto the (already-existing) mark. */
+function saveNoteText(note: string): void {
+  const cfi = noteEditor.value?.cfi
+  if (!cfi || !docPath) return
+  const a = annotations.find((x) => x.cfi === cfi)
+  if (!a) return
+  if (note) a.note = note
+  else delete a.note
+  void saveEpubSidecar(docPath, annotations)
+  void nextTick(decorateNotes)
+}
+
+async function deleteNote(): Promise<void> {
+  const ed = noteEditor.value
+  if (!ed || !docPath) return
+  noteEditor.value = null
+  removeMark(ed.cfi, annotations.find((a) => a.cfi === ed.cfi)?.style)
+  sweepOrphanMarks(ed.cfi)
+  annotations = annotations.filter((a) => a.cfi !== ed.cfi)
+  await saveEpubSidecar(docPath, annotations)
+}
+
+/** Stamp a quote mark straddling the start of every noted mark's first rect —
+ *  clearly signalling "this passage has a note". Runs after marks (re)render
+ *  (rebuilt on every page turn). Idempotent. */
+function decorateNotes(): void {
+  const root = host.value
+  if (!root) return
+  for (const g of root.querySelectorAll<SVGGElement>('g.bm-highlight, g.bm-underline')) {
+    const cfi = g.dataset.epubcfi
+    if (!cfi || !annotations.find((a) => a.cfi === cfi && a.note)) continue
+    if (g.querySelector('.bm-note-badge')) continue
+    const rect = g.querySelector('rect')
+    if (!rect) continue
+    const x = parseFloat(rect.getAttribute('x') ?? '0')
+    const y = parseFloat(rect.getAttribute('y') ?? '0')
+    const badge = document.createElementNS(SVG_NS, 'text')
+    badge.setAttribute('class', 'bm-note-badge')
+    badge.setAttribute('x', String(x - 2))
+    badge.setAttribute('y', String(y + 6)) // straddles the top of the first line
+    badge.textContent = '“' // “
+    g.appendChild(badge)
+  }
+}
+
+/** Open this book's annotations sidecar in the rendered AnnotationsViewer. */
+function viewAnnotations(): void {
+  if (docPath) void files.openFile(sidecarPath(docPath))
 }
 
 /** Remove the transient citation/search-jump highlight, if present. */
@@ -523,6 +674,9 @@ function toggleSearch(): void {
   if (searchOpen.value) {
     tocOpen.value = false
     void nextTick(() => searchInput.value?.focus())
+  } else {
+    // Return focus to the book so arrow paging works again.
+    refocusReader()
   }
 }
 
@@ -575,6 +729,9 @@ async function flashCfi(cfi: string): Promise<void> {
   // A tab switch / unmount during the async display() can destroy the rendition
   // out from under us — bail rather than deref null.
   if (!rendition) return
+  // Jumps (search result / citation / TOC index) leave focus on the clicked UI;
+  // hand it back to the book so arrow paging keeps working.
+  void nextTick(refocusReader)
   clearCitationHighlight()
   // When we're jumping TO an annotation (from the annotations page), that CFI
   // already carries a mark. epub.js keys marks by cfi+type, so adding a second
@@ -663,11 +820,19 @@ watch(
 )
 onBeforeUnmount(destroy)
 
+/** After a page turn the iframe that had keyboard focus is replaced, so focus
+ *  falls back to the top document and arrow keys stop paging until you click
+ *  back into the book. Re-focus the current chapter iframe once the turn settles
+ *  so arrow paging keeps working. */
+function refocusReader(): void {
+  const iframe = host.value?.querySelector('iframe')
+  iframe?.contentWindow?.focus()
+}
 function prev(): void {
-  void rendition?.prev()
+  void Promise.resolve(rendition?.prev()).then(refocusReader)
 }
 function next(): void {
-  void rendition?.next()
+  void Promise.resolve(rendition?.next()).then(refocusReader)
 }
 
 /** The chapter iframes currently attached (spread mode can hold two). epub.js
@@ -767,7 +932,10 @@ watch(
 
 <template>
   <div class="h-full flex flex-col">
+    <!-- Top bar: navigation/zoom on the left, search · read-aloud ·
+         view-annotations on the right, title centered. -->
     <div class="relative flex items-center gap-2 h-10 px-3 border-b border-border shrink-0">
+      <!-- Left: TOC + font zoom -->
       <button
         class="btn text-xs"
         :class="{ '!text-accent': tocOpen }"
@@ -777,16 +945,6 @@ watch(
       >
         <span class="codicon codicon-sm codicon-list-tree" />
       </button>
-      <button
-        class="btn text-xs"
-        :class="{ '!text-accent': searchOpen }"
-        title="Search in book"
-        @click="toggleSearch"
-      >
-        <span class="codicon codicon-sm codicon-search" />
-      </button>
-
-      <!-- Font zoom -->
       <button class="btn text-xs" title="Smaller text" @click="setFont(fontPct - 10)">
         <span class="codicon codicon-sm codicon-zoom-out" />
       </button>
@@ -794,29 +952,28 @@ watch(
       <button class="btn text-xs" title="Larger text" @click="setFont(fontPct + 10)">
         <span class="codicon codicon-sm codicon-zoom-in" />
       </button>
-      <button class="btn text-xs" title="朗读本章" @click="readAloud">
-        <span class="codicon codicon-sm codicon-unmute" />
-      </button>
 
       <!-- Chapter title, centered. Paging is arrow-keys only (no prev/next buttons). -->
       <span
         class="pointer-events-none absolute left-1/2 -translate-x-1/2 max-w-[40%] truncate text-center text-xs text-fg-3"
       >{{ chapterLabel }}</span>
 
-      <!-- Right side: back-to-page (left) then current / total page (right). -->
+      <!-- Right: search · read-aloud · view-annotations -->
       <div class="ml-auto flex items-center gap-2">
         <button
-          v-if="backTarget"
-          class="btn text-xs !text-accent"
-          :title="`Back to page ${backTarget.page}`"
-          @click="goBack"
+          class="btn text-xs"
+          :class="{ '!text-accent': searchOpen }"
+          title="Search in book"
+          @click="toggleSearch"
         >
-          <span class="codicon codicon-sm codicon-discard" /> {{ backTarget.page }}
+          <span class="codicon codicon-sm codicon-search" />
         </button>
-        <span class="text-xs text-fg-3 whitespace-nowrap">
-          <template v-if="totalPages">{{ curPage }} / {{ totalPages }}</template>
-          <template v-else>{{ progressPct }}%</template>
-        </span>
+        <button class="btn text-xs" title="朗读本章" @click="readAloud">
+          <span class="codicon codicon-sm codicon-unmute" />
+        </button>
+        <button class="btn text-xs" title="查看标注" @click="viewAnnotations">
+          <span class="codicon codicon-sm codicon-list-selection" />
+        </button>
       </div>
     </div>
 
@@ -867,7 +1024,55 @@ watch(
           <span class="block truncate">{{ entry.title }}</span>
         </button>
       </div>
-      <div class="flex-1 min-w-0" :class="theme.isDark ? 'bg-bg-1' : 'bg-white'" ref="host" />
+      <!-- Book page, with an unobtrusive bottom bar that only fades in when the
+           cursor nears the bottom edge — otherwise nothing distracts from reading. -->
+      <div
+        class="relative flex-1 min-w-0"
+        :class="theme.isDark ? 'bg-bg-1' : 'bg-white'"
+        @mouseleave="hideBottomBar"
+      >
+        <div class="h-full w-full" ref="host" />
+        <!-- Edge paging buttons — fade in as the cursor nears each side. -->
+        <button
+          class="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full border border-border bg-bg-1/80 shadow flex items-center justify-center text-fg-2 hover:text-fg-1 transition-opacity duration-200"
+          :class="nearLeft ? 'opacity-90' : 'opacity-0 pointer-events-none'"
+          title="上一页"
+          @mousedown.prevent
+          @click="prev"
+        >
+          <span class="codicon codicon-chevron-left" />
+        </button>
+        <button
+          class="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full border border-border bg-bg-1/80 shadow flex items-center justify-center text-fg-2 hover:text-fg-1 transition-opacity duration-200"
+          :class="nearRight ? 'opacity-90' : 'opacity-0 pointer-events-none'"
+          title="下一页"
+          @mousedown.prevent
+          @click="next"
+        >
+          <span class="codicon codicon-chevron-right" />
+        </button>
+        <div
+          class="absolute inset-x-0 bottom-0 flex items-center px-3 h-6 transition-opacity duration-200"
+          :class="nearBottom || barHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+          @mouseenter="barHovered = true"
+          @mouseleave="barHovered = false"
+        >
+          <button
+            v-if="backTarget"
+            class="flex items-center gap-1 text-[11px] text-accent hover:opacity-80"
+            :title="`回到第 ${backTarget.page} 页`"
+            @click="goBack"
+          >
+            <span class="codicon codicon-discard !text-[12px]" /> {{ backTarget.page }}
+          </button>
+          <span
+            class="absolute left-1/2 -translate-x-1/2 text-[11px] text-fg-3 whitespace-nowrap"
+          >
+            <template v-if="totalPages">{{ curPage }} / {{ totalPages }}</template>
+            <template v-else>{{ progressPct }}%</template>
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Mark popup: color swatches + highlight/underline toggle + delete -->
@@ -901,6 +1106,13 @@ watch(
           <span class="text-xs font-semibold underline underline-offset-2" :style="{ color: UNDERLINE_COLOR }">U</span>
         </button>
         <button
+          class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
+          title="笔记"
+          @click="openNoteEditor(popup.cfi)"
+        >
+          <span class="codicon codicon-sm codicon-note" />
+        </button>
+        <button
           v-if="popup.existing"
           class="text-fg-3 hover:text-removed ml-0.5"
           title="Delete mark"
@@ -910,6 +1122,22 @@ watch(
         </button>
       </div>
     </Teleport>
+
+    <NoteDialog
+      :open="!!noteEditor"
+      :excerpt="noteEditor?.excerpt ?? ''"
+      :initial-note="noteEditor?.note ?? ''"
+      :colors="HIGHLIGHT_COLORS"
+      :underline-color="UNDERLINE_COLOR"
+      :color="noteEditor?.color ?? HIGHLIGHT_COLORS[0].value"
+      :mark-style="noteEditor?.style ?? 'highlight'"
+      @pick-color="noteRecolor"
+      @set-underline="noteUnderline"
+      @read="readNoteExcerpt"
+      @save-text="saveNoteText"
+      @delete="deleteNote"
+      @close="noteEditor = null"
+    />
   </div>
 </template>
 
@@ -925,6 +1153,19 @@ watch(
   stroke: #ff3b30;
   stroke-width: 2px;
   stroke-opacity: 1;
+}
+/* Quote mark stamped at the start of a noted mark — bold red (matching the PDF
+   viewer's marker) so it's obvious. Non-interactive so the click falls through
+   to the edit handler. */
+.bm-note-badge {
+  font-size: 20px;
+  font-weight: 700;
+  fill: #dc2626;
+  /* The mark's <g> carries fill-opacity 0.4 (the highlight tint); override it so
+     the quote reads as a solid deep red, matching the PDF viewer's marker. */
+  fill-opacity: 1;
+  pointer-events: none;
+  user-select: none;
 }
 /* Transient "here it is" pulse for a jumped-to annotation (see flashCfi/pulseMark).
    Highlights deepen their fill; underlines thicken their stroke. */
