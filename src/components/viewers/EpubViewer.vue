@@ -315,6 +315,31 @@ function removeMark(cfi: string, style?: MarkStyle): void {
   }
 }
 
+/**
+ * Drop any stray mark elements epub.js left behind for this CFI — a DELETE-time
+ * cleanup only. Never call it on the paging hot path (`reapplyHighlights`),
+ * which remove+re-adds every mark on every relocation: sweeping there strips the
+ * live highlight a click just focus-scrolled past before it's re-added.
+ *
+ * Why orphans happen: `flashCfi()` (annotations-page jump) draws its cue with
+ * `annotations.highlight(cfi, …)` on the SAME CFI as the annotation. epub.js
+ * 0.3.93 keys marks by `cfi + type` (both "highlight"), so the flash's add
+ * clobbers the annotation's bookkeeping — `_annotations[hash]` and the
+ * single-slot `view.highlights[cfi]` — stranding the original `bm-highlight`
+ * `<g>` in the marks-pane overlay, tracked by nothing. Dismissing the cue then
+ * `annotations.remove(cfi, 'highlight')`s that hash away entirely, so a later
+ * `deleteAnnot` finds nothing to detach and the orphan lingers on screen though
+ * the data is gone — until a reload rebuilds the overlay. marks-pane stamps each
+ * element with `data-epubcfi`, so we can find and drop the leftovers directly.
+ */
+function sweepOrphanMarks(cfi: string): void {
+  const root = host.value
+  if (!root) return
+  for (const el of root.querySelectorAll<SVGGElement>('g.bm-highlight, g.bm-underline')) {
+    if (el.dataset.epubcfi === cfi) el.remove()
+  }
+}
+
 function reapplyHighlights(): void {
   if (!rendition) return
   for (const a of annotations) {
@@ -391,6 +416,10 @@ async function deleteAnnot(): Promise<void> {
   if (!rendition || !popup.value || !docPath) return
   const { cfi } = popup.value
   removeMark(cfi, annotations.find((a) => a.cfi === cfi)?.style)
+  // epub.js's own remove above misses orphaned marks (see sweepOrphanMarks) —
+  // most commonly on annotations reached via the annotations-page flash cue. A
+  // full sweep here guarantees the highlight actually leaves the screen.
+  sweepOrphanMarks(cfi)
   annotations = annotations.filter((a) => a.cfi !== cfi)
   popup.value = null
   await saveEpubSidecar(docPath, annotations)
