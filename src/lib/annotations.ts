@@ -258,6 +258,23 @@ function pdfRects(a: RawPdfAnnotation['annotation']): { x: number; y: number; w:
   return segs.map((r) => ({ x: r.origin.x, y: r.origin.y, w: r.size.width, h: r.size.height }))
 }
 
+/** PDF text extraction breaks a marked passage at each *visual* line, so its
+ *  stored text is riddled with newlines that fragment a single sentence (and even
+ *  split words). Rejoin into a continuous excerpt: no space between CJK
+ *  characters (they don't use spaces), a single space between Latin words. */
+export function normalizeExcerpt(text: string): string {
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  if (lines.length <= 1) return text.trim()
+  const cjk = /[⺀-鿿豈-﫿＀-｠]/
+  return lines.reduce((acc, line) => {
+    const glue = cjk.test(acc.slice(-1)) || cjk.test(line[0] ?? '') ? '' : ' '
+    return acc + glue + line
+  })
+}
+
 /** Build the display/edit model for a sidecar, sorted into reading order. */
 export function buildAnnotationItems(source: string, annotations: unknown[]): AnnotationItem[] {
   const kind = fileKind(source)
@@ -274,7 +291,7 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
         category: pdfCategory(a.type),
         typeLabel: PDF_SUBTYPE_NAMES[a.type] ?? `Type ${a.type}`,
         color: a.color ?? a.strokeColor ?? HIGHLIGHT_COLORS[0].value,
-        excerpt: a.custom?.text ?? '',
+        excerpt: normalizeExcerpt(a.custom?.text ?? ''),
         comment: a.contents ?? '',
         createdAt: a.created ?? '',
         page: a.pageIndex + 1,
