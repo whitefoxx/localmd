@@ -44,7 +44,7 @@ export interface ProviderPreset {
 export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
   {
     id: 'qwen',
-    label: 'Qwen（阿里云百炼）',
+    label: 'Qwen (Alibaba Cloud Bailian)',
     sdk: 'openai-compatible',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     defaultModel: 'qwen-plus',
@@ -52,7 +52,7 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'glm',
-    label: '智谱 GLM',
+    label: 'Zhipu GLM',
     sdk: 'openai-compatible',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     defaultModel: 'glm-4-plus',
@@ -60,7 +60,7 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'kimi',
-    label: 'Kimi（Moonshot）',
+    label: 'Kimi (Moonshot)',
     sdk: 'openai-compatible',
     baseUrl: 'https://api.moonshot.cn/v1',
     defaultModel: 'kimi-k2-0905-preview',
@@ -75,7 +75,7 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
   },
   {
     id: 'custom',
-    label: 'Custom（OpenAI-compatible）',
+    label: 'Custom (OpenAI-compatible)',
     sdk: 'openai-compatible',
     baseUrl: '',
     defaultModel: '',

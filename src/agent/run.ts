@@ -292,7 +292,7 @@ function buildViewImageTool(
           }
           ok = true
           // Don't put base64 in the transcript — just a summary of what was sent.
-          out = `已把 ${images.length} 张图片返回给模型${missing.length ? `(跳过 ${missing.length} 个无法读取)` : ''}`
+          out = `Returned ${images.length} image(s) to the model${missing.length ? ` (skipped ${missing.length} unreadable)` : ''}`
           return {
             images,
             note: missing.length ? `(unreadable, skipped: ${missing.join(', ')})` : '',
@@ -322,7 +322,7 @@ function buildViewImageTool(
   // Text-only primary: sub-call the vision-slot model, return its description.
   return tool({
     description:
-      '查看知识库中图片文件的实际内容(视觉理解)。传 KB 相对路径,如 ["raw/images/capture-123.png"]。仅当需要分析图片内容时调用。',
+      'Look at the actual contents of image files in the knowledge base (visual understanding). Pass KB-relative paths, e.g. ["raw/images/capture-123.png"]. Only call this when you need to analyze image content.',
     inputSchema: viewImageSchema,
     execute: async ({ paths, purpose }) => {
       const id = nextToolId()
@@ -342,7 +342,7 @@ function buildViewImageTool(
           out = `${desc}${note}`
           return out
         } catch (err) {
-          out = `视觉模型(${vision.profile.model})调用失败:${(err as Error).message}`
+          out = `Vision model (${vision.profile.model}) call failed: ${(err as Error).message}`
           return out
         }
       } finally {
@@ -381,10 +381,10 @@ function buildGenerateImageTool(
         await useFilesStore().refreshTree()
         opts.onEvent({ type: 'image', path })
         ok = true
-        out = `已生成图片并保存到 ${path}`
-        return `已生成图片并保存到 ${path}(已作为图片卡片展示给用户)。如需可 view_image 查看,勿重复粘贴内容。`
+        out = `Generated image and saved it to ${path}`
+        return `Generated image and saved it to ${path} (already shown to the user as an image card). Use view_image if you need to inspect it; do not paste the contents back.`
       } catch (err) {
-        out = `图像生成失败(${profile.model}):${(err as Error).message}`
+        out = `Image generation failed (${profile.model}): ${(err as Error).message}`
         return out
       } finally {
         opts.onEvent({ type: 'tool_result', id, ok, result: out })
@@ -447,7 +447,7 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
             .map((t, i) => {
               const r = results[i]
               const body = r instanceof Error ? `(failed: ${r.message})` : r
-              return `## 子任务 ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
+              return `## Subtask ${i + 1}: ${t.slice(0, 60)}\n\n${body}`
             })
             .join('\n\n')
         }

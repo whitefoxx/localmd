@@ -20,11 +20,11 @@ const expanded = ref(true)
           class="codicon codicon-sm shrink-0"
           :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
         />
-        <span class="truncate">Open Files ({{ files.openTabs.length }})</span>
+        <span class="truncate">{{ $t('files.openFiles', { n: files.openTabs.length }) }}</span>
       </button>
       <button
         class="text-fg-3 hover:text-fg-1 px-1"
-        :title="ui.editorTabsVisible ? 'Hide editor tab bar' : 'Show editor tab bar'"
+        :title="ui.editorTabsVisible ? $t('files.hideTabBar') : $t('files.showTabBar')"
         @click="ui.editorTabsVisible = !ui.editorTabsVisible"
       >
         <span
@@ -32,12 +32,12 @@ const expanded = ref(true)
           :class="ui.editorTabsVisible ? 'codicon-eye' : 'codicon-eye-closed'"
         />
       </button>
-      <button class="text-fg-3 hover:text-fg-1 px-1" title="Save all" @click="() => files.flush()">
+      <button class="text-fg-3 hover:text-fg-1 px-1" :title="$t('files.saveAll')" @click="() => files.flush()">
         <span class="codicon codicon-sm codicon-save-all" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-1 px-1"
-        title="Close all"
+        :title="$t('files.closeAll')"
         @click="() => files.closeAllTabs()"
       >
         <span class="codicon codicon-sm codicon-close-all" />

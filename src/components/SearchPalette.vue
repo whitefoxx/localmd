@@ -125,7 +125,7 @@ function onKeydown(e: KeyboardEvent): void {
           ref="inputEl"
           v-model="query"
           class="px-4 py-3 bg-transparent text-fg-0 placeholder-fg-3 focus:outline-none border-b border-border"
-          placeholder="Search files and content…  (type:foo to filter by concept type)"
+          :placeholder="$t('search.placeholder')"
           @keydown="onKeydown"
         />
         <div class="panel-scroll">
@@ -166,7 +166,7 @@ function onKeydown(e: KeyboardEvent): void {
               {{ row.type }}
             </span>
           </button>
-          <div v-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">No results</div>
+          <div v-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">{{ $t('search.noResults') }}</div>
         </div>
       </div>
     </div>

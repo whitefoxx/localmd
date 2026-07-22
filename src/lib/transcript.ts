@@ -53,15 +53,15 @@ export function renderTranscript(s: TranscriptSession): string {
   return `---\n${fm.join('\n')}\n---\n\n${body}`
 }
 
-/** One message as a `## t<id> · 角色` section. Tool calls collapse to one-liners;
+/** One message as a `## t<id> · role` section. Tool calls collapse to one-liners;
  *  model-internal thinking is omitted (the record is the discussion). */
 function renderMessage(m: UiMessage): string {
-  const lines: string[] = [`## t${m.id} · ${m.role === 'user' ? '用户' : '助手'}`, '']
+  const lines: string[] = [`## t${m.id} · ${m.role === 'user' ? 'User' : 'Assistant'}`, '']
   for (const c of m.contexts ?? []) {
-    lines.push(`> 📌 ${c.file ? `引用 ${c.file}` : '引用此前回复'}: ${excerpt(c.text)}`, '')
+    lines.push(`> 📌 ${c.file ? `Quoting ${c.file}` : 'Quoting an earlier reply'}: ${excerpt(c.text)}`, '')
   }
   if (m.attachments?.length) {
-    lines.push(`> 📎 附件: ${m.attachments.map((a) => a.path).join(', ')}`, '')
+    lines.push(`> 📎 Attachments: ${m.attachments.map((a) => a.path).join(', ')}`, '')
   }
   for (const p of m.parts) {
     if (p.type === 'text') {
@@ -71,9 +71,9 @@ function renderMessage(m: UiMessage): string {
       const status = p.status === 'error' ? ' ✗' : ''
       lines.push(`> ⚙ ${p.name}${p.detail ? ` — ${excerpt(p.detail, 160)}` : ''}${status}`, '')
     } else if (p.type === 'artifact') {
-      if (!p.pending) lines.push(`> 📄 工件: ${p.path}${p.title ? `(${p.title})` : ''}`, '')
+      if (!p.pending) lines.push(`> 📄 Artifact: ${p.path}${p.title ? ` (${p.title})` : ''}`, '')
     } else if (p.type === 'image') {
-      lines.push(`> 🖼 生成图片: ${p.path}`, '')
+      lines.push(`> 🖼 Generated image: ${p.path}`, '')
     }
   }
   if (m.error) lines.push(`> ⚠ ${m.error}`, '')

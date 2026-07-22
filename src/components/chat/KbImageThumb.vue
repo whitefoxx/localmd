@@ -37,10 +37,10 @@ onUnmounted(revoke)
   <button
     v-if="url"
     class="block my-2 max-w-[320px] overflow-hidden rounded-lg border border-border hover:border-accent/50 transition-colors"
-    :title="`${path} · 点击查看`"
+    :title="`${path} · ${$t('chat.openImage')}`"
     @click="files.openFile(path)"
   >
     <img :src="url" :alt="path" class="block w-full h-auto" />
   </button>
-  <div v-else-if="failed" class="my-2 text-xs text-fg-3">图片无法加载:{{ path }}</div>
+  <div v-else-if="failed" class="my-2 text-xs text-fg-3">{{ $t('chat.imageMissing') }}: {{ path }}</div>
 </template>

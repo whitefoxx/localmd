@@ -19,6 +19,7 @@ import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
 import type { MessagePart } from '@/stores/chat'
+import { t } from '@/i18n'
 
 const emit = defineEmits<{ openSettings: []; close: [] }>()
 
@@ -141,6 +142,17 @@ function baseName(p: string): string {
 function fmtTokens(n: number): string {
   return n >= 10_000 ? `${(n / 1000).toFixed(0)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
+
+/** Localized tooltip for the per-session token counter. */
+const usageTitle = computed(() => {
+  const u = chat.sessionUsage
+  let s = t('chat.tokenUsage', {
+    input: u.input.toLocaleString(),
+    output: u.output.toLocaleString(),
+  })
+  if (u.cacheRead) s += t('chat.tokenCacheSuffix', { cache: u.cacheRead.toLocaleString() })
+  return s
+})
 
 /* ── tool call loading + timer ──────────────────────────────────────────────
  * External MCP tool calls carry a status/timer; a shared clock ticks once a
@@ -662,7 +674,7 @@ watch(
       <span class="text-xs uppercase tracking-wide text-fg-3 flex-1">Agent</span>
       <button
         class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
-        title="保存会话到文件(可选目录、可改名)"
+        :title="$t('chat.saveSession')"
         :disabled="!chat.messages.length"
         @click="saveSession"
       >
@@ -671,7 +683,7 @@ watch(
       <button
         class="disabled:opacity-40 disabled:hover:!text-fg-3"
         :class="chat.currentFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-fg-3 hover:text-fg-0'"
-        :title="chat.currentFavorite ? '取消收藏此会话' : '收藏此会话'"
+        :title="chat.currentFavorite ? $t('chat.unfavoriteSession') : $t('chat.favoriteSession')"
         :disabled="!chat.messages.length"
         @click="chat.currentSessionId && chat.toggleFavorite(chat.currentSessionId)"
       >
@@ -680,20 +692,20 @@ watch(
           :class="chat.currentFavorite ? 'codicon-star-full' : 'codicon-star-empty'"
         />
       </button>
-      <button class="text-fg-3 hover:text-fg-0" title="New chat" @click="chat.newSession()">
+      <button class="text-fg-3 hover:text-fg-0" :title="$t('chat.newChat')" @click="chat.newSession()">
         <span class="codicon codicon-sm codicon-add" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-0"
         :class="{ '!text-accent': chat.historyOpen }"
-        title="Chat history"
+        :title="$t('chat.history')"
         @click="chat.historyOpen = !chat.historyOpen"
       >
         <span class="codicon codicon-sm codicon-history" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-0"
-        :title="ui.agentMaximized ? 'Restore panel' : 'Maximize panel'"
+        :title="ui.agentMaximized ? $t('chat.restorePanel') : $t('chat.maximizePanel')"
         @click="ui.agentMaximized = !ui.agentMaximized"
       >
         <span
@@ -705,7 +717,7 @@ watch(
            double-chevron, so two chevrons overlap). -->
       <button
         class="text-fg-3 hover:text-fg-0 inline-flex items-center"
-        title="Collapse agent panel (⌘J)"
+        :title="$t('chat.collapsePanel')"
         @click="emit('close')"
       >
         <span class="codicon codicon-sm codicon-chevron-right" />
@@ -718,7 +730,7 @@ watch(
       v-if="sessionSaved"
       class="absolute top-11 left-1/2 -translate-x-1/2 z-20 rounded-md border border-border bg-bg-3 px-3 py-1.5 text-xs text-fg-1 shadow-lg"
     >
-      已保存会话 · {{ sessionSaved }}
+      {{ $t('chat.savedToast', { name: sessionSaved }) }}
     </div>
 
     <!-- Session tabs (concurrent chats). Tabs shrink evenly to fit the panel
@@ -760,7 +772,7 @@ watch(
     <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1">
       <div class="h-full panel-scroll overscroll-contain">
       <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
-      <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">No previous chats</div>
+      <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">{{ $t('chat.noPreviousChats') }}</div>
       <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
       <div
         v-for="s in chat.sessions"
@@ -799,7 +811,7 @@ watch(
                 ? 'flex text-yellow-500 hover:text-yellow-400'
                 : 'hidden group-hover:flex text-fg-3 hover:text-fg-1'
             "
-            :title="s.favorite ? '取消收藏' : '收藏'"
+            :title="s.favorite ? $t('chat.unfavorite') : $t('chat.favorite')"
             @click.stop="chat.toggleFavorite(s.id)"
           >
             <span
@@ -815,17 +827,17 @@ watch(
         <span
           v-if="s.id === chat.currentSessionId"
           class="text-[10px] px-1 rounded bg-accent/20 text-accent shrink-0"
-        >当前</span>
+        >{{ $t('chat.currentBadge') }}</span>
         <span
           v-else-if="chat.tabs.some((t) => t.id === s.id)"
           class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0"
-        >已打开</span>
+        >{{ $t('chat.openBadge') }}</span>
         <span class="text-xs text-fg-3 shrink-0">
           {{ new Date(s.updatedAt).toLocaleDateString() }}
         </span>
         <button
           class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 shrink-0"
-          title="Delete"
+          :title="$t('common.delete')"
           @click.stop="chat.removeSession(s.id)"
         >
           <span class="codicon codicon-sm codicon-trash" />
@@ -849,9 +861,7 @@ watch(
       @scroll.passive="onTranscriptScroll"
     >
       <div v-if="!chat.messages.length" class="text-xs text-fg-3 leading-relaxed">
-        Ask questions about your knowledge base, or let the agent maintain it. It can list, read,
-        search, index and write files in the opened folder — writes appear in the review panel.
-        Paste screenshots or drop files here to add them; type @ to reference a file.
+        {{ $t('chat.emptyState') }}
       </div>
 
       <div v-for="m in chat.messages" :key="m.id">
@@ -870,7 +880,7 @@ watch(
                 @click="c.file && files.openFile(c.file)"
               >
                 <span class="codicon codicon-sm codicon-quote shrink-0" />
-                <span class="shrink-0 font-medium">{{ c.file ? baseName(c.file) : 'Agent 回复' }}</span>
+                <span class="shrink-0 font-medium">{{ c.file ? baseName(c.file) : $t('chat.agentReply') }}</span>
                 <span class="text-fg-3 shrink-0">·</span>
                 <span class="truncate max-w-[220px] text-fg-3 italic">{{ snippet(c.text) }}</span>
               </button>
@@ -918,10 +928,10 @@ watch(
               <div class="mt-1 ml-5 space-y-1.5">
                 <div v-if="toolHasArgs(part)">
                   <div class="mb-0.5 flex items-center justify-between">
-                    <span class="text-[10px] uppercase tracking-wide text-fg-3">参数</span>
+                    <span class="text-[10px] uppercase tracking-wide text-fg-3">{{ $t('chat.params') }}</span>
                     <button
                       class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
-                      title="复制"
+                      :title="$t('common.copy')"
                       @click.stop.prevent="copyBlock($event, formatArgs(part))"
                     >
                       <span class="codicon codicon-sm codicon-copy" />
@@ -933,10 +943,10 @@ watch(
                 </div>
                 <div v-if="part.result">
                   <div class="mb-0.5 flex items-center justify-between">
-                    <span class="text-[10px] uppercase tracking-wide text-fg-3">结果</span>
+                    <span class="text-[10px] uppercase tracking-wide text-fg-3">{{ $t('chat.result') }}</span>
                     <button
                       class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
-                      title="复制"
+                      :title="$t('common.copy')"
                       @click.stop.prevent="copyBlock($event, part.result ?? '')"
                     >
                       <span class="codicon codicon-sm codicon-copy" />
@@ -965,7 +975,7 @@ watch(
               @toggle="onThinkingToggle(m, i, $event)"
             >
               <summary class="cursor-pointer select-none hover:text-fg-2">
-                <span class="codicon codicon-sm codicon-lightbulb mr-1" />Thinking
+                <span class="codicon codicon-sm codicon-lightbulb mr-1" />{{ $t('chat.thinking') }}
                 <span v-if="thinkTime(part)" class="ml-1 tabular-nums text-fg-3">· {{ thinkTime(part) }}</span>
               </summary>
               <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">
@@ -986,10 +996,10 @@ watch(
               />
               <span class="flex-1 min-w-0">
                 <span class="block text-sm font-medium text-fg-0 truncate">
-                  {{ part.pending ? '正在生成 artifact…' : part.title }}
+                  {{ part.pending ? $t('chat.generatingArtifact') : part.title }}
                 </span>
                 <span class="block text-xs text-fg-3">
-                  {{ part.pending ? '请稍候,HTML 生成中' : 'HTML artifact · 点击打开' }}
+                  {{ part.pending ? $t('chat.artifactGenerating') : $t('chat.artifactOpen') }}
                 </span>
               </span>
               <span
@@ -1019,7 +1029,7 @@ watch(
               <span
                 class="codicon codicon-sm codicon-chevron-right transition-transform group-open/src:rotate-90"
               />
-              来源 · {{ annotateAssistant(m).sources.length }}
+              {{ $t('chat.sources', { n: annotateAssistant(m).sources.length }) }}
             </summary>
             <div class="flex flex-col gap-1 mt-1.5">
               <button
@@ -1048,7 +1058,7 @@ watch(
             v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length"
             class="text-xs text-fg-3"
           >
-            Thinking…
+            {{ $t('chat.thinkingEllipsis') }}
           </div>
         </div>
       </div>
@@ -1062,14 +1072,14 @@ watch(
     >
       <div class="flex items-center gap-1.5 text-xs text-fg-3 uppercase tracking-wide mb-1.5">
         <span class="codicon codicon-sm codicon-checklist" />
-        Plan
+        {{ $t('chat.plan') }}
         <span class="normal-case">
           {{ planItems.filter((i) => i.status === 'done').length }}/{{ planItems.length }}
         </span>
         <span class="flex-1" />
         <button
           class="hover:text-fg-0"
-          title="Dismiss"
+          :title="$t('common.dismiss')"
           @click="chat.currentSessionId && plan.clear(chat.currentSessionId)"
         >
           <span class="codicon codicon-sm codicon-close" />
@@ -1201,12 +1211,12 @@ watch(
             >
               {{ baseName(r.file) }}
             </button>
-            <span v-else class="shrink-0 font-medium text-fg-1">Agent 回复</span>
+            <span v-else class="shrink-0 font-medium text-fg-1">{{ $t('chat.agentReply') }}</span>
             <span class="text-fg-3 shrink-0">·</span>
             <span class="truncate max-w-[180px] text-fg-3 italic">{{ snippet(r.text) }}</span>
             <button
               class="text-fg-3 hover:text-removed shrink-0 ml-0.5"
-              title="Remove"
+              :title="$t('common.remove')"
               @mousedown.prevent="composer.remove(r.id)"
             >
               <span class="codicon codicon-sm codicon-close" />
@@ -1226,7 +1236,7 @@ watch(
               <img :src="thumbFor(a.path)" class="w-full h-full object-cover" alt="" />
               <button
                 class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-bg-0/80 text-fg-2 hover:text-fg-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Remove"
+                :title="$t('common.remove')"
                 @click="removeAttachment(i)"
               >
                 <span class="codicon codicon-close text-[10px]" />
@@ -1245,7 +1255,7 @@ watch(
               </button>
             </span>
           </template>
-          <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">saving…</span>
+          <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">{{ $t('common.saving') }}</span>
         </div>
 
         <textarea
@@ -1253,7 +1263,7 @@ watch(
           v-model="input"
           rows="3"
           class="w-full bg-transparent border-0 outline-none resize-none font-sans text-sm text-fg-0 placeholder-fg-3 px-3 pt-2.5"
-          placeholder="Ask or instruct the agent… (@ 引用文件 / 技能,可粘贴截图)"
+          :placeholder="$t('chat.inputPlaceholder')"
           @keydown="onKeydown"
           @paste="onPaste"
           @input="syncCaret"
@@ -1266,22 +1276,22 @@ watch(
         <div class="flex items-center gap-2 px-2 pb-2">
           <button
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-fg-2 hover:text-fg-0 hover:bg-bg-2 transition-colors"
-            title="Attach files (saved into the KB)"
-            aria-label="Attach files"
+            :title="$t('chat.attachFiles')"
+            :aria-label="$t('chat.attachFilesAria')"
             @click="fileInput?.click()"
           >
             <span class="codicon codicon-add" />
           </button>
           <span class="text-xs text-fg-3 flex-1 truncate">
             <template v-if="chat.running">
-              <span class="text-accent">agent 工作中</span> · 回车插话,下一步生效
+              <span class="text-accent">{{ $t('chat.agentWorking') }}</span> · {{ $t('chat.steerHint') }}
             </template>
             <template v-else>
-              {{ settingsStore.primary?.model || 'not configured' }}
-              <span v-if="settingsStore.visionAvailable" title="视觉理解可用">· 👁</span>
+              {{ settingsStore.primary?.model || $t('chat.notConfigured') }}
+              <span v-if="settingsStore.visionAvailable" :title="$t('chat.visionAvailable')">· 👁</span>
               <span
                 v-if="chat.sessionUsage.input || chat.sessionUsage.output"
-                :title="`本会话 token:输入 ${chat.sessionUsage.input.toLocaleString()},输出 ${chat.sessionUsage.output.toLocaleString()}${chat.sessionUsage.cacheRead ? `,缓存命中 ${chat.sessionUsage.cacheRead.toLocaleString()}` : ''}`"
+                :title="usageTitle"
               >
                 · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
               </span>
@@ -1293,8 +1303,8 @@ watch(
           <button
             v-if="!chat.running || canSend"
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-accent text-white disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition"
-            :title="chat.running ? '插话:发送给正在工作的 agent(不打断,下一步读取)' : 'Send (Enter)'"
-            :aria-label="chat.running ? 'Steer' : 'Send'"
+            :title="chat.running ? $t('chat.steerSend') : $t('chat.sendEnter')"
+            :aria-label="chat.running ? $t('chat.steer') : $t('chat.send')"
             :disabled="!canSend"
             @click="send"
           >
@@ -1303,8 +1313,8 @@ watch(
           <button
             v-if="chat.running"
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center bg-bg-3 text-fg-0 hover:bg-removed/20 hover:text-removed transition-colors"
-            title="Stop"
-            aria-label="Stop"
+            :title="$t('chat.stop')"
+            :aria-label="$t('chat.stop')"
             @click="chat.stop()"
           >
             <span class="codicon codicon-sm codicon-primitive-square" />

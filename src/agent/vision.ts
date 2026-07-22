@@ -56,7 +56,7 @@ export async function visionDescribe(
   question: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const q = question || '请详细描述这些图片的内容。'
+  const q = question || 'Describe the contents of these images in detail.'
   const timeout = AbortSignal.timeout(VISION_TIMEOUT_MS)
   const { text } = await generateText({
     model: toLanguageModel(profile),

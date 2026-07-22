@@ -84,20 +84,20 @@ function onAuxClick(e: MouseEvent, path: string): void {
       :style="menuStyle"
     >
       <button :class="ctxItem" @click="run(() => files.closeTab(ctx!.path))">
-        Close<span class="ml-auto text-fg-3 text-xs">⌘W</span>
+        {{ $t('files.tabs.close') }}<span class="ml-auto text-fg-3 text-xs">⌘W</span>
       </button>
       <button :class="ctxItem" @click="run(() => files.closeOtherTabs(ctx!.path))">
-        Close Others
+        {{ $t('files.tabs.closeOthers') }}
       </button>
       <button
         :class="hasRight ? ctxItem : 'w-full flex items-center px-3 py-1.5 text-left text-fg-3 cursor-not-allowed'"
         :disabled="!hasRight"
         @click="hasRight && run(() => files.closeTabsToRight(ctx!.path))"
       >
-        Close to the Right
+        {{ $t('files.tabs.closeToRight') }}
       </button>
-      <button :class="ctxItem" @click="run(() => files.closeSavedTabs())">Close Saved</button>
-      <button :class="ctxItem" @click="run(() => files.closeAllTabs())">Close All</button>
+      <button :class="ctxItem" @click="run(() => files.closeSavedTabs())">{{ $t('files.tabs.closeSaved') }}</button>
+      <button :class="ctxItem" @click="run(() => files.closeAllTabs())">{{ $t('files.tabs.closeAll') }}</button>
     </div>
   </template>
 </template>

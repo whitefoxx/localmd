@@ -38,6 +38,7 @@ import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
 import { useTtsStore } from '@/stores/tts'
 import { useFilesStore } from '@/stores/files'
 import { baseName } from '@/lib/wiki'
+import { t } from '@/i18n'
 
 const props = defineProps<{ path: string }>()
 
@@ -177,13 +178,13 @@ let ttsLocations: Awaited<ReturnType<typeof loadPdfLocations>> = null
 async function readAloud(): Promise<void> {
   const sel = await getEngineSelection()
   if (sel) {
-    tts.speak(sel, '选中内容')
+    tts.speak(sel, t('viewers.selection'))
     return
   }
   // Triggered from a selected mark's popup: read the highlighted text itself.
   const markText = annotationApi?.getSelectedAnnotation?.()?.object?.custom?.text
   if (typeof markText === 'string' && markText.trim()) {
-    tts.speak(markText, '选中内容')
+    tts.speak(markText, t('viewers.selection'))
     return
   }
   const page = getScrollApi()?.getCurrentPage?.() ?? 1
@@ -259,7 +260,7 @@ function openNoteForAnnotation(host: AnnoObject): void {
 
 /** Read the note's passage aloud (the dialog's speaker button). */
 function readNoteExcerpt(): void {
-  if (noteEditor.value?.excerpt) tts.speak(noteEditor.value.excerpt, '选中内容')
+  if (noteEditor.value?.excerpt) tts.speak(noteEditor.value.excerpt, t('viewers.selection'))
 }
 
 /** The mark that owns a note, given any selected object (the mark itself, or its
@@ -728,7 +729,7 @@ function customizeViewerUi(r: PluginRegistry): void {
 
   commands.registerCommand({
     id: 'bm:read-aloud',
-    label: '朗读',
+    label: t('viewers.pdf.readAloud'),
     icon: 'bm-read-aloud',
     action: () => void readAloud(),
   })
@@ -767,7 +768,7 @@ function customizeViewerUi(r: PluginRegistry): void {
   // silently turning the *next* text selection into an underline.
   commands.registerCommand({
     id: 'bm:underline',
-    label: '下划线',
+    label: t('viewers.pdf.underline'),
     icon: 'underline',
     iconProps: { primaryColor: UNDERLINE_COLOR },
     action: ({ registry, documentId }) => {
@@ -784,7 +785,7 @@ function customizeViewerUi(r: PluginRegistry): void {
   // that mark's note; on a text selection it creates a fresh noted highlight.
   commands.registerCommand({
     id: 'bm:note',
-    label: '笔记',
+    label: t('viewers.pdf.note'),
     icon: 'bm-note',
     action: ({ registry }) => {
       const a = (
@@ -798,7 +799,7 @@ function customizeViewerUi(r: PluginRegistry): void {
   // Replaces EmbedPDF's comment panel button: open this book's annotations.
   commands.registerCommand({
     id: 'bm:view-annotations',
-    label: '查看标注',
+    label: t('viewers.pdf.viewAnnotations'),
     icon: 'bm-view-annotations',
     action: () => void files.openFile(sidecarPath),
   })
@@ -983,23 +984,23 @@ async function runIndex(auto = false): Promise<void> {
     msgTimer = null
   }
   indexState.value = 'parsing'
-  indexMsg.value = auto ? '' : 'Starting…'
+  indexMsg.value = auto ? '' : t('viewers.pdf.indexStarting')
   try {
-    const result = await indexDocument(props.path, (c, t) => {
-      indexMsg.value = `Extracting page ${c}/${t}`
+    const result = await indexDocument(props.path, (c, total) => {
+      indexMsg.value = t('viewers.pdf.indexExtracting', { c, t: total })
     })
     indexState.value = 'done'
     if (auto && result.cached) {
       indexMsg.value = ''
     } else {
       indexMsg.value =
-        `${result.cached ? 'Already indexed' : 'Indexed'} · ${result.sectionCount} sections` +
-        `${result.blockCount === 0 ? ' · no text layer (scanned?)' : ''}`
+        `${result.cached ? t('viewers.pdf.indexAlready') : t('viewers.pdf.indexDone')} · ${t('viewers.pdf.indexSections', { n: result.sectionCount })}` +
+        `${result.blockCount === 0 ? ` · ${t('viewers.pdf.indexNoText')}` : ''}`
       msgTimer = window.setTimeout(() => (indexMsg.value = ''), 5000)
     }
   } catch (err) {
     indexState.value = 'error'
-    indexMsg.value = (err as Error).message || 'Indexing failed'
+    indexMsg.value = (err as Error).message || t('viewers.pdf.indexFailed')
   }
 }
 
@@ -1204,7 +1205,7 @@ onBeforeUnmount(() => {
         class="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-bg-1/50 text-sm text-fg-3"
       >
         <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
-        跳转到上次阅读位置…
+        {{ $t('viewers.pdf.restoring') }}
       </div>
       <!-- Read aloud + highlight colours live in the PDF toolbar and selection
            popup now (see customizeViewerUi). -->

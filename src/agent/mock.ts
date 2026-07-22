@@ -74,7 +74,7 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
     await streamText(reply, opts.onEvent)
   } else if (writeMatch) {
     const result = await runTool('write_file', { path: writeMatch[1], content: writeMatch[2] }, opts)
-    reply = `完成:${result}`
+    reply = `Done: ${result}`
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('artifact ')) {
     const title = script.slice('artifact '.length).trim() || 'artifact'
@@ -86,24 +86,24 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
       },
       opts,
     )
-    reply = `已生成 artifact:${title}`
+    reply = `Generated artifact: ${title}`
     await streamText(reply, opts.onEvent)
   } else if (script === 'plan') {
     await runTool(
       'update_plan',
       {
         items: [
-          { text: '第一步', status: 'done' },
-          { text: '第二步', status: 'done' },
-          { text: '第三步', status: 'in_progress' },
+          { text: 'Step one', status: 'done' },
+          { text: 'Step two', status: 'done' },
+          { text: 'Step three', status: 'in_progress' },
         ],
       },
       opts,
     )
-    reply = '计划已更新'
+    reply = 'Plan updated'
     await streamText(reply, opts.onEvent)
   } else {
-    reply = 'mock 回复:' + script.slice(0, 40)
+    reply = 'mock reply: ' + script.slice(0, 40)
     await streamText(reply, opts.onEvent)
   }
 

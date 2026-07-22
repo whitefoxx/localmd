@@ -6,6 +6,7 @@ import { readHeadText } from '@/lib/git'
 import { GIT_DECOR } from '@/lib/gitStatus'
 import { diffLines, collapseContext, type HunkLine } from '@/lib/diff'
 import * as fs from '@/lib/fs'
+import { t } from '@/i18n'
 
 const git = useGitStore()
 const files = useFilesStore()
@@ -42,7 +43,7 @@ function toggle(path: string): void {
 async function showDiff(path: string): Promise<void> {
   selected.value = path
   if (git.changes.find((c) => c.path === path)?.binary) {
-    diff.value = [{ type: 'same', text: '(二进制文件,无文本 diff)' }]
+    diff.value = [{ type: 'same', text: t('git.binaryNoDiff') }]
     return
   }
   const before = (await readHeadText(path)) ?? ''
@@ -94,13 +95,13 @@ function fmtTime(ms: number): string {
           <template v-if="git.remote">
             <span class="text-xs text-fg-3 truncate">{{ git.remote.owner }}/{{ git.remote.repo }}</span>
             <button class="btn text-xs" :disabled="!!git.busy" @click="git.sync('pull')">
-              <span class="codicon codicon-sm codicon-arrow-down mr-1" />Pull
+              <span class="codicon codicon-sm codicon-arrow-down mr-1" />{{ $t('git.pull') }}
             </button>
             <button class="btn text-xs" :disabled="!!git.busy" @click="git.sync('push')">
-              <span class="codicon codicon-sm codicon-arrow-up mr-1" />Push
+              <span class="codicon codicon-sm codicon-arrow-up mr-1" />{{ $t('git.push') }}
             </button>
           </template>
-          <button class="text-fg-3 hover:text-fg-0" :disabled="!!git.busy" title="Refresh" @click="git.refresh()">
+          <button class="text-fg-3 hover:text-fg-0" :disabled="!!git.busy" :title="$t('git.refresh')" @click="git.refresh()">
             <span class="codicon codicon-sm codicon-refresh" />
           </button>
           <button class="text-fg-3 hover:text-fg-0" @click="git.panelOpen = false">
@@ -112,11 +113,11 @@ function fmtTime(ms: number): string {
           <!-- Changes + commit -->
           <div class="w-[300px] shrink-0 border-r border-border flex flex-col">
             <div class="px-3 py-2 text-xs uppercase tracking-wide text-fg-3 shrink-0">
-              Changes ({{ git.changes.length }})
+              {{ $t('git.changes', { n: git.changes.length }) }}
             </div>
             <div class="flex-1 panel-scroll">
               <div v-if="!git.changes.length" class="px-3 text-xs text-fg-3">
-                没有改动。（.trace/ 不参与；tracked 二进制的内容改动无法检测，如有请在终端提交）
+                {{ $t('git.noChanges') }}
               </div>
               <div
                 v-for="c in git.changes"
@@ -130,15 +131,15 @@ function fmtTime(ms: number): string {
                   :checked="checked.has(c.path)"
                   :disabled="!committable(c)"
                   class="shrink-0"
-                  :title="committable(c) ? '' : '超过 100MB(GitHub API 推送上限),请在终端提交'"
+                  :title="committable(c) ? '' : $t('git.oversizedCheckbox')"
                   @click.stop="committable(c) && toggle(c.path)"
                 />
                 <span class="truncate flex-1" :class="GIT_DECOR[c.kind].class" :title="c.path">{{ c.path }}</span>
                 <span
                   v-if="c.binary"
                   class="text-[10px] px-1 rounded bg-bg-2 text-fg-3 shrink-0"
-                  :title="c.oversized ? '超过 100MB,请在终端提交' : '二进制文件'"
-                >{{ c.oversized ? '>100MB' : 'bin' }}</span>
+                  :title="c.oversized ? $t('git.oversizedTitle') : $t('git.binaryTitle')"
+                >{{ c.oversized ? '>100MB' : $t('git.binary') }}</span>
                 <span
                   class="shrink-0 text-xs font-medium w-3 text-center"
                   :class="GIT_DECOR[c.kind].class"
@@ -151,14 +152,14 @@ function fmtTime(ms: number): string {
                 v-model="message"
                 rows="2"
                 class="input resize-none text-xs mb-2"
-                placeholder="Commit message"
+                :placeholder="$t('git.commitPlaceholder')"
               />
               <button
                 class="btn-primary text-xs w-full"
                 :disabled="!!git.busy || !message.trim() || !checked.size"
                 @click="doCommit"
               >
-                <span class="codicon codicon-sm codicon-check mr-1" />Commit {{ checked.size }} file(s)
+                <span class="codicon codicon-sm codicon-check mr-1" />{{ $t('git.commitN', { n: checked.size }) }}
               </button>
             </div>
           </div>
@@ -167,9 +168,9 @@ function fmtTime(ms: number): string {
           <div class="flex-1 min-w-0 flex flex-col">
             <template v-if="selected">
               <div class="px-3 py-2 text-xs text-fg-3 border-b border-border shrink-0 truncate">
-                {{ selected }} · diff vs HEAD
+                {{ selected }} · {{ $t('git.diffVsHead') }}
                 <button class="ml-2 text-accent hover:underline" @click="files.openFile(selected!); git.panelOpen = false">
-                  打开
+                  {{ $t('common.open') }}
                 </button>
               </div>
               <div class="flex-1 panel-scroll font-mono text-xs leading-5">
@@ -177,7 +178,7 @@ function fmtTime(ms: number): string {
                   <div
                     v-if="line.type === 'skip'"
                     class="px-3 py-0.5 text-center text-fg-3 bg-bg-2/60 select-none"
-                  >⋯ 未变动的 {{ line.count }} 行 ⋯</div>
+                  >{{ $t('git.unchangedLines', { n: line.count }) }}</div>
                   <div
                     v-else
                     class="px-3 whitespace-pre-wrap"
@@ -191,7 +192,7 @@ function fmtTime(ms: number): string {
               </div>
             </template>
             <template v-else>
-              <div class="px-3 py-2 text-xs uppercase tracking-wide text-fg-3 shrink-0">Recent commits</div>
+              <div class="px-3 py-2 text-xs uppercase tracking-wide text-fg-3 shrink-0">{{ $t('git.recentCommits') }}</div>
               <div class="flex-1 panel-scroll">
                 <div
                   v-for="e in git.log"
@@ -203,7 +204,7 @@ function fmtTime(ms: number): string {
                     <span class="font-mono">{{ e.oid.slice(0, 7) }}</span> · {{ e.author }} · {{ fmtTime(e.when) }}
                   </div>
                 </div>
-                <div v-if="!git.log.length" class="px-3 text-xs text-fg-3">还没有提交</div>
+                <div v-if="!git.log.length" class="px-3 text-xs text-fg-3">{{ $t('git.noCommits') }}</div>
               </div>
             </template>
           </div>

@@ -14,6 +14,7 @@ import {
 } from '@/lib/fileOps'
 import FileTreeNode from '@/components/FileTreeNode.vue'
 import type { TreeNode } from '@/lib/fs'
+import { t } from '@/i18n'
 
 const files = useFilesStore()
 const kb = useKbStore()
@@ -84,7 +85,7 @@ async function newFile(): Promise<void> {
 
 async function newFolder(): Promise<void> {
   closeMenu()
-  const name = prompt('New folder name:')?.trim()
+  const name = prompt(t('files.newFolderPrompt'))?.trim()
   if (!name) return
   const path = inTarget(name)
   await fs.mkdir(path)
@@ -113,7 +114,7 @@ async function indexDocs(dir: string): Promise<void> {
   const docs = files.allFiles.filter((p) => p.startsWith(prefix) && indexableKind(p))
   if (!docs.length) return
   for (let i = 0; i < docs.length; i++) {
-    indexStatus.value = `Indexing ${i + 1}/${docs.length}…`
+    indexStatus.value = t('files.indexingN', { i: i + 1, total: docs.length })
     try {
       await indexDocument(docs[i])
     } catch (err) {
@@ -128,7 +129,7 @@ async function indexDocs(dir: string): Promise<void> {
 /** (Re)build the AI index for a single pdf/epub/md file. */
 async function indexFile(path: string): Promise<void> {
   closeMenu()
-  indexStatus.value = 'Indexing…'
+  indexStatus.value = t('files.indexing')
   try {
     await indexDocument(path)
   } catch (err) {
@@ -149,7 +150,7 @@ function menuOpen(node: TreeNode): void {
 
 async function menuRename(node: TreeNode): Promise<void> {
   closeMenu()
-  const next = prompt('Rename to:', node.name)?.trim()
+  const next = prompt(t('files.renamePrompt'), node.name)?.trim()
   if (!next || next === node.name) return
   const i = node.path.lastIndexOf('/')
   const newPath = i < 0 ? next : `${node.path.slice(0, i)}/${next}`
@@ -184,27 +185,27 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
           class="codicon codicon-sm shrink-0"
           :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
         />
-        <span class="truncate">{{ indexStatus || 'Files' }}</span>
+        <span class="truncate">{{ indexStatus || $t('files.heading') }}</span>
       </button>
-      <button class="text-fg-3 hover:text-fg-1 ml-2" title="New file" @click="newFile">
+      <button class="text-fg-3 hover:text-fg-1 ml-2" :title="$t('files.newFile')" @click="newFile">
         <span class="codicon codicon-sm codicon-new-file" />
       </button>
-      <button class="text-fg-3 hover:text-fg-1 ml-2" title="New folder" @click="newFolder">
+      <button class="text-fg-3 hover:text-fg-1 ml-2" :title="$t('files.newFolder')" @click="newFolder">
         <span class="codicon codicon-sm codicon-new-folder" />
       </button>
-      <button class="text-fg-3 hover:text-fg-1 ml-2" title="Import files" @click="pickImport">
+      <button class="text-fg-3 hover:text-fg-1 ml-2" :title="$t('files.importFiles')" @click="pickImport">
         <span class="codicon codicon-sm codicon-desktop-download" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-1 ml-2"
-        title="Collapse all"
+        :title="$t('files.collapseAll')"
         @click="files.collapseAll()"
       >
         <span class="codicon codicon-sm codicon-collapse-all" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-1 ml-2"
-        title="Refresh"
+        :title="$t('files.refresh')"
         @click="() => files.refreshTree()"
       >
         <span class="codicon codicon-sm codicon-refresh" />
@@ -212,7 +213,7 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
     </div>
     <template v-if="expanded">
       <FileTreeNode v-for="node in files.tree" :key="node.path" :node="node" :depth="0" />
-      <div v-if="!files.tree.length" class="px-3 py-2 text-xs text-fg-3">Empty folder</div>
+      <div v-if="!files.tree.length" class="px-3 py-2 text-xs text-fg-3">{{ $t('files.emptyFolder') }}</div>
     </template>
     <input ref="fileInput" type="file" multiple class="hidden" @change="onImport" />
 
@@ -225,48 +226,48 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
       >
         <template v-if="ctx.node.kind === 'dir'">
           <button :class="ctxItem" @click="newFile">
-            <span class="codicon codicon-sm codicon-new-file" />New File
+            <span class="codicon codicon-sm codicon-new-file" />{{ $t('files.menu.newFile') }}
           </button>
           <button :class="ctxItem" @click="newFolder">
-            <span class="codicon codicon-sm codicon-new-folder" />New Folder
+            <span class="codicon codicon-sm codicon-new-folder" />{{ $t('files.menu.newFolder') }}
           </button>
           <button :class="ctxItem" @click="pickImport">
-            <span class="codicon codicon-sm codicon-cloud-upload" />Import Files…
+            <span class="codicon codicon-sm codicon-cloud-upload" />{{ $t('files.menu.importFiles') }}
           </button>
           <button :class="ctxItem" @click="indexDocs(ctx.node.path)">
-            <span class="codicon codicon-sm codicon-book" />Index docs for AI
+            <span class="codicon codicon-sm codicon-book" />{{ $t('files.menu.indexDocs') }}
           </button>
           <div :class="ctxSep" />
         </template>
         <template v-else>
           <button :class="ctxItem" @click="menuOpen(ctx.node)">
-            <span class="codicon codicon-sm codicon-go-to-file" />Open
+            <span class="codicon codicon-sm codicon-go-to-file" />{{ $t('files.menu.open') }}
           </button>
           <button
             v-if="indexableKind(ctx.node.path)"
             :class="ctxItem"
             @click="indexFile(ctx.node.path)"
           >
-            <span class="codicon codicon-sm codicon-book" />Index for AI
+            <span class="codicon codicon-sm codicon-book" />{{ $t('files.menu.indexForAi') }}
           </button>
           <div :class="ctxSep" />
         </template>
 
         <button :class="ctxItem" @click="menuRename(ctx.node)">
-          <span class="codicon codicon-sm codicon-edit" />Rename…
+          <span class="codicon codicon-sm codicon-edit" />{{ $t('files.menu.rename') }}
           <span class="ml-auto text-fg-3 text-xs">F2</span>
         </button>
         <button :class="ctxItem" @click="menuDelete(ctx.node)">
           <span class="codicon codicon-sm codicon-trash text-removed" />
-          <span class="text-removed">Delete</span>
+          <span class="text-removed">{{ $t('files.menu.delete') }}</span>
           <span class="ml-auto text-fg-3 text-xs">⌫</span>
         </button>
         <div :class="ctxSep" />
         <button :class="ctxItem" @click="menuCopyPath(ctx.node, false)">
-          <span class="codicon codicon-sm codicon-link" />Copy Path
+          <span class="codicon codicon-sm codicon-link" />{{ $t('files.menu.copyPath') }}
         </button>
         <button :class="ctxItem" @click="menuCopyPath(ctx.node, true)">
-          <span class="codicon codicon-sm codicon-link" />Copy Relative Path
+          <span class="codicon codicon-sm codicon-link" />{{ $t('files.menu.copyRelativePath') }}
         </button>
       </div>
     </template>

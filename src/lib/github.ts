@@ -184,13 +184,13 @@ async function fetchTreeInto(ctx: Ctx, treeSha: string, progress: Progress): Pro
       await fetchTreeInto(ctx, e.sha, progress)
     } else if (e.type === 'blob') {
       if (await hasObject(e.sha)) continue
-      progress(`下载 ${e.path}`)
+      progress(`Downloading ${e.path}`)
       const blob = await api(ctx, 'GET', `/git/blobs/${e.sha}`)
       const bytes = b64ToBytes(blob.content as string)
       const oid = await git.writeBlob({ ...base(), blob: bytes })
-      if (oid !== e.sha) throw new Error(`blob sha 不一致: 期望 ${e.sha}, 得到 ${oid}`)
+      if (oid !== e.sha) throw new Error(`blob sha mismatch: expected ${e.sha}, got ${oid}`)
     } else {
-      throw new Error(`不支持的 tree entry 类型 ${e.type}(${e.path})——请在终端处理`)
+      throw new Error(`Unsupported tree entry type ${e.type} (${e.path}) — please handle it in a terminal`)
     }
   }
   const oid = await git.writeTree({
@@ -202,7 +202,7 @@ async function fetchTreeInto(ctx: Ctx, treeSha: string, progress: Progress): Pro
       type: e.type as 'blob' | 'tree',
     })),
   })
-  if (oid !== treeSha) throw new Error(`tree sha 不一致: 期望 ${treeSha}, 得到 ${oid}`)
+  if (oid !== treeSha) throw new Error(`tree sha mismatch: expected ${treeSha}, got ${oid}`)
 }
 
 /** Fast-forward pull. Returns a summary line. */
@@ -210,12 +210,12 @@ export async function pull(ctx: Ctx, progress: Progress = () => {}): Promise<str
   const { git, base } = raw
   const branch = (await currentBranch()) ?? 'main'
   const remote = await remoteHead(ctx, branch)
-  if (!remote) throw new Error(`远端没有分支 ${branch}`)
+  if (!remote) throw new Error(`Remote has no branch ${branch}`)
   const local = await headOid()
-  if (remote === local) return '已是最新'
+  if (remote === local) return 'Already up to date'
 
   // Walk remote history back to a commit we already have.
-  progress('获取远端提交…')
+  progress('Fetching remote commits…')
   const chain: ApiCommit[] = []
   const queue = [remote]
   const seen = new Set<string>()
@@ -226,7 +226,7 @@ export async function pull(ctx: Ctx, progress: Progress = () => {}): Promise<str
     const commit = (await api(ctx, 'GET', `/git/commits/${sha}`)) as unknown as ApiCommit
     chain.push(commit)
     for (const p of commit.parents) queue.push(p.sha)
-    if (chain.length > 500) throw new Error('差异提交过多(>500),请在终端 pull')
+    if (chain.length > 500) throw new Error('Too many diverging commits (>500) — please pull in a terminal')
   }
 
   // Oldest-first so parents exist before children. (The fast-forward check
@@ -235,7 +235,7 @@ export async function pull(ctx: Ctx, progress: Progress = () => {}): Promise<str
   chain.reverse()
   for (let i = 0; i < chain.length; i++) {
     const c = chain[i]
-    progress(`同步提交 ${i + 1}/${chain.length}`)
+    progress(`Syncing commit ${i + 1}/${chain.length}`)
     await fetchTreeInto(ctx, c.tree.sha, progress)
     const oid = await git.writeCommit({
       ...base(),
@@ -250,21 +250,21 @@ export async function pull(ctx: Ctx, progress: Progress = () => {}): Promise<str
     })
     if (oid !== c.sha) {
       throw new Error(
-        `commit sha 不一致(期望 ${c.sha.slice(0, 7)}, 得到 ${oid.slice(0, 7)})——该提交无法经 API 重建,请在终端 pull`,
+        `commit sha mismatch (expected ${c.sha.slice(0, 7)}, got ${oid.slice(0, 7)}) — this commit can't be reconstructed via the API, please pull in a terminal`,
       )
     }
   }
 
   if (local && !(await isAncestor(local, remote))) {
-    throw new Error('本地与远端已分叉——请在终端解决(git pull --rebase 或 merge)')
+    throw new Error('Local and remote have diverged — please resolve in a terminal (git pull --rebase or merge)')
   }
 
-  progress('更新工作区…')
+  progress('Updating working tree…')
   await git.writeRef({ ...base(), ref: `refs/heads/${branch}`, value: remote, force: true })
   await git.writeRef({ ...base(), ref: `refs/remotes/origin/${branch}`, value: remote, force: true })
   resetGitCache()
   await git.checkout({ ...base(), ref: branch, force: false })
-  return `已拉取 ${chain.length} 个提交(${remote.slice(0, 7)})`
+  return `Pulled ${chain.length} commit(s) (${remote.slice(0, 7)})`
 }
 
 /* ── push ────────────────────────────────────────────────────────────────── */
@@ -277,18 +277,18 @@ async function pushTree(ctx: Ctx, treeOid: string, progress: Progress): Promise<
     if (e.type === 'tree') {
       await pushTree(ctx, e.oid, progress)
     } else if (e.type === 'blob') {
-      progress(`上传 ${e.path}`)
+      progress(`Uploading ${e.path}`)
       const { blob } = await git.readBlob({ ...base(), oid: e.oid })
       if (blob.length > 100 * 1024 * 1024) {
-        throw new Error(`${e.path} 超过 GitHub API 的 100MB 单文件上限——请在终端 push`)
+        throw new Error(`${e.path} exceeds the GitHub API's 100MB per-file limit — please push in a terminal`)
       }
       const res = await api(ctx, 'POST', '/git/blobs', {
         content: bytesToB64(blob),
         encoding: 'base64',
       })
-      if (res.sha !== e.oid) throw new Error(`blob sha 不一致(${e.path})`)
+      if (res.sha !== e.oid) throw new Error(`blob sha mismatch (${e.path})`)
     } else {
-      throw new Error(`不支持的对象类型 ${e.type}(${e.path})——请在终端 push`)
+      throw new Error(`Unsupported object type ${e.type} (${e.path}) — please push in a terminal`)
     }
   }
   const res = await api(ctx, 'POST', '/git/trees', {
@@ -299,7 +299,7 @@ async function pushTree(ctx: Ctx, treeOid: string, progress: Progress): Promise<
       sha: e.oid,
     })),
   })
-  if (res.sha !== treeOid) throw new Error(`tree sha 不一致: 期望 ${treeOid}, 得到 ${res.sha}`)
+  if (res.sha !== treeOid) throw new Error(`tree sha mismatch: expected ${treeOid}, got ${res.sha}`)
 }
 
 /** Fast-forward push (mirrors local commits through the API). */
@@ -307,15 +307,15 @@ export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<str
   const { git, base } = raw
   const branch = (await currentBranch()) ?? 'main'
   const local = await headOid()
-  if (!local) throw new Error('本地还没有提交')
+  if (!local) throw new Error('No local commits yet')
   const remote = await remoteHead(ctx, branch)
-  if (!remote) throw new Error(`远端没有分支 ${branch}——首次推送请在终端执行`)
-  if (remote === local) return '已是最新'
+  if (!remote) throw new Error(`Remote has no branch ${branch} — run the first push in a terminal`)
+  if (remote === local) return 'Already up to date'
   if (!(await hasObject(remote))) {
-    throw new Error('远端有本地未知的提交——先 Pull')
+    throw new Error('Remote has commits unknown locally — pull first')
   }
   if (!(await isAncestor(remote, local))) {
-    throw new Error('本地与远端已分叉——请在终端解决')
+    throw new Error('Local and remote have diverged — please resolve in a terminal')
   }
 
   // Linear chain remote..local (merge commits allowed when their other
@@ -326,23 +326,23 @@ export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<str
     chain.push(cursor)
     const { commit } = await git.readCommit({ ...base(), oid: cursor })
     if (commit.gpgsig) {
-      throw new Error('包含 GPG 签名的提交无法经 API 镜像——请在终端 push')
+      throw new Error("Commits with a GPG signature can't be mirrored via the API — please push in a terminal")
     }
     const [first, ...rest] = commit.parent
     for (const p of rest) {
       if (!(await isAncestor(p, remote))) {
-        throw new Error('历史包含复杂 merge——请在终端 push')
+        throw new Error('History contains a complex merge — please push in a terminal')
       }
     }
-    if (!first) throw new Error('到达根提交仍未遇到远端 HEAD——请在终端 push')
+    if (!first) throw new Error("Reached the root commit without encountering the remote HEAD — please push in a terminal")
     cursor = first
-    if (chain.length > 200) throw new Error('待推送提交过多(>200),请在终端 push')
+    if (chain.length > 200) throw new Error('Too many commits to push (>200) — please push in a terminal')
   }
 
   chain.reverse()
   for (let i = 0; i < chain.length; i++) {
     const oid = chain[i]
-    progress(`推送提交 ${i + 1}/${chain.length}`)
+    progress(`Pushing commit ${i + 1}/${chain.length}`)
     const { commit } = await git.readCommit({ ...base(), oid })
     await pushTree(ctx, commit.tree, progress)
     const res = await api(ctx, 'POST', '/git/commits', {
@@ -362,16 +362,16 @@ export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<str
     })
     if (res.sha !== oid) {
       throw new Error(
-        `commit sha 不一致(期望 ${oid.slice(0, 7)}, 得到 ${String(res.sha).slice(0, 7)})——请在终端 push`,
+        `commit sha mismatch (expected ${oid.slice(0, 7)}, got ${String(res.sha).slice(0, 7)}) — please push in a terminal`,
       )
     }
   }
 
-  progress('更新远端引用…')
+  progress('Updating remote ref…')
   await api(ctx, 'PATCH', `/git/refs/${encodeURIComponent(`heads/${branch}`)}`, {
     sha: local,
     force: false,
   })
   await git.writeRef({ ...base(), ref: `refs/remotes/origin/${branch}`, value: local, force: true })
-  return `已推送 ${chain.length} 个提交(${local.slice(0, 7)})`
+  return `Pushed ${chain.length} commit(s) (${local.slice(0, 7)})`
 }

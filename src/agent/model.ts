@@ -69,6 +69,6 @@ export function toImageModel(profile: LlmProfile): ImageModel {
         apiKey,
       }).imageModel(model)
     default:
-      throw new Error(`provider ${profile.provider} 不支持图像生成`)
+      throw new Error(`provider ${profile.provider} does not support image generation`)
   }
 }

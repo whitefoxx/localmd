@@ -70,12 +70,12 @@ export function flattenToolResult(result: {
 }): string {
   const parts = (result.content ?? []).map((c) => {
     if (c.type === 'text') return String(c.text ?? '')
-    if (c.type === 'image') return `[图片 ${c.mimeType ?? ''}]`
+    if (c.type === 'image') return `[image ${c.mimeType ?? ''}]`
     if (c.type === 'resource') {
       const r = c.resource as { text?: string; uri?: string } | undefined
-      return r?.text ?? `[资源 ${r?.uri ?? ''}]`
+      return r?.text ?? `[resource ${r?.uri ?? ''}]`
     }
-    if (c.type === 'resource_link') return `[资源链接 ${c.uri ?? ''}]`
+    if (c.type === 'resource_link') return `[resource link ${c.uri ?? ''}]`
     return ''
   })
   const text = parts.filter(Boolean).join('\n') || '(empty result)'
@@ -214,7 +214,7 @@ export class McpExtensionClient implements McpClientLike {
     const chrome = (globalThis as unknown as { chrome?: ChromeRuntimeGlobal }).chrome
     if (!chrome?.runtime?.connect) {
       throw new Error(
-        'chrome.runtime 不可用——需要安装对应扩展,且其 externally_connectable 允许本页面源',
+        'chrome.runtime is unavailable — the matching extension must be installed and its externally_connectable must allow this page origin',
       )
     }
     const port = chrome.runtime.connect(this.cfg.url.trim())
@@ -222,7 +222,7 @@ export class McpExtensionClient implements McpClientLike {
     port.onDisconnect.addListener(() => {
       this.port = null
       const detail = chrome.runtime?.lastError?.message
-      const err = new Error(`扩展连接已断开${detail ? `: ${detail}` : ''}`)
+      const err = new Error(`Extension connection closed${detail ? `: ${detail}` : ''}`)
       for (const p of this.pending.values()) p.reject(err)
       this.pending.clear()
     })
@@ -247,7 +247,7 @@ export class McpExtensionClient implements McpClientLike {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id)
-        reject(new Error(`MCP ${method} 超时(${Math.round(timeoutMs / 1000)}s)`))
+        reject(new Error(`MCP ${method} timed out (${Math.round(timeoutMs / 1000)}s)`))
       }, timeoutMs)
       const settle = {
         resolve: (v: unknown) => {

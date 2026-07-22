@@ -67,7 +67,7 @@ export function renderCitationTokens(
   out = out.replace(CITE_INLINE_RE, (_m, num: string | undefined, blockId: string) => {
     const src = num ? sources.get(num) : undefined
     const label = num ? `[${num}]` : '[•]'
-    const title = src ? `${blockId} · ${src.path}` : `${blockId}(点击时自动定位来源)`
+    const title = src ? `${blockId} · ${src.path}` : `${blockId} (source located automatically on click)`
     const dataPath = src ? ` data-cite-path="${escapeHtml(src.path)}"` : ''
     return `<a href="#" class="citation" data-block="${escapeHtml(blockId)}"${dataPath} title="${escapeHtml(title)}">${label}</a>`
   })

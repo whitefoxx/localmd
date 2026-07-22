@@ -53,7 +53,7 @@ describe('flattenToolResult', () => {
         { type: 'resource', resource: { text: 'embedded' } },
       ],
     })
-    expect(out).toBe('hello\n[图片 image/png]\nembedded')
+    expect(out).toBe('hello\n[image image/png]\nembedded')
   })
   it('marks isError results', () => {
     expect(flattenToolResult({ content: [{ type: 'text', text: 'boom' }], isError: true })).toBe(

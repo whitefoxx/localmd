@@ -21,6 +21,7 @@ import {
   type EpubAnnotation,
 } from '@/lib/annotations'
 import NoteDialog from '@/components/NoteDialog.vue'
+import { t } from '@/i18n'
 
 type MarkStyle = 'highlight' | 'underline'
 
@@ -513,7 +514,7 @@ function openNoteEditor(cfi: string): void {
 
 /** Read the note's passage aloud (the dialog's speaker button). */
 function readNoteExcerpt(): void {
-  if (noteEditor.value?.excerpt) tts.speak(noteEditor.value.excerpt, '选中内容')
+  if (noteEditor.value?.excerpt) tts.speak(noteEditor.value.excerpt, t('viewers.selection'))
 }
 
 /** Live: recolour / restyle the open note's mark (no save button needed). */
@@ -888,7 +889,7 @@ function readAloud(): void {
 
 /** Speak the passage selected in the chapter (from the selection popup). */
 function speakSelection(): void {
-  if (selText) tts.speak(selText, '选中内容')
+  if (selText) tts.speak(selText, t('viewers.selection'))
   popup.value = null
 }
 
@@ -940,16 +941,16 @@ watch(
         class="btn text-xs"
         :class="{ '!text-accent': tocOpen }"
         :disabled="!toc.length"
-        :title="toc.length ? 'Table of contents' : 'No navigation'"
+        :title="toc.length ? $t('viewers.epub.toc') : $t('viewers.epub.noNav')"
         @click="tocOpen = !tocOpen; searchOpen && (searchOpen = false)"
       >
         <span class="codicon codicon-sm codicon-list-tree" />
       </button>
-      <button class="btn text-xs" title="Smaller text" @click="setFont(fontPct - 10)">
+      <button class="btn text-xs" :title="$t('viewers.epub.smallerText')" @click="setFont(fontPct - 10)">
         <span class="codicon codicon-sm codicon-zoom-out" />
       </button>
       <span class="text-xs text-fg-3 w-9 text-center">{{ fontPct }}%</span>
-      <button class="btn text-xs" title="Larger text" @click="setFont(fontPct + 10)">
+      <button class="btn text-xs" :title="$t('viewers.epub.largerText')" @click="setFont(fontPct + 10)">
         <span class="codicon codicon-sm codicon-zoom-in" />
       </button>
 
@@ -963,15 +964,15 @@ watch(
         <button
           class="btn text-xs"
           :class="{ '!text-accent': searchOpen }"
-          title="Search in book"
+          :title="$t('viewers.epub.searchInBook')"
           @click="toggleSearch"
         >
           <span class="codicon codicon-sm codicon-search" />
         </button>
-        <button class="btn text-xs" title="朗读本章" @click="readAloud">
+        <button class="btn text-xs" :title="$t('viewers.epub.readChapter')" @click="readAloud">
           <span class="codicon codicon-sm codicon-unmute" />
         </button>
-        <button class="btn text-xs" title="查看标注" @click="viewAnnotations">
+        <button class="btn text-xs" :title="$t('viewers.epub.viewAnnotations')" @click="viewAnnotations">
           <span class="codicon codicon-sm codicon-list-selection" />
         </button>
       </div>
@@ -985,21 +986,21 @@ watch(
             ref="searchInput"
             v-model="searchQuery"
             type="text"
-            placeholder="Search in book…"
+            :placeholder="$t('viewers.epub.searchPlaceholder')"
             class="w-full text-sm bg-bg-2 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-accent"
             @keydown.enter="runSearch"
           />
         </div>
         <div class="flex-1 min-h-0 panel-scroll">
-          <div v-if="searching" class="px-3 py-2 text-xs text-fg-3">Searching…</div>
+          <div v-if="searching" class="px-3 py-2 text-xs text-fg-3">{{ $t('viewers.epub.searching') }}</div>
           <div v-else-if="searchResults.length" class="px-3 py-1 text-[11px] uppercase tracking-wide text-fg-3">
-            {{ searchResults.length }} result<span v-if="searchResults.length > 1">s</span>
+            {{ searchResults.length > 1 ? $t('viewers.epub.results', { n: searchResults.length }) : $t('viewers.epub.resultsOne', { n: searchResults.length }) }}
           </div>
           <div
             v-else-if="searchQuery.trim()"
             class="px-3 py-2 text-xs text-fg-3"
           >
-            No matches.
+            {{ $t('viewers.epub.noMatches') }}
           </div>
           <button
             v-for="(r, i) in searchResults"
@@ -1036,7 +1037,7 @@ watch(
         <button
           class="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full border border-border bg-bg-1/80 shadow flex items-center justify-center text-fg-2 hover:text-fg-1 transition-opacity duration-200"
           :class="nearLeft ? 'opacity-90' : 'opacity-0 pointer-events-none'"
-          title="上一页"
+          :title="$t('viewers.epub.prevPage')"
           @mousedown.prevent
           @click="prev"
         >
@@ -1045,7 +1046,7 @@ watch(
         <button
           class="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-9 h-9 rounded-full border border-border bg-bg-1/80 shadow flex items-center justify-center text-fg-2 hover:text-fg-1 transition-opacity duration-200"
           :class="nearRight ? 'opacity-90' : 'opacity-0 pointer-events-none'"
-          title="下一页"
+          :title="$t('viewers.epub.nextPage')"
           @mousedown.prevent
           @click="next"
         >
@@ -1060,7 +1061,7 @@ watch(
           <button
             v-if="backTarget"
             class="flex items-center gap-1 text-[11px] text-accent hover:opacity-80"
-            :title="`回到第 ${backTarget.page} 页`"
+            :title="$t('viewers.epub.backToPage', { page: backTarget.page })"
             @click="goBack"
           >
             <span class="codicon codicon-discard !text-[12px]" /> {{ backTarget.page }}
@@ -1087,27 +1088,27 @@ watch(
           :key="c.value"
           class="w-5 h-5 rounded-full border border-border transition-transform hover:scale-110"
           :style="{ backgroundColor: c.value }"
-          :title="`Highlight ${c.name}`"
+          :title="$t('viewers.epub.highlightColor', { name: c.name })"
           @click="pickColor(c.value)"
         />
         <span class="w-px h-4 bg-border mx-0.5" />
         <button
           class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
-          title="朗读选中"
+          :title="$t('viewers.epub.readSelection')"
           @click="speakSelection"
         >
           <span class="codicon codicon-sm codicon-unmute" />
         </button>
         <button
           class="w-6 h-5 rounded flex items-center justify-center leading-none text-fg-3 hover:text-fg-1"
-          title="Underline (red)"
+          :title="$t('viewers.epub.underlineRed')"
           @click="underlineSelection"
         >
           <span class="text-xs font-semibold underline underline-offset-2" :style="{ color: UNDERLINE_COLOR }">U</span>
         </button>
         <button
           class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
-          title="笔记"
+          :title="$t('viewers.epub.note')"
           @click="openNoteEditor(popup.cfi)"
         >
           <span class="codicon codicon-sm codicon-note" />
@@ -1115,7 +1116,7 @@ watch(
         <button
           v-if="popup.existing"
           class="text-fg-3 hover:text-removed ml-0.5"
-          title="Delete mark"
+          :title="$t('viewers.epub.deleteMark')"
           @click="deleteAnnot"
         >
           <span class="codicon codicon-sm codicon-trash" />

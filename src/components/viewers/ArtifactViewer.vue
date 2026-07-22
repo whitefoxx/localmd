@@ -46,10 +46,10 @@ function openInNewTab(): void {
         <span
           class="codicon codicon-sm mr-1"
           :class="showSource ? 'codicon-preview' : 'codicon-code'"
-        />{{ showSource ? '预览' : '源码' }}
+        />{{ showSource ? $t('viewers.artifact.preview') : $t('viewers.artifact.source') }}
       </button>
-      <button class="btn text-xs" title="在新标签页打开(沙箱隔离)" @click="openInNewTab">
-        <span class="codicon codicon-sm codicon-link-external mr-1" />新标签页
+      <button class="btn text-xs" :title="$t('viewers.artifact.openNewTab')" @click="openInNewTab">
+        <span class="codicon codicon-sm codicon-link-external mr-1" />{{ $t('viewers.artifact.newTab') }}
       </button>
     </div>
     <div class="flex-1 min-h-0">

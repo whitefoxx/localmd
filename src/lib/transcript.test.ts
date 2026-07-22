@@ -48,8 +48,8 @@ describe('renderTranscript', () => {
   })
 
   it('renders turn anchors and collapsed tool lines, omits thinking', () => {
-    expect(out).toContain('## t1 · 用户')
-    expect(out).toContain('## t2 · 助手')
+    expect(out).toContain('## t1 · User')
+    expect(out).toContain('## t2 · Assistant')
     expect(out).toContain('> ⚙ read_file — wiki/index.md')
     expect(out).toContain('结论:转录进 raw/conversations。')
     expect(out).not.toContain('internal chain of thought')
@@ -78,10 +78,10 @@ describe('renderTranscript', () => {
       ] as UiMessage[],
     })
     const r = renderTranscript(s)
-    expect(r).toContain('> 📎 附件: .tmp/shot.png')
-    expect(r).toContain('> 📌 引用 wiki/a.md: 选中的 一段 话')
-    expect(r).toContain('> 📄 工件: wiki/roadmap.html(路线图)')
-    expect(r).toContain('> 🖼 生成图片: raw/images/gen.png')
+    expect(r).toContain('> 📎 Attachments: .tmp/shot.png')
+    expect(r).toContain('> 📌 Quoting wiki/a.md: 选中的 一段 话')
+    expect(r).toContain('> 📄 Artifact: wiki/roadmap.html (路线图)')
+    expect(r).toContain('> 🖼 Generated image: raw/images/gen.png')
     expect(r).toContain('> ⚙ edit_file — wiki/a.md ✗')
     expect(r).toContain('> ⚠ Stopped.')
   })

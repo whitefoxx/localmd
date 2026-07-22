@@ -21,9 +21,9 @@ export interface TrimOptions {
 const DEFAULTS: Required<TrimOptions> = { keepTurns: 2, maxChars: 1500 }
 
 const stub = (chars: number) =>
-  `[之前的工具结果已修剪(原 ${chars} 字符)——如仍需其内容,重新调用相应工具]`
-const IMG_STUB = '[之前的图片已修剪——如需重看,调用 view_image]'
-const INPUT_STUB = '[已修剪]'
+  `[Earlier tool result trimmed (was ${chars} chars) — if you still need its content, call the relevant tool again]`
+const IMG_STUB = '[Earlier image trimmed — to view it again, call view_image]'
+const INPUT_STUB = '[trimmed]'
 
 /** Rough token estimate for threshold checks (CJK ≈1 token/char, EN ≈0.3). */
 export function estimateChars(history: unknown): number {
@@ -134,14 +134,14 @@ function partText(part: AnyPart): string {
       return ''
     case 'image':
     case 'file':
-      return '[图片]'
+      return '[image]'
     case 'tool-call':
-      return `[调用 ${part.toolName}: ${clip(JSON.stringify(part.input))}]`
+      return `[call ${part.toolName}: ${clip(JSON.stringify(part.input))}]`
     case 'tool-result': {
       const o = part.output as AnyPart | undefined
       const body =
         o?.type === 'text' ? String(o.value ?? '') : clip(JSON.stringify(o?.value ?? o ?? ''))
-      return `[工具结果: ${clip(body)}]`
+      return `[tool result: ${clip(body)}]`
     }
     default:
       return ''
@@ -149,7 +149,7 @@ function partText(part: AnyPart): string {
 }
 
 function roleLabel(role: string): string {
-  return role === 'user' ? '用户' : role === 'assistant' ? '助手' : role === 'tool' ? '工具' : role
+  return role === 'user' ? 'User' : role === 'assistant' ? 'Assistant' : role === 'tool' ? 'Tool' : role
 }
 
 /** Plain-text transcript of the history, for the summarizer. */
@@ -162,7 +162,7 @@ export function renderTranscript(history: ModelMessage[]): string {
     return `${roleLabel(m.role)}: ${body}`
   })
   const text = lines.join('\n')
-  return text.length > TRANSCRIPT_CAP ? `${text.slice(0, TRANSCRIPT_CAP)}\n…[后续已截断]` : text
+  return text.length > TRANSCRIPT_CAP ? `${text.slice(0, TRANSCRIPT_CAP)}\n…[remainder truncated]` : text
 }
 
 export interface Split {
@@ -185,7 +185,7 @@ export function splitForCompaction(
  *  ack keeps role alternation valid). */
 export function compactedPrefix(summary: string): { user: string; assistant: string } {
   return {
-    user: `[系统注入:以下是本会话较早部分的自动摘要,原始消息已移除以节省上下文]\n\n${summary}\n\n[摘要结束,请基于它与后续消息继续]`,
-    assistant: '已了解之前的进展,继续。',
+    user: `[System injection: the following is an automatic summary of the earlier part of this session; the original messages have been removed to save context]\n\n${summary}\n\n[End of summary — continue based on it and the messages that follow]`,
+    assistant: 'Understood the earlier progress; continuing.',
   }
 }

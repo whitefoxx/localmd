@@ -69,7 +69,7 @@ export const useGitStore = defineStore('git', () => {
 
   /** Sets the panel's "waiting" note when another session holds the git lock. */
   function noteWait(): void {
-    progress.value = '等待其他 git 操作完成…'
+    progress.value = 'Waiting for another git operation to finish…'
   }
 
   /** Re-read branch/status/log. Cheap after the first run (index cache).
@@ -114,7 +114,7 @@ export const useGitStore = defineStore('git', () => {
         },
         { onWait: noteWait },
       )
-      lastSync.value = `已提交 ${oid.slice(0, 7)}`
+      lastSync.value = `Committed ${oid.slice(0, 7)}`
     } catch (err) {
       error.value = (err as Error).message
     } finally {
@@ -128,11 +128,11 @@ export const useGitStore = defineStore('git', () => {
     if (busy.value) return
     const settings = useSettingsStore()
     if (!remote.value) {
-      error.value = '没有可识别的 GitHub remote'
+      error.value = 'No recognizable GitHub remote'
       return
     }
     if (direction === 'push' && !settings.state.githubToken) {
-      error.value = '推送需要 GitHub token——在 Settings 里配置'
+      error.value = 'Pushing requires a GitHub token — configure it in Settings'
       return
     }
     busy.value = direction
@@ -152,7 +152,7 @@ export const useGitStore = defineStore('git', () => {
     } catch (err) {
       const e = err as Error & { data?: { filepaths?: string[] } }
       if (e.name === 'CheckoutConflictError' && e.data?.filepaths) {
-        error.value = `本地未提交的改动与远端冲突: ${e.data.filepaths.join(', ')} — 先提交或还原这些文件`
+        error.value = `Local uncommitted changes conflict with the remote: ${e.data.filepaths.join(', ')} — commit or revert these files first`
       } else {
         error.value = e.message
       }

@@ -51,12 +51,12 @@ describe('trimHistory', () => {
   it('stubs old large tool results, images, and tool-call inputs', () => {
     const out = trimHistory(history, { keepTurns: 1, maxChars: 100 })
     const toolParts = parts(out[2])
-    expect((toolParts[0].output as Rec).value).toContain('已修剪')
+    expect((toolParts[0].output as Rec).value).toContain('trimmed')
     const inner = (toolParts[1].output as Rec).value as Rec[]
-    expect(inner[0].text).toContain('已修剪')
+    expect(inner[0].text).toContain('trimmed')
     expect(inner[1].type).toBe('text') // media replaced with a text stub
     const asst = parts(out[1])
-    expect((asst[1].input as Rec).content).toBe('[已修剪]')
+    expect((asst[1].input as Rec).content).toBe('[trimmed]')
     expect((asst[0].input as Rec).path).toBe('a.md') // small input untouched
   })
 
@@ -110,8 +110,8 @@ describe('compaction helpers', () => {
         ],
       },
     ])
-    expect(t).toContain('用户: 找 bug')
-    expect(t).toContain('[调用 read_file')
+    expect(t).toContain('User: 找 bug')
+    expect(t).toContain('[call read_file')
     expect(t).toContain('…') // clipped tool result
   })
 

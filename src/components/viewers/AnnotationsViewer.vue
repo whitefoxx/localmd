@@ -23,6 +23,7 @@ import {
   type AnnotationItem,
   type AnnotationCategory,
 } from '@/lib/annotations'
+import { t } from '@/i18n'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
@@ -52,14 +53,12 @@ const items = computed<AnnotationItem[]>(() =>
     : [],
 )
 
-const CATEGORY_LABEL: Record<AnnotationCategory, string> = {
-  highlight: '高亮',
-  underline: '下划线',
-  note: '评论',
-  other: '标注',
+/** Reactive category label — reads i18n so it re-renders on language change. */
+function categoryName(category: AnnotationCategory): string {
+  return t(`viewers.annotations.category.${category}`)
 }
 function categoryLabel(it: AnnotationItem): string {
-  return it.category === 'other' ? it.typeLabel : CATEGORY_LABEL[it.category]
+  return it.category === 'other' ? it.typeLabel : categoryName(it.category)
 }
 
 /** Header summary: how many of each category. */
@@ -68,7 +67,7 @@ const counts = computed(() => {
   for (const it of items.value) c[it.category]++
   return (['highlight', 'underline', 'note', 'other'] as AnnotationCategory[])
     .filter((k) => c[k])
-    .map((k) => ({ label: CATEGORY_LABEL[k], n: c[k] }))
+    .map((k) => ({ label: categoryName(k), n: c[k] }))
 })
 
 /** PDF groups by page; EPUB is one flat list in reading order. */
@@ -76,7 +75,7 @@ const groups = computed<{ label: string; items: AnnotationItem[] }[]>(() => {
   if (kind.value !== 'pdf') return items.value.length ? [{ label: '', items: items.value }] : []
   const out: { label: string; items: AnnotationItem[] }[] = []
   for (const it of items.value) {
-    const label = `第 ${it.page} 页`
+    const label = t('viewers.annotations.page', { page: it.page ?? '' })
     const last = out[out.length - 1]
     if (last?.label === label) last.items.push(it)
     else out.push({ label, items: [it] })
@@ -178,17 +177,17 @@ function focusEl(el: unknown): void {
         <h1 class="text-lg font-semibold text-fg-0 truncate">{{ sourceName }}</h1>
       </div>
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fg-3 mb-6">
-        <span>{{ items.length }} 条标注</span>
+        <span>{{ $t('viewers.annotations.count', { n: items.length }) }}</span>
         <span v-for="c in counts" :key="c.label" class="text-fg-3">{{ c.n }} {{ c.label }}</span>
         <button v-if="sourceExists" class="text-accent hover:underline" @click="openSource">
-          <span class="codicon codicon-sm codicon-go-to-file align-text-bottom" /> 打开原书
+          <span class="codicon codicon-sm codicon-go-to-file align-text-bottom" /> {{ $t('viewers.annotations.openSource') }}
         </button>
-        <span v-else class="text-yellow-500">原书文件不存在,无法跳转</span>
+        <span v-else class="text-yellow-500">{{ $t('viewers.annotations.sourceMissing') }}</span>
       </div>
 
       <div v-if="!items.length" class="text-center text-fg-3 py-16">
         <span class="codicon codicon-lg codicon-bookmark block mb-2" />
-        这本书还没有标注 — 在阅读器里选中文字即可高亮
+        {{ $t('viewers.annotations.empty') }}
       </div>
 
       <section v-for="g in groups" :key="g.label || 'all'" class="mb-6">
@@ -200,7 +199,7 @@ function focusEl(el: unknown): void {
           :key="it.id"
           class="group relative mb-3 rounded-md border border-border bg-bg-1 overflow-hidden transition-colors"
           :class="sourceExists ? 'hover:border-accent/60 cursor-pointer' : ''"
-          :title="sourceExists ? '点击跳转到原文位置' : ''"
+          :title="sourceExists ? $t('viewers.annotations.jumpTitle') : ''"
           @click="jump(it)"
         >
           <!-- color bar -->
@@ -230,7 +229,7 @@ function focusEl(el: unknown): void {
             <div
               v-else-if="it.category !== 'note'"
               class="text-sm text-fg-3 italic"
-            >(无摘录文本)</div>
+            >{{ $t('viewers.annotations.noExcerpt') }}</div>
 
             <!-- comment: display / inline edit. For a note-type mark the comment
                  IS the content, so it shows even without an excerpt above. -->
@@ -240,20 +239,20 @@ function focusEl(el: unknown): void {
                 :ref="focusEl"
                 rows="3"
                 class="w-full text-sm bg-bg-2 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-accent resize-y"
-                placeholder="写点想法…(⌘↵ 保存,Esc 取消)"
+                :placeholder="$t('viewers.annotations.notePlaceholder')"
                 @keydown.enter.meta.prevent="saveNote(it)"
                 @keydown.esc.stop="editingId = null"
               />
               <div class="flex gap-2 mt-1">
-                <button class="btn-primary text-xs" @click="saveNote(it)">保存</button>
-                <button class="btn text-xs" @click="editingId = null">取消</button>
+                <button class="btn-primary text-xs" @click="saveNote(it)">{{ $t('common.save') }}</button>
+                <button class="btn text-xs" @click="editingId = null">{{ $t('common.cancel') }}</button>
               </div>
             </div>
             <div
               v-else-if="it.comment"
               class="mt-2 flex items-start gap-1.5 text-sm"
               :class="it.category === 'note' ? 'text-fg-1' : 'text-fg-2'"
-              title="点击编辑评论"
+              :title="$t('viewers.annotations.editComment')"
               @click.stop="beginNote(it)"
             >
               <span class="codicon codicon-sm codicon-comment mt-0.5 text-fg-3 shrink-0" />
@@ -270,7 +269,7 @@ function focusEl(el: unknown): void {
                 <button
                   v-if="editingId !== it.id && !it.comment"
                   class="btn text-xs"
-                  title="添加评论"
+                  :title="$t('viewers.annotations.addComment')"
                   @click="beginNote(it)"
                 >
                   <span class="codicon codicon-sm codicon-comment-add" />
@@ -284,11 +283,11 @@ function focusEl(el: unknown): void {
                       it.color.toLowerCase() === c.value.toLowerCase() ? 'border-fg-1' : 'border-border'
                     "
                     :style="{ backgroundColor: c.value }"
-                    :title="`改为 ${c.name}`"
+                    :title="$t('viewers.annotations.changeTo', { name: c.name })"
                     @click="setColor(it, c.value)"
                   />
                 </template>
-                <button class="btn text-xs hover:!text-removed" title="删除标注" @click="removeAt(it.origIndex)">
+                <button class="btn text-xs hover:!text-removed" :title="$t('viewers.annotations.deleteAnnotation')" @click="removeAt(it.origIndex)">
                   <span class="codicon codicon-sm codicon-trash" />
                 </button>
               </div>

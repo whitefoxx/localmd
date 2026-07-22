@@ -36,6 +36,7 @@ import { useTtsStore } from '@/stores/tts'
 import { baseName, splitFrontmatter } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
 import type { RecentKb } from '@/lib/idb'
+import { t } from '@/i18n'
 
 /* Shared styling for the VS Code–style activity-bar buttons. */
 const actBtn =
@@ -166,7 +167,7 @@ function readAloud(): void {
   if (!path) return
   const sel = window.getSelection()?.toString().trim()
   if (sel) {
-    tts.speak(sel, '选中内容')
+    tts.speak(sel, t('layout.selection'))
     return
   }
   const body = splitFrontmatter(files.content).body
@@ -174,7 +175,10 @@ function readAloud(): void {
 }
 
 const saveLabel = computed(
-  () => ({ saved: 'Saved', dirty: 'Unsaved', saving: 'Saving…' })[files.saveState],
+  () =>
+    ({ saved: t('common.saved'), dirty: t('common.unsaved'), saving: t('common.saving') })[
+      files.saveState
+    ],
 )
 
 /* Save state shown as a colored dot in the sidebar header (label = tooltip):
@@ -189,7 +193,17 @@ const saveDisplay = computed(
 )
 
 const gitTitle = computed(
-  () => `Git: ${git.branch ?? ''}${git.dirtyCount ? ` · ${git.dirtyCount} changed` : ''}`,
+  () =>
+    `Git: ${git.branch ?? ''}${git.dirtyCount ? ` · ${t('layout.nChanged', { n: git.dirtyCount })}` : ''}`,
+)
+
+const themeLabel = computed(
+  () =>
+    t('layout.theme', {
+      pref: { system: t('layout.themeSystem'), light: t('layout.themeLight'), dark: t('layout.themeDark') }[
+        theme.pref
+      ],
+    }),
 )
 
 /* codicons 0.0.45 has no sun/moon glyphs — use ones that actually render. */
@@ -263,24 +277,24 @@ function closeKb(): void {
       class="flex items-center gap-2 px-3 py-1.5 text-xs shrink-0 bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-b border-yellow-500/30"
     >
       <span class="codicon codicon-sm codicon-warning" />
-      该知识库已在另一个标签页打开——两边同时编辑会互相覆盖(自动保存、git、标注)。建议只保留一个标签页操作。
+      {{ $t('layout.concurrentWarning') }}
     </div>
 
     <div class="flex-1 flex min-h-0">
       <!-- Activity bar (VS Code style) -->
       <nav class="w-12 shrink-0 bg-bg-1 border-r border-border flex flex-col items-center py-2 gap-1">
         <!-- Top group -->
-        <button :class="actBtn" title="Toggle sidebar (⌘B)" @click="ui.sidebarOpen = !ui.sidebarOpen">
+        <button :class="actBtn" :title="$t('layout.toggleSidebar')" @click="ui.sidebarOpen = !ui.sidebarOpen">
           <span
             v-if="ui.sidebarOpen"
             class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
           />
           <span class="codicon codicon-files" :class="{ 'text-accent': ui.sidebarOpen }" />
         </button>
-        <button :class="actBtn" title="Search (⌘K)" @click="ui.searchOpen = true">
+        <button :class="actBtn" :title="$t('layout.search')" @click="ui.searchOpen = true">
           <span class="codicon codicon-search" />
         </button>
-        <button :class="actBtn" title="Graph view" @click="ui.graphOpen = !ui.graphOpen">
+        <button :class="actBtn" :title="$t('layout.graphView')" @click="ui.graphOpen = !ui.graphOpen">
           <span
             v-if="ui.graphOpen"
             class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
@@ -298,13 +312,13 @@ function closeKb(): void {
             class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] leading-4 text-center font-medium"
           >{{ git.dirtyCount }}</span>
         </button>
-        <button :class="actBtn" title="KB health" @click="ui.healthOpen = true">
+        <button :class="actBtn" :title="$t('layout.kbHealth')" @click="ui.healthOpen = true">
           <span class="codicon codicon-pulse" />
         </button>
         <button
           v-if="review.count"
           :class="actBtn"
-          title="Review agent changes"
+          :title="$t('layout.reviewChanges')"
           @click="review.panelOpen = true"
         >
           <span class="codicon codicon-diff text-accent" />
@@ -316,13 +330,13 @@ function closeKb(): void {
         <span class="flex-1" />
 
         <!-- Bottom group -->
-        <button :class="actBtn" title="Settings" @click="ui.settingsOpen = true">
+        <button :class="actBtn" :title="$t('common.settings')" @click="ui.settingsOpen = true">
           <span class="codicon codicon-settings-gear" :class="{ 'text-accent': ui.settingsOpen }" />
         </button>
-        <button :class="actBtn" :title="`Theme: ${theme.pref}`" @click="theme.cycle()">
+        <button :class="actBtn" :title="themeLabel" @click="theme.cycle()">
           <span class="codicon" :class="themeIcon" />
         </button>
-        <button :class="actBtn" title="Close folder" @click="closeKb">
+        <button :class="actBtn" :title="$t('layout.closeFolder')" @click="closeKb">
           <span class="codicon codicon-close" />
         </button>
       </nav>
@@ -335,7 +349,7 @@ function closeKb(): void {
       >
         <div
           class="absolute right-0 top-0 bottom-0 w-1 -mr-0.5 z-20 cursor-col-resize hover:bg-accent/40"
-          title="Drag to resize"
+          :title="$t('layout.dragResize')"
           @mousedown.prevent="startSidebarResize"
         />
         <!-- KB switcher header (h-9 matches the editor tab bar / agent header) -->
@@ -365,10 +379,10 @@ function closeKb(): void {
             class="absolute left-2 right-2 top-full mt-1 z-50 rounded-md border border-border bg-bg-1 shadow-lg py-1 text-sm"
           >
             <button :class="menuItem" @click="openFolder">
-              <span class="codicon codicon-sm codicon-folder-opened text-fg-3" />Open Folder…
+              <span class="codicon codicon-sm codicon-folder-opened text-fg-3" />{{ $t('layout.openFolder') }}
             </button>
             <div class="px-3 pt-2 pb-1 text-[11px] uppercase tracking-wide text-fg-3">
-              Open Recent
+              {{ $t('layout.openRecent') }}
             </div>
             <button
               v-for="r in recentsOther"
@@ -409,7 +423,7 @@ function closeKb(): void {
             >
               <button
                 class="btn text-xs shadow-sm"
-                title="朗读(有选中读选中)"
+                :title="$t('layout.readAloud')"
                 @mousedown.prevent
                 @click="readAloud"
               >
@@ -423,7 +437,7 @@ function closeKb(): void {
                   class="codicon codicon-sm mr-1"
                   :class="files.mode === 'edit' ? 'codicon-open-preview' : 'codicon-edit'"
                 />
-                {{ files.mode === 'edit' ? 'Preview' : 'Edit' }}
+                {{ files.mode === 'edit' ? $t('common.preview') : $t('common.edit') }}
               </button>
             </div>
 
@@ -442,7 +456,7 @@ function closeKb(): void {
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">
                   <span class="codicon codicon-lg codicon-file-binary block mb-2" />
-                  Binary file — no preview
+                  {{ $t('layout.binaryNoPreview') }}
                 </div>
               </div>
             </template>
@@ -452,21 +466,20 @@ function closeKb(): void {
             >
               <div v-if="showScaffold" class="text-center max-w-md px-6">
                 <span class="codicon codicon-lg codicon-sparkle block mb-3 text-accent" />
-                <div class="text-fg-1 font-medium mb-2">这个文件夹还是空的</div>
+                <div class="text-fg-1 font-medium mb-2">{{ $t('layout.emptyFolderTitle') }}</div>
                 <p class="text-xs leading-relaxed mb-4">
-                  可以初始化为知识库:创建 raw/(源文件收集)、wiki/(LLM 维护的页面)、
-                  AGENTS.md(约定)和 ingest / lint 两个起步技能。
+                  {{ $t('layout.scaffoldDesc') }}
                 </p>
                 <div class="flex gap-2 justify-center">
                   <button class="btn-primary text-xs" :disabled="scaffolding" @click="doScaffold">
-                    <span class="codicon codicon-sm codicon-rocket mr-1" />初始化知识库
+                    <span class="codicon codicon-sm codicon-rocket mr-1" />{{ $t('layout.scaffoldInit') }}
                   </button>
-                  <button class="btn text-xs" @click="scaffoldDismissed = true">先不用</button>
+                  <button class="btn text-xs" @click="scaffoldDismissed = true">{{ $t('layout.scaffoldSkip') }}</button>
                 </div>
               </div>
               <div v-else class="text-center">
                 <span class="codicon codicon-lg codicon-markdown block mb-2" />
-                Select a file to start
+                {{ $t('layout.selectFile') }}
               </div>
             </div>
           </div>
@@ -487,7 +500,7 @@ function closeKb(): void {
         <div
           v-if="!ui.agentMaximized"
           class="absolute left-0 top-0 bottom-0 w-1 -ml-0.5 z-20 cursor-col-resize hover:bg-accent/40"
-          title="Drag to resize"
+          :title="$t('layout.dragResize')"
           @mousedown.prevent="startAgentResize"
         />
         <ChatPanel @open-settings="ui.settingsOpen = true" @close="ui.agentOpen = false" />
@@ -499,8 +512,8 @@ function closeKb(): void {
     <div v-if="ui.graphOpen" class="fixed inset-0 z-40 bg-bg-0 flex flex-col">
       <div class="flex items-center gap-2 px-4 h-11 border-b border-border shrink-0">
         <span class="codicon codicon-type-hierarchy-sub text-accent shrink-0" />
-        <span class="font-semibold text-fg-0 shrink-0">Graph</span>
-        <span class="text-xs text-fg-3 shrink-0">点击节点打开文件</span>
+        <span class="font-semibold text-fg-0 shrink-0">{{ $t('layout.graph') }}</span>
+        <span class="text-xs text-fg-3 shrink-0">{{ $t('layout.graphHint') }}</span>
         <!-- type color legend: what each node color means -->
         <div class="flex items-center gap-3 overflow-x-auto min-w-0 flex-1 pl-2 text-xs">
           <span
@@ -516,17 +529,17 @@ function closeKb(): void {
               class="inline-block h-2.5 w-2.5 rounded-full"
               style="background: rgb(var(--c-fg-3))"
             />
-            <span class="text-fg-3 whitespace-nowrap">无类型</span>
+            <span class="text-fg-3 whitespace-nowrap">{{ $t('layout.untyped') }}</span>
           </span>
           <span v-if="graphLegend.hasCurrent" class="flex items-center gap-1.5 shrink-0">
             <span
               class="inline-block h-2.5 w-2.5 rounded-full"
               style="background: rgb(var(--c-accent))"
             />
-            <span class="text-fg-3 whitespace-nowrap">当前文件</span>
+            <span class="text-fg-3 whitespace-nowrap">{{ $t('layout.currentFile') }}</span>
           </span>
         </div>
-        <button class="text-fg-3 hover:text-fg-0 shrink-0" title="Close (Esc)" @click="ui.graphOpen = false">
+        <button class="text-fg-3 hover:text-fg-0 shrink-0" :title="$t('layout.closeEsc')" @click="ui.graphOpen = false">
           <span class="codicon codicon-close" />
         </button>
       </div>
@@ -540,7 +553,7 @@ function closeKb(): void {
     <button
       v-if="!ui.agentOpen"
       class="absolute bottom-5 right-5 z-30 w-12 h-12 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-      title="Open agent (⌘J)"
+      :title="$t('layout.openAgent')"
       @click="ui.agentOpen = true"
     >
       <span class="codicon codicon-lg codicon-sparkle" />
@@ -560,7 +573,7 @@ function closeKb(): void {
       v-if="dragging"
       class="absolute inset-0 z-40 bg-accent/10 border-4 border-dashed border-accent flex items-center justify-center pointer-events-none"
     >
-      <div class="text-accent text-lg font-semibold">Drop files to capture into raw/</div>
+      <div class="text-accent text-lg font-semibold">{{ $t('layout.dropToCapture') }}</div>
     </div>
   </div>
 </template>

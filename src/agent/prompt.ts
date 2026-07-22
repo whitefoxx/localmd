@@ -12,6 +12,7 @@ import { readMemory, MEMORY_FILE } from '@/lib/memory'
 import { catalogEntry } from '@/lib/mcp'
 import { useMcpStore } from '@/stores/mcp'
 import { useSettingsStore } from '@/stores/settings'
+import { getLocale, LOCALE_NAMES } from '@/i18n'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools (list_files, read_file, write_file, search_files). All paths are relative to the KB root.
 
@@ -33,7 +34,6 @@ Guidelines:
 - Lint / KB health: call kb_health for structural problems (broken links, orphans, unreachable/thin pages) — do NOT read pages to find those. Report its findings first; semantic checks (contradictions, stale claims) need reading content and are token-heavy, so ask the user before scanning content and let them narrow the scope. Prefer catching issues at the source: when you create a page, link it into the relevant index and use resolvable [[wikilinks]] so it never becomes an orphan or a dangling link.
 - Saving & distilling conversations: the valuable thinking in a chat is worth keeping. When the user asks to save/record this conversation, call save_transcript (it writes a plain markdown file — a normal KB file). Distilling means extracting the conclusions/decisions/ideas from a discussion into topical wiki pages, merging into an existing page when one fits. The source can be the CURRENT conversation, or any file the user @-mentions or names (e.g. a previously saved conversation) — treat a saved conversation as an ordinary file, no special handling. Link back to the source with a [[wikilink]] when it is a KB file. When a discussion reaches a real conclusion or decision, you may briefly offer once (at the end of your reply) to distill it — then let the user decide; don't do it unprompted.
 - Keep edits minimal and focused on what the user asked.
-- Answer in the user's language.
 
 Attachments and file references:
 - Users can paste screenshots or upload files into the chat — these are saved into the KB under raw/ (images in raw/images/, PDFs in raw/papers/, …) and the message notes their paths. Treat them as part of the KB.
@@ -47,6 +47,12 @@ Documents (PDF/EPUB) and citation workflow:
 
 export async function buildSystemPrompt(sessionId: string): Promise<string> {
   let prompt = BASE
+
+  // The system prompt is always English; the *replies* follow the user's chosen
+  // interface language. Injected dynamically so switching the app language takes
+  // effect on the next turn.
+  const langName = LOCALE_NAMES[getLocale()]
+  prompt += `\n\nResponse language: the user's interface is set to ${langName}. Write your reasoning (thinking) and your replies primarily in ${langName}. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink". If the user writes to you in another language, follow their lead for that exchange.`
 
   const skills = await listSkills()
   if (skills.length) {
@@ -98,7 +104,7 @@ Browser access: web_search (find pages via DuckDuckGo) and web_fetch (read a URL
   } else if (!hasExtension) {
     prompt += `
 
-Browser access: NONE this session — the browser extension isn't connected and the built-in web tools (Jina AI Reader) are disabled. You cannot search the web or fetch pages. If the user needs that, tell them to connect the web-agent browser extension or enable "内置网页工具 (Jina AI Reader)" in Settings → 外部工具 — and never fabricate web content or URLs in the meantime.`
+Browser access: NONE this session — the browser extension isn't connected and the built-in web tools (Jina AI Reader) are disabled. You cannot search the web or fetch pages. If the user needs that, tell them to connect the web-agent browser extension or enable "Built-in web tools (Jina AI Reader)" in Settings → Tools — and never fabricate web content or URLs in the meantime.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))

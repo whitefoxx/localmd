@@ -14,6 +14,9 @@ import {
   type HotkeyId,
   type Binding,
 } from '@/lib/hotkeys'
+import { t, useI18n, LOCALES, type Locale } from '@/i18n'
+
+const { locale, setLocale } = useI18n()
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
@@ -90,13 +93,13 @@ function onRecordKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') return cancelRecording()
   if (MODIFIER_KEYS.includes(e.key)) return // wait for the non-modifier key
   if (!(e.metaKey || e.ctrlKey)) {
-    hotkeyError.value = '快捷键需配合 ⌘ 或 Ctrl'
+    hotkeyError.value = t('settings.needsModifier')
     return
   }
   const b: Binding = { code: e.code, mod: true, ...(e.shiftKey ? { shift: true } : {}) }
   const conflict = findConflict(id, b, store.state.hotkeys)
   if (conflict) {
-    hotkeyError.value = `与「${conflict.label}」冲突，请换一个`
+    hotkeyError.value = t('settings.conflictsWith', { label: conflict.label })
     return
   }
   // Recording the default again just clears the override.
@@ -107,17 +110,21 @@ function onRecordKey(e: KeyboardEvent): void {
 }
 
 /** Left-nav sections (ChatGPT-style). */
-type SectionId = 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
-const NAV: { id: SectionId; label: string; icon: string }[] = [
-  { id: 'models', label: '模型', icon: 'codicon-sparkle' },
-  { id: 'agent', label: 'Agent', icon: 'codicon-settings-gear' },
-  { id: 'hotkeys', label: '快捷键', icon: 'codicon-keyboard' },
-  { id: 'health', label: 'KB 健康', icon: 'codicon-pulse' },
-  { id: 'tools', label: '外部工具', icon: 'codicon-plug' },
-  { id: 'git', label: 'Git & GitHub', icon: 'codicon-github' },
+type SectionId = 'general' | 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
+const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
+  { id: 'general', labelKey: 'settings.nav.general', icon: 'codicon-globe' },
+  { id: 'models', labelKey: 'settings.nav.models', icon: 'codicon-sparkle' },
+  { id: 'agent', labelKey: 'settings.nav.agent', icon: 'codicon-settings-gear' },
+  { id: 'hotkeys', labelKey: 'settings.nav.hotkeys', icon: 'codicon-keyboard' },
+  { id: 'health', labelKey: 'settings.nav.health', icon: 'codicon-pulse' },
+  { id: 'tools', labelKey: 'settings.nav.tools', icon: 'codicon-plug' },
+  { id: 'git', labelKey: 'settings.nav.git', icon: 'codicon-github' },
 ]
 const section = ref<SectionId>('models')
-const sectionTitle = computed(() => NAV.find((n) => n.id === section.value)?.label ?? '')
+const sectionTitle = computed(() => {
+  const n = NAV.find((n) => n.id === section.value)
+  return n ? t(n.labelKey) : ''
+})
 function goSection(id: SectionId): void {
   section.value = id
   editing.value = null // leaving the models pane cancels an in-progress edit
@@ -189,10 +196,11 @@ function toggleMcpServer(id: string): void {
 }
 
 function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: string } {
-  if (s.status === 'off') return { label: '已停用', cls: 'bg-fg-3' }
-  if (s.status === 'connecting') return { label: '连接中…', cls: 'bg-fg-3' }
-  if (s.status === 'error') return { label: s.error?.slice(0, 60) ?? '连接失败', cls: 'bg-removed' }
-  return { label: `${s.tools.length} 个工具`, cls: 'bg-added' }
+  if (s.status === 'off') return { label: t('settings.status.off'), cls: 'bg-fg-3' }
+  if (s.status === 'connecting') return { label: t('settings.status.connecting'), cls: 'bg-fg-3' }
+  if (s.status === 'error')
+    return { label: s.error?.slice(0, 60) ?? t('settings.status.failed'), cls: 'bg-removed' }
+  return { label: t('settings.status.nTools', { n: s.tools.length }), cls: 'bg-added' }
 }
 
 function addProfile(): void {
@@ -230,9 +238,9 @@ function saveProfile(): void {
 
 function slotBadges(p: LlmProfile): string[] {
   const out: string[] = []
-  if (store.state.slots.primary === p.id) out.push('主模型')
-  if (store.state.slots.vision === p.id) out.push('视觉')
-  if (store.state.slots.image === p.id) out.push('图像')
+  if (store.state.slots.primary === p.id) out.push(t('settings.badge.primary'))
+  if (store.state.slots.vision === p.id) out.push(t('settings.badge.vision'))
+  if (store.state.slots.image === p.id) out.push(t('settings.badge.image'))
   return out
 }
 </script>
@@ -252,12 +260,12 @@ function slotBadges(p: LlmProfile): string[] {
           <div class="flex items-center h-12 px-2.5 shrink-0">
             <button
               class="w-7 h-7 flex items-center justify-center rounded-md text-fg-3 hover:text-fg-0 hover:bg-bg-3 transition-colors"
-              title="关闭 (Esc)"
+              :title="$t('layout.closeEsc')"
               @click="emit('close')"
             >
               <span class="codicon codicon-close" />
             </button>
-            <span class="ml-1.5 text-sm font-semibold text-fg-0">Settings</span>
+            <span class="ml-1.5 text-sm font-semibold text-fg-0">{{ $t('common.settings') }}</span>
           </div>
           <nav class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
             <button
@@ -272,12 +280,12 @@ function slotBadges(p: LlmProfile): string[] {
               @click="goSection(n.id)"
             >
               <span class="codicon shrink-0" :class="n.icon" />
-              <span class="truncate">{{ n.label }}</span>
+              <span class="truncate">{{ $t(n.labelKey) }}</span>
             </button>
           </nav>
           <div class="px-3 py-2.5 text-[11px] text-fg-3 leading-relaxed border-t border-border">
             <span class="codicon codicon-sm codicon-shield mr-0.5" />
-            API key 与 token 只存在本浏览器,直连服务商,不经其他服务器。
+            {{ $t('settings.privacyNote') }}
           </div>
         </aside>
 
@@ -287,11 +295,11 @@ function slotBadges(p: LlmProfile): string[] {
             <span
               v-if="editing"
               class="codicon codicon-arrow-left text-fg-3 hover:text-fg-0 cursor-pointer mr-2"
-              title="返回"
+              :title="$t('settings.back')"
               @click="editing = null"
             />
             <h2 class="text-base font-semibold text-fg-0">
-              {{ editing ? (isExistingProfile ? '编辑模型' : '添加模型') : sectionTitle }}
+              {{ editing ? (isExistingProfile ? $t('settings.editProfile') : $t('settings.addProfile')) : sectionTitle }}
             </h2>
           </div>
 
@@ -335,23 +343,38 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
 
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Label（可选）</label>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.labelOptional') }}</label>
                 <input v-model="editing.label" class="input" :placeholder="autoLabel(editing)" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Max tokens（可选）</label>
-                <input v-model.number="editing.maxTokens" type="number" class="input" placeholder="默认" />
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.maxTokensOptional') }}</label>
+                <input v-model.number="editing.maxTokens" type="number" class="input" :placeholder="$t('settings.defaultPlaceholder')" />
               </div>
 
               <p class="text-xs text-fg-3 leading-relaxed">
-                选好 provider 后只需填 API key 和模型名——base URL 与接口适配由 SDK 内置。端点须允许浏览器（CORS）访问；连接失败时聊天区会给出提示。
+                {{ $t('settings.profileHelp') }}
               </p>
 
               <div class="flex gap-2 pt-1">
                 <button class="btn-primary text-xs" :disabled="!editing.apiKey || !editing.model" @click="saveProfile">
-                  保存
+                  {{ $t('common.save') }}
                 </button>
-                <button class="btn text-xs" @click="editing = null">取消</button>
+                <button class="btn text-xs" @click="editing = null">{{ $t('common.cancel') }}</button>
+              </div>
+            </div>
+
+            <!-- ▸ General -->
+            <div v-else-if="section === 'general'" class="space-y-4 max-w-md">
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.language') }}</label>
+                <select
+                  :value="locale"
+                  class="input"
+                  @change="setLocale(($event.target as HTMLSelectElement).value as Locale)"
+                >
+                  <option v-for="l in LOCALES" :key="l.value" :value="l.value">{{ l.label }}</option>
+                </select>
+                <p class="text-xs text-fg-3 leading-relaxed mt-2">{{ $t('settings.languageDesc') }}</p>
               </div>
             </div>
 
@@ -359,13 +382,13 @@ function slotBadges(p: LlmProfile): string[] {
             <div v-else-if="section === 'models'" class="space-y-6">
               <div>
                 <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs uppercase tracking-wide text-fg-3">模型 Profiles</span>
+                  <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.profilesHeading') }}</span>
                   <button class="btn text-xs" @click="addProfile">
-                    <span class="codicon codicon-sm codicon-add mr-1" />添加模型
+                    <span class="codicon codicon-sm codicon-add mr-1" />{{ $t('settings.addProfile') }}
                   </button>
                 </div>
                 <div v-if="!store.state.profiles.length" class="text-sm text-fg-3 py-3">
-                  还没有配置模型 — 添加一个 API key 后 agent 才能工作。
+                  {{ $t('settings.noProfiles') }}
                 </div>
                 <div v-else class="rounded-lg border border-border divide-y divide-border overflow-hidden">
                   <div
@@ -383,12 +406,12 @@ function slotBadges(p: LlmProfile): string[] {
                       :key="b"
                       class="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent shrink-0"
                     >{{ b }}</span>
-                    <button class="text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100" title="编辑" @click="editProfile(p)">
+                    <button class="text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100" :title="$t('common.edit')" @click="editProfile(p)">
                       <span class="codicon codicon-sm codicon-edit" />
                     </button>
                     <button
                       class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100"
-                      title="删除"
+                      :title="$t('common.delete')"
                       @click="store.deleteProfile(p.id)"
                     >
                       <span class="codicon codicon-sm codicon-trash" />
@@ -399,10 +422,10 @@ function slotBadges(p: LlmProfile): string[] {
 
               <!-- Slots -->
               <div v-if="store.state.profiles.length">
-                <div class="text-xs uppercase tracking-wide text-fg-3 mb-2">模型分工</div>
+                <div class="text-xs uppercase tracking-wide text-fg-3 mb-2">{{ $t('settings.slotsHeading') }}</div>
                 <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
                   <div class="flex items-center justify-between gap-4 px-3 py-3">
-                    <div class="text-sm text-fg-1">主模型</div>
+                    <div class="text-sm text-fg-1">{{ $t('settings.slot.primary') }}</div>
                     <select
                       :value="store.state.slots.primary ?? ''"
                       class="input w-48 shrink-0"
@@ -412,37 +435,33 @@ function slotBadges(p: LlmProfile): string[] {
                     </select>
                   </div>
                   <div class="flex items-center justify-between gap-4 px-3 py-3">
-                    <div class="text-sm text-fg-1">视觉理解</div>
+                    <div class="text-sm text-fg-1">{{ $t('settings.slot.vision') }}</div>
                     <select
                       :value="store.state.slots.vision ?? ''"
                       class="input w-48 shrink-0"
                       @change="store.setSlot('vision', ($event.target as HTMLSelectElement).value || null)"
                     >
-                      <option value="">未配置</option>
+                      <option value="">{{ $t('settings.notConfigured') }}</option>
                       <option v-for="p in store.state.profiles" :key="p.id" :value="p.id">{{ p.label }}</option>
                     </select>
                   </div>
                   <div class="flex items-center justify-between gap-4 px-3 py-3">
-                    <div class="text-sm text-fg-1">图像生成</div>
+                    <div class="text-sm text-fg-1">{{ $t('settings.slot.image') }}</div>
                     <select
                       :value="store.state.slots.image ?? ''"
                       class="input w-48 shrink-0"
                       @change="store.setSlot('image', ($event.target as HTMLSelectElement).value || null)"
                     >
-                      <option value="">未配置</option>
+                      <option value="">{{ $t('settings.notConfigured') }}</option>
                       <option v-for="p in imageCapableProfiles" :key="p.id" :value="p.id">{{ p.label }}</option>
                     </select>
                   </div>
                 </div>
                 <p class="text-xs text-fg-3 leading-relaxed mt-2">
-                  Claude 主模型天生多模态，无需配置视觉槽。OpenAI 兼容主模型：若它本身是多模态（如
-                  qwen-vl、glm-4v、gpt-4o），视觉槽选它自己（图片直接进上下文）；若是纯文本模型（如
-                  deepseek-chat），视觉槽指一个专门的视觉模型（agent 通过 view_image 工具调用它）。
+                  {{ $t('settings.visionHelp') }}
                 </p>
                 <p class="text-xs text-fg-3 leading-relaxed mt-2">
-                  图像生成槽可选，配置后主模型可用 generate_image 工具作图（保存进 raw/images/）。支持
-                  OpenAI（DALL·E）、Google（Imagen）、xAI，以及 OpenAI 兼容的 /images/generations 端点（智谱
-                  CogView、Qwen、自定义等）；模型名填对应的作图模型，端点须允许浏览器 CORS。
+                  {{ $t('settings.imageHelp') }}
                 </p>
               </div>
             </div>
@@ -451,15 +470,13 @@ function slotBadges(p: LlmProfile): string[] {
             <div v-else-if="section === 'agent'" class="space-y-2">
               <div class="rounded-lg border border-border overflow-hidden">
                 <div class="px-3 py-3">
-                  <div class="text-sm text-fg-1">写入模式</div>
+                  <div class="text-sm text-fg-1">{{ $t('settings.writeMode') }}</div>
                   <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                    先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里
-                    Approve 或 Reject。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、
-                    如何提交由你在 Git 面板自行决定。
+                    {{ $t('settings.writeModeDesc') }}
                   </div>
                   <select v-model="store.state.writeMode" class="input mt-2.5">
-                    <option value="auto">直接写入（事后审查）</option>
-                    <option value="ask">先询问（每次批准）</option>
+                    <option value="auto">{{ $t('settings.writeAuto') }}</option>
+                    <option value="ask">{{ $t('settings.writeAsk') }}</option>
                   </select>
                 </div>
               </div>
@@ -468,10 +485,9 @@ function slotBadges(p: LlmProfile): string[] {
                 <div class="px-3 py-3">
                   <div class="flex items-center justify-between gap-4">
                     <div class="min-w-0">
-                      <div class="text-sm text-fg-1">多标签页会话</div>
+                      <div class="text-sm text-fg-1">{{ $t('settings.multiTab') }}</div>
                       <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                        允许 agent 面板同时开多个会话标签；关闭时最多一个会话。运行中的会话，切换标签或
-                        关闭它的标签都不会中断——只有输入框的 stop 按钮、删除会话或关闭网页才会停止。
+                        {{ $t('settings.multiTabDesc') }}
                       </div>
                     </div>
                     <button
@@ -492,7 +508,7 @@ function slotBadges(p: LlmProfile): string[] {
                     v-if="store.state.agentMultiTab"
                     class="mt-3 flex items-center justify-between gap-4 border-t border-border pt-3"
                   >
-                    <div class="text-sm text-fg-1">最多标签数</div>
+                    <div class="text-sm text-fg-1">{{ $t('settings.maxTabs') }}</div>
                     <select v-model.number="store.state.agentMaxTabs" class="input w-24">
                       <option v-for="n in [2, 3, 4, 5, 6, 7, 8]" :key="n" :value="n">{{ n }}</option>
                     </select>
@@ -504,9 +520,9 @@ function slotBadges(p: LlmProfile): string[] {
             <!-- ▸ Hotkeys -->
             <div v-else-if="section === 'hotkeys'" class="space-y-4">
               <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wide text-fg-3">键盘快捷键</span>
+                <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.hotkeysHeading') }}</span>
                 <button class="text-xs text-accent hover:underline" @click="resetAllHotkeys">
-                  恢复默认
+                  {{ $t('settings.resetDefaults') }}
                 </button>
               </div>
               <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
@@ -528,15 +544,15 @@ function slotBadges(p: LlmProfile): string[] {
                         ? 'border-accent text-accent bg-accent/10'
                         : 'border-border text-fg-1 hover:bg-bg-2'
                     "
-                    :title="recordingId === def.id ? '按下新组合键，Esc 取消' : '点击后录制新键位'"
+                    :title="recordingId === def.id ? $t('settings.recordingHint') : $t('settings.recordHint')"
                     @click="startRecording(def.id)"
                   >
-                    {{ recordingId === def.id ? '录制中…' : formatBinding(effectiveBinding(def)) }}
+                    {{ recordingId === def.id ? $t('settings.recording') : formatBinding(effectiveBinding(def)) }}
                   </button>
                   <button
                     class="shrink-0 text-fg-3 hover:text-fg-0 transition-colors"
                     :class="{ 'opacity-25 pointer-events-none': !isOverridden(def.id) }"
-                    title="重置为默认"
+                    :title="$t('settings.resetOne')"
                     @click="resetHotkey(def.id)"
                   >
                     <span class="codicon codicon-sm codicon-discard" />
@@ -545,18 +561,16 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
               <p v-if="hotkeyError" class="text-xs text-removed">{{ hotkeyError }}</p>
               <p class="text-xs text-fg-3 leading-relaxed">
-                点击右侧键位后按下新组合键（需含 ⌘/Ctrl）。⌘N、⌘M、⌘` 等被浏览器或系统占用时，改用
-                ⌥⌘N、⌥⌘M、⌃` 触发同一命令。改动即时保存。
+                {{ $t('settings.hotkeysHelp') }}
               </p>
             </div>
 
             <!-- ▸ KB health scope -->
             <div v-else-if="section === 'health'" class="space-y-4">
               <div>
-                <span class="text-xs uppercase tracking-wide text-fg-3">检测范围</span>
+                <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.healthScope') }}</span>
                 <p class="mt-1 text-xs text-fg-3 leading-relaxed">
-                  KB 健康检查（断链、孤立页）扫描哪些目录。默认检测整个知识库；也可只选某些顶层目录，
-                  比如只查 wiki/、忽略 raw/ 里的对话记录。
+                  {{ $t('settings.healthDesc') }}
                 </p>
               </div>
               <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
@@ -572,7 +586,7 @@ function slotBadges(p: LlmProfile): string[] {
                         : 'codicon-circle-large-outline text-fg-3'
                     "
                   />
-                  <span class="text-fg-1">全部目录</span>
+                  <span class="text-fg-1">{{ $t('settings.allDirs') }}</span>
                 </button>
                 <button
                   v-for="d in kbDirs"
@@ -591,7 +605,7 @@ function slotBadges(p: LlmProfile): string[] {
                   <span class="font-mono text-xs text-fg-1">{{ d }}/</span>
                 </button>
               </div>
-              <p v-if="!kbDirs.length" class="text-xs text-fg-3">此知识库暂无子目录。</p>
+              <p v-if="!kbDirs.length" class="text-xs text-fg-3">{{ $t('settings.noSubdirs') }}</p>
             </div>
 
             <!-- ▸ External tools (MCP) -->
@@ -600,10 +614,9 @@ function slotBadges(p: LlmProfile): string[] {
               <div class="rounded-lg border border-border overflow-hidden">
                 <div class="px-3 py-3 flex items-center justify-between gap-4">
                   <div class="min-w-0">
-                    <div class="text-sm text-fg-1">内置网页工具 (Jina AI Reader)</div>
+                    <div class="text-sm text-fg-1">{{ $t('settings.jinaTitle') }}</div>
                     <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                      给 agent 提供 web_search / web_fetch，免 key、无需扩展。优先使用下方连接的浏览器
-                      扩展（能带上你的登录态）；扩展不可用时回退到它。关闭后，未连接扩展时 agent 将没有联网能力。
+                      {{ $t('settings.jinaDesc') }}
                     </div>
                   </div>
                   <button
@@ -623,8 +636,8 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
 
               <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wide text-fg-3">已连接的服务器</span>
-                <button class="text-xs text-accent hover:underline" @click="mcp.refresh()">重连</button>
+                <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectedServers') }}</span>
+                <button class="text-xs text-accent hover:underline" @click="mcp.refresh()">{{ $t('settings.reconnect') }}</button>
               </div>
               <div v-if="mcp.servers.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
                 <div
@@ -637,7 +650,7 @@ function slotBadges(p: LlmProfile): string[] {
                   <span
                     v-if="s.source === 'kb'"
                     class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
-                    title="来自知识库的 .agents/mcp.json — 编辑该文件修改"
+                    :title="$t('settings.kbServerTitle')"
                   >KB</span>
                   <span class="text-fg-3 truncate flex-1" :title="s.config.url">
                     {{ mcpStatusLabel(s).label }}
@@ -646,14 +659,14 @@ function slotBadges(p: LlmProfile): string[] {
                     <button
                       class="shrink-0"
                       :class="editMcpId === s.config.id ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
-                      title="编辑"
+                      :title="$t('common.edit')"
                       @click="startEditMcp(s.config)"
                     >
                       <span class="codicon codicon-sm codicon-edit" />
                     </button>
                     <button
                       class="text-fg-3 hover:text-fg-0 shrink-0"
-                      :title="s.config.enabled === false ? '启用' : '停用(保留配置)'"
+                      :title="s.config.enabled === false ? $t('settings.enable') : $t('settings.disable')"
                       @click="toggleMcpServer(s.config.id)"
                     >
                       <span
@@ -661,51 +674,48 @@ function slotBadges(p: LlmProfile): string[] {
                         :class="s.config.enabled === false ? 'codicon-circle-slash' : 'codicon-pass'"
                       />
                     </button>
-                    <button class="text-fg-3 hover:text-removed shrink-0" title="删除" @click="removeMcpServer(s.config.id)">
+                    <button class="text-fg-3 hover:text-removed shrink-0" :title="$t('common.delete')" @click="removeMcpServer(s.config.id)">
                       <span class="codicon codicon-sm codicon-trash" />
                     </button>
                   </template>
                 </div>
               </div>
-              <div v-else class="text-sm text-fg-3">还没有全局工具服务器。</div>
+              <div v-else class="text-sm text-fg-3">{{ $t('settings.noGlobalServers') }}</div>
 
               <div>
                 <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent mb-1.5">
                   <span class="codicon codicon-sm codicon-edit" />
-                  正在编辑「{{ mcpName || 'server' }}」
+                  {{ $t('settings.editingServer', { name: mcpName || 'server' }) }}
                 </div>
                 <div class="space-y-2">
-                  <input v-model="mcpName" class="input text-xs" placeholder="名称" />
-                  <input v-model="mcpUrl" class="input text-xs" placeholder="https://…/mcp 或 Chrome 扩展 ID" />
-                  <input v-model="mcpToken" type="password" class="input text-xs" placeholder="token(可选)" autocomplete="off" />
+                  <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
+                  <input v-model="mcpUrl" class="input text-xs" :placeholder="$t('settings.urlPlaceholder')" />
+                  <input v-model="mcpToken" type="password" class="input text-xs" :placeholder="$t('settings.tokenPlaceholder')" autocomplete="off" />
                   <div class="flex gap-2 pt-0.5">
                     <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
-                      {{ editMcpId ? '保存' : '添加' }}
+                      {{ editMcpId ? $t('common.save') : $t('common.add') }}
                     </button>
-                    <button v-if="editMcpId" class="btn text-xs" @click="resetMcpForm">取消</button>
+                    <button v-if="editMcpId" class="btn text-xs" @click="resetMcpForm">{{ $t('common.cancel') }}</button>
                   </div>
                 </div>
               </div>
               <p class="text-xs text-fg-3 leading-relaxed">
-                服务器必须允许浏览器 CORS;URL 栏填 32 位 Chrome 扩展 ID 则走扩展桥接。这里是
-                全局配置;知识库还可以自带 <code>.agents/mcp.json</code>(随 git 走,重复目标以
-                KB 为准,token 建议只放这里不放文件)。工具以 mcp__名称__工具 出现在 agent
-                工具列表;外部工具的结果按不可信数据处理。
+                {{ $t('settings.toolsHelp') }}
               </p>
             </div>
 
             <!-- ▸ Git & GitHub -->
             <div v-else-if="section === 'git'" class="space-y-4 max-w-md">
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 作者名</label>
-                <input v-model="store.state.gitName" class="input" placeholder="（默认读仓库 git config）" />
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.commitAuthor') }}</label>
+                <input v-model="store.state.gitName" class="input" :placeholder="$t('settings.commitAuthorPlaceholder')" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Commit 邮箱</label>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.commitEmail') }}</label>
                 <input v-model="store.state.gitEmail" class="input" placeholder="you@example.com" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">GitHub Token（push 需要；pull 公开仓库可不填）</label>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.githubToken') }}</label>
                 <input
                   v-model="store.state.githubToken"
                   type="password"
@@ -720,10 +730,7 @@ function slotBadges(p: LlmProfile): string[] {
                   target="_blank"
                   rel="noopener"
                   class="text-accent hover:underline"
-                >点这里创建 Fine-grained token ↗</a>：Repository access 选 Only select
-                repositories（只勾知识库仓库），Permissions → Contents 设为 Read and
-                write，生成后把 <code>github_pat_…</code> 粘贴到上面。详细步骤见 README「Git 与
-                GitHub 同步」。同步 fast-forward-only，冲突时回终端处理。
+                >{{ $t('settings.githubTokenLink') }}</a>{{ $t('settings.githubHelp') }}
               </p>
             </div>
           </div>

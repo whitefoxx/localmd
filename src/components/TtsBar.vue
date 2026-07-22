@@ -17,25 +17,25 @@ const settings = useSettingsStore()
       v-if="tts.playing"
       class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-bg-1 px-3 py-2 shadow-xl"
     >
-      <button class="btn text-xs" :title="tts.paused ? '继续' : '暂停'" @click="tts.toggle()">
+      <button class="btn text-xs" :title="tts.paused ? $t('tts.resume') : $t('tts.pause')" @click="tts.toggle()">
         <span class="codicon codicon-sm" :class="tts.paused ? 'codicon-play' : 'codicon-debug-pause'" />
       </button>
-      <button class="btn text-xs" title="停止朗读" @click="tts.stop()">
+      <button class="btn text-xs" :title="$t('tts.stop')" @click="tts.stop()">
         <span class="codicon codicon-sm codicon-debug-stop" />
       </button>
       <span v-if="tts.title" class="text-xs text-fg-2 max-w-[160px] truncate" :title="tts.title">
         {{ tts.title }}
       </span>
-      <select v-model="settings.state.ttsVoice" class="input text-xs !w-auto py-0.5" title="音色">
-        <option value="">自动 · 按语言</option>
-        <optgroup v-if="tts.googleVoices.length" label="Google · 在线">
+      <select v-model="settings.state.ttsVoice" class="input text-xs !w-auto py-0.5" :title="$t('tts.voice')">
+        <option value="">{{ $t('tts.voiceAuto') }}</option>
+        <optgroup v-if="tts.googleVoices.length" :label="$t('tts.groupGoogleOnline')">
           <option v-for="v in tts.googleVoices" :key="v.name" :value="v.name">
             {{ v.name.replace(/^Google\s*/, '') }} · {{ v.lang }}
           </option>
         </optgroup>
         <!-- Local system voices: offline-capable, zero-wait where Google is
              unreachable (e.g. mainland China). -->
-        <optgroup v-if="tts.localVoices.length" label="本地 · 离线">
+        <optgroup v-if="tts.localVoices.length" :label="$t('tts.groupLocalOffline')">
           <option v-for="v in tts.localVoices" :key="v.name" :value="v.name">
             {{ v.name }} · {{ v.lang }}
           </option>
@@ -44,7 +44,7 @@ const settings = useSettingsStore()
       <select
         v-model.number="settings.state.ttsRate"
         class="input text-xs !w-auto py-0.5"
-        title="语速"
+        :title="$t('tts.rate')"
       >
         <option :value="0.75">0.75×</option>
         <option :value="1">1×</option>

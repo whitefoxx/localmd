@@ -37,7 +37,7 @@ export async function moveEntry(source: string, isDir: boolean, targetDir: strin
   if (isDir && (targetDir === source || targetDir.startsWith(`${source}/`))) return
   const dest = targetDir ? `${targetDir}/${name}` : name
   if (await fs.exists(dest)) {
-    window.alert(`"${targetDir || 'KB 根目录'}" 下已存在 ${name},移动已取消`)
+    window.alert(`${name} already exists under "${targetDir || 'KB root'}"; move cancelled`)
     return
   }
   await files.renameEntry(source, dest, isDir)

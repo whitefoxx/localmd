@@ -5,85 +5,85 @@
  */
 import * as fs from '@/lib/fs'
 
-const AGENTS_MD = `# 知识库说明(AGENTS.md)
+const AGENTS_MD = `# Knowledge base guide (AGENTS.md)
 
-这是一个 LLM 维护的个人知识库。agent 在这里工作时遵循以下约定。
+This is a personal knowledge base maintained by an LLM. Agents working here follow the conventions below.
 
-## 结构
+## Structure
 
 \`\`\`
-raw/    ← 不可变的源文件(文章、书、图片、数据)。只读,不要修改
-raw/conversations/ ← 保存下来的会话记录(type: chat),就是普通 md 文件(保存位置可自选)。蒸馏时把讨论里的结论提炼进 wiki
-wiki/   ← LLM 维护的 markdown 页面。用 [[wikilinks]] 互相链接
-wiki/index.md ← 入口页,新页面要从这里可达
-.agents/skills/ ← 可复用的工作流(SKILL.md)
-MEMORY.md ← 跨会话的持久记忆(用户偏好、项目状态、重要决策)。可选:用户自己写,或让 agent 记录/更新;不主动自动总结
+raw/    ← Immutable source files (articles, books, images, data). Read-only, do not modify
+raw/conversations/ ← Saved conversation records (type: chat), just plain md files (store them wherever you like). When harvesting, distill the conclusions from the discussion into the wiki
+wiki/   ← Markdown pages maintained by the LLM. Link them to each other with [[wikilinks]]
+wiki/index.md ← Entry page; every new page must be reachable from here
+.agents/skills/ ← Reusable workflows (SKILL.md)
+MEMORY.md ← Persistent memory across sessions (user preferences, project state, important decisions). Optional: the user can write it themselves, or have the agent record/update it; never auto-summarize on your own
 \`\`\`
 
-## 规则
+## Rules
 
-- raw/ 是事实来源:ingest 时读取它,写作只发生在 wiki/
-- 每个 wiki 页面聚焦一个主题;宁可多建小页面 + 链接,不要堆大杂烩
-- 引用来源:从 PDF/EPUB 得出的结论用 [[N:block-id]] 引用标注
-- 修改前先读原文件;编辑保持最小化
+- raw/ is the source of truth: read it when you ingest, but only ever write to wiki/
+- Each wiki page focuses on a single topic; prefer many small linked pages over one catch-all page
+- Cite your sources: annotate conclusions drawn from a PDF/EPUB with a [[N:block-id]] reference
+- Read the original file before changing it; keep edits minimal
 `
 
-const INDEX_MD = `# 索引
+const INDEX_MD = `# Index
 
-欢迎!这是知识库的入口页。
+Welcome! This is the entry page for your knowledge base.
 
-## 开始使用
+## Getting started
 
-1. 把文章 / PDF / EPUB 拖进窗口,或在聊天框粘贴截图——会自动归档到 \`raw/\`
-2. 对右侧 agent 说 \`/ingest\`,它会阅读源文件并生成 wiki 页面
-3. 用 \`/lint\` 检查知识库健康度
+1. Drag an article / PDF / EPUB into the window, or paste a screenshot into the chat box — it's filed automatically under \`raw/\`
+2. Tell the agent on the right \`/ingest\` and it will read the source files and generate wiki pages
+3. Run \`/lint\` to check the health of the knowledge base
 
-## 页面
+## Pages
 
-(暂无 — ingest 后 agent 会把新页面链接到这里)
+(None yet — after ingesting, the agent will link new pages here)
 `
 
 const SKILL_INGEST = `---
 name: ingest
-description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并链接索引
+description: Process not-yet-ingested source files under raw/, generate or update wiki pages, and link them into the index
 ---
 
-# Ingest 流程
+# Ingest workflow
 
-1. 列出 raw/ 下的源文件,对照 wiki/ 找出尚未处理的。
-2. 逐个阅读(PDF/EPUB 走索引),为每个源创建或更新 wiki 页面,遵循 AGENTS.md 的约定。
-3. 新页面用 [[wikilinks]] 链入 wiki/index.md。
-4. 汇报:处理了哪些、跳过了哪些(及原因)。
+1. List the source files under raw/ and compare against wiki/ to find the ones not yet processed.
+2. Read them one by one (use the index for PDF/EPUB), creating or updating a wiki page for each source, following the conventions in AGENTS.md.
+3. Link new pages into wiki/index.md with [[wikilinks]].
+4. Report: what you processed, and what you skipped (and why).
 `
 
 const SKILL_LINT = `---
 name: lint
-description: 检查知识库健康度——孤儿页、断链、缺失索引项、内容矛盾
+description: Check the health of the knowledge base — orphan pages, broken links, missing index entries, contradictory content
 ---
 
-# Lint 流程
+# Lint workflow
 
-1. 遍历 wiki/ 全部页面,收集 [[wikilinks]]。
-2. 找出:孤儿页(无入链)、断链(目标不存在)、index.md 缺失的页面。
-3. 抽查内容矛盾(同一事实在不同页面说法不一)。
-4. 先列出全部问题再动手修;修复需逐项说明。
+1. Walk every page under wiki/ and collect the [[wikilinks]].
+2. Find: orphan pages (no inbound links), broken links (target doesn't exist), and pages missing from index.md.
+3. Spot-check for contradictory content (the same fact stated differently across pages).
+4. List all the problems first, then fix them; explain each fix as you make it.
 `
 
 const SKILL_HARVEST = `---
 name: harvest
-description: 蒸馏一段讨论——把其中的结论、决策、想法提炼进 wiki 笔记
+description: Distill a discussion — pull its conclusions, decisions, and ideas into wiki notes
 ---
 
-# Harvest 流程
+# Harvest workflow
 
-对象:一段讨论。可以是**当前对话**的内容,也可以是用户 @ 指定的任意文件(比如之前保存的会话文件——当普通文件处理即可,无需特殊对待)。
+Subject: a discussion. This can be the **current conversation**, or any file the user @-mentions (for example a previously saved conversation file — just treat it as an ordinary file, no special handling needed).
 
-1. 通读要蒸馏的内容,提炼值得留存的结论、决策、想法——是提炼,不是复述对话。
-2. 按主题合并进 wiki 已有页面(优先),必要时新建页面并链入索引。
-3. 若来源是 KB 里的文件,在写入的笔记里用 [[链接]] 指回来源,方便日后复核。
-4. 汇报:蒸馏出了什么、写进了哪里、跳过了什么。
+1. Read through the material to be distilled and extract the conclusions, decisions, and ideas worth keeping — this is distillation, not a transcript of the conversation.
+2. Merge into existing wiki pages by topic (preferred), creating a new page and linking it into the index only when necessary.
+3. If the source is a file in the KB, add a [[link]] back to it in the notes you write, so it's easy to re-check later.
+4. Report: what you distilled, where you wrote it, and what you skipped.
 
-没有值得蒸馏的内容也是正常结果,如实说明即可。
+Finding nothing worth distilling is a perfectly normal outcome — just say so.
 `
 
 const FILES: Array<[string, string]> = [

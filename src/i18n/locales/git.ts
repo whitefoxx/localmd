@@ -1,0 +1,41 @@
+/** Git panel: changes, commit, diff, log, sync. Namespace: `git`. */
+export default {
+  en: {
+    pull: 'Pull',
+    push: 'Push',
+    refresh: 'Refresh',
+    changes: 'Changes ({n})',
+    noChanges:
+      'No changes. (.trace/ is excluded; content changes in tracked binaries can\'t be detected — commit those from the terminal.)',
+    binary: 'bin',
+    binaryTitle: 'Binary file',
+    oversizedTitle: 'Over 100MB — commit from the terminal',
+    oversizedCheckbox: 'Over 100MB (GitHub API push limit) — commit from the terminal',
+    commitPlaceholder: 'Commit message',
+    commitN: 'Commit {n} file(s)',
+    diffVsHead: 'diff vs HEAD',
+    binaryNoDiff: '(binary file, no text diff)',
+    unchangedLines: '⋯ {n} unchanged lines ⋯',
+    recentCommits: 'Recent commits',
+    noCommits: 'No commits yet',
+  },
+  zh: {
+    pull: 'Pull',
+    push: 'Push',
+    refresh: '刷新',
+    changes: '改动（{n}）',
+    noChanges:
+      '没有改动。（.trace/ 不参与；tracked 二进制的内容改动无法检测，如有请在终端提交）',
+    binary: 'bin',
+    binaryTitle: '二进制文件',
+    oversizedTitle: '超过 100MB，请在终端提交',
+    oversizedCheckbox: '超过 100MB（GitHub API 推送上限），请在终端提交',
+    commitPlaceholder: 'Commit message',
+    commitN: 'Commit {n} 个文件',
+    diffVsHead: 'diff vs HEAD',
+    binaryNoDiff: '（二进制文件，无文本 diff）',
+    unchangedLines: '⋯ 未变动的 {n} 行 ⋯',
+    recentCommits: '最近提交',
+    noCommits: '还没有提交',
+  },
+}

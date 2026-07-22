@@ -93,14 +93,14 @@ function onKey(e: KeyboardEvent): void {
       >
         <button
           class="absolute top-2.5 right-2.5 w-6 h-6 rounded flex items-center justify-center text-fg-3 hover:text-fg-1 hover:bg-bg-2"
-          title="关闭"
+          :title="$t('common.close')"
           @click="tryClose"
         >
           <span class="codicon codicon-sm codicon-close" />
         </button>
         <div class="flex items-center gap-2 px-4 py-3 border-b border-border">
           <span class="codicon codicon-sm codicon-note text-fg-3" />
-          <span class="text-sm font-medium text-fg-1">笔记</span>
+          <span class="text-sm font-medium text-fg-1">{{ $t('note.title') }}</span>
         </div>
 
         <div class="p-4 flex flex-col gap-3">
@@ -116,14 +116,14 @@ function onKey(e: KeyboardEvent): void {
               v-model="draft"
               rows="4"
               class="w-full text-sm bg-bg-2 rounded px-2 py-1.5 pr-10 outline-none focus:ring-1 focus:ring-accent resize-y"
-              placeholder="写点想法…(⌘↵ 保存)"
+              :placeholder="$t('note.placeholder')"
               @keydown.enter.meta.prevent="saveText"
               @keydown.enter.ctrl.prevent="saveText"
             />
             <button
               v-if="dirty"
               class="absolute bottom-2.5 right-2 w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center shadow hover:opacity-90"
-              title="保存笔记 (⌘↵)"
+              :title="$t('note.saveNote')"
               @click="saveText"
             >
               <span class="codicon codicon-sm codicon-check" />
@@ -142,13 +142,13 @@ function onKey(e: KeyboardEvent): void {
                   : 'border-border'
               "
               :style="{ backgroundColor: c.value }"
-              :title="`高亮 ${c.name}`"
+              :title="$t('note.highlight', { name: c.name })"
               @click="pick(c.value)"
             />
             <span class="w-px h-4 bg-border mx-0.5" />
             <button
               class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
-              title="朗读选中"
+              :title="$t('note.readSelection')"
               @click="emit('read')"
             >
               <span class="codicon codicon-sm codicon-unmute" />
@@ -156,7 +156,7 @@ function onKey(e: KeyboardEvent): void {
             <button
               class="w-6 h-5 rounded flex items-center justify-center leading-none hover:text-fg-1"
               :class="localStyle === 'underline' ? 'text-fg-1' : 'text-fg-3'"
-              title="下划线"
+              :title="$t('note.underline')"
               @click="chooseUnderline"
             >
               <span
@@ -167,7 +167,7 @@ function onKey(e: KeyboardEvent): void {
             <span class="flex-1" />
             <button
               class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:!text-removed"
-              title="删除整条标注"
+              :title="$t('note.deleteMark')"
               @click="emit('delete')"
             >
               <span class="codicon codicon-sm codicon-trash" />
@@ -179,9 +179,9 @@ function onKey(e: KeyboardEvent): void {
             v-if="confirming"
             class="flex items-center gap-2 text-xs text-fg-2 border-t border-border pt-3"
           >
-            <span class="flex-1">笔记尚未保存,确定关闭?</span>
-            <button class="btn text-xs" @click="emit('close')">放弃</button>
-            <button class="btn-primary text-xs" @click="confirming = false">继续编辑</button>
+            <span class="flex-1">{{ $t('note.unsavedPrompt') }}</span>
+            <button class="btn text-xs" @click="emit('close')">{{ $t('note.discard') }}</button>
+            <button class="btn-primary text-xs" @click="confirming = false">{{ $t('note.keepEditing') }}</button>
           </div>
         </div>
       </div>

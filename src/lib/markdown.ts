@@ -65,7 +65,7 @@ const LANG_ALIASES: Record<string, string> = {
 // A hover copy button in the corner of every rendered code block. The click is
 // handled by a delegated listener (handleCodeCopy) on the preview container.
 const CODE_COPY_BTN =
-  '<button class="code-copy" type="button" title="复制" aria-label="复制代码"><span class="codicon codicon-copy"></span></button>'
+  '<button class="code-copy" type="button" title="Copy" aria-label="Copy code"><span class="codicon codicon-copy"></span></button>'
 
 function wrapCodeBlock(pre: string): string {
   return `<div class="code-block">${CODE_COPY_BTN}${pre}</div>`

@@ -196,7 +196,7 @@ const createArtifact = defineTool({
   description:
     'Create a self-contained interactive HTML artifact (a study guide, learning path, roadmap, interactive explainer, diagram, etc.) saved under artifacts/. The user opens it in a sandboxed viewer. Requirements: return a COMPLETE standalone HTML document (start with <!doctype html>), inline ALL CSS and JS, no external network/CDN dependencies (it must work fully offline and runs sandboxed with no access to the app). Use it when the user wants a rich, interactive, or visually structured deliverable that plain markdown cannot express; otherwise prefer write_file.',
   schema: z.object({
-    title: z.string().describe('Short human title, e.g. "机器学习学习路径"'),
+    title: z.string().describe('Short human title, e.g. "Machine Learning Study Path"'),
     html: z.string().describe('The complete standalone HTML document'),
   }),
   describeCall: (a) => `artifact: ${a.title}`,
@@ -376,7 +376,7 @@ async function lockedGit(fn: () => Promise<string>): Promise<string> {
     return await withGitLock(fn, { timeoutMs: 15_000 })
   } catch (err) {
     if (err instanceof GitBusyError) {
-      return 'Error: 另一个会话正在执行 git 操作(commit/sync),稍后重试。请告知用户当前 git 被占用。'
+      return 'Error: another session is running a git operation (commit/sync); retry shortly. Tell the user that git is currently busy.'
     }
     throw err
   }
@@ -513,7 +513,7 @@ const gitPush = defineTool({
     const ctx = await githubContext()
     if (typeof ctx === 'string') return ctx
     if (!ctx.token) {
-      return 'Error: push requires a GitHub token — ask the user to add one in Settings → Git & GitHub (the README has a step-by-step guide under "获取 GitHub Token").'
+      return 'Error: push requires a GitHub token — ask the user to add one in Settings → Git & GitHub (the README has a step-by-step guide under "Getting a GitHub Token").'
     }
     try {
       const summary = await ghPush(ctx)
@@ -562,7 +562,7 @@ type McpTool = ReturnType<ReturnType<typeof useMcpStore>['activeToolsFor']>[numb
 function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): ExternalToolSpec {
   return {
     name: t.qualifiedName,
-    description: `[外部 MCP:${t.serverName}] ${t.def.description}`.slice(0, 1024),
+    description: `[External MCP: ${t.serverName}] ${t.def.description}`.slice(0, 1024),
     jsonSchema: t.def.inputSchema,
     describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
     run: async (args) => {

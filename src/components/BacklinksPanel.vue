@@ -28,7 +28,7 @@ watch(
         class="codicon codicon-sm"
         :class="expanded ? 'codicon-chevron-down' : 'codicon-chevron-right'"
       />
-      Backlinks ({{ links.length }})
+      {{ $t('backlinks.heading', { n: links.length }) }}
     </button>
     <div v-if="expanded" class="pb-2 overflow-auto panel-scroll min-h-0">
       <button
@@ -39,7 +39,7 @@ watch(
       >
         {{ p }}
       </button>
-      <div v-if="!links.length" class="pl-6 pr-2 text-xs text-fg-3">No backlinks</div>
+      <div v-if="!links.length" class="pl-6 pr-2 text-xs text-fg-3">{{ $t('backlinks.empty') }}</div>
     </div>
   </div>
 </template>

@@ -8,6 +8,7 @@ import { splitFrontmatter } from '@/lib/wiki'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
 import { useTtsHighlight } from '@/composables/useTtsHighlight'
+import { t } from '@/i18n'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
@@ -65,7 +66,7 @@ async function onClick(e: MouseEvent): Promise<void> {
     } else if (a.dataset.target) {
       // Broken link: create the page under wiki/ and open it in edit mode.
       const target = a.dataset.target
-      if (confirm(`Page “${target}” does not exist. Create it under wiki/?`)) {
+      if (confirm(t('viewers.markdown.createPagePrompt', { target }))) {
         await files.createFile(`wiki/${target}.md`, `# ${target}\n\n`)
       }
     }

@@ -73,7 +73,7 @@ export type MessagePart =
  *  preview in the transcript so persisted sessions don't balloon. */
 function capToolResult(s: string): string {
   const MAX = 4000
-  return s.length > MAX ? `${s.slice(0, MAX)}\n… (+${s.length - MAX} 字符已截断)` : s
+  return s.length > MAX ? `${s.slice(0, MAX)}\n… (+${s.length - MAX} characters truncated)` : s
 }
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
@@ -451,24 +451,24 @@ export const useChatStore = defineStore('chat', () => {
     let out = trimmed
     const uploaded = attachments.filter((a) => !a.image).map((a) => a.path)
     if (uploaded.length) {
-      out += `\n\n[用户随消息上传了文件(已保存到知识库): ${uploaded.join(', ')} — 用 read_file 查看内容]`
+      out += `\n\n[The user uploaded files with this message (saved to the KB): ${uploaded.join(', ')} — use read_file to view their contents]`
     }
     if (imagePaths.length) {
       if (imagesTravelInline) {
-        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')}]`
+        out += `\n\n[Images attached to this message (saved to the KB): ${imagePaths.join(', ')}]`
       } else if (visionAvailable) {
-        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')} — 用 view_image 工具查看内容]`
+        out += `\n\n[Images attached to this message (saved to the KB): ${imagePaths.join(', ')} — use the view_image tool to see their contents]`
       } else {
-        out += `\n\n[消息附带图片(已保存到知识库): ${imagePaths.join(', ')} — 当前未配置视觉模型,无法查看图片内容,如需可提示用户在设置里配置]`
+        out += `\n\n[Images attached to this message (saved to the KB): ${imagePaths.join(', ')} — no vision model is currently configured, so the image contents can't be viewed; you may suggest the user configure one in Settings]`
       }
     }
-    // What the user is looking at right now — lets "总结这个文件" work
+    // What the user is looking at right now — lets "summarize this file" work
     // without an explicit @-mention.
     const files = useFilesStore()
     const viewing = files.currentPath
     if (viewing) {
       const page = fileKind(viewing) === 'pdf' ? pdfPage.get(viewing) : undefined
-      out += `\n\n[用户当前正在查看: ${viewing}${page ? ` (第 ${page} 页)` : ''}]`
+      out += `\n\n[The user is currently viewing: ${viewing}${page ? ` (page ${page})` : ''}]`
     }
     const textMentions = mentioned.filter((p) => !imagePaths.includes(p))
     if (textMentions.length) {
@@ -476,7 +476,7 @@ export const useChatStore = defineStore('chat', () => {
       for (const p of textMentions) {
         const kind = fileKind(p)
         if (kind === 'pdf' || kind === 'epub') {
-          blocks.push(`@${p}: ${kind.toUpperCase()} 文档 — 通过 read_file 走结构化索引读取。`)
+          blocks.push(`@${p}: ${kind.toUpperCase()} document — read it via read_file through the structured index.`)
           continue
         }
         if (isAnnotationsPath(p)) {
@@ -484,17 +484,17 @@ export const useChatStore = defineStore('chat', () => {
           const raw = await fs.tryReadFile(p)
           const digest = raw !== null ? renderAnnotationsDigest(p, raw) : null
           if (digest) {
-            blocks.push(`@${p} 的内容(标注渲染视图):\n${digest}`)
+            blocks.push(`@${p} contents (rendered annotations view):\n${digest}`)
             continue
           }
         }
         const content = await fs.tryReadFile(p)
         if (content === null) {
-          blocks.push(`@${p}: (文件不存在)`)
+          blocks.push(`@${p}: (file does not exist)`)
         } else if (content.length <= INLINE_MENTION_CHARS) {
-          blocks.push(`@${p} 的内容:\n\`\`\`\n${content}\n\`\`\``)
+          blocks.push(`@${p} contents:\n\`\`\`\n${content}\n\`\`\``)
         } else {
-          blocks.push(`@${p}: 文件较大(${content.length} 字符) — 用 read_file 读取。`)
+          blocks.push(`@${p}: file is large (${content.length} characters) — use read_file to read it.`)
         }
       }
       out += `\n\n<referenced_files>\n${blocks.join('\n\n')}\n</referenced_files>`
@@ -504,8 +504,8 @@ export const useChatStore = defineStore('chat', () => {
     if (selections.length) {
       const blocks = selections.map((s) =>
         s.file
-          ? `从文件 ${s.file} 中选中的内容:\n\`\`\`\n${s.text}\n\`\`\``
-          : `引用你之前回复中的一段内容:\n\`\`\`\n${s.text}\n\`\`\``,
+          ? `Content selected from file ${s.file}:\n\`\`\`\n${s.text}\n\`\`\``
+          : `A passage quoted from an earlier reply of yours:\n\`\`\`\n${s.text}\n\`\`\``,
       )
       out += `\n\n<selected_context>\n${blocks.join('\n\n')}\n</selected_context>`
     }
@@ -721,7 +721,7 @@ export const useChatStore = defineStore('chat', () => {
         if (estimateChars(hist) > COMPACT_AT_CHARS) {
           const split = splitForCompaction(hist)
           if (split) {
-            onEvent({ type: 'tool', name: 'compact', detail: '历史过长,压缩上下文…' })
+            onEvent({ type: 'tool', name: 'compact', detail: 'History too long, compacting context…' })
             try {
               const summary = await summarizeHistory(
                 primary,
