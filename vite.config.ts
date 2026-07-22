@@ -30,5 +30,14 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    // MarkdownEditor pulls in @codemirror/language-data, which *dynamically*
+    // imports individual @codemirror/lang-* packages the first time a file of
+    // that type is opened. In dev, Vite's pre-bundler would optimize that lazy
+    // package on its own and give it a second copy of @codemirror/state — then
+    // `instanceof` checks fail with "Unrecognized extension value ... multiple
+    // instances of @codemirror/state" and the editor's mounted hook throws.
+    // Forcing a single instance of state (and view) keeps every extension on the
+    // same class. (Prod builds are unaffected — Rollup bundles them together.)
+    dedupe: ['@codemirror/state', '@codemirror/view'],
   },
 })
