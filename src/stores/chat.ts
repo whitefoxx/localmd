@@ -14,6 +14,7 @@ import { extractMentions } from '@/lib/mentions'
 import {
   trimHistory,
   estimateChars,
+  TRIM_AT_CHARS,
   COMPACT_AT_CHARS,
   splitForCompaction,
   renderTranscript,
@@ -87,6 +88,8 @@ export interface TokenUsage {
   input: number
   output: number
   cacheRead: number
+  /** Optional: sessions persisted before cache-write tracking lack it. */
+  cacheWrite?: number
 }
 
 export interface UiMessage {
@@ -650,10 +653,11 @@ export const useChatStore = defineStore('chat', () => {
         if (last?.type === 'thinking') last.text += e.delta
         else parts.push({ type: 'thinking', text: e.delta, startedAt: Date.now() })
       } else if (e.type === 'usage') {
-        const u = (assistant.usage ??= { input: 0, output: 0, cacheRead: 0 })
+        const u = (assistant.usage ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 })
         u.input += e.input
         u.output += e.output
         u.cacheRead += e.cacheRead
+        u.cacheWrite = (u.cacheWrite ?? 0) + e.cacheWrite
       } else if (e.type === 'tool_result') {
         const p = parts.find((x): x is Extract<MessagePart, { type: 'tool' }> =>
           x.type === 'tool' && x.id === e.id,
@@ -698,7 +702,7 @@ export const useChatStore = defineStore('chat', () => {
     const controller = new AbortController()
     controllers.set(session.id, controller)
     try {
-      const system = await buildSystemPrompt(session.id)
+      const system = await buildSystemPrompt()
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
@@ -708,15 +712,20 @@ export const useChatStore = defineStore('chat', () => {
         ]
         session.history = hist
         session.history = await runMockTurn({
-          system,
+          system: `${system.stable}\n\n${system.dynamic}`,
           messages: [...hist],
           sessionId: session.id,
           onEvent,
           signal: controller.signal,
         })
       } else {
-        // Old turns' large tool results/images become stubs before replay.
-        let hist = trimHistory(session.history as ModelMessage[])
+        // History hygiene runs as BATCH events, not per-send sweeps: rewriting
+        // old bytes invalidates every provider's prefix cache from the rewrite
+        // point, so between events the history must stay append-only. Once the
+        // size crosses the threshold, stub everything outside the keep window
+        // in one go (the stubs persist — old regions stay byte-stable).
+        let hist = session.history as ModelMessage[]
+        if (estimateChars(hist) > TRIM_AT_CHARS) hist = trimHistory(hist)
         // Still huge after trimming → replace the old prefix with a summary.
         if (estimateChars(hist) > COMPACT_AT_CHARS) {
           const split = splitForCompaction(hist)
@@ -841,12 +850,13 @@ export const useChatStore = defineStore('chat', () => {
 
   /** Session-wide token totals (sum of every assistant message's usage). */
   const sessionUsage = computed<TokenUsage>(() => {
-    const total = { input: 0, output: 0, cacheRead: 0 }
+    const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
     for (const m of messages.value) {
       if (!m.usage) continue
       total.input += m.usage.input
       total.output += m.usage.output
       total.cacheRead += m.usage.cacheRead
+      total.cacheWrite += m.usage.cacheWrite ?? 0
     }
     return total
   })

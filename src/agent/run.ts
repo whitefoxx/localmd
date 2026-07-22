@@ -37,8 +37,11 @@ import {
 } from './tools'
 import { toLanguageModel } from './model'
 import { mapLimit } from '@/lib/async'
+import { sdkKindFor } from '@/lib/providers'
+import { withMovingBreakpoint } from '@/lib/promptCache'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
 import { generateKbImage } from './imagegen'
+import type { SystemPromptParts } from './prompt'
 import type { LlmProfile } from '@/stores/settings'
 import type { AgentEventHandler } from './types'
 
@@ -46,13 +49,18 @@ const MAX_ITERATIONS = 25
 const MAX_IMAGES_PER_CALL = 5
 const DEFAULT_MAX_TOKENS = 8192
 
-const SUBAGENT_SYSTEM_SUFFIX = `
+/* Subagent framing rides in the task's user message, NOT the system prompt:
+ * a subagent request whose tools + system are byte-identical to the main
+ * loop's shares its prompt-cache prefix, so spinning one up is cheap. */
+const SUBAGENT_TASK_PREFACE = `[You are running as a SUBAGENT on one scoped task. Work autonomously with the tools; do not ask the user questions. Your final message is returned verbatim to the main agent as a tool result — make it a complete, self-contained answer. run_subagent is unavailable to you.]
 
-You are running as a SUBAGENT on one scoped task. Work autonomously with the tools; do not ask the user questions. Your final message is returned verbatim to the main agent as a tool result — make it a complete, self-contained answer. You cannot spawn further subagents.`
+Task: `
+
+const CACHE_BREAKPOINT = { anthropic: { cacheControl: { type: 'ephemeral' as const } } }
 
 export interface RunTurnOptions {
   profile: LlmProfile
-  system: string
+  system: SystemPromptParts
   /** Full conversation history including the newest user message. */
   messages: ModelMessage[]
   /** Vision slot: undefined = no image understanding; inline = the primary is
@@ -130,7 +138,12 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   }
   if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts, nextToolId)
   if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts, nextToolId)
-  if (opts.allowSubagent) tools['run_subagent'] = buildSubagentTool(opts, nextToolId)
+  // Registered in subagents too (as a refusing stub) so the serialized tool
+  // list — and with it the provider's prompt-cache prefix — matches the main
+  // loop's byte for byte.
+  tools['run_subagent'] = opts.allowSubagent
+    ? buildSubagentTool(opts, nextToolId)
+    : buildSubagentStub()
   const staticNames = Object.keys(tools)
 
   // Register EVERY external tool (active + deferred) so a deferred one can be
@@ -163,25 +176,36 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     ...externalToolSpecs(opts.sessionId).map((e) => e.name),
   ]
 
+  // Anthropic caches nothing it isn't told to: besides the two system-block
+  // breakpoints, mark the last message each step so the ever-growing history
+  // is written to cache once and re-read at 0.1× on every subsequent step and
+  // turn. Other providers cache by prefix automatically — for them the marks
+  // are inert and the win comes from keeping the prefix bytes stable.
+  const movingBreakpoint = sdkKindFor(opts.profile.provider) === 'anthropic'
+
   let streamError: unknown = null
   const result = streamText({
     model,
     // The system prompt must go through `instructions`, NOT a system message in
-    // `messages` (the SDK rejects those). As an array of system messages it
-    // still carries Anthropic's cache breakpoint over the prefix (tools +
-    // system); other providers ignore the providerOptions.
+    // `messages` (the SDK rejects those). Two system messages become two cache
+    // breakpoints: the stable block survives KB/session/locale changes, the
+    // dynamic block only invalidates itself. Other providers ignore the
+    // providerOptions and see a plain two-part system prompt.
     instructions: [
-      {
-        role: 'system',
-        content: opts.system,
-        providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
-      },
+      { role: 'system', content: opts.system.stable, providerOptions: CACHE_BREAKPOINT },
+      ...(opts.system.dynamic
+        ? [{ role: 'system' as const, content: opts.system.dynamic, providerOptions: CACHE_BREAKPOINT }]
+        : []),
     ],
     messages: opts.messages,
     tools,
     activeTools: activeToolNames(),
-    // Re-gate before each step so an enable_tools activation takes effect now.
-    prepareStep: () => ({ activeTools: activeToolNames() }),
+    // Re-gate before each step so an enable_tools activation takes effect now,
+    // and move the message cache breakpoint to the step's last message.
+    prepareStep: ({ messages }) => ({
+      activeTools: activeToolNames(),
+      ...(movingBreakpoint ? { messages: withMovingBreakpoint(messages) } : {}),
+    }),
     // Stop at the iteration cap, or early when the user queues a steer message —
     // evaluated after each completed step, so the turn ends cleanly (all tool
     // results present) and the caller can append the steer and run another turn.
@@ -242,12 +266,14 @@ function usageEvent(usage: LanguageModelUsage): {
   input: number
   output: number
   cacheRead: number
+  cacheWrite: number
 } {
   return {
     type: 'usage',
     input: usage.inputTokens ?? 0,
     output: usage.outputTokens ?? 0,
     cacheRead: usage.inputTokenDetails?.cacheReadTokens ?? 0,
+    cacheWrite: usage.inputTokenDetails?.cacheWriteTokens ?? 0,
   }
 }
 
@@ -395,17 +421,34 @@ function buildGenerateImageTool(
 
 /* ── run_subagent ────────────────────────────────────────────────────────── */
 
+/* Description and schema are shared with the subagent-side stub — the tool
+ * must serialize identically in both so the cache prefix matches. */
+const SUBAGENT_DESCRIPTION =
+  'Delegate scoped, self-contained subtasks to subagents with fresh contexts and the same KB tools (they cannot spawn subagents). Use it for work that would flood your context — surveying many files, summarizing long documents, independent research questions. INDEPENDENT tasks run in parallel — pass them together in one call. Each task description must be complete and self-contained; you receive only the final answers.'
+
+const subagentSchema = z.object({
+  tasks: z
+    .array(z.string())
+    .min(1)
+    .max(5)
+    .describe('1-5 self-contained subtask descriptions; independent tasks run concurrently'),
+})
+
+/** What a subagent gets under the run_subagent name: same wire bytes, no
+ *  recursion — depth stays 1 and the refusal costs one cheap step at most. */
+function buildSubagentStub(): ToolSet[string] {
+  return tool({
+    description: SUBAGENT_DESCRIPTION,
+    inputSchema: subagentSchema,
+    execute: async () =>
+      'Error: run_subagent is unavailable — you ARE a subagent. Do the work directly with your other tools.',
+  })
+}
+
 function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): ToolSet[string] {
   return tool({
-    description:
-      'Delegate scoped, self-contained subtasks to subagents with fresh contexts and the same KB tools (they cannot spawn subagents). Use it for work that would flood your context — surveying many files, summarizing long documents, independent research questions. INDEPENDENT tasks run in parallel — pass them together in one call. Each task description must be complete and self-contained; you receive only the final answers.',
-    inputSchema: z.object({
-      tasks: z
-        .array(z.string())
-        .min(1)
-        .max(5)
-        .describe('1-5 self-contained subtask descriptions; independent tasks run concurrently'),
-    }),
+    description: SUBAGENT_DESCRIPTION,
+    inputSchema: subagentSchema,
     execute: async ({ tasks }) => {
       const id = nextToolId()
       opts.onEvent({
@@ -421,8 +464,7 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
           const tag = tasks.length > 1 ? `[${i + 1}]` : ''
           const history = await runTurn({
             ...opts,
-            system: opts.system + SUBAGENT_SYSTEM_SUFFIX,
-            messages: [{ role: 'user', content: task }],
+            messages: [{ role: 'user', content: SUBAGENT_TASK_PREFACE + task }],
             allowSubagent: false,
             onEvent: (e) => {
               // Surface tool activity (indented) and usage; the subagent's text

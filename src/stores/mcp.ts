@@ -102,6 +102,19 @@ export const useMcpStore = defineStore('mcp', () => {
     )
   }
 
+  const NO_ACTIVATIONS: ReadonlySet<string> = new Set()
+
+  /** Every policy-deferred tool, IGNORING session activation — the system
+   *  prompt lists this frozen catalog so its bytes stay identical across turns
+   *  (activation would otherwise shrink the list and invalidate the provider's
+   *  prompt-cache prefix). Activation changes which schemas are sent, never
+   *  the catalog text. */
+  const deferredCatalog = computed<ExternalTool[]>(() =>
+    allTools.value.filter((t) =>
+      isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, NO_ACTIVATIONS),
+    ),
+  )
+
   /** Activate deferred tools by qualified name; returns what actually matched. */
   function activate(sessionId: string, names: string[]): string[] {
     const known = new Set(allTools.value.map((t) => t.qualifiedName))
@@ -190,6 +203,7 @@ export const useMcpStore = defineStore('mcp', () => {
     allTools,
     activeToolsFor,
     deferredToolsFor,
+    deferredCatalog,
     activate,
     clearActivated,
     refresh,

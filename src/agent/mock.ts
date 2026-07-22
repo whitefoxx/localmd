@@ -65,7 +65,7 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
   // Scripts operate on the raw user line (before attachment/mention notes).
   const script = text.split('\n')[0].trim()
 
-  opts.onEvent({ type: 'usage', input: 100, output: 20, cacheRead: 0 })
+  opts.onEvent({ type: 'usage', input: 100, output: 20, cacheRead: 0, cacheWrite: 0 })
 
   let reply: string
   const writeMatch = /^write\s+(\S+)\s+([\s\S]+)$/.exec(script)

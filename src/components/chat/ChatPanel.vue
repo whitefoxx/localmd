@@ -143,7 +143,9 @@ function fmtTokens(n: number): string {
   return n >= 10_000 ? `${(n / 1000).toFixed(0)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 }
 
-/** Localized tooltip for the per-session token counter. */
+/** Localized tooltip for the per-session token counter. Cache read/write
+ *  totals verify that prompt caching is actually landing (reads are billed at
+ *  a fraction of fresh input). */
 const usageTitle = computed(() => {
   const u = chat.sessionUsage
   let s = t('chat.tokenUsage', {
@@ -151,6 +153,7 @@ const usageTitle = computed(() => {
     output: u.output.toLocaleString(),
   })
   if (u.cacheRead) s += t('chat.tokenCacheSuffix', { cache: u.cacheRead.toLocaleString() })
+  if (u.cacheWrite) s += t('chat.tokenCacheWriteSuffix', { cache: u.cacheWrite.toLocaleString() })
   return s
 })
 

@@ -9,8 +9,10 @@ export type AgentEvent =
   /** A previously-started (id-bearing) tool call finished. `result` is the raw
    *  output string (the UI caps it) so the transcript can show what it returned. */
   | { type: 'tool_result'; id: number; ok: boolean; result?: string }
-  /** Per-API-request token usage (a turn with tool calls emits several). */
-  | { type: 'usage'; input: number; output: number; cacheRead: number }
+  /** Per-API-request token usage (a turn with tool calls emits several).
+   *  cacheRead/cacheWrite let the UI show how much of the input hit the
+   *  provider's prompt cache (billed at a fraction of fresh input). */
+  | { type: 'usage'; input: number; output: number; cacheRead: number; cacheWrite: number }
   /** An artifact (self-contained interactive HTML). `pending` fires when the
    *  model STARTS emitting one (its HTML streams for a while) so the chat can
    *  show a loading card; the non-pending event (once written) fills in the
