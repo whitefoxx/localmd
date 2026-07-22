@@ -32,6 +32,27 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
 - **Tool-neutral KB.** KB-facing conventions live in AGENTS.md / `.agents/`
   (open formats), never vendor-specific directories.
 
+## Token economy
+
+The request prefix is a cache key — every LLM provider bills repeated bytes at
+a fraction of fresh ones, but only when the prefix matches exactly (Anthropic
+additionally needs explicit `cacheControl` breakpoints). When touching the
+agent pipeline (docs/token-optimization.md has the full log):
+
+- **Append, don't rewrite.** Never mutate earlier history/prompt bytes on a
+  per-turn basis; hygiene (trimming, compaction) runs as discrete batch events
+  behind size thresholds (`TRIM_AT_CHARS` / `COMPACT_AT_CHARS`).
+- **Keep prompt bytes session-stable.** The system prompt's stable/dynamic
+  split, the frozen deferred-tools catalog, and byte-identical subagent
+  tools+system all exist so the cache prefix survives; don't add content that
+  varies turn-to-turn.
+- **Always-on text is paid on every step of every turn.** Before extending the
+  system prompt or a tool description, prefer just-in-time delivery: error
+  messages, tool results, use_skill, enable_tools.
+- **Verify with the usage tooltip** (cache hits/writes in the chat composer):
+  a near-zero cache-hit share across a multi-turn session means a
+  prefix-stability regression.
+
 ## Hard compatibility constraints
 
 - doc-index is byte-compatible with trace-app: `.trace/*-index/` layout,
