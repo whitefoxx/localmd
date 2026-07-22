@@ -20,6 +20,7 @@ import {
   explainGithubError,
 } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
+import { renderFileList } from '@/lib/fileList'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import { jinaRead, jinaSearch } from '@/lib/webread'
 import { diffLines, collapseContext } from '@/lib/diff'
@@ -99,7 +100,8 @@ const listFiles = defineTool({
     try {
       const tree = dir ? await fs.readTreeFrom(dir) : await fs.readTree()
       const paths = fs.collectFiles(tree)
-      return paths.length ? paths.join('\n') : '(empty directory)'
+      // Huge listings fold into a per-directory summary — drill down with dir.
+      return paths.length ? renderFileList(paths) : '(empty directory)'
     } catch (err) {
       if ((err as DOMException).name === 'NotFoundError') return `Error: no such directory: ${dir}`
       throw err

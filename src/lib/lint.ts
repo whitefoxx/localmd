@@ -121,10 +121,21 @@ export function computeLint(pages: ReadonlyMap<string, LintPage>): LintReport {
   }
 }
 
+/** Per-category cap in the rendered report — counts stay exact, long path
+ *  lists get elided (the Health panel shows every entry). */
+const MAX_LISTED = 40
+
 /** Render a report as compact text for the agent (the kb_health tool result). */
 export function formatLintReport(r: LintReport): string {
+  const capped = (rendered: string[]): string => {
+    const shown = rendered.slice(0, MAX_LISTED).map((p) => `  ${p}`)
+    if (rendered.length > MAX_LISTED) {
+      shown.push(`  … +${rendered.length - MAX_LISTED} more (full list in the Health panel)`)
+    }
+    return shown.join('\n')
+  }
   const list = (title: string, items: string[]): string =>
-    items.length ? `\n\n${title} (${items.length}):\n` + items.map((p) => `  ${p}`).join('\n') : ''
+    items.length ? `\n\n${title} (${items.length}):\n` + capped(items) : ''
 
   const summary =
     `KB structural health — ${r.pageCount} pages · ` +
@@ -134,11 +145,11 @@ export function formatLintReport(r: LintReport): string {
 
   const broken = r.brokenLinks.length
     ? `\n\nBroken wikilinks (target missing):\n` +
-      r.brokenLinks.map((b) => `  ${b.path} → ${b.targets.join(', ')}`).join('\n')
+      capped(r.brokenLinks.map((b) => `${b.path} → ${b.targets.join(', ')}`))
     : ''
   const thin = r.thin.length
     ? `\n\nThin pages (<${THIN_LINES} lines):\n` +
-      r.thin.map((t) => `  ${t.path} (${t.lines})`).join('\n')
+      capped(r.thin.map((t) => `${t.path} (${t.lines})`))
     : ''
 
   const body =
