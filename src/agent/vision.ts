@@ -32,13 +32,58 @@ export interface KbImage {
   base64: string
 }
 
+/** Longest edge sent to a model. Vision billing scales with pixels and every
+ *  provider downsizes to roughly this anyway (it matches Anthropic's cap), so
+ *  larger originals only inflate the request. */
+const MAX_IMAGE_EDGE = 1568
+
+/** Shrink an oversized raster image for the model-facing copy (the KB file is
+ *  untouched). PNG stays PNG (screenshots, alpha); other formats re-encode as
+ *  JPEG. Returns null when the image is small enough, the format is unsafe to
+ *  re-encode (GIF/SVG), or canvas APIs are unavailable — caller keeps the
+ *  original bytes. */
+async function downscaled(buf: ArrayBuffer, mediaType: string): Promise<Omit<KbImage, 'path'> | null> {
+  if (!/^image\/(png|jpeg|webp)$/.test(mediaType)) return null
+  if (typeof createImageBitmap === 'undefined' || typeof OffscreenCanvas === 'undefined') return null
+  let bitmap: ImageBitmap
+  try {
+    bitmap = await createImageBitmap(new Blob([buf], { type: mediaType }))
+  } catch {
+    return null
+  }
+  try {
+    const scale = MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height)
+    if (scale >= 1) return null
+    const canvas = new OffscreenCanvas(
+      Math.max(1, Math.round(bitmap.width * scale)),
+      Math.max(1, Math.round(bitmap.height * scale)),
+    )
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    const outType = mediaType === 'image/png' ? 'image/png' : 'image/jpeg'
+    const blob = await canvas.convertToBlob(
+      outType === 'image/jpeg' ? { type: outType, quality: 0.85 } : { type: outType },
+    )
+    return { mediaType: outType, base64: arrayBufferToBase64(await blob.arrayBuffer()) }
+  } catch {
+    return null
+  } finally {
+    bitmap.close()
+  }
+}
+
 /** Load a KB image file as base64 + media type; null when missing or not an
- *  image. SVG is excluded — most vision APIs reject it. */
+ *  image. SVG is excluded — most vision APIs reject it. Oversized images are
+ *  downscaled for the request; the file in the KB keeps its full resolution. */
 export async function loadKbImage(path: string): Promise<KbImage | null> {
   if (fileKind(path) !== 'image' || /\.svg$/i.test(path)) return null
   try {
     const buf = await fs.readBinary(path)
-    return { path, mediaType: mimeFor(path), base64: arrayBufferToBase64(buf) }
+    const mediaType = mimeFor(path)
+    const small = await downscaled(buf, mediaType)
+    if (small) return { path, ...small }
+    return { path, mediaType, base64: arrayBufferToBase64(buf) }
   } catch {
     return null
   }
