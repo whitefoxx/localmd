@@ -95,6 +95,17 @@ export const useReviewStore = defineStore('review', () => {
     pending.value.delete(path)
   }
 
+  /** A commit is an approval: the given paths are now in git history, so drop
+   *  them from the review list without touching the files on disk. Ask-mode
+   *  writes still awaiting a decision are left alone — an unwritten file can't
+   *  have been committed. Paths not under review are ignored. */
+  function markCommitted(paths: Iterable<string>): void {
+    for (const path of paths) {
+      const change = pending.value.get(path)
+      if (change && !change.awaiting) pending.value.delete(path)
+    }
+  }
+
   async function discard(path: string): Promise<void> {
     if (resolvers.has(path)) {
       decide(path, false)
@@ -135,6 +146,7 @@ export const useReviewStore = defineStore('review', () => {
     decide,
     rejectAwaiting,
     approve,
+    markCommitted,
     discard,
     approveAll,
     discardAll,

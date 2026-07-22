@@ -518,6 +518,8 @@ const gitCommit = defineTool({
       email: settings.state.gitEmail || 'browser-md@local',
     })
     const oid = await g.commitPaths(chosen, message.trim(), author)
+    // Committing is an approval — drop these from the agent-changes review list.
+    useReviewStore().markCommitted(chosen.map((c) => c.path))
     void useGitStore().refresh()
     const note = blocked.length
       ? `\n(skipped >100MB files — commit from a terminal: ${blocked.map((c) => c.path).join(', ')})`

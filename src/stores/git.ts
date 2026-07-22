@@ -17,6 +17,7 @@ import {
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
+import { useReviewStore } from '@/stores/review'
 
 export const useGitStore = defineStore('git', () => {
   const kb = useKbStore()
@@ -137,6 +138,8 @@ export const useGitStore = defineStore('git', () => {
         { onWait: noteWait },
       )
       lastSync.value = `Committed ${oid.slice(0, 7)}`
+      // Committing is an approval — drop these from the agent-changes review list.
+      useReviewStore().markCommitted(paths)
     } catch (err) {
       error.value = (err as Error).message
     } finally {
