@@ -306,9 +306,17 @@ function closeKb(): void {
             v-if="git.panelOpen"
             class="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r bg-accent"
           />
-          <span class="codicon codicon-git-branch" :class="{ 'text-accent': git.panelOpen }" />
+          <span class="codicon codicon-git-pull-request" :class="{ 'text-accent': git.panelOpen }" />
+          <!-- Top-right corner: spinner while git is working (e.g. fetching
+               status), otherwise the count of changed files. -->
           <span
-            v-if="git.dirtyCount"
+            v-if="git.busy"
+            class="absolute -top-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-accent text-white"
+          >
+            <span class="codicon codicon-loading codicon-modifier-spin text-[10px]" />
+          </span>
+          <span
+            v-else-if="git.dirtyCount"
             class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] leading-4 text-center font-medium"
           >{{ git.dirtyCount }}</span>
         </button>
