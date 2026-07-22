@@ -494,6 +494,29 @@ function userText(m: { parts: MessagePart[] }): string {
   return p?.type === 'text' ? p.text : ''
 }
 
+/** The copyable text of a message: the reply's markdown (or the user's prompt),
+ *  joining all text parts and skipping tool/thinking/artifact chrome. */
+function messageText(m: UiMessage): string {
+  return m.parts
+    .filter((p): p is MessagePart & { type: 'text' } => p.type === 'text')
+    .map((p) => p.text)
+    .join('\n\n')
+    .trim()
+}
+
+/** Which message was just copied — pins its action row open and shows a
+ *  "Copied" hint for a moment (survives the cursor leaving the message). */
+const copiedMsg = ref<number | null>(null)
+let copiedTimer: number | undefined
+async function copyMessage(e: MouseEvent, m: UiMessage): Promise<void> {
+  const ok = await copyText(messageText(m))
+  flashCopy(e.currentTarget as HTMLElement, ok)
+  if (!ok) return
+  copiedMsg.value = m.id
+  window.clearTimeout(copiedTimer)
+  copiedTimer = window.setTimeout(() => (copiedMsg.value = null), 1500)
+}
+
 /** Save the current conversation as a KB file. The user picks the location and
  *  can rename it in the browser's save dialog; the default name is the session's
  *  own title. If saved inside the open KB, refresh the tree so it shows up. */
@@ -867,7 +890,7 @@ watch(
         {{ $t('chat.emptyState') }}
       </div>
 
-      <div v-for="m in chat.messages" :key="m.id">
+      <div v-for="m in chat.messages" :key="m.id" class="group/msg">
         <div
           v-if="m.role === 'user'"
           class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable text-fg-0"
@@ -1063,6 +1086,27 @@ watch(
           >
             {{ $t('chat.thinkingEllipsis') }}
           </div>
+        </div>
+        <!-- Per-message copy: reveals on hover/focus, copies the message's text
+             (the reply markdown or the user's prompt), skipping tool/thinking
+             chrome. Hidden while the final reply is still streaming. -->
+        <div
+          v-if="messageText(m) && !(chat.running && m === chat.messages[chat.messages.length - 1])"
+          class="mt-1 flex items-center justify-end gap-1.5 transition-opacity"
+          :class="
+            copiedMsg === m.id
+              ? 'opacity-100'
+              : 'opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100'
+          "
+        >
+          <span v-if="copiedMsg === m.id" class="text-xs text-added">{{ $t('common.copied') }}</span>
+          <button
+            class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
+            :title="$t('common.copy')"
+            @click="copyMessage($event, m)"
+          >
+            <span class="codicon codicon-sm codicon-copy" />
+          </button>
         </div>
       </div>
     </div>
