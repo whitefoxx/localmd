@@ -116,9 +116,97 @@ async function apiExists(ctx: Ctx, path: string): Promise<boolean> {
     await api(ctx, 'GET', path)
     return true
   } catch (e) {
-    if (e instanceof GithubError && (e.status === 404 || e.status === 422)) return false
+    // 404/422: object absent. 409 "Git Repository is empty": no commits yet —
+    // the object can't exist, so an existence check is safely "not present".
+    if (e instanceof GithubError && (e.status === 404 || e.status === 422 || e.status === 409)) {
+      return false
+    }
     throw e
   }
+}
+
+export interface CreatedRepo extends GithubRepo {
+  private: boolean
+  htmlUrl: string
+  cloneUrl: string
+}
+
+/** Create a repository owned by the authenticated user (the token's owner) and
+ *  return its identity + URLs. `auto_init: false` keeps it empty so a first
+ *  push mirrors the local history verbatim (see push()). Requires a token whose
+ *  scope allows repo creation (fine-grained: "Administration" write). */
+export async function createRepo(
+  token: string,
+  name: string,
+  opts: { private?: boolean; description?: string } = {},
+): Promise<CreatedRepo> {
+  const resp = await fetch(`${API}/user/repos`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      name,
+      private: opts.private ?? true,
+      auto_init: false,
+      ...(opts.description ? { description: opts.description } : {}),
+    }),
+  })
+  if (!resp.ok) {
+    let detail = ''
+    try {
+      detail = ((await resp.json()) as { message?: string }).message ?? ''
+    } catch {
+      /* non-json error body */
+    }
+    throw new GithubError(resp.status, `GitHub API ${resp.status}: ${detail || resp.statusText}`)
+  }
+  const data = (await resp.json()) as {
+    name: string
+    private: boolean
+    owner: { login: string }
+    html_url: string
+    clone_url: string
+  }
+  return {
+    owner: data.owner.login,
+    repo: data.name,
+    private: data.private,
+    htmlUrl: data.html_url,
+    cloneUrl: data.clone_url,
+  }
+}
+
+export type GithubOp = 'create' | 'push' | 'pull'
+
+/** Turn a failed GitHub API call into an actionable message: the base error plus
+ *  guidance about the fine-grained-token settings that usually cause it. GitHub
+ *  returns 404 (not 403) for repos outside a fine-grained token's Repository
+ *  access, so a "not found" on push is almost always a token-scope problem. */
+export function explainGithubError(err: unknown, op: GithubOp, repo?: string): string {
+  const base = err instanceof Error ? err.message : String(err)
+  const raw = (err as { status?: unknown })?.status
+  const status = typeof raw === 'number' ? raw : null
+  const named = repo ? `“${repo}”` : 'this repo'
+  let hint = ''
+  if (status === 401) {
+    hint =
+      'The token is invalid or expired — create a new fine-grained token on GitHub (Settings → Developer settings → Fine-grained tokens) and paste it into Settings → Git & GitHub.'
+  } else if (status === 403 && op === 'create') {
+    hint =
+      'The token isn’t allowed to create repositories. Give it Administration: Read and write, and set Repository access to “All repositories” (a token limited to “Only select repositories” can’t create a new one, since it isn’t in the list yet).'
+  } else if (status === 403) {
+    hint = `The token can’t write to ${named}. Grant Contents: Read and write, and make sure Repository access includes it — either “All repositories”, or add ${named} under “Only select repositories”.`
+  } else if (status === 404) {
+    hint = `GitHub can’t see ${named} with this token. Fine-grained tokens return 404 (not 403) for repos outside their Repository access, so add ${named} under “Only select repositories” (or switch to “All repositories”) and grant Contents + Metadata: Read${op === 'pull' ? '' : ' and write'}.`
+  } else if (status === 422 && op === 'create') {
+    hint =
+      'A repository with that name already exists on your account — pick a different name, or attach the existing one with git_remote_add instead of creating it.'
+  }
+  return hint ? `${base}\n${hint}` : base
 }
 
 function b64ToBytes(b64: string): Uint8Array {
@@ -142,7 +230,8 @@ async function remoteHead(ctx: Ctx, branch: string): Promise<string | null> {
     const ref = await api(ctx, 'GET', `/git/ref/${encodeURIComponent(`heads/${branch}`)}`)
     return (ref.object as { sha: string }).sha
   } catch (e) {
-    if (e instanceof GithubError && e.status === 404) return null
+    // 404 = branch absent; 409 = repository is entirely empty (no commits yet).
+    if (e instanceof GithubError && (e.status === 404 || e.status === 409)) return null
     throw e
   }
 }
@@ -302,6 +391,19 @@ async function pushTree(ctx: Ctx, treeOid: string, progress: Progress): Promise<
   if (res.sha !== treeOid) throw new Error(`tree sha mismatch: expected ${treeOid}, got ${res.sha}`)
 }
 
+/** GitHub's Git Data API refuses to create objects (blob/tree/commit) in a
+ *  repository with no commits — it returns 409 "Git Repository is empty". Seed
+ *  such a repo with one throwaway commit via the Contents API so the object
+ *  endpoints work; push() then force-moves the branch onto the reconstructed
+ *  local history, leaving the seed commit dangling (never in the branch). */
+async function seedEmptyRepo(ctx: Ctx, progress: Progress): Promise<void> {
+  progress('Initializing the empty repository…')
+  await api(ctx, 'PUT', '/contents/.git-init', {
+    message: 'chore: initialize repository',
+    content: bytesToB64(new TextEncoder().encode('placeholder — replaced by the initial push\n')),
+  })
+}
+
 /** Fast-forward push (mirrors local commits through the API). */
 export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<string> {
   const { git, base } = raw
@@ -309,35 +411,51 @@ export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<str
   const local = await headOid()
   if (!local) throw new Error('No local commits yet')
   const remote = await remoteHead(ctx, branch)
-  if (!remote) throw new Error(`Remote has no branch ${branch} — run the first push in a terminal`)
   if (remote === local) return 'Already up to date'
-  if (!(await hasObject(remote))) {
-    throw new Error('Remote has commits unknown locally — pull first')
-  }
-  if (!(await isAncestor(remote, local))) {
-    throw new Error('Local and remote have diverged — please resolve in a terminal')
+  // First push to an empty repo (no remote branch): upload the whole history
+  // and CREATE the ref, instead of bouncing the user to a terminal.
+  const firstPush = remote === null
+  if (!firstPush) {
+    if (!(await hasObject(remote))) {
+      throw new Error('Remote has commits unknown locally — pull first')
+    }
+    if (!(await isAncestor(remote, local))) {
+      throw new Error('Local and remote have diverged — please resolve in a terminal')
+    }
   }
 
-  // Linear chain remote..local (merge commits allowed when their other
-  // parents are already on the remote).
+  // Commits to upload: remote-exclusive..local for a normal fast-forward, or the
+  // entire history back to the root commit for a first push. Merge commits are
+  // allowed on a normal push when their other parents are already on the remote;
+  // a first push only supports linear history (bail to a terminal otherwise).
   const chain: string[] = []
-  let cursor = local
-  while (cursor !== remote) {
+  let cursor: string | undefined = local
+  while (cursor && cursor !== remote) {
     chain.push(cursor)
     const { commit } = await git.readCommit({ ...base(), oid: cursor })
     if (commit.gpgsig) {
       throw new Error("Commits with a GPG signature can't be mirrored via the API — please push in a terminal")
     }
     const [first, ...rest] = commit.parent
-    for (const p of rest) {
-      if (!(await isAncestor(p, remote))) {
-        throw new Error('History contains a complex merge — please push in a terminal')
+    if (firstPush) {
+      if (rest.length) {
+        throw new Error('History has a merge commit — please run the first push to this repo in a terminal')
       }
+    } else {
+      for (const p of rest) {
+        if (!(await isAncestor(p, remote))) {
+          throw new Error('History contains a complex merge — please push in a terminal')
+        }
+      }
+      if (!first) throw new Error("Reached the root commit without encountering the remote HEAD — please push in a terminal")
     }
-    if (!first) throw new Error("Reached the root commit without encountering the remote HEAD — please push in a terminal")
     cursor = first
     if (chain.length > 200) throw new Error('Too many commits to push (>200) — please push in a terminal')
   }
+
+  // An empty repo must be made non-empty before the Git Data API accepts any
+  // object writes (see seedEmptyRepo). Do it up front, before the upload loop.
+  if (firstPush) await seedEmptyRepo(ctx, progress)
 
   chain.reverse()
   for (let i = 0; i < chain.length; i++) {
@@ -368,10 +486,27 @@ export async function push(ctx: Ctx, progress: Progress = () => {}): Promise<str
   }
 
   progress('Updating remote ref…')
-  await api(ctx, 'PATCH', `/git/refs/${encodeURIComponent(`heads/${branch}`)}`, {
-    sha: local,
-    force: false,
-  })
+  if (firstPush) {
+    // Seeding created the repo's default branch. If it's our branch, force it
+    // onto the reconstructed history (dropping the seed commit); otherwise our
+    // branch doesn't exist yet, so create it.
+    const seeded = await remoteHead(ctx, branch)
+    if (seeded) {
+      await api(ctx, 'PATCH', `/git/refs/${encodeURIComponent(`heads/${branch}`)}`, {
+        sha: local,
+        force: true,
+      })
+    } else {
+      await api(ctx, 'POST', '/git/refs', { ref: `refs/heads/${branch}`, sha: local })
+    }
+  } else {
+    await api(ctx, 'PATCH', `/git/refs/${encodeURIComponent(`heads/${branch}`)}`, {
+      sha: local,
+      force: false,
+    })
+  }
   await git.writeRef({ ...base(), ref: `refs/remotes/origin/${branch}`, value: local, force: true })
-  return `Pushed ${chain.length} commit(s) (${local.slice(0, 7)})`
+  return firstPush
+    ? `Pushed ${chain.length} commit(s) to a new ${branch} branch (${local.slice(0, 7)})`
+    : `Pushed ${chain.length} commit(s) (${local.slice(0, 7)})`
 }

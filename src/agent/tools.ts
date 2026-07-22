@@ -12,7 +12,13 @@ import { z } from 'zod'
 import * as fs from '@/lib/fs'
 import * as g from '@/lib/git'
 import { withGitLock, GitBusyError } from '@/lib/gitlock'
-import { push as ghPush, pull as ghPull, parseGithubRemote } from '@/lib/github'
+import {
+  push as ghPush,
+  pull as ghPull,
+  parseGithubRemote,
+  createRepo as ghCreateRepo,
+  explainGithubError,
+} from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import { jinaRead, jinaSearch } from '@/lib/webread'
@@ -28,6 +34,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbIndexStore } from '@/stores/kbIndex'
+import { useKbStore } from '@/stores/kb'
 
 /** Per-turn execution context threaded from the runners into every tool call,
  *  attributing side effects (writes, plan updates, tool activations) to the
@@ -392,6 +399,20 @@ async function githubContext(): Promise<
   return { ...repo, token: useSettingsStore().state.githubToken }
 }
 
+const gitInit = defineTool({
+  name: 'git_init',
+  description:
+    'Initialize a new git repository in the opened KB folder (default branch `main`) so it can be versioned and committed. Use this when git_status reports the folder is not a git repository and the user wants version control. No-op if a repo already exists.',
+  schema: z.object({}),
+  describeCall: () => 'git init',
+  run: () => lockedGit(async () => {
+    if (await g.isRepo()) return 'Already a git repository — nothing to initialize.'
+    await g.init()
+    void useGitStore().refresh()
+    return 'Initialized an empty git repository on branch main. Stage and commit files with git_commit.'
+  }),
+})
+
 const gitStatus = defineTool({
   name: 'git_status',
   description:
@@ -513,14 +534,14 @@ const gitPush = defineTool({
     const ctx = await githubContext()
     if (typeof ctx === 'string') return ctx
     if (!ctx.token) {
-      return 'Error: push requires a GitHub token — ask the user to add one in Settings → Git & GitHub (the README has a step-by-step guide under "Getting a GitHub Token").'
+      return 'Error: push requires a GitHub token. Ask the user to add a fine-grained token in Settings → Git & GitHub with Contents: Read and write, and Repository access that includes this repo ("All repositories", or add it under "Only select repositories"). The README has a step-by-step guide under "Getting a GitHub Token".'
     }
     try {
       const summary = await ghPush(ctx)
       void useGitStore().refresh()
       return summary
     } catch (err) {
-      return `Push failed: ${(err as Error).message}`
+      return `Push failed: ${explainGithubError(err, 'push', `${ctx.owner}/${ctx.repo}`)}`
     }
   }),
 })
@@ -541,8 +562,61 @@ const gitPull = defineTool({
       void useGitStore().refresh()
       return summary
     } catch (err) {
-      return `Pull failed: ${(err as Error).message}`
+      return `Pull failed: ${explainGithubError(err, 'pull', `${ctx.owner}/${ctx.repo}`)}`
     }
+  }),
+})
+
+const gitRemoteAdd = defineTool({
+  name: 'git_remote_add',
+  description:
+    'Point the KB at a git remote (usually `origin` on GitHub) so git_push/git_pull can sync to it. Pass the repo URL (https://github.com/owner/name, with or without .git). Replaces the remote if one with the same name exists.',
+  schema: z.object({
+    url: z.string().describe('Remote repository URL'),
+    name: z.string().optional().describe('Remote name (default: origin)'),
+  }),
+  describeCall: (a) => `git remote add ${a.name ?? 'origin'} ${a.url}`,
+  run: ({ url, name }) => lockedGit(async () => {
+    if (!(await g.isRepo())) return 'Error: not a git repository — run git_init first.'
+    const remote = name?.trim() || 'origin'
+    await g.addRemote(url.trim(), remote)
+    void useGitStore().refresh()
+    return `Set remote ${remote} → ${url.trim()}`
+  }),
+})
+
+const githubCreateRepo = defineTool({
+  name: 'github_create_repo',
+  description:
+    "Create a new GitHub repository for the authenticated user (via the GitHub token in Settings) and set it as the KB's `origin` remote — no need to open the GitHub website or a terminal. Defaults: name = the open KB's folder name, and private. Afterwards git_commit then git_push publishes the history (the first push to the empty repo is supported). Requires a token allowed to create repos (fine-grained: Administration write).",
+  schema: z.object({
+    name: z.string().optional().describe('Repository name (default: the KB folder name)'),
+    private: z.boolean().optional().describe('Create a private repo (default: true)'),
+  }),
+  describeCall: (a) =>
+    `github create repo ${a.name ?? '(kb name)'}${a.private === false ? ' (public)' : ' (private)'}`,
+  run: ({ name, private: priv }) => lockedGit(async () => {
+    const token = useSettingsStore().state.githubToken
+    if (!token) {
+      return 'Error: creating a repo requires a GitHub token. Ask the user to add a fine-grained token in Settings → Git & GitHub with Administration: Read and write and Repository access set to "All repositories" (see the README under "Getting a GitHub Token"). If a browser tool is connected, creating the repo on the GitHub website is an alternative.'
+    }
+    const repoName = (name?.trim() || useKbStore().name || '').trim()
+    if (!repoName) return 'Error: no repository name given and no KB is open.'
+    let created
+    try {
+      created = await ghCreateRepo(token, repoName, { private: priv ?? true })
+    } catch (err) {
+      return `Create repo failed: ${explainGithubError(err, 'create', repoName)}`
+    }
+    const isRepo = await g.isRepo()
+    if (isRepo) {
+      await g.addRemote(created.htmlUrl)
+      void useGitStore().refresh()
+    }
+    const tail = isRepo
+      ? 'Set as origin remote — now git_commit, then git_push to publish.'
+      : `The KB isn't a git repo yet — run git_init, then git_remote_add ${created.htmlUrl}, then commit and push.`
+    return `Created ${created.private ? 'private' : 'public'} repo ${created.owner}/${created.repo} (${created.htmlUrl}). ${tail}`
   }),
 })
 
@@ -650,10 +724,13 @@ export const TOOLS: ToolSpec[] = [
   updatePlan,
   useSkill,
   enableTools,
+  gitInit,
   gitStatus,
   gitDiff,
   gitLog,
   gitCommit,
   gitPush,
   gitPull,
+  gitRemoteAdd,
+  githubCreateRepo,
 ]

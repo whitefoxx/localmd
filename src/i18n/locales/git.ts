@@ -4,6 +4,8 @@ export default {
     pull: 'Pull',
     push: 'Push',
     refresh: 'Refresh',
+    notRepo: "This folder isn't a git repository yet. Initialize one to track changes and commit.",
+    initRepo: 'Initialize repository',
     changes: 'Changes ({n})',
     noChanges:
       'No changes. (.trace/ is excluded; content changes in tracked binaries can\'t be detected — commit those from the terminal.)',
@@ -23,6 +25,8 @@ export default {
     pull: 'Pull',
     push: 'Push',
     refresh: '刷新',
+    notRepo: '这个文件夹还不是 git 仓库。初始化后即可跟踪改动并提交。',
+    initRepo: '初始化仓库',
     changes: '改动（{n}）',
     noChanges:
       '没有改动。（.trace/ 不参与；tracked 二进制的内容改动无法检测，如有请在终端提交）',

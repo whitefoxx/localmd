@@ -109,7 +109,19 @@ function fmtTime(ms: number): string {
           </button>
         </div>
 
-        <div class="flex-1 flex min-h-0">
+        <!-- Not a git repository yet: offer to initialize one -->
+        <div
+          v-if="!git.isRepo"
+          class="flex-1 flex flex-col items-center justify-center gap-3 p-8 text-center"
+        >
+          <span class="codicon codicon-source-control text-3xl text-fg-3" />
+          <p class="text-sm text-fg-2 max-w-sm">{{ $t('git.notRepo') }}</p>
+          <button class="btn-primary text-xs" :disabled="!!git.busy" @click="git.init()">
+            <span class="codicon codicon-sm codicon-repo-create mr-1" />{{ $t('git.initRepo') }}
+          </button>
+        </div>
+
+        <div v-else class="flex-1 flex min-h-0">
           <!-- Changes + commit -->
           <div class="w-[300px] shrink-0 border-r border-border flex flex-col">
             <div class="px-3 py-2 text-xs uppercase tracking-wide text-fg-3 shrink-0">

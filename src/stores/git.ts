@@ -7,7 +7,13 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import * as g from '@/lib/git'
 import { withGitLock } from '@/lib/gitlock'
-import { parseGithubRemote, push as ghPush, pull as ghPull, type GithubRepo } from '@/lib/github'
+import {
+  parseGithubRemote,
+  push as ghPush,
+  pull as ghPull,
+  explainGithubError,
+  type GithubRepo,
+} from '@/lib/github'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
@@ -97,6 +103,22 @@ export const useGitStore = defineStore('git', () => {
     }
   }
 
+  /** Initialize a git repo in the opened KB, then reload state. */
+  async function init(): Promise<void> {
+    if (!kb.name || busy.value || isRepo.value) return
+    busy.value = 'init'
+    error.value = ''
+    try {
+      await withGitLock(() => g.init(), { onWait: noteWait })
+    } catch (err) {
+      error.value = (err as Error).message
+    } finally {
+      busy.value = null
+      progress.value = ''
+    }
+    await refresh()
+  }
+
   async function commit(paths: string[], message: string): Promise<void> {
     if (busy.value || !message.trim() || !paths.length) return
     busy.value = 'commit'
@@ -154,7 +176,8 @@ export const useGitStore = defineStore('git', () => {
       if (e.name === 'CheckoutConflictError' && e.data?.filepaths) {
         error.value = `Local uncommitted changes conflict with the remote: ${e.data.filepaths.join(', ')} — commit or revert these files first`
       } else {
-        error.value = e.message
+        const repo = remote.value ? `${remote.value.owner}/${remote.value.repo}` : undefined
+        error.value = explainGithubError(e, direction, repo)
       }
     } finally {
       busy.value = null
@@ -178,6 +201,7 @@ export const useGitStore = defineStore('git', () => {
     statusByPath,
     dirStatus,
     refresh,
+    init,
     commit,
     sync,
   }

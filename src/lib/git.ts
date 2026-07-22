@@ -38,6 +38,15 @@ export async function isRepo(): Promise<boolean> {
   }
 }
 
+/** Initialize a fresh git repository in the opened KB folder (branch `main`),
+ *  writing the standard .git layout so it interops with CLI git and trace-app.
+ *  isomorphic-git's init is idempotent, but callers should guard with isRepo()
+ *  to avoid touching an existing repo. Resets the object cache. */
+export async function init(defaultBranch = 'main'): Promise<void> {
+  await git.init({ fs: gitFs, dir, defaultBranch })
+  resetGitCache()
+}
+
 export async function currentBranch(): Promise<string | null> {
   try {
     return (await git.currentBranch({ ...base(), fullname: false })) ?? null
@@ -178,6 +187,11 @@ export async function recentLog(depth = 20): Promise<LogEntry[]> {
 export interface RemoteInfo {
   name: string
   url: string
+}
+
+/** Add or replace a named remote (default `origin`) pointing at `url`. */
+export async function addRemote(url: string, remote = 'origin'): Promise<void> {
+  await git.addRemote({ ...base(), remote, url, force: true })
 }
 
 export async function listRemotes(): Promise<RemoteInfo[]> {
