@@ -77,6 +77,52 @@ describe('estimateChars', () => {
   it('measures serialized size', () => {
     expect(estimateChars([{ a: 'xx' }])).toBeGreaterThan(8)
   })
+
+  it('counts media payloads as a constant, not their base64 length', () => {
+    const b64 = 'A'.repeat(300_000)
+    const withImage: ModelMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look at this' },
+          { type: 'image', image: `data:image/png;base64,${b64}` },
+        ],
+      } as unknown as ModelMessage,
+    ]
+    expect(estimateChars(withImage)).toBeLessThan(1000)
+    // tool-result file parts carry base64 under data.data
+    const toolResult = [
+      { type: 'file', data: { type: 'data', data: b64 }, mediaType: 'image/png' },
+    ]
+    expect(estimateChars(toolResult)).toBeLessThan(500)
+    // ordinary long text still counts in full
+    expect(estimateChars([{ type: 'text', text: 'x'.repeat(50_000) }])).toBeGreaterThan(50_000)
+  })
+})
+
+describe('reasoning stripping', () => {
+  it('drops old reasoning parts but never empties a message', () => {
+    const h: ModelMessage[] = [
+      { role: 'user', content: 'q1' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'reasoning', text: 'chain of thought ' + BIG },
+          { type: 'text', text: 'answer 1' },
+        ],
+      } as unknown as ModelMessage,
+      {
+        role: 'assistant',
+        content: [{ type: 'reasoning', text: 'only reasoning' }],
+      } as unknown as ModelMessage,
+      { role: 'user', content: 'q2' },
+      { role: 'assistant', content: 'answer 2' },
+    ]
+    const out = trimHistory(h, { keepTurns: 1, maxChars: 100 })
+    expect(parts(out[1]).map((p) => p.type)).toEqual(['text'])
+    // a reasoning-only message keeps its content rather than turning invalid
+    expect(parts(out[2]).map((p) => p.type)).toEqual(['reasoning'])
+  })
 })
 
 describe('compaction helpers', () => {
