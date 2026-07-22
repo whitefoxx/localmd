@@ -13,16 +13,7 @@
  *  - `shift` is matched exactly.
  */
 
-export type HotkeyId =
-  | 'save'
-  | 'search'
-  | 'sidebar'
-  | 'agent'
-  | 'newFile'
-  | 'move'
-  | 'delete'
-  | 'tabPrev'
-  | 'tabNext'
+export type HotkeyId = 'search' | 'sidebar' | 'agent' | 'tabPrev' | 'tabNext'
 
 export interface Binding {
   /** KeyboardEvent.code, e.g. 'KeyS', 'BracketLeft', 'Backquote', 'Enter'. */
@@ -42,18 +33,11 @@ export interface HotkeyDef {
   defaultBinding: Binding
   /** Extra fixed combos that always work but aren't user-editable. */
   aliases?: Binding[]
-  /** Most commands only act once a KB is open; `false` = always (save). */
+  /** Most commands only act once a KB is open; `false` fires always. */
   needsKb?: boolean
 }
 
 export const HOTKEYS: HotkeyDef[] = [
-  {
-    id: 'save',
-    label: 'Save file',
-    hint: 'Write the current file to disk',
-    defaultBinding: { mod: true, code: 'KeyS' },
-    needsKb: false,
-  },
   {
     id: 'search',
     label: 'Search',
@@ -75,26 +59,10 @@ export const HOTKEYS: HotkeyDef[] = [
     defaultBinding: { mod: true, code: 'KeyJ' },
     aliases: [{ mod: true, code: 'Enter', notInEditable: true }],
   },
-  {
-    id: 'newFile',
-    label: 'New file',
-    hint: 'The browser takes ⌘N, so use ⌥⌘N',
-    defaultBinding: { mod: true, code: 'KeyN' },
-  },
-  {
-    id: 'move',
-    label: 'Move file / folder',
-    hint: '⌘M is a system shortcut, so use ⌥⌘M / ⌃M',
-    defaultBinding: { mod: true, code: 'KeyM' },
-  },
-  {
-    id: 'delete',
-    label: 'Delete selection',
-    hint: 'Delete the selected item in the tree or the current file',
-    defaultBinding: { mod: true, code: 'KeyD' },
-  },
-  { id: 'tabPrev', label: 'Previous tab', defaultBinding: { mod: true, code: 'BracketLeft' } },
-  { id: 'tabNext', label: 'Next tab', defaultBinding: { mod: true, code: 'BracketRight' } },
+  // ⌘[ / ⌘] are CodeMirror's indent — yield them inside the editor so paging tabs
+  // only fires outside an editable target (the global handler runs in capture phase).
+  { id: 'tabPrev', label: 'Previous tab', defaultBinding: { mod: true, code: 'BracketLeft', notInEditable: true } },
+  { id: 'tabNext', label: 'Next tab', defaultBinding: { mod: true, code: 'BracketRight', notInEditable: true } },
 ]
 
 export const HOTKEY_BY_ID = Object.fromEntries(HOTKEYS.map((h) => [h.id, h])) as Record<

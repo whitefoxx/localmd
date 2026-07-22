@@ -1,7 +1,6 @@
 /**
  * Interactive file operations (prompt/confirm + store mutation + git status
- * refresh), shared by the file-tree UI and the global hotkeys so both paths
- * behave identically.
+ * refresh) backing the file-tree UI — the "+" button, context menu, drag-to-move.
  */
 import * as fs from '@/lib/fs'
 import { useFilesStore } from '@/stores/files'
@@ -44,26 +43,7 @@ export async function moveEntry(source: string, isDir: boolean, targetDir: strin
   refreshGitStatus()
 }
 
-/** The entry hotkeys operate on: the tree selection, or the open file. */
-function hotkeyTarget(): { path: string; isDir: boolean } | null {
-  const files = useFilesStore()
-  if (files.selectedPath) return { path: files.selectedPath, isDir: files.selectedIsDir }
-  if (files.currentPath) return { path: files.currentPath, isDir: false }
-  return null
-}
-
-/** Hotkey: move the selected entry (or current file) via a directory prompt.
- *  A missing target directory is created implicitly by the write. */
-export async function moveInteractive(): Promise<void> {
-  const t = hotkeyTarget()
-  if (!t) return
-  const parent = t.path.includes('/') ? t.path.slice(0, t.path.lastIndexOf('/')) : ''
-  const input = prompt(`Move "${t.path}" to directory (empty = KB root):`, parent)
-  if (input === null) return
-  await moveEntry(t.path, t.isDir, input.trim().replace(/^\/+|\/+$/g, ''))
-}
-
-/** Confirm-then-delete; used by the context menu and the ⌘D hotkey. */
+/** Confirm-then-delete; used by the file-tree context menu. */
 export async function deleteInteractive(path: string, isDir: boolean): Promise<void> {
   const files = useFilesStore()
   const what = isDir ? 'folder (and its contents)' : 'file'
@@ -71,10 +51,4 @@ export async function deleteInteractive(path: string, isDir: boolean): Promise<v
   if (!confirm(`Delete ${what} “${name}”? This cannot be undone.`)) return
   await files.deleteEntry(path, isDir)
   refreshGitStatus()
-}
-
-/** Hotkey: delete the selected entry (or current file). */
-export async function deleteSelectedInteractive(): Promise<void> {
-  const t = hotkeyTarget()
-  if (t) await deleteInteractive(t.path, t.isDir)
 }

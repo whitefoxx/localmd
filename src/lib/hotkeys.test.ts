@@ -21,20 +21,20 @@ function ev(code: string, opts: Partial<KeyboardEvent> = {}): KeyboardEvent {
 }
 
 describe('matchBinding', () => {
-  const save = HOTKEY_BY_ID.save.defaultBinding // { mod, KeyS }
+  const sidebar = HOTKEY_BY_ID.sidebar.defaultBinding // { mod, KeyB }
 
   it('matches ⌘ and Ctrl interchangeably', () => {
-    expect(matchBinding(ev('KeyS', { metaKey: true }), save)).toBe(true)
-    expect(matchBinding(ev('KeyS', { ctrlKey: true }), save)).toBe(true)
+    expect(matchBinding(ev('KeyB', { metaKey: true }), sidebar)).toBe(true)
+    expect(matchBinding(ev('KeyB', { ctrlKey: true }), sidebar)).toBe(true)
   })
 
-  it('ignores Alt (so ⌥⌘S still counts)', () => {
-    expect(matchBinding(ev('KeyS', { metaKey: true, altKey: true }), save)).toBe(true)
+  it('ignores Alt (so ⌥⌘B still counts)', () => {
+    expect(matchBinding(ev('KeyB', { metaKey: true, altKey: true }), sidebar)).toBe(true)
   })
 
   it('requires the modifier and exact shift', () => {
-    expect(matchBinding(ev('KeyS'), save)).toBe(false)
-    expect(matchBinding(ev('KeyS', { metaKey: true, shiftKey: true }), save)).toBe(false)
+    expect(matchBinding(ev('KeyB'), sidebar)).toBe(false)
+    expect(matchBinding(ev('KeyB', { metaKey: true, shiftKey: true }), sidebar)).toBe(false)
   })
 })
 
@@ -59,9 +59,9 @@ describe('resolveHotkey', () => {
     expect(resolveHotkey(inInput, {})).toBeNull()
   })
 
-  it('honors the browser-safe forms ⌥⌘N / Ctrl+M', () => {
-    expect(resolveHotkey(ev('KeyN', { metaKey: true, altKey: true }), {})).toBe('newFile')
-    expect(resolveHotkey(ev('KeyM', { ctrlKey: true }), {})).toBe('move')
+  it('honors the browser-safe forms ⌥⌘B / Ctrl+J', () => {
+    expect(resolveHotkey(ev('KeyB', { metaKey: true, altKey: true }), {})).toBe('sidebar')
+    expect(resolveHotkey(ev('KeyJ', { ctrlKey: true }), {})).toBe('agent')
   })
 
   it('applies user overrides and drops the old default', () => {
@@ -73,7 +73,7 @@ describe('resolveHotkey', () => {
 
 describe('findConflict', () => {
   it('reports the command already bound to a combo', () => {
-    expect(findConflict('delete', { mod: true, code: 'KeyK' }, {})?.id).toBe('search')
+    expect(findConflict('agent', { mod: true, code: 'KeyK' }, {})?.id).toBe('search')
   })
   it('ignores the command itself', () => {
     expect(findConflict('search', { mod: true, code: 'KeyK' }, {})).toBeNull()
@@ -91,7 +91,7 @@ describe('normalizeHotkeyOverrides', () => {
   it('keeps valid overrides, drops unknown ids and malformed bindings', () => {
     const out = normalizeHotkeyOverrides({
       agent: { code: 'KeyG', mod: true, shift: true },
-      save: {}, // no code → dropped
+      sidebar: {}, // no code → dropped
       bogus: { code: 'KeyX', mod: true }, // unknown id → dropped
     })
     expect(out).toEqual({ agent: { code: 'KeyG', mod: true, shift: true } })

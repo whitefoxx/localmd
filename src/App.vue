@@ -12,11 +12,6 @@ import { useTtsStore } from '@/stores/tts'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import TtsBar from '@/components/TtsBar.vue'
-import {
-  newFileInteractive,
-  moveInteractive,
-  deleteSelectedInteractive,
-} from '@/lib/fileOps'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
 
 const kb = useKbStore()
@@ -37,27 +32,34 @@ function onFocus(): void {
 }
 
 /** What each command does. Key bindings live in the registry (@/lib/hotkeys);
- *  overrides in the settings store. See onKeydown for the KB-open / save guard. */
+ *  overrides in the settings store. See onKeydown for the KB-open guard. */
 const RUN: Record<HotkeyId, () => void> = {
-  save: () => void files.flush(),
   search: () => (ui.searchOpen = !ui.searchOpen),
   sidebar: () => (ui.sidebarOpen = !ui.sidebarOpen),
   agent: () => (ui.agentOpen = !ui.agentOpen),
-  newFile: () => void newFileInteractive(),
-  move: () => void moveInteractive(),
-  delete: () => void deleteSelectedInteractive(),
   tabPrev: () => void files.cycleTab(-1),
   tabNext: () => void files.cycleTab(1),
 }
 
 function onKeydown(e: KeyboardEvent): void {
-  // A component already consumed this key (e.g. CodeMirror's ⌘[ indent).
+  // Runs in the capture phase (see onMounted), i.e. before any element/plugin/
+  // editor handler. When a combo is one of our hotkeys we claim it outright:
+  // preventDefault (kill the browser's own ⌘P print / ⌘S save) *and*
+  // stopPropagation, so the event never reaches in-page listeners that would
+  // double-handle it. The PDF viewer (EmbedPDF) registers a document-level
+  // keydown listener mapping ⌘P to its own in-app print dialog; without
+  // stopPropagation here that dialog still popped up alongside our search panel.
+  // Keys the editor legitimately owns (⌘[/⌘] indent, ⌘D select-next) carry
+  // notInEditable, so resolveHotkey won't match them inside an editable target,
+  // we don't stop them, and they fall through to CodeMirror. Keys inside an epub
+  // chapter iframe never reach here — EpubViewer forwards those onto window itself.
   if (e.defaultPrevented) return
   const id = resolveHotkey(e, settings.state.hotkeys)
   if (id) {
     e.preventDefault()
-    // Every command except save is a no-op until a KB is open (we still
-    // preventDefault so the browser doesn't run its own ⌘K/⌘N/… meanwhile).
+    e.stopPropagation()
+    // These commands are a no-op until a KB is open (we still preventDefault so
+    // the browser doesn't run its own ⌘K/⌘B/… meanwhile).
     if (HOTKEY_BY_ID[id].needsKb !== false && !kb.isOpen) return
     RUN[id]()
     return
@@ -90,13 +92,14 @@ function onBeforeUnload(): void {
 onMounted(() => {
   void kb.refreshRecents()
   window.addEventListener('focus', onFocus)
-  window.addEventListener('keydown', onKeydown)
+  // Capture phase: claim hotkeys before the PDF viewer / browser default can.
+  window.addEventListener('keydown', onKeydown, true)
   window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', onFocus)
-  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keydown', onKeydown, true)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
