@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { rawSubdirFor, sanitizeFilename, ensureFilename, numberedVariant } from './capture'
+import {
+  rawSubdirFor,
+  sanitizeFilename,
+  ensureFilename,
+  numberedVariant,
+  landingPathFor,
+  INBOX_DIR,
+} from './capture'
+
+describe('landingPathFor — raw/ bucketing only when the KB has a raw/ tree', () => {
+  it('buckets by type in raw-layout KBs', () => {
+    expect(landingPathFor('paper.pdf', true)).toBe('raw/papers/paper.pdf')
+    expect(landingPathFor('shot.png', true)).toBe('raw/images/shot.png')
+  })
+  it('lands flat in inbox/ elsewhere — never grafts raw/ onto foreign layouts', () => {
+    expect(landingPathFor('paper.pdf', false)).toBe(`${INBOX_DIR}/paper.pdf`)
+    expect(landingPathFor('shot.png', false)).toBe(`${INBOX_DIR}/shot.png`)
+  })
+})
 
 describe('rawSubdirFor — must stay aligned with trace-app routing', () => {
   it('routes by extension', () => {

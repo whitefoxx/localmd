@@ -64,10 +64,20 @@ async function onClick(e: MouseEvent): Promise<void> {
     if (a.dataset.resolved === '1' && a.dataset.target) {
       await files.openFile(a.dataset.target)
     } else if (a.dataset.target) {
-      // Broken link: create the page under wiki/ and open it in edit mode.
+      // Broken link: create the page and open it in edit mode. Path-style
+      // targets ([[notes/foo]]) are explicit; bare names go under wiki/ when
+      // the KB has one (the default layout), otherwise next to this file.
       const target = a.dataset.target
-      if (confirm(t('viewers.markdown.createPagePrompt', { target }))) {
-        await files.createFile(`wiki/${target}.md`, `# ${target}\n\n`)
+      const cur = files.currentPath ?? ''
+      const dir = files.allFiles.some((p) => p.startsWith('wiki/'))
+        ? 'wiki'
+        : cur.includes('/')
+          ? cur.slice(0, cur.lastIndexOf('/'))
+          : ''
+      const dest = target.includes('/') || !dir ? `${target}.md` : `${dir}/${target}.md`
+      const title = target.split('/').pop() ?? target
+      if (confirm(t('viewers.markdown.createPagePrompt', { target: dest }))) {
+        await files.createFile(dest, `# ${title}\n\n`)
       }
     }
     return

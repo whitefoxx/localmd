@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderTranscript, sessionFileName } from './transcript'
+import { renderTranscript, sessionFileName, transcriptDirFor } from './transcript'
 import type { TranscriptSession } from './transcript'
 import type { UiMessage } from '@/stores/chat'
 
@@ -26,6 +26,13 @@ function session(overrides: Partial<TranscriptSession> = {}): TranscriptSession 
     ...overrides,
   }
 }
+
+describe('transcriptDirFor', () => {
+  it('keeps trace-app’s conversations dir in raw-layout KBs, inbox/ elsewhere', () => {
+    expect(transcriptDirFor(true)).toBe('raw/conversations/browser-md')
+    expect(transcriptDirFor(false)).toBe('inbox/conversations')
+  })
+})
 
 describe('sessionFileName', () => {
   it('prefixes the date and keeps the title (CJK and spaces)', () => {

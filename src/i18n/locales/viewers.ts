@@ -74,7 +74,7 @@ export default {
     },
 
     markdown: {
-      createPagePrompt: 'Page “{target}” does not exist. Create it under wiki/?',
+      createPagePrompt: 'This page does not exist. Create {target}?',
     },
   },
   zh: {
@@ -147,7 +147,7 @@ export default {
     },
 
     markdown: {
-      createPagePrompt: '页面「{target}」不存在，是否在 wiki/ 下创建？',
+      createPagePrompt: '页面不存在，是否创建 {target}？',
     },
   },
 }

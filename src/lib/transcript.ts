@@ -9,6 +9,7 @@
  * own title.
  */
 import type { UiMessage } from '@/stores/chat'
+import { INBOX_DIR } from '@/lib/capture'
 
 /** The slice of a chat session the renderer needs. */
 export interface TranscriptSession {
@@ -19,8 +20,11 @@ export interface TranscriptSession {
 }
 
 /** Default directory for the agent's save_transcript tool (the user's button
- *  picks a location instead). */
-export const TRANSCRIPT_DIR = 'raw/conversations/browser-md'
+ *  picks a location instead): the conversations corner of a raw/ layout, or
+ *  the neutral inbox/ elsewhere. Pure — layout detection is the caller's job. */
+export function transcriptDirFor(rawLayout: boolean): string {
+  return rawLayout ? 'raw/conversations/browser-md' : `${INBOX_DIR}/conversations`
+}
 
 function localDate(ts: number): string {
   const d = new Date(ts)

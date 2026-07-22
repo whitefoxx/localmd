@@ -1,11 +1,31 @@
 /**
  * Source capture (drag-drop onto the app + paste/upload in the chat input):
- * route incoming files into `raw/<subdir>` by type with collision-safe names.
- * The routing table is byte-for-byte trace-app's, so both apps file sources
- * identically. Pure helpers are exported for unit tests; the only I/O lives
- * in importFile()/captureFiles().
+ * route incoming files to a landing spot with collision-safe names. KBs using
+ * the trace-app layout (a `raw/` tree exists) bucket by type into
+ * `raw/<subdir>` — that routing table is byte-for-byte trace-app's, so both
+ * apps file sources identically. Any other KB gets a flat neutral `inbox/`
+ * instead: opening a pre-existing folder must never graft our layout onto it
+ * (the agent re-files from inbox/ into the user's own structure on ingest).
+ * Pure helpers are exported for unit tests; the only I/O lives in
+ * importFile()/captureFiles().
  */
 import * as fs from '@/lib/fs'
+
+/** Neutral landing directory for KBs that don't use the raw/ layout. */
+export const INBOX_DIR = 'inbox'
+
+/** Whether this KB uses the trace-app raw/ intake layout. Automatic writes
+ *  (drops, pastes, generated images, saved sessions) bucket into raw/ only
+ *  when the tree already has one. */
+export async function usesRawLayout(): Promise<boolean> {
+  return fs.exists('raw')
+}
+
+/** Where an incoming file lands: raw/<subdir>/ bucketing in raw-layout KBs, a
+ *  flat inbox/ elsewhere. Pure — layout detection is the caller's job. */
+export function landingPathFor(name: string, rawLayout: boolean): string {
+  return rawLayout ? `raw/${rawSubdirFor(name)}/${name}` : `${INBOX_DIR}/${name}`
+}
 
 /** Which `raw/` subdirectory an uploaded/pasted file belongs in, by extension. */
 export function rawSubdirFor(filename: string): string {
@@ -65,10 +85,10 @@ async function resolveUniquePath(desired: string): Promise<string> {
   throw new Error(`could not find a free name for ${desired}`)
 }
 
-/** Write an incoming File into `raw/<subdir>/` and return its KB path. */
+/** Write an incoming File into its landing spot and return its KB path. */
 export async function importFile(f: File): Promise<string> {
   const name = ensureFilename(f.name, f.type, Date.now())
-  const dest = await resolveUniquePath(`raw/${rawSubdirFor(name)}/${name}`)
+  const dest = await resolveUniquePath(landingPathFor(name, await usesRawLayout()))
   await fs.writeFile(dest, f)
   return dest
 }
@@ -106,7 +126,7 @@ export async function importTempFile(f: File): Promise<string> {
 
 /** Write an incoming File into an explicit KB directory ('' = root), keeping
  *  its original name (collision-safe). Used by the file-tree "Import" action,
- *  which places files where the user points rather than routing into raw/. */
+ *  which places files where the user points rather than at the landing spot. */
 export async function importFileInto(f: File, dir: string): Promise<string> {
   const name = ensureFilename(f.name, f.type, Date.now())
   const dest = await resolveUniquePath(dir ? `${dir}/${name}` : name)
@@ -114,7 +134,7 @@ export async function importFileInto(f: File, dir: string): Promise<string> {
   return dest
 }
 
-/** Save dropped/uploaded files into raw/; returns the KB paths written. */
+/** Save dropped/uploaded files into their landing spot; returns the KB paths written. */
 export async function captureFiles(files: File[]): Promise<string[]> {
   const written: string[] = []
   for (const file of files) {

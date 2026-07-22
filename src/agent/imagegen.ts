@@ -1,24 +1,27 @@
 /**
  * Image generation for the `image` capability slot. The agent calls the
  * generate_image tool; the loop routes it here, which asks the image-slot
- * model (via the AI SDK) to produce an image and saves the bytes into the KB
- * under raw/images/ (trace-app's archiving convention), returning the path so
- * the chat can show it and the model can reference it.
+ * model (via the AI SDK) to produce an image and saves the bytes into the KB —
+ * raw/images/ in raw-layout KBs (trace-app's archiving convention), inbox/
+ * elsewhere — returning the path so the chat can show it and the model can
+ * reference it.
  */
 import { generateImage as aiGenerateImage } from 'ai'
 import { toImageModel } from './model'
 import * as fs from '@/lib/fs'
+import { INBOX_DIR, usesRawLayout } from '@/lib/capture'
 import { slugify } from '@/lib/docindex/util'
 import type { LlmProfile } from '@/stores/settings'
 
-/** Pick `raw/images/generated-<slug>.<ext>`, appending -2, -3… on collision. */
+/** Pick `<landing dir>/generated-<slug>.<ext>`, appending -2, -3… on collision. */
 async function uniqueImagePath(prompt: string, ext: string): Promise<string> {
+  const dir = (await usesRawLayout()) ? 'raw/images' : INBOX_DIR
   const slug = slugify(prompt).slice(0, 40) || 'image'
   for (let n = 1; n < 1000; n++) {
-    const path = `raw/images/generated-${slug}${n > 1 ? `-${n}` : ''}.${ext}`
+    const path = `${dir}/generated-${slug}${n > 1 ? `-${n}` : ''}.${ext}`
     if (!(await fs.exists(path))) return path
   }
-  return `raw/images/generated-${slug}-${Date.now()}.${ext}`
+  return `${dir}/generated-${slug}-${Date.now()}.${ext}`
 }
 
 /** Generate an image from a prompt and save it into the KB. Returns its

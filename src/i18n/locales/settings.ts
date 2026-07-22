@@ -36,7 +36,7 @@ export default {
     visionHelp:
       'A Claude primary is multimodal by nature — no vision slot needed. For an OpenAI-compatible primary: if it is itself multimodal (e.g. qwen-vl, glm-4v, gpt-4o), point the vision slot at itself (images go straight into context); if it is text-only (e.g. deepseek-chat), point the vision slot at a dedicated vision model (the agent calls it through the view_image tool).',
     imageHelp:
-      'The image-generation slot is optional; once set, the primary can create pictures with the generate_image tool (saved into raw/images/). Supported: OpenAI (DALL·E), Google (Imagen), xAI, and OpenAI-compatible /images/generations endpoints (Zhipu CogView, Qwen, custom, …). Enter the matching image model name; the endpoint must allow browser CORS.',
+      'The image-generation slot is optional; once set, the primary can create pictures with the generate_image tool (saved into the KB). Supported: OpenAI (DALL·E), Google (Imagen), xAI, and OpenAI-compatible /images/generations endpoints (Zhipu CogView, Qwen, custom, …). Enter the matching image model name; the endpoint must allow browser CORS.',
 
     // Agent behavior
     writeMode: 'Write mode',
@@ -136,7 +136,7 @@ export default {
     visionHelp:
       'Claude 主模型天生多模态，无需配置视觉槽。OpenAI 兼容主模型：若它本身是多模态（如 qwen-vl、glm-4v、gpt-4o），视觉槽选它自己（图片直接进上下文）；若是纯文本模型（如 deepseek-chat），视觉槽指一个专门的视觉模型（agent 通过 view_image 工具调用它）。',
     imageHelp:
-      '图像生成槽可选，配置后主模型可用 generate_image 工具作图（保存进 raw/images/）。支持 OpenAI（DALL·E）、Google（Imagen）、xAI，以及 OpenAI 兼容的 /images/generations 端点（智谱 CogView、Qwen、自定义等）；模型名填对应的作图模型，端点须允许浏览器 CORS。',
+      '图像生成槽可选，配置后主模型可用 generate_image 工具作图（保存进知识库）。支持 OpenAI（DALL·E）、Google（Imagen）、xAI，以及 OpenAI 兼容的 /images/generations 端点（智谱 CogView、Qwen、自定义等）；模型名填对应的作图模型，端点须允许浏览器 CORS。',
 
     // Agent behavior
     writeMode: '写入模式',
