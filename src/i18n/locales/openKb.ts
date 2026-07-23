@@ -6,6 +6,7 @@ export default {
     openFolder: 'Open local folder',
     newKb: 'Start a new knowledge base',
     recent: 'Recent',
+    forget: 'Remove from recent',
     howItWorks: 'How it works',
     step1Title: 'Open a folder',
     step1Body:
@@ -26,6 +27,7 @@ export default {
     openFolder: '打开本地文件夹',
     newKb: '新建一个知识库',
     recent: '最近',
+    forget: '从最近中移除',
     howItWorks: '如何使用',
     step1Title: '打开一个文件夹',
     step1Body: '设备上任意文件夹——空的，或已经装满 Markdown。什么都不会被拷走。',

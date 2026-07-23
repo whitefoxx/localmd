@@ -43,27 +43,32 @@ async function openRecent(entry: RecentKb): Promise<void> {
     await files.restoreTabs()
   }
 }
+
+/** Drop an entry from the recent list — the folder on disk is untouched. */
+async function forget(entry: RecentKb): Promise<void> {
+  await kb.forgetRecent(entry.name)
+}
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto">
+  <div class="h-full overflow-y-auto select-text">
     <!-- Hero: fills the first screen -->
     <section class="relative min-h-full flex items-center justify-center px-6 py-16">
       <div class="w-[440px] max-w-full">
-        <div class="flex items-center gap-2.5 mb-1">
-          <svg
-            class="w-8 h-8 text-accent"
-            viewBox="0 0 128 128"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="10"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M24 90V40l22 26 22-26v50" />
-            <path d="M100 40v46m0 0-14-14m14 14 14-14" />
+        <div class="flex items-center gap-2.5 mb-2">
+          <svg class="w-8 h-8 text-accent" viewBox="0 0 128 128" aria-hidden="true">
+            <rect width="128" height="128" rx="28" fill="currentColor" />
+            <g fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M50 36H36v56h14" />
+              <path d="M78 36h14v56H78" />
+            </g>
+            <circle cx="64" cy="64" r="6.5" fill="#fff" />
           </svg>
-          <h1 class="text-3xl font-bold text-fg-0">local<span class="text-accent">md</span></h1>
+          <h1 class="font-wordmark text-3xl font-bold tracking-tight leading-none">
+            <span class="text-fg-3/50">[[</span
+            ><span class="text-fg-0">local</span><span class="text-accent">md</span
+            ><span class="text-fg-3/50">]]</span>
+          </h1>
         </div>
         <p class="text-fg-2 mb-6">
           {{ $t('openKb.tagline') }}
@@ -86,16 +91,30 @@ async function openRecent(entry: RecentKb): Promise<void> {
           <!-- Returning users: jump straight back into a recent folder. -->
           <div v-if="kb.recents.length" class="mt-8">
             <div class="text-xs uppercase tracking-wide text-fg-3 mb-2">{{ $t('openKb.recent') }}</div>
-            <button
+            <div
               v-for="r in kb.recents"
               :key="r.name"
-              class="w-full text-left px-3 py-2 rounded hover:bg-bg-2 text-fg-1 flex items-center gap-2"
-              @click="openRecent(r)"
+              class="group relative rounded hover:bg-bg-2"
             >
-              <span class="codicon codicon-folder text-fg-3" />
-              <span class="flex-1 truncate">{{ r.name }}</span>
-              <span class="text-xs text-fg-3">{{ new Date(r.lastOpened).toLocaleDateString() }}</span>
-            </button>
+              <button
+                class="w-full text-left px-3 py-2 text-fg-1 flex items-center gap-2"
+                @click="openRecent(r)"
+              >
+                <span class="codicon codicon-folder text-fg-3" />
+                <span class="flex-1 truncate">{{ r.name }}</span>
+                <span class="text-xs text-fg-3 group-hover:opacity-0 transition-opacity">
+                  {{ new Date(r.lastOpened).toLocaleDateString() }}
+                </span>
+              </button>
+              <button
+                class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 text-fg-3 hover:text-removed hover:bg-bg-3 transition"
+                :title="$t('openKb.forget')"
+                :aria-label="$t('openKb.forget')"
+                @click.stop="forget(r)"
+              >
+                <span class="codicon codicon-sm codicon-close" />
+              </button>
+            </div>
           </div>
 
           <!-- First-time visitors: what this is and how it works. -->

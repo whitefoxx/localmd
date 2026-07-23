@@ -4,6 +4,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Brand wordmark — Space Grotesk 700 (latin subset), self-hosted so the
+   [[localmd]] logo stays crisp and works offline. Used only by .font-wordmark. */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/space-grotesk-700.woff2') format('woff2');
+}
+.font-wordmark {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+}
+
 /* Theme palettes — RGB triplets consumed by tailwind.config.ts via
    rgb(var(--c-…) / alpha). `data-theme` on <html> picks the set; the theme
    store keeps it in sync with the light/dark/system preference.

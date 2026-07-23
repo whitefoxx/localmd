@@ -89,6 +89,12 @@ export const useKbStore = defineStore('kb', () => {
     }
   }
 
+  /** Drop a folder from the recent list (does not touch the folder itself). */
+  async function forgetRecent(name: string): Promise<void> {
+    await removeRecent(name)
+    await refreshRecents()
+  }
+
   function close(): void {
     releaseLock?.()
     releaseLock = null
@@ -106,6 +112,7 @@ export const useKbStore = defineStore('kb', () => {
     error,
     lockedByOther,
     refreshRecents,
+    forgetRecent,
     pickAndOpen,
     openRecent,
     openHandle, // used by the E2E bootstrap (memory-fs handle)
