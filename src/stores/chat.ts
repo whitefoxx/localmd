@@ -42,6 +42,21 @@ type UserContent =
       | { type: 'image'; image: string; mediaType?: string }
     >
 
+/** Ambient "now" stamp appended to each user message so the agent knows the
+ *  current moment — dating notes, resolving "today"/"recent", frontmatter
+ *  dates — without a tool round-trip. It lives on the message (not the system
+ *  prompt) so the cached prompt prefix stays byte-stable across turns, and is
+ *  baked in once at send time so history never mutates. Local wall clock, in
+ *  the user's own timezone. */
+function currentTimeNote(): string {
+  const now = new Date()
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const date = now.toLocaleDateString('en-CA') // YYYY-MM-DD
+  const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  return `[Current date & time: ${date} (${weekday}) ${time}${tz ? ` ${tz}` : ''}]`
+}
+
 export type MessagePart =
   | { type: 'text'; text: string }
   /** `startedAt`/`elapsedMs` let the UI show how long the model thought.
@@ -452,6 +467,8 @@ export const useChatStore = defineStore('chat', () => {
     selections: SelectionRef[],
   ): Promise<string> {
     let out = trimmed
+    // Ambient current time, so date-aware tasks work without a tool round-trip.
+    out += `\n\n${currentTimeNote()}`
     const uploaded = attachments.filter((a) => !a.image).map((a) => a.path)
     if (uploaded.length) {
       out += `\n\n[The user uploaded files with this message (saved to the KB): ${uploaded.join(', ')} — use read_file to view their contents]`
