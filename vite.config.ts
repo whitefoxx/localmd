@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'browser-md',
-        short_name: 'browser-md',
+        name: 'localmd',
+        short_name: 'localmd',
         description: 'Local-first AI knowledge base — your markdown files, in your browser.',
         theme_color: '#0d1117',
         background_color: '#0d1117',
