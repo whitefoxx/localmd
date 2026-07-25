@@ -57,6 +57,25 @@ export const useFilesStore = defineStore('files', () => {
    *  KB, so the empty state during a KB switch/close can't clobber saved tabs. */
   let tabsReady = false
 
+  /**
+   * Point the tree at `path`: expand the folders on the way to it and make it
+   * THE selected row (selection is single, so every other highlight drops).
+   * The state half of "reveal the active file" — FileTree does the scrolling.
+   * Paths the tree doesn't show (.trace/, .git/) are ignored: selecting a row
+   * that isn't rendered would only strand `targetDir` inside a hidden folder.
+   */
+  function revealPath(path: string): void {
+    if (!allFiles.value.includes(path)) return
+    const segs = path.split('/')
+    segs.pop()
+    let dir = ''
+    for (const seg of segs) {
+      dir = dir ? `${dir}/${seg}` : seg
+      expandedDirs.value.add(dir)
+    }
+    select(path, false)
+  }
+
   function toggleDir(path: string): void {
     const s = expandedDirs.value
     if (s.has(path)) s.delete(path)
@@ -428,6 +447,7 @@ export const useFilesStore = defineStore('files', () => {
     expandedDirs,
     toggleDir,
     collapseAll,
+    revealPath,
     renameEntry,
     deleteEntry,
     closeOtherTabs,

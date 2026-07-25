@@ -85,6 +85,25 @@ test('deleting a folder asks first and says it cannot be undone', async ({ page 
   await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
 })
 
+test('switching tabs reveals and selects the file in the tree', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const tree = page.locator('aside')
+  // Two tabs: the scaffolded wiki/index.md, plus AGENTS.md from the root.
+  await tree.getByText('AGENTS.md', { exact: true }).click()
+  await expect(page.locator('main').getByRole('button', { name: /AGENTS\.md/ })).toBeVisible()
+
+  // Collapse everything, so wiki/index.md is not even rendered any more.
+  await tree.getByTitle('Collapse all').click()
+  const indexRow = tree.locator('[data-tree-path="wiki/index.md"]')
+  await expect(indexRow).toBeHidden()
+
+  // Clicking its tab expands wiki/ again and moves the highlight onto the row.
+  await page.locator('main').getByRole('button', { name: /index\.md/ }).click()
+  await expect(indexRow).toBeVisible()
+  await expect(indexRow).toHaveClass(/bg-accent/)
+  await expect(tree.locator('[data-tree-path="AGENTS.md"]')).not.toHaveClass(/bg-accent/)
+})
+
 test('artifact tool renders a card that opens the sandboxed viewer', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)

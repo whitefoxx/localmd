@@ -23,15 +23,17 @@ const indexStatus = ref('')
 const expanded = ref(true)
 const rootEl = ref<HTMLElement | null>(null)
 
-/* Keep the active file visible: when the open file changes (clicked here, or
- * opened from backlinks / open-files / @-mention), scroll its row into view
- * within the tree's scroll container. `block: 'nearest'` only nudges when the
- * row is actually off-screen — e.g. after the backlinks panel resizes below. */
+/* Follow the active file: whenever it changes (a tab click, or an open from
+ * backlinks / open-files / a wikilink / the agent), the tree expands the path
+ * down to it, highlights that row alone, and scrolls it into view.
+ * `block: 'nearest'` only nudges when the row is actually off-screen — e.g.
+ * after the backlinks panel resizes below. */
 watch(
   () => files.currentPath,
   async (path) => {
     if (!path) return
-    await nextTick()
+    files.revealPath(path)
+    await nextTick() // rows of a just-expanded folder need to exist first
     const el = rootEl.value?.querySelector(`[data-tree-path="${CSS.escape(path)}"]`)
     el?.scrollIntoView({ block: 'nearest' })
   },
