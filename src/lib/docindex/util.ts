@@ -41,7 +41,7 @@ export function fnv1a(s: string): string {
 }
 
 /** Index directory for a source path: `.trace/<kind>-index/<name>-<hash>`. */
-export function indexDirFor(kind: 'pdf' | 'epub' | 'md', source: string): string {
+export function indexDirFor(kind: 'pdf' | 'epub' | 'md' | 'docx', source: string): string {
   const base = source.split('/').pop()?.replace(/\.[^.]+$/, '') ?? source
   return `.trace/${kind}-index/${slugify(base)}-${fnv1a(source)}`
 }

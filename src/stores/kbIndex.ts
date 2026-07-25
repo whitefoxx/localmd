@@ -114,13 +114,13 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     }
   }
 
-  /** Cache the section files of every PDF/EPUB index, so book content is
-   *  searchable and hits can jump to the passage via their block ids. */
+  /** Cache the section files of every PDF/EPUB/DOCX index, so document content
+   *  is searchable and hits can jump to the passage via their block ids. */
   async function refreshDocSections(): Promise<void> {
     const next = new Map(docSections.value)
     const seen = new Set<string>()
     let changed = false
-    for (const kind of ['pdf-index', 'epub-index']) {
+    for (const kind of ['pdf-index', 'epub-index', 'docx-index']) {
       let tree
       try {
         tree = await fs.readTreeFrom(`.trace/${kind}`)

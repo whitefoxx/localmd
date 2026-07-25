@@ -1,24 +1,24 @@
 /**
  * Render-time handling of Q&A citation tokens inside wiki pages and chat
  * answers. Ported from trace-app — token forms:
- *   [[pdf1:raw/papers/x.pdf]]   — declares source #1 (also [[epub2:…]], [[md3:…]])
+ *   [[pdf1:raw/papers/x.pdf]]   — declares source #1 (also [[epub2:…]], [[md3:…]], [[docx4:…]])
  *   [[1:b14-3]]                 — inline citation into source #1, block b14-3
  *   [[b14-3]]                   — inline citation, source inferred at click time
  */
 import { escapeHtml } from './wiki'
 
-const CITE_SOURCE_RE = /\[\[(pdf|epub|md)(\d+):([^\]]+?)\]\]/g
+const CITE_SOURCE_RE = /\[\[(pdf|epub|md|docx)(\d+):([^\]]+?)\]\]/g
 const CITE_INLINE_RE = /\[\[(?:(\d+):)?(b\d+-\d+)\]\]/g
 
 export interface CiteSource {
-  kind: 'pdf' | 'epub' | 'md'
+  kind: 'pdf' | 'epub' | 'md' | 'docx'
   path: string
 }
 
 /** True if a `[[…]]` inner string is a citation token, not a wikilink target. */
 export function isCitationToken(inner: string): boolean {
   const s = inner.trim()
-  return /^(?:pdf|epub|md)\d+:/i.test(s) || /^(?:\d+:)?b\d+-\d+$/i.test(s)
+  return /^(?:pdf|epub|md|docx)\d+:/i.test(s) || /^(?:\d+:)?b\d+-\d+$/i.test(s)
 }
 
 /** Map source number → declared path, from every `[[pdfN:path]]` in the body. */

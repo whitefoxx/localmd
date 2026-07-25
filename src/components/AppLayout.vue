@@ -23,6 +23,7 @@ import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
 import EpubViewer from '@/components/viewers/EpubViewer.vue'
+import DocxViewer from '@/components/viewers/DocxViewer.vue'
 import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
 import AnnotationsViewer from '@/components/viewers/AnnotationsViewer.vue'
 import TextPreview from '@/components/viewers/TextPreview.vue'
@@ -460,6 +461,7 @@ function closeKb(): void {
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
               <EpubViewer v-else-if="kind === 'epub'" />
+              <DocxViewer v-else-if="kind === 'docx'" />
               <ArtifactViewer v-else-if="kind === 'html'" />
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">

@@ -76,6 +76,17 @@ export default {
     markdown: {
       createPagePrompt: 'This page does not exist. Create {target}?',
     },
+
+    docx: {
+      loading: 'Opening document…',
+      loadFailed: 'Could not read this Word document.',
+      indexing: 'Indexing for AI…',
+      indexed: 'Indexed · {n} blocks',
+      indexFailed: 'Indexing failed',
+      legacyTitle: 'Legacy .doc format',
+      legacyHint:
+        'Word 97–2003 (.doc) is a binary format that cannot be read in the browser. Open it in Word or Pages and save a copy as .docx.',
+    },
   },
   zh: {
     selection: '选中内容',
@@ -148,6 +159,17 @@ export default {
 
     markdown: {
       createPagePrompt: '页面不存在，是否创建 {target}？',
+    },
+
+    docx: {
+      loading: '正在打开文档…',
+      loadFailed: '无法读取这个 Word 文档。',
+      indexing: '正在建立 AI 索引…',
+      indexed: '已索引 · {n} 个片段',
+      indexFailed: '索引失败',
+      legacyTitle: '旧版 .doc 格式',
+      legacyHint:
+        'Word 97–2003 的 .doc 是二进制格式，浏览器无法解析。请用 Word 或 Pages 打开后另存为 .docx。',
     },
   },
 }

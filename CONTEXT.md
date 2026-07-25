@@ -63,9 +63,10 @@ _Avoid_: capability slot (fine in prose, but "slot" is canonical), channel, role
 ## Documents, sources & citations
 
 **Doc-index**:
-The extracted structure of a single document (PDF/EPUB/MD), stored under
-`.trace/<kind>-index/`. Byte-compatible with trace-app. This is the per-document
-artifact — never call it just "the index".
+The extracted structure of a single document (PDF/EPUB/DOCX/MD), stored under
+`.trace/<kind>-index/`. The PDF/EPUB layouts are byte-compatible with trace-app;
+`docx-index` is ours (trace-app has none). This is the per-document artifact —
+never call it just "the index".
 _Avoid_: bare "index", parse, extraction.
 
 **Source**:

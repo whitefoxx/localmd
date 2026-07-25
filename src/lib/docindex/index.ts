@@ -6,7 +6,7 @@ import * as fs from '@/lib/fs'
 import { indexDirFor } from './util'
 
 export interface IndexSummary {
-  kind: 'pdf' | 'epub' | 'md'
+  kind: 'pdf' | 'epub' | 'md' | 'docx'
   indexDir: string
   title: string
   blockCount: number
@@ -16,10 +16,13 @@ export interface IndexSummary {
 
 export type IndexProgress = (current: number, total: number) => void
 
-export function indexableKind(path: string): 'pdf' | 'epub' | 'md' | null {
+export function indexableKind(path: string): 'pdf' | 'epub' | 'md' | 'docx' | null {
   if (/\.pdf$/i.test(path)) return 'pdf'
   if (/\.epub$/i.test(path)) return 'epub'
   if (/\.md$/i.test(path)) return 'md'
+  // Legacy .doc is claimed here too, so the attempt fails with a message that
+  // explains itself instead of "not an indexable document".
+  if (/\.docx?$/i.test(path)) return 'docx'
   return null
 }
 
@@ -33,6 +36,18 @@ export async function indexDocument(
   if (kind === 'pdf') {
     const { parsePdf } = await import('./pdf')
     const r = await parsePdf(path, onProgress)
+    return {
+      kind,
+      indexDir: r.indexDir,
+      title: r.manifest.title,
+      blockCount: r.manifest.blockCount,
+      sectionCount: r.manifest.sections.length,
+      cached: r.cached,
+    }
+  }
+  if (kind === 'docx') {
+    const { parseDocx } = await import('./docx')
+    const r = await parseDocx(path, onProgress)
     return {
       kind,
       indexDir: r.indexDir,

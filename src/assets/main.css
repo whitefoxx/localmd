@@ -125,6 +125,31 @@
   letter-spacing: 0.01em;
 }
 
+/* Word (.docx) reading view — layered on .md-preview, which already styles the
+   prose. Only what a Word document adds: tables that can outgrow the measure,
+   embedded images, and the flash that marks a cited block. */
+.docx-reader table {
+  @apply block w-max max-w-full overflow-x-auto;
+}
+.docx-reader img {
+  @apply my-3 block;
+}
+.docx-reader mark {
+  @apply bg-accent/25 text-inherit rounded px-0.5;
+}
+.docx-reader .docx-flash {
+  animation: docx-flash 2s ease-out;
+  border-radius: 3px;
+}
+@keyframes docx-flash {
+  from {
+    background-color: rgb(var(--c-accent) / 0.28);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 /* Read-aloud (TTS) highlight-follow: the sentence being spoken, via the CSS
    Custom Highlight API (see composables/useTtsHighlight.ts). */
 ::highlight(tts-sentence) {

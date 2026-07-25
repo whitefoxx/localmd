@@ -127,7 +127,7 @@ const readFile = defineTool({
       const digest = renderAnnotationsDigest(path, raw)
       if (digest) return digest
       content = raw
-    } else if (/\.(pdf|epub)$/i.test(path)) {
+    } else if (/\.(pdf|epub|docx?)$/i.test(path)) {
       // Binary documents go through the structured index (block ids, citeable).
       const { hasIndex, indexDirFor, indexableKind } = await import('@/lib/docindex')
       const kind = indexableKind(path)!
@@ -293,7 +293,7 @@ const kbHealth = defineTool({
 const indexDocument = defineTool({
   name: 'index_document',
   description:
-    'Generate (or refresh) the structured AI index for a PDF, EPUB, or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a fresh index already exists.',
+    'Generate (or refresh) the structured AI index for a PDF, EPUB, Word (.docx), or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a fresh index already exists.',
   schema: z.object({
     path: z.string().describe('KB-relative source path, e.g. "raw/papers/x.pdf"'),
   }),

@@ -495,7 +495,7 @@ export const useChatStore = defineStore('chat', () => {
       const blocks: string[] = []
       for (const p of textMentions) {
         const kind = fileKind(p)
-        if (kind === 'pdf' || kind === 'epub') {
+        if (kind === 'pdf' || kind === 'epub' || kind === 'docx') {
           blocks.push(`@${p}: ${kind.toUpperCase()} document — read it via read_file through the structured index.`)
           continue
         }

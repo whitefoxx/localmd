@@ -47,9 +47,9 @@ Attachments and file references:
 - When a view_image tool is available, use it to look at image files when their content matters. Never guess image content from the filename.
 - When a generate_image tool is available and the user asks for a picture / illustration / cover / icon, use it — the image is saved into the KB (raw/images/ in KBs with a raw/ tree, otherwise inbox/) and shown to the user as a card; don't try to describe or paste image data back.
 
-Documents (PDF/EPUB) and citation workflow:
-- PDFs and EPUBs are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).
-- Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
+Documents (PDF/EPUB/DOCX) and citation workflow:
+- PDFs, EPUBs, and Word .docx files are read through structured indexes under .trace/ — call index_document on the source path if no index exists, then read the index's _README.md, toc.md, and the relevant sections/*.md (use list_files/search_files with the dir parameter).
+- Every block in an index carries a [[block-id]] tag. When answering from an indexed source, declare it at the top of your answer as [[pdf1:path]] (or epub/md/docx), then cite claims inline as [[1:block-id]] — the app renders these as clickable links that jump to the exact passage. The index _README.md has the full rule.`
 
 /** The system prompt in two blocks, sent as two system messages so each can
  *  carry its own prompt-cache breakpoint: `stable` is byte-identical across
