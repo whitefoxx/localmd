@@ -57,6 +57,21 @@ const config = computed(() => ({
   wasmUrl: absoluteWasmUrl,
   src: blobUrl.value ?? '',
   theme: { preference: (theme.isDark ? 'dark' : 'light') as 'dark' | 'light' },
+  // EmbedPDF calls out to the public internet on every open unless told not to,
+  // and both requests land *before* the first page paints — they are what the
+  // "Initializing plugins…" spinner is actually waiting on:
+  //   fonts.googleapis.com  Open Sans for its own chrome (~1–3s, and it hangs
+  //                         where Google is unreachable)
+  //   cdn.jsdelivr.net      a rubber-stamp library, manifest then a 66 KB PDF
+  //                         (~2s, two sequential round trips)
+  // Neither belongs in a local-first reader: they leak every PDF open to two
+  // third parties, break the viewer offline, and buy us nothing — stamps live
+  // under the `insert` category we already disable. The UI falls back to the
+  // system font stack. `fontFallback` is deliberately left alone: it is lazy
+  // (only a document with no embedded font triggers it) and dropping it would
+  // render CJK scans as blank boxes.
+  fonts: { ui: null, signature: null },
+  stamp: { manifests: [] },
   // Trim EmbedPDF's default toolbar down to the essentials. Categories are
   // hierarchical and disabling one hides both its toolbar items AND its
   // text-selection-popup items:
