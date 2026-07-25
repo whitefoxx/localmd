@@ -6,7 +6,9 @@
  *
  * write_file records a before/after snapshot in the review store so the user
  * can approve or discard agent edits afterwards (the browser equivalent of
- * trace-app's git-based review flow).
+ * trace-app's git-based review flow). delete_path rides the same store — an
+ * undoable snapshot for text files, an always-ask confirmation for the
+ * directories and binaries no snapshot can bring back.
  */
 import { z } from 'zod'
 import * as fs from '@/lib/fs'
@@ -21,6 +23,8 @@ import {
 } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { renderFileList } from '@/lib/fileList'
+import { fileKind } from '@/lib/filetypes'
+import { refreshGitStatus } from '@/lib/fileOps'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import { jinaRead, jinaSearch } from '@/lib/webread'
 import { diffLines, collapseContext } from '@/lib/diff'
@@ -109,15 +113,33 @@ const listFiles = defineTool({
   },
 })
 
+/** Serve one window of `content`, telling the model how to read the rest — a
+ *  long file is otherwise unreachable past the first MAX_READ_CHARS. */
+function clip(content: string, offset = 0): string {
+  const from = Math.max(0, Math.trunc(offset))
+  if (from && from >= content.length) {
+    return `Error: offset ${from} is past the end of the file (${content.length} chars).`
+  }
+  const window = content.slice(from, from + MAX_READ_CHARS)
+  const end = from + window.length
+  return end >= content.length
+    ? window
+    : `${window}\n\n[truncated at ${end} of ${content.length} chars — continue with read_file offset=${end}]`
+}
+
 const readFile = defineTool({
   name: 'read_file',
   description:
-    'Read a file from the knowledge base. Path is relative to the KB root. PDF files are returned as extracted text with [page N] markers.',
+    'Read a file from the knowledge base. Path is relative to the KB root. PDF files are returned as extracted text with [page N] markers. A long file comes back truncated, with the offset to continue from.',
   schema: z.object({
     path: z.string().describe('KB-relative path, e.g. "wiki/index.md"'),
+    offset: z
+      .number()
+      .optional()
+      .describe('Character offset to start at — how you continue a truncated read'),
   }),
-  describeCall: (a) => `read ${a.path}`,
-  run: async ({ path }) => {
+  describeCall: (a) => `read ${a.path}${a.offset ? ` @${a.offset}` : ''}`,
+  run: async ({ path, offset }) => {
     let content: string | null
     if (isAnnotationsPath(path)) {
       // Highlight sidecars are rect/CFI-heavy JSON — serve the rendered digest,
@@ -125,7 +147,7 @@ const readFile = defineTool({
       const raw = await fs.tryReadFile(path)
       if (raw === null) return `Error: file not found: ${path}`
       const digest = renderAnnotationsDigest(path, raw)
-      if (digest) return digest
+      if (digest) return clip(digest, offset)
       content = raw
     } else if (/\.(pdf|epub|docx?)$/i.test(path)) {
       // Binary documents go through the structured index (block ids, citeable).
@@ -140,10 +162,7 @@ const readFile = defineTool({
       content = await fs.tryReadFile(path)
     }
     if (content === null) return `Error: file not found: ${path}`
-    if (content.length > MAX_READ_CHARS) {
-      return content.slice(0, MAX_READ_CHARS) + `\n\n[truncated: file is ${content.length} chars]`
-    }
-    return content
+    return clip(content, offset)
   },
 })
 
@@ -187,6 +206,157 @@ const editFile = defineTool({
     }
     await performWrite(path, before, result.content)
     return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
+  },
+})
+
+/* ── deleting and moving ─────────────────────────────────────────────────── */
+
+/** Normalize a path argument: tolerate "./x" and trailing slashes from the model. */
+function cleanPath(p: string): string {
+  return p.trim().replace(/^\.\//, '').replace(/\/+$/, '')
+}
+
+/** Git's own storage is not KB content — losing it loses the history. */
+const PROTECTED_RE = /^\.git(\/|$)/
+
+/** Reject the paths no tool may touch: the KB root itself and .git. */
+function guardPath(path: string, what: string): string | null {
+  if (!path || path === '.') return `Error: refusing to ${what} the KB root.`
+  if (PROTECTED_RE.test(path)) return `Error: .git holds the repository history and is off limits.`
+  return null
+}
+
+/** Files we can read and write back as a string — the ones content search can
+ *  scan and the review panel can restore after a delete. */
+function isTextFile(path: string): boolean {
+  const kind = fileKind(path)
+  return kind === 'markdown' || kind === 'text' || kind === 'html'
+}
+
+/** Listing of everything a recursive delete would remove, for the approval diff. */
+const MAX_LISTED = 200
+async function dirListing(dir: string): Promise<{ text: string; count: number }> {
+  const paths = fs.collectFiles(await fs.readTreeFrom(dir))
+  const shown = paths.slice(0, MAX_LISTED)
+  const more = paths.length - shown.length
+  return {
+    text: shown.join('\n') + (more > 0 ? `\n… and ${more} more` : ''),
+    count: paths.length,
+  }
+}
+
+const deletePath = defineTool({
+  name: 'delete_path',
+  description:
+    'Delete a file, or a whole directory with everything inside it (needs recursive: true). Only delete what the user asked you to remove — never tidy up on your own initiative. A deleted text file can be restored from the Agent-changes panel; directories and binaries (PDF/EPUB/images) cannot, so those always ask the user first.',
+  schema: z.object({
+    path: z.string().describe('KB-relative path to delete, e.g. "inbox/draft.md"'),
+    recursive: z
+      .boolean()
+      .optional()
+      .describe('Required for a directory: delete it and everything inside'),
+  }),
+  describeCall: (a) => `delete ${a.path}`,
+  run: async ({ path, recursive }, ctx) => {
+    const target = cleanPath(path)
+    const guard = guardPath(target, 'delete')
+    if (guard) return guard
+    const kind = await fs.statKind(target)
+    if (!kind) return `Error: no such file or directory: ${target}`
+    const isDir = kind === 'dir'
+    if (isDir && !recursive) {
+      return `Error: ${target} is a directory. Pass recursive: true to delete it and everything inside — after checking with the user that this is what they want.`
+    }
+    const listing = isDir ? await dirListing(target) : null
+    const before = isDir ? listing!.text : isTextFile(target) ? await fs.tryReadFile(target) : null
+    const restorable = !isDir && before !== null
+    // Ask when the user reviews every write — and always when the deletion is
+    // final, since there is no snapshot to undo it with.
+    if (useSettingsStore().state.writeMode === 'ask' || !restorable) {
+      const ok = await useReviewStore().askApproval(ctx.sessionId, target, before, '', {
+        deleted: true,
+        dir: isDir,
+      })
+      if (!ok) return `User declined deleting ${target}. Ask them how to proceed instead of retrying.`
+    }
+    await useFilesStore().deleteEntry(target, isDir)
+    useReviewStore().recordDelete(target, before, isDir)
+    refreshGitStatus()
+    if (isDir) return `Deleted directory ${target} and its ${listing!.count} file(s). This cannot be undone.`
+    return restorable
+      ? `Deleted ${target}. The user can still restore it from the Agent-changes panel.`
+      : `Deleted ${target}. This cannot be undone.`
+  },
+})
+
+const movePath = defineTool({
+  name: 'move_path',
+  description:
+    'Move or rename a file or directory inside the KB. Missing destination folders are created; an existing destination is never overwritten. [[wikilinks]] resolve by file name, so MOVING a page keeps its links working while RENAMING one breaks them — search for the old name afterwards and update the links.',
+  schema: z.object({
+    from: z.string().describe('Current KB-relative path'),
+    to: z.string().describe('New KB-relative path, including the new file name'),
+  }),
+  describeCall: (a) => `move ${a.from} → ${a.to}`,
+  run: async ({ from, to }) => {
+    const src = cleanPath(from)
+    const dest = cleanPath(to)
+    const guard = guardPath(src, 'move') ?? guardPath(dest, 'move onto')
+    if (guard) return guard
+    if (src === dest) return `Error: source and destination are the same (${src}).`
+    const kind = await fs.statKind(src)
+    if (!kind) return `Error: no such file or directory: ${src}`
+    if (kind === 'dir' && dest.startsWith(`${src}/`)) {
+      return `Error: cannot move ${src} into itself.`
+    }
+    if (await fs.statKind(dest)) {
+      return `Error: ${dest} already exists — pick another destination, or delete it first.`
+    }
+    await useFilesStore().renameEntry(src, dest, kind === 'dir')
+    refreshGitStatus()
+    return `Moved ${kind === 'dir' ? 'directory ' : ''}${src} → ${dest}`
+  },
+})
+
+const createDirectory = defineTool({
+  name: 'create_directory',
+  description:
+    'Create an empty directory. write_file already creates the folders in its path, so use this only when the folder itself is the deliverable — scaffolding a layout the user asked for.',
+  schema: z.object({
+    path: z.string().describe('KB-relative directory path, e.g. "wiki/concepts"'),
+  }),
+  describeCall: (a) => `mkdir ${a.path}`,
+  run: async ({ path }) => {
+    const target = cleanPath(path)
+    const guard = guardPath(target, 'create')
+    if (guard) return guard
+    const kind = await fs.statKind(target)
+    if (kind === 'dir') return `${target}/ already exists.`
+    if (kind === 'file') return `Error: ${target} already exists as a file.`
+    await fs.mkdir(target)
+    await useFilesStore().refreshTree()
+    return `Created directory ${target}/ (empty — git only records it once it holds a file).`
+  },
+})
+
+const openFile = defineTool({
+  name: 'open_file',
+  description:
+    "Open a file in the user's editor pane so they can SEE it — after writing a page, or when they ask you to open/show something. It displays the file to the user and returns nothing to you; use read_file when you need the content yourself.",
+  schema: z.object({
+    path: z.string().describe('KB-relative path to show the user'),
+  }),
+  describeCall: (a) => `open ${a.path}`,
+  run: async ({ path }) => {
+    const target = cleanPath(path)
+    const kind = await fs.statKind(target)
+    if (kind !== 'file') {
+      return kind === 'dir'
+        ? `Error: ${target} is a directory — open one of the files inside it.`
+        : `Error: file not found: ${target}`
+    }
+    await useFilesStore().openFile(target)
+    return `Opened ${target} in the user's editor — it is on their screen now, so don't paste the content back.`
   },
 })
 
@@ -246,29 +416,58 @@ const updatePlan = defineTool({
   },
 })
 
+/** Compile a query: `/re/flags` is a regular expression, anything else a
+ *  case-insensitive substring. Returns the error message on a bad regex. */
+function matcher(query: string): ((s: string) => boolean) | string {
+  const slashed = /^\/(.+)\/([gimsuy]*)$/.exec(query)
+  if (!slashed) {
+    const needle = query.toLowerCase()
+    return (s) => s.toLowerCase().includes(needle)
+  }
+  try {
+    // `g`/`y` would carry lastIndex between calls and skip matches — drop them.
+    const re = new RegExp(slashed[1], slashed[2].replace(/[gy]/g, ''))
+    return (s) => re.test(s)
+  } catch (err) {
+    return `Error: invalid regular expression ${query} — ${(err as Error).message}`
+  }
+}
+
 const searchFiles = defineTool({
   name: 'search_files',
   description:
-    'Case-insensitive substring search across markdown/text files. Returns "path:line: text" matches. Pass "dir" to search inside a specific directory — including index directories under .trace/.',
+    'Search the knowledge base and return "path:line: text" matches. The query is a case-insensitive substring, or a regular expression when wrapped in slashes ("/^#+ .*API/"). Pass names: true to match file PATHS instead of contents (how you find a file by name in a big KB), and dir to restrict the scan — including index directories under .trace/.',
   schema: z.object({
-    query: z.string().describe('Substring to search for'),
+    query: z.string().describe('Substring, or /regex/ to match with a regular expression'),
     dir: z.string().optional().describe('Directory to search in, e.g. ".trace/pdf-index/foo-123"'),
+    names: z.boolean().optional().describe('Match file paths instead of file contents'),
   }),
-  describeCall: (a) => (a.dir ? `search "${a.query}" in ${a.dir}` : `search "${a.query}"`),
-  run: async ({ query, dir }) => {
+  describeCall: (a) =>
+    `${a.names ? 'find' : 'search'} "${a.query}"${a.dir ? ` in ${a.dir}` : ''}`,
+  run: async ({ query, dir, names }) => {
+    const match = matcher(query)
+    if (typeof match === 'string') return match
     const tree = dir ? await fs.readTreeFrom(dir) : await fs.readTree()
-    const paths = fs.collectFiles(tree).filter((p) => /\.(md|txt|json|ya?ml|csv)$/i.test(p))
-    const needle = query.toLowerCase()
+    const all = fs.collectFiles(tree)
+
+    if (names) {
+      // Every file, not just the readable ones — finding "that PDF" is the point.
+      const hits = all.filter(match)
+      if (!hits.length) return `No file paths match "${query}"`
+      return (
+        hits.slice(0, MAX_SEARCH_RESULTS).join('\n') +
+        (hits.length > MAX_SEARCH_RESULTS ? `\n[${hits.length} matches, capped at ${MAX_SEARCH_RESULTS}]` : '')
+      )
+    }
+
     const out: string[] = []
-    for (const p of paths) {
+    for (const p of all.filter(isTextFile)) {
       if (out.length >= MAX_SEARCH_RESULTS) break
       const content = await fs.tryReadFile(p)
       if (!content) continue
       const lines = content.split('\n')
       for (let i = 0; i < lines.length && out.length < MAX_SEARCH_RESULTS; i++) {
-        if (lines[i].toLowerCase().includes(needle)) {
-          out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`)
-        }
+        if (match(lines[i])) out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`)
       }
     }
     if (!out.length) return `No matches for "${query}"`
@@ -467,6 +666,49 @@ const gitDiff = defineTool({
     return rendered.length > 20_000
       ? rendered.slice(0, 20_000) + '\n[diff truncated]'
       : rendered || '(no changes)'
+  },
+})
+
+const gitRestore = defineTool({
+  name: 'git_restore',
+  description:
+    'Restore text files to their committed state (HEAD), throwing away the uncommitted changes — this also brings back a file that was deleted after being committed. Pass exact paths from git_status. It overwrites current work, so confirm with the user before restoring anything they might still want.',
+  schema: z.object({
+    paths: z.array(z.string()).min(1).describe('KB-relative paths to restore from HEAD'),
+  }),
+  describeCall: (a) => `git restore ${a.paths.join(', ').slice(0, 60)}`,
+  run: async ({ paths }, ctx) => {
+    if (!(await g.isRepo())) return 'Error: not a git repository'
+    const done: string[] = []
+    const failed: string[] = []
+    for (const raw of paths) {
+      const path = cleanPath(raw)
+      // HEAD blobs are decoded as UTF-8, so a binary would come back corrupted.
+      if (!isTextFile(path)) {
+        failed.push(`${path} (binary — restore it from a terminal)`)
+        continue
+      }
+      const head = await g.readHeadText(path)
+      if (head === null) {
+        failed.push(`${path} (not in HEAD)`)
+        continue
+      }
+      const before = await fs.tryReadFile(path)
+      if (before === head) {
+        failed.push(`${path} (already matches HEAD)`)
+        continue
+      }
+      if (!(await approved(ctx, path, before, head))) {
+        failed.push(`${path} (declined by the user)`)
+        continue
+      }
+      await performWrite(path, before, head)
+      done.push(path)
+    }
+    refreshGitStatus()
+    const head = done.length ? `Restored ${done.length} file(s) from HEAD:\n${done.map((p) => `  ${p}`).join('\n')}` : ''
+    const tail = failed.length ? `${head ? '\n' : ''}Skipped: ${failed.join(', ')}` : ''
+    return head + tail || 'Error: nothing to restore.'
   },
 })
 
@@ -721,6 +963,10 @@ export const TOOLS: ToolSpec[] = [
   readFile,
   writeFile,
   editFile,
+  deletePath,
+  movePath,
+  createDirectory,
+  openFile,
   createArtifact,
   searchFiles,
   kbHealth,
@@ -732,6 +978,7 @@ export const TOOLS: ToolSpec[] = [
   gitInit,
   gitStatus,
   gitDiff,
+  gitRestore,
   gitLog,
   gitCommit,
   gitPush,

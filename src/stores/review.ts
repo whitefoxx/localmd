@@ -6,6 +6,11 @@
  *    recorded so the user can approve (keep) or discard (restore) afterwards.
  *  - ask: the write tool PAUSES on askApproval() until the user approves or
  *    rejects in this panel; rejected writes never touch the disk.
+ *
+ * Deletions ride the same flow: a removed text file keeps its content as the
+ * `before` snapshot, so Discard restores it exactly like an unwanted write. A
+ * directory or a binary can't be snapshotted — those deletions always ask
+ * first (whatever the write mode) and the entry is only a receipt afterwards.
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -19,6 +24,18 @@ export interface PendingChange {
   after: string
   /** Set while the agent is paused waiting for the user's decision (ask mode). */
   awaiting?: boolean
+  /** The change REMOVES the path instead of writing it: `after` is empty, so the
+   *  diff reads as a pure deletion and Approve merely acknowledges it. */
+  deleted?: boolean
+  /** The removed path was a directory — `before` then holds its file listing for
+   *  display only and must never be written back. */
+  dir?: boolean
+}
+
+/** Whether Discard can put the file back: writes always restore, deletions only
+ *  when we hold a text snapshot (directories and binaries are gone for good). */
+export function isRestorable(c: PendingChange): boolean {
+  return !c.deleted || (!c.dir && c.before !== null)
 }
 
 export const useReviewStore = defineStore('review', () => {
@@ -33,13 +50,39 @@ export const useReviewStore = defineStore('review', () => {
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
 
-  function recordWrite(path: string, before: string | null, after: string): void {
+  /** Kind of the recorded change; absent fields mean "an ordinary write". */
+  type ChangeMeta = Pick<PendingChange, 'deleted' | 'dir'>
+
+  /** Register or update the entry for `path`, always keeping the ORIGINAL
+   *  `before` snapshot — that is the pre-agent state Discard restores, however
+   *  many times the agent touches the file afterwards. */
+  function upsert(
+    path: string,
+    before: string | null,
+    after: string,
+    meta: ChangeMeta,
+  ): PendingChange {
     const existing = pending.value.get(path)
     if (existing) {
-      existing.after = after // keep the original `before` snapshot
-    } else {
-      pending.value.set(path, { path, before, after })
+      existing.after = after
+      existing.deleted = meta.deleted ?? false
+      existing.dir = meta.dir ?? false
+      return existing
     }
+    const change: PendingChange = { path, before, after, ...meta }
+    pending.value.set(path, change)
+    return change
+  }
+
+  function recordWrite(path: string, before: string | null, after: string): void {
+    upsert(path, before, after, {})
+  }
+
+  /** Record an agent deletion. `before` is the text snapshot Discard puts back;
+   *  null for binaries (nothing to restore), and for a directory it is the
+   *  removed file listing — shown in the diff, never written back. */
+  function recordDelete(path: string, before: string | null, dir: boolean): void {
+    upsert(path, before, '', { deleted: true, dir })
   }
 
   /** Ask-first mode: register the proposed write and pause the tool until the
@@ -49,14 +92,9 @@ export const useReviewStore = defineStore('review', () => {
     path: string,
     before: string | null,
     after: string,
+    meta: ChangeMeta = {},
   ): Promise<boolean> {
-    const existing = pending.value.get(path)
-    if (existing) {
-      existing.after = after
-      existing.awaiting = true
-    } else {
-      pending.value.set(path, { path, before, after, awaiting: true })
-    }
+    upsert(path, before, after, meta).awaiting = true
     panelOpen.value = true
     return new Promise((resolve) => {
       resolvers.get(path)?.resolve(false) // a superseded ask counts as rejected
@@ -113,7 +151,11 @@ export const useReviewStore = defineStore('review', () => {
     }
     const change = pending.value.get(path)
     if (!change) return
-    if (change.before === null) {
+    if (change.deleted) {
+      // Undo the removal when a text snapshot exists; for a directory or a
+      // binary there is nothing to put back, so Discard just drops the receipt.
+      if (isRestorable(change)) await fs.writeFile(path, change.before!)
+    } else if (change.before === null) {
       await fs.removeFile(path).catch(() => {})
     } else {
       await fs.writeFile(path, change.before)
@@ -142,6 +184,7 @@ export const useReviewStore = defineStore('review', () => {
     changes,
     count,
     recordWrite,
+    recordDelete,
     askApproval,
     decide,
     rejectAwaiting,

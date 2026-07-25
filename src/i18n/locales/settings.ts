@@ -41,7 +41,7 @@ export default {
     // Agent behavior
     writeMode: 'Write mode',
     writeModeDesc:
-      'In ask mode, the agent\'s write_file / edit_file pause until you Approve or Reject in the Review panel. After changes you can review the affected files in the “Agent changes” panel; whether and how to commit is up to you in the Git panel.',
+      'In ask mode, the agent\'s write_file / edit_file / delete_path pause until you Approve or Reject in the Review panel. Deleting a folder or a binary file asks in BOTH modes — nothing can bring those back. After changes you can review the affected files in the “Agent changes” panel; whether and how to commit is up to you in the Git panel.',
     writeAuto: 'Write directly (review afterward)',
     writeAsk: 'Ask first (approve each time)',
     multiTab: 'Multi-tab sessions',
@@ -141,7 +141,7 @@ export default {
     // Agent behavior
     writeMode: '写入模式',
     writeModeDesc:
-      '先询问模式下，agent 的 write_file / edit_file 会挂起，直到你在 Review 面板里 Approve 或 Reject。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、如何提交由你在 Git 面板自行决定。',
+      '先询问模式下，agent 的 write_file / edit_file / delete_path 会挂起，直到你在 Review 面板里 Approve 或 Reject。删除文件夹或二进制文件在两种模式下都会先询问——它们没有任何办法找回。改动后可在 “Agent changes” 面板查看被改的文件，是否提交、如何提交由你在 Git 面板自行决定。',
     writeAuto: '直接写入（事后审查）',
     writeAsk: '先询问（每次批准）',
     multiTab: '多标签页会话',

@@ -132,16 +132,21 @@ export async function writeFile(path: string, content: string | Blob): Promise<v
   await w.close()
 }
 
-export async function exists(path: string): Promise<boolean> {
+/** What lives at `path`: a file, a directory, or nothing. */
+export async function statKind(path: string): Promise<'file' | 'dir' | null> {
   try {
     await getFileHandle(path)
-    return true
+    return 'file'
   } catch (err) {
     const name = (err as DOMException).name
-    if (name === 'NotFoundError') return false
-    if (name === 'TypeMismatchError') return true // it's a directory
+    if (name === 'NotFoundError') return null
+    if (name === 'TypeMismatchError') return 'dir'
     throw err
   }
+}
+
+export async function exists(path: string): Promise<boolean> {
+  return (await statKind(path)) !== null
 }
 
 export async function mkdir(path: string): Promise<void> {

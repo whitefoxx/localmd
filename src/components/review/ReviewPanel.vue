@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useReviewStore } from '@/stores/review'
+import { useReviewStore, isRestorable } from '@/stores/review'
 import { useFilesStore } from '@/stores/files'
 import { diffLines, collapseContext } from '@/lib/diff'
 
@@ -8,6 +8,7 @@ const review = useReviewStore()
 const files = useFilesStore()
 
 const selected = ref<string | null>(null)
+const current = computed(() => review.changes.find((c) => c.path === selected.value) ?? null)
 
 watch(
   () => review.changes,
@@ -19,11 +20,13 @@ watch(
   { immediate: true },
 )
 
-const diff = computed(() => {
-  const change = review.changes.find((c) => c.path === selected.value)
-  if (!change) return []
-  return collapseContext(diffLines(change.before ?? '', change.after))
-})
+const diff = computed(() =>
+  current.value ? collapseContext(diffLines(current.value.before ?? '', current.value.after)) : [],
+)
+
+/** A deletion Discard can undo. Directories and binaries can't be — the panel
+ *  says so, and its Discard button only dismisses the entry. */
+const restorable = computed(() => !!current.value && isRestorable(current.value))
 
 async function openInEditor(path: string): Promise<void> {
   review.panelOpen = false
@@ -71,7 +74,13 @@ async function openInEditor(path: string): Promise<void> {
             >
               <span
                 class="codicon codicon-sm shrink-0"
-                :class="c.before === null ? 'codicon-diff-added text-added' : 'codicon-diff-modified text-accent'"
+                :class="
+                  c.deleted
+                    ? 'codicon-diff-removed text-removed'
+                    : c.before === null
+                      ? 'codicon-diff-added text-added'
+                      : 'codicon-diff-modified text-accent'
+                "
               />
               <span class="truncate flex-1">{{ c.path }}</span>
               <span
@@ -86,13 +95,38 @@ async function openInEditor(path: string): Promise<void> {
           <div class="flex-1 min-w-0 flex flex-col">
             <div v-if="selected" class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
               <span class="text-xs font-mono text-fg-2 flex-1 truncate">{{ selected }}</span>
-              <button class="btn text-xs" @click="openInEditor(selected)">{{ $t('common.open') }}</button>
+              <button v-if="!current?.deleted" class="btn text-xs" @click="openInEditor(selected)">
+                {{ $t('common.open') }}
+              </button>
               <button class="btn text-xs" @click="review.discard(selected)">
-                {{ review.changes.find((c) => c.path === selected)?.awaiting ? $t('review.reject') : $t('review.discard') }}
+                {{
+                  current?.awaiting
+                    ? $t('review.reject')
+                    : restorable
+                      ? $t('review.discard')
+                      : $t('review.dismiss')
+                }}
               </button>
               <button class="btn-primary text-xs" @click="review.approve(selected)">
-                {{ review.changes.find((c) => c.path === selected)?.awaiting ? $t('review.approveWrite') : $t('review.approve') }}
+                {{
+                  !current?.awaiting
+                    ? $t('review.approve')
+                    : current?.deleted
+                      ? $t('review.approveDelete')
+                      : $t('review.approveWrite')
+                }}
               </button>
+            </div>
+            <div
+              v-if="current?.deleted"
+              class="px-3 py-1.5 text-xs border-b border-border bg-removed/10 text-removed shrink-0"
+            >
+              <template v-if="current.awaiting">
+                {{ restorable ? $t('review.willDelete') : $t('review.willDeleteFinal') }}
+              </template>
+              <template v-else>
+                {{ restorable ? $t('review.deletedRestorable') : $t('review.deletedFinal') }}
+              </template>
             </div>
             <div class="flex-1 panel-scroll font-mono text-xs leading-5 selectable">
               <template v-for="(line, i) in diff" :key="i">

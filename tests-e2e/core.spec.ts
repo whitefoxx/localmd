@@ -46,6 +46,45 @@ test('agent write shows up in review and can be approved', async ({ page }) => {
   await expect(reviewBadge).toBeHidden()
 })
 
+test('agent delete is undoable from the review panel', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const tree = page.locator('aside')
+  await expect(tree.getByText('index.md', { exact: true }).first()).toBeVisible()
+
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('delete wiki/index.md')
+  await input.press('Enter')
+
+  // Gone from the tree, and recorded as a restorable deletion.
+  await expect(tree.getByText('index.md', { exact: true }).first()).toBeHidden({ timeout: 10_000 })
+  const reviewBadge = page.getByTitle('Review agent changes')
+  await reviewBadge.click()
+  await expect(page.getByText('Discard restores the file')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Discard', exact: true }).click()
+  await expect(reviewBadge).toBeHidden()
+  await page.keyboard.press('Escape')
+  await expect(tree.getByText('index.md', { exact: true }).first()).toBeVisible()
+})
+
+test('deleting a folder asks first and says it cannot be undone', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const tree = page.locator('aside')
+  await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
+
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('delete wiki')
+  await input.press('Enter')
+
+  // The panel opens by itself: a folder deletion always needs a decision.
+  await expect(page.getByText('everything listed below is gone for good')).toBeVisible({
+    timeout: 10_000,
+  })
+  await page.getByRole('button', { name: 'Reject' }).click()
+  await page.keyboard.press('Escape')
+  await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
+})
+
 test('artifact tool renders a card that opens the sandboxed viewer', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)
