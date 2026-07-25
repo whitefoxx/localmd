@@ -1,13 +1,18 @@
 /**
  * Feature-detected shims for built-ins that pdf.js 6 assumes.
  *
- * pdf.js computes a document's fingerprint with `Uint8Array.prototype.toHex()`
- * — shipped in Chrome 140 / Safari 18.2 / Firefox 133 — so on anything older
- * *every* `getDocument()` rejects with "a.toHex is not a function" and no PDF
- * can be indexed. The throw happens inside the pdf.js worker, which has its own
- * global scope: `installJsShims` must therefore stay self-contained (globals
- * only — no imports, no closure over module state) so `jsShimSource()` can
- * stringify it and prepend it to the worker (see docindex/pdf/extract.ts).
+ * pdf.js tracks the bleeding edge of V8: it fingerprints documents with
+ * `Uint8Array.prototype.toHex()` (Chrome 140) and caches nearly everything
+ * through `Map.prototype.getOrInsertComputed()` (newer still), so on a browser
+ * a few versions behind, `getDocument()` rejects before reading a single page
+ * and no PDF can be indexed. Everything listed here is used unconditionally by
+ * pdf.js — the things it *does* feature-detect (Float16Array, ImageDecoder,
+ * OffscreenCanvas) are its own problem and are deliberately not shimmed.
+ *
+ * The throws happen inside the pdf.js worker, which has its own global scope:
+ * `installJsShims` must therefore stay self-contained (globals only — no
+ * imports, no closure over module state) so `jsShimSource()` can stringify it
+ * and prepend it to the worker (see docindex/pdf/extract.ts).
  *
  * Every shim is a no-op on a browser that already has the built-in.
  */
@@ -21,6 +26,11 @@ const SHIMS_NEEDED = [
   (Uint8Array.prototype as unknown as Record<string, unknown>).toHex,
   (Uint8Array.prototype as unknown as Record<string, unknown>).toBase64,
   (Uint8Array as unknown as Record<string, unknown>).fromBase64,
+  (Map.prototype as unknown as Record<string, unknown>).getOrInsert,
+  (Map.prototype as unknown as Record<string, unknown>).getOrInsertComputed,
+  (WeakMap.prototype as unknown as Record<string, unknown>).getOrInsertComputed,
+  (Math as unknown as Record<string, unknown>).sumPrecise,
+  (Response.prototype as unknown as Record<string, unknown>).bytes,
   (Promise as unknown as Record<string, unknown>).try,
   (Promise as unknown as Record<string, unknown>).withResolvers,
 ].some((v) => typeof v !== 'function')
@@ -55,6 +65,54 @@ export function installJsShims(): void {
     const out = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
     return out
+  })
+
+  // The "upsert" proposal — pdf.js caches nearly everything through these.
+  for (const ctor of [Map, WeakMap]) {
+    define(
+      ctor.prototype,
+      'getOrInsert',
+      function getOrInsert(this: Map<unknown, unknown>, key: unknown, value: unknown) {
+        if (this.has(key)) return this.get(key)
+        this.set(key, value)
+        return value
+      },
+    )
+    define(
+      ctor.prototype,
+      'getOrInsertComputed',
+      function getOrInsertComputed(
+        this: Map<unknown, unknown>,
+        key: unknown,
+        compute: (k: unknown) => unknown,
+      ) {
+        if (typeof compute !== 'function') throw new TypeError('callback must be a function')
+        if (this.has(key)) return this.get(key)
+        const value = compute(key)
+        this.set(key, value)
+        return value
+      },
+    )
+  }
+
+  // Compensated (Neumaier) summation — exact enough for the integer glyph
+  // metrics pdf.js sums, and it never loses a term to cancellation.
+  define(Math, 'sumPrecise', function sumPrecise(values: Iterable<number>) {
+    let sum = 0
+    let compensation = 0
+    let count = 0
+    for (const v of values) {
+      if (typeof v !== 'number') throw new TypeError('Math.sumPrecise: values must be numbers')
+      count++
+      const t = sum + v
+      compensation += Math.abs(sum) >= Math.abs(v) ? sum - t + v : v - t + sum
+      sum = t
+    }
+    return count === 0 ? -0 : sum + compensation
+  })
+
+  define(Response.prototype, 'bytes', async function bytes(this: Response) {
+    return new Uint8Array(await this.arrayBuffer())
   })
 
   define(Promise, 'try', function tryCall(fn: (...a: unknown[]) => unknown, ...args: unknown[]) {

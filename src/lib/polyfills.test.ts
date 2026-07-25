@@ -73,6 +73,48 @@ describe('installJsShims', () => {
     await expect(promise).resolves.toBe('ok')
   })
 
+  it('computes a map entry once and caches it', () => {
+    drop(Map.prototype, 'getOrInsertComputed')
+    installJsShims()
+    const cache = new Map<string, number>() as unknown as {
+      getOrInsertComputed(k: string, f: (k: string) => number): number
+    } & Map<string, number>
+    let calls = 0
+    const compute = (key: string): number => {
+      calls++
+      return key.length
+    }
+    expect(cache.getOrInsertComputed('abc', compute)).toBe(3)
+    expect(cache.getOrInsertComputed('abc', compute)).toBe(3)
+    expect(calls).toBe(1)
+    expect(cache.get('abc')).toBe(3)
+    // A stored falsy value must not look like a cache miss.
+    cache.set('zero', 0)
+    expect(cache.getOrInsertComputed('zero', compute)).toBe(0)
+    expect(calls).toBe(1)
+  })
+
+  it('inserts a plain map default only when the key is absent', () => {
+    drop(Map.prototype, 'getOrInsert')
+    installJsShims()
+    const m = new Map<string, string>([['a', 'kept']]) as unknown as {
+      getOrInsert(k: string, v: string): string
+    } & Map<string, string>
+    expect(m.getOrInsert('a', 'new')).toBe('kept')
+    expect(m.getOrInsert('b', 'new')).toBe('new')
+    expect(m.get('b')).toBe('new')
+  })
+
+  it('sums without losing small terms to cancellation', () => {
+    drop(Math, 'sumPrecise')
+    installJsShims()
+    const sum = (Math as unknown as { sumPrecise(v: Iterable<number>): number }).sumPrecise
+    expect(sum([1, 2, 3, 4])).toBe(10)
+    // Naive left-to-right addition returns 0 here; compensated summation doesn't.
+    expect(sum([1e100, 1, -1e100, 1])).toBe(2)
+    expect(Object.is(sum([]), -0)).toBe(true)
+  })
+
   it('leaves a native implementation alone', () => {
     const before = Object.getOwnPropertyDescriptor(Uint8Array.prototype, 'toHex')
     installJsShims()
