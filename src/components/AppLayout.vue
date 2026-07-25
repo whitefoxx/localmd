@@ -413,7 +413,9 @@ function closeKb(): void {
         </div>
 
         <OpenFilesPanel />
-        <div class="flex-1 min-h-0 panel-scroll flex flex-col">
+        <!-- scroll-pt-7 keeps scrollIntoView from parking a row under the
+             tree's sticky heading row -->
+        <div class="flex-1 min-h-0 panel-scroll scroll-pt-7 flex flex-col">
           <FileTree class="flex-1" />
         </div>
         <BacklinksPanel />

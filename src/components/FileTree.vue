@@ -175,8 +175,11 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
 </script>
 
 <template>
-  <div ref="rootEl" class="py-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
-    <div class="flex items-center px-3 mb-1">
+  <div ref="rootEl" class="pb-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
+    <!-- The tree scrolls inside the sidebar's panel-scroll container; the
+         heading + actions row stays pinned to its top edge (opaque bg so rows
+         slide underneath). -->
+    <div class="sticky top-0 z-10 flex items-center px-3 pt-2 pb-1 bg-bg-1">
       <button
         class="flex items-center gap-1 text-xs uppercase tracking-wide text-fg-3 hover:text-fg-1 flex-1 min-w-0"
         @click="expanded = !expanded"
