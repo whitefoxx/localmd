@@ -208,32 +208,45 @@ async function autoIndex(path: string, token: number): Promise<void> {
 
 /* ── annotations ─────────────────────────────────────────────────────────── */
 
-/** Open the mark popup wherever the user finished selecting. */
-function onSelect(): void {
-  const host = body.value
-  if (!host) return
-  const hit = rangeFromSelection(host, window.getSelection())
-  if (!hit) return
-  const rect = window.getSelection()?.getRangeAt(0).getBoundingClientRect()
-  if (!rect || rect.width === 0) return
-  selectedText = hit.text
-  const id = formatDocxRange(hit.range)
-  popup.value = {
-    x: rect.left + rect.width / 2,
-    y: rect.bottom,
-    id,
-    existing: annotations.some((a) => a.range === id),
-  }
+/** Any new gesture outside the popup dismisses it; the mouseup may reopen it. */
+function onDocumentPointerDown(e: MouseEvent): void {
+  if ((e.target as HTMLElement | null)?.closest('.bm-popup')) return
+  popup.value = null
 }
 
-/** Clicking an existing mark reopens it: notes go straight to the dialog. */
-function onBodyClick(e: MouseEvent): void {
-  const span = (e.target as HTMLElement | null)?.closest<HTMLElement>('.docx-mark')
-  if (!span) {
-    if (!window.getSelection()?.isCollapsed) return // a drag-select ends in a click
-    popup.value = null
+/**
+ * Work out what the finished gesture meant, one tick late: clicking inside an
+ * existing selection only collapses it *after* mouseup, so reading the
+ * selection synchronously would re-open the popup the mousedown just closed.
+ */
+function onPointerUp(e: MouseEvent): void {
+  const span = (e.target as HTMLElement | null)?.closest<HTMLElement>('.docx-mark') ?? null
+  window.setTimeout(() => settleGesture(span), 0)
+}
+
+function settleGesture(span: HTMLElement | null): void {
+  const host = body.value
+  if (!host) return
+
+  // A live selection wins: offer to mark it.
+  const hit = rangeFromSelection(host, window.getSelection())
+  if (hit) {
+    const rect = window.getSelection()?.getRangeAt(0).getBoundingClientRect()
+    if (!rect || rect.width === 0) return
+    selectedText = hit.text
+    const id = formatDocxRange(hit.range)
+    popup.value = {
+      x: rect.left + rect.width / 2,
+      y: rect.bottom,
+      id,
+      existing: annotations.some((a) => a.range === id),
+    }
     return
   }
+
+  // Otherwise a plain click on an existing mark reopens it — a mark carrying a
+  // note goes straight to the note, like the PDF and EPUB readers.
+  if (!span) return
   const id = span.dataset.anno ?? ''
   const existing = annotations.find((a) => a.range === id)
   if (existing?.note) {
@@ -381,8 +394,12 @@ watch(sidecarRevision, async (rev) => {
   annotations = await loadDocxSidecar(shownPath)
   drawAllMarks()
 })
-onMounted(() => void load(files.currentPath))
+onMounted(() => {
+  document.addEventListener('mousedown', onDocumentPointerDown)
+  void load(files.currentPath)
+})
 onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', onDocumentPointerDown)
   saveScroll()
   releaseMedia()
   if (msgTimer !== null) window.clearTimeout(msgTimer)
@@ -405,7 +422,7 @@ onBeforeUnmount(() => {
         :title="$t('viewers.docx.viewAnnotations')"
         @click="viewAnnotations"
       >
-        <span class="codicon codicon-sm codicon-bookmark" />
+        <span class="codicon codicon-sm codicon-list-selection" />
       </button>
     </div>
 
@@ -436,8 +453,7 @@ onBeforeUnmount(() => {
         v-show="ready"
         ref="body"
         class="md-preview docx-reader max-w-3xl mx-auto px-8 py-8 selectable"
-        @mouseup="onSelect"
-        @click="onBodyClick"
+        @mouseup="onPointerUp"
       />
     </div>
 

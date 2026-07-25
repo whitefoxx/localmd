@@ -119,6 +119,29 @@ test('highlighting a passage marks it, and the mark round-trips through the side
   await expect(page.locator('.docx-mark.docx-flash')).toBeVisible()
 })
 
+test('the mark popup goes away on the next click, including inside the selection', async ({
+  page,
+}) => {
+  await openFixture(page)
+  await selectText(page, 'b1-3', 4, 9)
+  await expect(page.locator('.bm-popup')).toBeVisible()
+
+  // Clicking the selected text itself dismisses it: the browser only collapses
+  // the selection after mouseup, which used to re-open the popup immediately.
+  const spot = await page.evaluate(() => {
+    const r = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+  })
+  await page.mouse.click(spot.x, spot.y)
+  await expect(page.locator('.bm-popup')).toHaveCount(0)
+
+  // And so does a click on unselected text.
+  await selectText(page, 'b1-3', 4, 9)
+  await expect(page.locator('.bm-popup')).toBeVisible()
+  await page.locator('[data-bid="b1-6"]').click()
+  await expect(page.locator('.bm-popup')).toHaveCount(0)
+})
+
 test('a note is attached to its mark and survives a reopen', async ({ page }) => {
   await openFixture(page)
   await selectText(page, 'b1-3', 4, 9)

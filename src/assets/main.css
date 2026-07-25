@@ -138,15 +138,26 @@
   @apply bg-accent/25 text-inherit rounded px-0.5;
 }
 /* Highlight/underline marks (lib/docxMarks.ts sets the color inline). A mark
-   carrying a note gets a 📝 badge on its first span, like the EPUB reader. */
+   carrying a note is stamped with a deep-red quote straddling its first span —
+   the same signal the EPUB and PDF readers use. Absolutely positioned so the
+   badge overlaps the text instead of shifting it. */
 .docx-reader .docx-mark {
   @apply cursor-pointer rounded-sm;
 }
+.docx-reader .docx-mark[data-note] {
+  position: relative;
+}
 .docx-reader .docx-mark[data-note]::before {
-  content: '📝';
-  font-size: 0.75em;
-  margin-right: 0.15em;
-  vertical-align: 0.15em;
+  content: '“';
+  position: absolute;
+  left: -0.3em;
+  top: -0.5em;
+  font-size: 1.3em;
+  font-weight: 700;
+  line-height: 1;
+  color: #dc2626;
+  pointer-events: none;
+  user-select: none;
 }
 .docx-reader .docx-flash {
   animation: docx-flash 2s ease-out;
