@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -58,6 +58,96 @@ async function makeDocx(): Promise<Buffer> {
   return (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer
 }
 
+/** Open a fresh KB with the fixture imported (the same path a drop takes) and rendered. */
+async function openFixture(page: Page): Promise<void> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-docx-'))
+  const file = path.join(dir, 'field-notes.docx')
+  await writeFile(file, await makeDocx())
+
+  await page.goto('/?e2e=1')
+  await expect(page.getByText('This folder is empty')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  await page.locator('input[type="file"]').first().setInputFiles(file)
+  const entry = page.locator('aside').getByText('field-notes.docx', { exact: true })
+  await expect(entry).toBeVisible({ timeout: 10_000 })
+  await entry.click()
+  await expect(page.locator('.docx-reader h1').first()).toBeVisible()
+}
+
+/**
+ * Select part of a block's text and end the gesture, which is what opens the
+ * mark popup. Playwright can't drag-select reliably across text nodes, so the
+ * range is built directly and the mouseup replayed.
+ */
+async function selectText(page: Page, bid: string, start: number, end: number): Promise<void> {
+  await page.evaluate(
+    ([bid, start, end]) => {
+      const block = document.querySelector(`[data-bid="${bid}"]`)!
+      const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+      const node = walker.nextNode()!
+      const range = document.createRange()
+      range.setStart(node, start as number)
+      range.setEnd(node, end as number)
+      const sel = window.getSelection()!
+      sel.removeAllRanges()
+      sel.addRange(range)
+      document
+        .querySelector('.docx-reader')!
+        .dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    },
+    [bid, start, end] as const,
+  )
+}
+
+test('highlighting a passage marks it, and the mark round-trips through the sidecar', async ({
+  page,
+}) => {
+  await openFixture(page)
+  await selectText(page, 'b1-3', 4, 9) // "pilot" in "The pilot ran for six weeks…"
+
+  await page.getByTitle('Highlight yellow').click()
+  const mark = page.locator('.docx-mark')
+  await expect(mark).toHaveText('pilot')
+  await expect(mark).toHaveAttribute('data-anno', 'b1-3:4~b1-3:9')
+
+  // The mark lives in a real sidecar file, opened from the reader's toolbar.
+  await page.getByTitle('View annotations').click()
+
+  // The annotations page renders the excerpt; clicking it jumps back and flashes.
+  await expect(page.getByRole('blockquote').getByText('pilot', { exact: true })).toBeVisible()
+  await page.getByTitle('Click to jump to the passage').first().click()
+  await expect(page.locator('.docx-mark.docx-flash')).toBeVisible()
+})
+
+test('a note is attached to its mark and survives a reopen', async ({ page }) => {
+  await openFixture(page)
+  await selectText(page, 'b1-3', 4, 9)
+
+  await page.getByTitle('Note', { exact: true }).click()
+  await page.getByPlaceholder(/Jot down a thought/).fill('Check the second cohort too.')
+  await page.getByTitle(/Save note/).click()
+  await page.getByTitle('Close', { exact: true }).click()
+
+  // The mark now carries a note badge...
+  await expect(page.locator('.docx-mark[data-note]')).toBeVisible()
+  // ...and clicking it reopens the note rather than the color popup.
+  await page.locator('.docx-mark').first().click()
+  await expect(page.getByPlaceholder(/Jot down a thought/)).toHaveValue(
+    'Check the second cohort too.',
+  )
+})
+
+test('a mark can be deleted again', async ({ page }) => {
+  await openFixture(page)
+  await selectText(page, 'b1-3', 4, 9)
+  await page.getByTitle('Highlight yellow').click()
+  await expect(page.locator('.docx-mark')).toHaveCount(1)
+
+  await page.locator('.docx-mark').first().click()
+  await page.getByTitle('Delete mark').click()
+  await expect(page.locator('.docx-mark')).toHaveCount(0)
+})
+
 test('a legacy .doc explains itself instead of failing silently', async ({ page }) => {
   const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-doc-'))
   const file = path.join(dir, 'legacy-report.doc')
@@ -77,19 +167,7 @@ test('a legacy .doc explains itself instead of failing silently', async ({ page 
 })
 
 test('a .docx renders with its structure and is indexed for the agent', async ({ page }) => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-docx-'))
-  const file = path.join(dir, 'field-notes.docx')
-  await writeFile(file, await makeDocx())
-
-  await page.goto('/?e2e=1')
-  await expect(page.getByText('This folder is empty')).toBeVisible({ timeout: 10_000 })
-  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-
-  // Import through the file tree's hidden input, the same path a drop takes.
-  await page.locator('input[type="file"]').first().setInputFiles(file)
-  const treeEntry = page.locator('aside').getByText('field-notes.docx', { exact: true })
-  await expect(treeEntry).toBeVisible({ timeout: 10_000 })
-  await treeEntry.click()
+  await openFixture(page)
 
   // Structure survived the round trip: heading levels, list, table, emphasis.
   const reader = page.locator('.docx-reader')

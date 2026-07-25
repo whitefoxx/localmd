@@ -137,6 +137,17 @@
 .docx-reader mark {
   @apply bg-accent/25 text-inherit rounded px-0.5;
 }
+/* Highlight/underline marks (lib/docxMarks.ts sets the color inline). A mark
+   carrying a note gets a 📝 badge on its first span, like the EPUB reader. */
+.docx-reader .docx-mark {
+  @apply cursor-pointer rounded-sm;
+}
+.docx-reader .docx-mark[data-note]::before {
+  content: '📝';
+  font-size: 0.75em;
+  margin-right: 0.15em;
+  vertical-align: 0.15em;
+}
 .docx-reader .docx-flash {
   animation: docx-flash 2s ease-out;
   border-radius: 3px;

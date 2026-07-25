@@ -86,6 +86,12 @@ export default {
       legacyTitle: 'Legacy .doc format',
       legacyHint:
         'Word 97–2003 (.doc) is a binary format that cannot be read in the browser. Open it in Word or Pages and save a copy as .docx.',
+      viewAnnotations: 'View annotations',
+      highlightColor: 'Highlight {name}',
+      readSelection: 'Read selection aloud',
+      underlineRed: 'Underline (red)',
+      note: 'Note',
+      deleteMark: 'Delete mark',
     },
   },
   zh: {
@@ -170,6 +176,12 @@ export default {
       legacyTitle: '旧版 .doc 格式',
       legacyHint:
         'Word 97–2003 的 .doc 是二进制格式，浏览器无法解析。请用 Word 或 Pages 打开后另存为 .docx。',
+      viewAnnotations: '查看标注',
+      highlightColor: '高亮 {name}',
+      readSelection: '朗读选中',
+      underlineRed: '下划线（红色）',
+      note: '笔记',
+      deleteMark: '删除划线',
     },
   },
 }

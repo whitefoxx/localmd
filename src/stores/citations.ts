@@ -12,11 +12,13 @@ import { useUiStore } from '@/stores/ui'
 
 /** Direct jump target from the annotations page — no doc-index involved.
  *  EPUB sets `cfi`; PDF sets `page` (1-based) + region `rects` (PDF points,
- *  top-left origin, the annotation's own segmentRects). */
+ *  top-left origin, the annotation's own segmentRects); DOCX sets `range`
+ *  (the `b1-3:10~b1-4:22` locator). */
 export interface AnnotationTarget {
   cfi?: string
   page?: number
   rects?: { x: number; y: number; w: number; h: number }[]
+  range?: string
 }
 
 export interface PendingJump {

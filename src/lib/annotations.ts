@@ -5,11 +5,13 @@
  * PDF entries use EmbedPDF's annotation object shape (top-left-origin PDF
  * points, 0-based pageIndex, type 9 = highlight). We keep each raw entry
  * verbatim and only derive the fields we render, so fields we don't model
- * survive a round-trip. EPUB entries are simple {cfi, color, text, createdAt}.
+ * survive a round-trip. EPUB entries are simple {cfi, color, text, createdAt};
+ * DOCX entries are the same with a block-offset `range` in place of the CFI.
  */
 import { ref } from 'vue'
 import * as fs from '@/lib/fs'
 import { fileKind } from '@/lib/filetypes'
+import { compareDocxRange } from '@/lib/docxMarks'
 
 // macOS Books-style palette — deeper/more saturated than the old pastels.
 // Highlights render at ~0.4 fill-opacity.
@@ -208,6 +210,39 @@ export function compareCfi(a: string, b: string): number {
   return 0
 }
 
+/* ───────── DOCX ───────── */
+
+/**
+ * Same shape as an EPUB annotation, with a block-offset locator in place of the
+ * CFI (see lib/docxMarks.ts for the `b1-3:10~b1-4:22` form).
+ */
+export interface DocxAnnotation {
+  range: string
+  color: string
+  text: string
+  createdAt: string
+  style?: 'highlight' | 'underline'
+  note?: string
+}
+
+export async function loadDocxSidecar(source: string): Promise<DocxAnnotation[]> {
+  const raw = await fs.tryReadFile(sidecarPath(source))
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as { annotations?: DocxAnnotation[] }
+    return Array.isArray(parsed.annotations) ? parsed.annotations : []
+  } catch {
+    return []
+  }
+}
+
+export async function saveDocxSidecar(
+  source: string,
+  annotations: DocxAnnotation[],
+): Promise<void> {
+  await fs.writeFile(sidecarPath(source), JSON.stringify({ version: 1, annotations }, null, 2))
+}
+
 /* ───────── categories (shared by the viewer + the agent digest) ───────── */
 
 /** PDF/EmbedPDF annotation subtype numbers → display names (from the engine's
@@ -250,6 +285,8 @@ export interface AnnotationItem {
   rects?: { x: number; y: number; w: number; h: number }[]
   /** EPUB: range CFI (for the jump). */
   cfi?: string
+  /** DOCX: block-offset locator (for the jump). */
+  range?: string
   origIndex: number
 }
 
@@ -298,6 +335,21 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
         rects: pdfRects(a),
         origIndex: i,
       })
+    } else if (kind === 'docx') {
+      const a = entry as DocxAnnotation
+      if (typeof a?.range !== 'string') return
+      const category: AnnotationCategory = a.style === 'underline' ? 'underline' : 'highlight'
+      items.push({
+        id: a.range,
+        category,
+        typeLabel: category,
+        color: category === 'underline' ? UNDERLINE_COLOR : a.color,
+        excerpt: a.text ?? '',
+        comment: a.note ?? '',
+        createdAt: a.createdAt ?? '',
+        range: a.range,
+        origIndex: i,
+      })
     } else {
       const a = entry as EpubAnnotation
       if (typeof a?.cfi !== 'string') return
@@ -317,6 +369,8 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
   })
   if (kind === 'pdf') {
     items.sort((x, y) => x.page! - y.page! || (x.rects?.[0]?.y ?? 0) - (y.rects?.[0]?.y ?? 0))
+  } else if (kind === 'docx') {
+    items.sort((x, y) => compareDocxRange(x.range!, y.range!))
   } else {
     items.sort((x, y) => compareCfi(x.cfi!, y.cfi!))
   }

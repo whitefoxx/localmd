@@ -92,6 +92,7 @@ function openSource(): void {
 function jump(it: AnnotationItem): void {
   if (!source.value || !sourceExists.value) return
   if (it.cfi) void citations.openAnnotation(source.value, { cfi: it.cfi })
+  else if (it.range) void citations.openAnnotation(source.value, { range: it.range })
   else if (it.page) void citations.openAnnotation(source.value, { page: it.page, rects: it.rects })
 }
 
