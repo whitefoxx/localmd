@@ -8,9 +8,29 @@
  */
 import * as pdfjs from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { installJsShims, jsShimSource, jsShimsNeeded } from '@/lib/polyfills'
 import type { NormRect, OutlineNode, PdfBlock } from './types'
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+installJsShims()
+pdfjs.GlobalWorkerOptions.workerSrc = shimmedWorkerUrl()
+
+/**
+ * pdf.js runs in its own worker global, so the shims installed above don't
+ * reach it — and the very first thing it does with a document (fingerprinting
+ * via `Uint8Array.prototype.toHex()`) is what breaks on pre-Chrome-140
+ * browsers. On those, point workerSrc at a tiny module blob that installs the
+ * shims and then imports the real worker; modern browsers keep the plain URL.
+ */
+function shimmedWorkerUrl(): string {
+  try {
+    const absolute = new URL(workerUrl, location.href).href
+    if (!jsShimsNeeded()) return absolute
+    const src = `${jsShimSource()}\nawait import(${JSON.stringify(absolute)});\n`
+    return URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))
+  } catch {
+    return workerUrl
+  }
+}
 
 export interface PdfExtractResult {
   title: string
