@@ -92,6 +92,31 @@ match**, so the request bytes must be stable; Anthropic additionally requires
   events now carry `cacheWrite`; the session token tooltip shows cache
   reads/writes so caching regressions are visible in normal use.
 
+### P3 — pre-activated tool recall (2026-07-26)
+
+A gap the original pass missed: **the tools array sits at the very front of the
+cache prefix** (providers render `tools` → `system` → `messages`), so the first
+`enable_tools` of a session doesn't just cost its own round trip — it changes
+byte 0 and invalidates the *entire* prefix, forcing the frozen catalog, both
+system blocks and the whole history to be re-written mid-turn. Everything under
+P0 exists to keep those bytes stable, and activation was quietly undoing it.
+
+- ✅ **Recall of used deferred tools** (`lib/mcp.ts` `MAX_RECALLED_TOOLS = 8` +
+  `recallTouch`, `stores/mcp.ts` `recalled`/`rememberUse`/`preactivate`,
+  seeded from `chat.ts` `addTab`): a deferred tool the agent actually CALLED is
+  remembered per KB (localStorage, LRU, capped) and pre-activated when a new
+  session opens. The common case loses the enable_tools round trip and keeps a
+  byte-stable tool set from request one; the activation breakpoint moves to
+  session start, where a cache write was due anyway.
+- The cap is the whole safety story: pre-activated schemas ride along with every
+  request whether or not the session needs them, which is exactly the cost
+  deferral exists to avoid. Only *called* tools earn a slot (enabling one is not
+  enough), and the list is capped at 8 — raise it only with usage data.
+- The system-prompt catalog is untouched: `deferredCatalog` still ignores
+  activation, so pre-activation changes which schemas are sent and not one byte
+  of the prompt. Re-attaching a *running* session skips pre-activation — growing
+  its tool set mid-turn is the invalidation this exists to avoid.
+
 ## Deliberately not done
 
 - ⏸ **Deferring the 9 git tools** — after caching, they cost ~1k tokens at 0.1×;

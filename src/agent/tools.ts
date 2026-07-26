@@ -888,7 +888,13 @@ function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): Extern
     describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
     run: async (args) => {
       try {
-        return await mcp.callTool(t.serverId, t.def.name, args)
+        const out = await mcp.callTool(t.serverId, t.def.name, args)
+        // A tool that actually ran earns a recall slot, so the next session in
+        // this KB starts with it already active (see the store's `recalled`).
+        // Only successful calls count — a tool that always throws shouldn't
+        // squat on the cap.
+        mcp.rememberUse(t.qualifiedName)
+        return out
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }

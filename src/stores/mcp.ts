@@ -18,6 +18,7 @@ import {
   normalizeMcpServerList,
   mergeMcpConfigs,
   isDeferredTool,
+  recallTouch,
   KB_MCP_CONFIG_PATH,
   type McpClientLike,
   type McpServerConfig,
@@ -41,6 +42,21 @@ export interface ExternalTool {
   serverId: string
   serverName: string
   def: McpToolDef
+}
+
+/* ── recall store (which deferred tools this KB actually uses) ───────────── */
+
+const RECALL_KEY = 'browser-md:mcp-recall:v1'
+
+/** Persisted per KB folder name, matching how viewMemory keys reading
+ *  positions — identical tool names in different KBs must not collide. */
+function readRecall(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(RECALL_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, string[]>) : {}
+  } catch {
+    return {} // best-effort: a lost recall list only costs one enable_tools round trip
+  }
 }
 
 async function loadKbServers(): Promise<McpServerConfig[]> {
@@ -114,6 +130,49 @@ export const useMcpStore = defineStore('mcp', () => {
       isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, NO_ACTIVATIONS),
     ),
   )
+
+  /* ── recall ───────────────────────────────────────────────────────────── */
+
+  /** Deferred tools this KB has actually used, most recent first (capped). A
+   *  fresh session starts with these already active, so the common case costs
+   *  no enable_tools round trip AND keeps its tool set — the very front of the
+   *  provider's cache prefix — byte-stable from the first request. Mid-session
+   *  activation still works; it just stops being the norm. */
+  const recalled = ref<string[]>([])
+
+  function persistRecall(): void {
+    const kbName = useKbStore().name
+    if (!kbName) return
+    try {
+      localStorage.setItem(RECALL_KEY, JSON.stringify({ ...readRecall(), [kbName]: recalled.value }))
+    } catch {
+      /* quota exceeded or private mode — recall is best-effort */
+    }
+  }
+
+  /** Record a tool the agent actually CALLED. Only policy-deferred tools earn a
+   *  slot: everything else is already in every request, so remembering it would
+   *  waste the cap. */
+  function rememberUse(qualifiedName: string): void {
+    const t = allTools.value.find((x) => x.qualifiedName === qualifiedName)
+    if (!t) return
+    const count = toolCountByServer.value.get(t.serverId) ?? 0
+    if (!isDeferredTool(qualifiedName, count, NO_ACTIVATIONS)) return
+    const next = recallTouch(recalled.value, qualifiedName)
+    if (next.join('\n') === recalled.value.join('\n')) return
+    recalled.value = next
+    persistRecall()
+  }
+
+  /** Seed a new session with the recalled tools (those that still exist and are
+   *  still policy-deferred). Called once per session, before its first request. */
+  function preactivate(sessionId: string): void {
+    const names = recalled.value.filter((n) => {
+      const t = allTools.value.find((x) => x.qualifiedName === n)
+      return !!t && isDeferredTool(n, toolCountByServer.value.get(t.serverId) ?? 0, NO_ACTIVATIONS)
+    })
+    if (names.length) activate(sessionId, names)
+  }
 
   /** Activate deferred tools by qualified name; returns what actually matched. */
   function activate(sessionId: string, names: string[]): string[] {
@@ -198,13 +257,25 @@ export const useMcpStore = defineStore('mcp', () => {
     { immediate: true },
   )
 
+  // Recall belongs to the KB it was learned in — swap it on KB open/close.
+  watch(
+    () => kb.name,
+    (name) => {
+      recalled.value = name ? (readRecall()[name] ?? []) : []
+    },
+    { immediate: true },
+  )
+
   return {
     servers,
     allTools,
     activeToolsFor,
     deferredToolsFor,
     deferredCatalog,
+    recalled,
     activate,
+    preactivate,
+    rememberUse,
     clearActivated,
     refresh,
     callTool,

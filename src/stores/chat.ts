@@ -267,6 +267,13 @@ export const useChatStore = defineStore('chat', () => {
       if (victim) closeTab(victim.id)
     }
     tabs.value.push(s)
+    // Start the session with the deferred tools this KB actually uses already
+    // active: no enable_tools round trip in the common case, and a tool set
+    // that stays byte-stable from request one (it sits at the very front of the
+    // provider's cache prefix — activating mid-turn invalidates everything).
+    // Skipped for a re-attached running session: growing ITS tool set mid-turn
+    // is the exact invalidation this avoids elsewhere.
+    if (!s.running) useMcpStore().preactivate(s.id)
     return true
   }
 

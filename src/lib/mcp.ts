@@ -368,3 +368,18 @@ export function catalogEntry(qualifiedName: string, description: string): string
   const desc = description.replace(/\s+/g, ' ').trim()
   return `- ${qualifiedName}: ${desc.length > 80 ? `${desc.slice(0, 80)}…` : desc}`
 }
+
+/* ── recall (pre-activating what this KB actually uses) ──────────────────── */
+
+/** How many deferred tools a KB may carry into a fresh session. Their schemas
+ *  then ride along with EVERY request of that session, so this is the ceiling
+ *  on what pre-activation can cost when the session turns out not to need
+ *  them — deliberately small. Only tools the agent actually CALLED are
+ *  remembered; merely enabling one is not enough to earn a slot. */
+export const MAX_RECALLED_TOOLS = 8
+
+/** Move `name` to the front of the recall list (most recent first) and trim to
+ *  the cap — plain LRU. Returns a new array; the input is never mutated. */
+export function recallTouch(list: readonly string[], name: string, max = MAX_RECALLED_TOOLS): string[] {
+  return [name, ...list.filter((n) => n !== name)].slice(0, Math.max(0, max))
+}

@@ -10,6 +10,8 @@ import {
   mergeMcpConfigs,
   isDeferredTool,
   catalogEntry,
+  recallTouch,
+  MAX_RECALLED_TOOLS,
 } from './mcp'
 
 describe('tool namespacing', () => {
@@ -127,5 +129,26 @@ describe('deferred loading', () => {
   it('renders compact catalog lines', () => {
     expect(catalogEntry('mcp__x__y', 'short  desc')).toBe('- mcp__x__y: short desc')
     expect(catalogEntry('mcp__x__y', 'z'.repeat(100))).toContain('…')
+  })
+})
+
+describe('recallTouch', () => {
+  it('moves a used tool to the front without duplicating it', () => {
+    expect(recallTouch(['a', 'b'], 'c')).toEqual(['c', 'a', 'b'])
+    expect(recallTouch(['a', 'b', 'c'], 'c')).toEqual(['c', 'a', 'b'])
+  })
+
+  it('drops the least recently used past the cap', () => {
+    const full = Array.from({ length: MAX_RECALLED_TOOLS }, (_, i) => `t${i}`)
+    const next = recallTouch(full, 'new')
+    expect(next).toHaveLength(MAX_RECALLED_TOOLS)
+    expect(next[0]).toBe('new')
+    expect(next).not.toContain(`t${MAX_RECALLED_TOOLS - 1}`) // the oldest fell off
+  })
+
+  it('never mutates the input', () => {
+    const list = ['a', 'b']
+    recallTouch(list, 'c')
+    expect(list).toEqual(['a', 'b'])
   })
 })
