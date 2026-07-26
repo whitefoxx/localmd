@@ -92,12 +92,24 @@ const SECRET_META = new Map(
   CATALOG.flatMap((e) => (e.secrets ?? []).map((s) => [s.id, { ...s, entry: e.id }] as const)),
 )
 
-/** Every key the installed tools actually reference — catalog packs and
- *  agent-written tools alike, so a tool the agent just made has somewhere for
- *  its key to go. */
+/**
+ * Every key the installed tools actually reference — catalog packs and
+ * agent-written tools alike, so a tool the agent just made has somewhere for
+ * its key to go.
+ *
+ * `users` matters more than it looks: keys live in one flat namespace, so any
+ * installed tool that names an existing id receives its value whatever host it
+ * points at. Listing who reads each key is how that stays visible.
+ */
 const requiredKeys = computed(() => {
-  const ids = new Set(tools.specs.flatMap((s) => secretRefs(s)))
-  return [...ids].map((id) => SECRET_META.get(id) ?? { id, label: id, plain: false, url: undefined })
+  const users = new Map<string, string[]>()
+  for (const spec of tools.specs) {
+    for (const id of secretRefs(spec)) users.set(id, [...(users.get(id) ?? []), spec.name])
+  }
+  return [...users].map(([id, names]) => ({
+    ...(SECRET_META.get(id) ?? { id, label: id, plain: false, url: undefined }),
+    users: names,
+  }))
 })
 
 function secretValue(id: string): string {
@@ -556,8 +568,15 @@ function removeDetail(): void {
     <div v-if="tools.kbPending.length" class="rounded-lg border border-accent/40 bg-accent/5 px-3 py-3 space-y-2">
       <div class="text-sm text-fg-1">{{ $t('settings.kbToolsTitle') }}</div>
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.kbToolsDesc') }}</p>
-      <ul class="text-xs font-mono text-fg-2 space-y-0.5">
-        <li v-for="s in tools.kbPending" :key="s.id">{{ s.name }} → {{ s.request.url }}</li>
+      <ul class="text-xs font-mono text-fg-2 space-y-1">
+        <li v-for="s in tools.kbPending" :key="s.id">
+          <div class="break-all">{{ s.name }} → {{ s.request.url }}</div>
+          <!-- A tool arriving with the folder can name a key you already hold;
+               where it sends data is only half of what you are approving. -->
+          <div v-if="secretRefs(s).length" class="text-removed">
+            ↳ {{ $t('settings.kbToolsUsesKeys', { ids: secretRefs(s).join(', ') }) }}
+          </div>
+        </li>
       </ul>
       <button class="btn text-xs" @click="tools.trustKbTools()">{{ $t('settings.kbToolsApprove') }}</button>
     </div>
@@ -852,24 +871,32 @@ function removeDetail(): void {
     <div v-if="requiredKeys.length">
       <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.keys') }}</span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.keysDesc') }}</p>
-      <div class="space-y-1.5">
-        <div v-for="k in requiredKeys" :key="k.id" class="flex items-center gap-2">
-          <label class="text-xs text-fg-3 w-32 shrink-0 truncate" :title="k.id">{{ k.label }}</label>
-          <input
-            :type="k.plain ? 'text' : 'password'"
-            class="input text-xs flex-1"
-            autocomplete="off"
-            :value="secretValue(k.id)"
-            :placeholder="k.id"
-            @input="onSecretInput(k.id, $event)"
-          />
-          <a
-            v-if="k.url"
-            :href="k.url"
-            target="_blank"
-            rel="noopener"
-            class="text-xs text-accent hover:underline shrink-0"
-          >{{ $t('settings.getKey') }}</a>
+      <div class="space-y-2.5">
+        <div v-for="k in requiredKeys" :key="k.id">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-fg-3 w-32 shrink-0 truncate" :title="k.id">{{ k.label }}</label>
+            <input
+              :type="k.plain ? 'text' : 'password'"
+              class="input text-xs flex-1"
+              autocomplete="off"
+              :value="secretValue(k.id)"
+              :placeholder="k.id"
+              @input="onSecretInput(k.id, $event)"
+            />
+            <a
+              v-if="k.url"
+              :href="k.url"
+              target="_blank"
+              rel="noopener"
+              class="text-xs text-accent hover:underline shrink-0"
+            >{{ $t('settings.getKey') }}</a>
+          </div>
+          <!-- Which tools read this value. One flat namespace means the answer
+               is not always the one entry you expect. -->
+          <!-- 8.5rem lines up under the input: w-32 label + gap-2. -->
+          <p class="mt-1 ml-[8.5rem] text-xs text-fg-3 truncate" :title="k.users.join(', ')">
+            {{ $t('settings.keyUsedBy', { tools: k.users.join(', ') }) }}
+          </p>
         </div>
       </div>
     </div>

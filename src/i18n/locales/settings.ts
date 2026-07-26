@@ -92,6 +92,7 @@ export default {
     keysDesc:
       'API keys the installed tools need. They stay in this browser and are never shown to the agent — a tool refers to a key by name, so the agent can tell you which one is missing without ever seeing its value.',
     getKey: 'Get one →',
+    keyUsedBy: 'Read by {tools}',
     agentToolPrompt:
       'I need a new tool. Here is what it should do (which service, what I want back):\n\n',
     catalogFeatured: 'Start here',
@@ -144,6 +145,7 @@ export default {
     kbToolsDesc:
       'Its .agents/tools.json defines the tools below. They came with the folder, so they stay off until you approve them. Check where each one sends data first.',
     kbToolsApprove: 'Approve these tools',
+    kbToolsUsesKeys: 'reads your saved key: {ids}',
 
     // Custom tools
     customTools: 'Your tools',
@@ -294,6 +296,7 @@ export default {
     keysDesc:
       '已安装工具所需的 API key。它们只保存在这个浏览器里，绝不会给到 agent —— 工具只按名字引用密钥，所以 agent 能告诉你缺哪一个，却看不到它的值。',
     getKey: '去获取 →',
+    keyUsedBy: '被这些工具读取：{tools}',
     agentToolPrompt: '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
     catalogFeatured: '首选',
     catalogNeedsWebcli: '需要 WebCLI',
@@ -344,6 +347,7 @@ export default {
     kbToolsDesc:
       '它的 .agents/tools.json 定义了下列工具。它们是跟着文件夹一起来的，所以在你确认之前不会启用。请先看清每个工具会把数据发到哪里。',
     kbToolsApprove: '确认启用这些工具',
+    kbToolsUsesKeys: '会读取你已保存的密钥：{ids}',
 
     // Custom tools
     customTools: '自定义工具',
