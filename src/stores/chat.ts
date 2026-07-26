@@ -26,6 +26,7 @@ import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
+import { describeQuote } from '@/lib/quoteContext'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
@@ -465,6 +466,7 @@ export const useChatStore = defineStore('chat', () => {
     imagesTravelInline: boolean,
     visionAvailable: boolean,
     selections: SelectionRef[],
+    session: ChatSession,
   ): Promise<string> {
     let out = trimmed
     // Ambient current time, so date-aware tasks work without a tool round-trip.
@@ -519,13 +521,13 @@ export const useChatStore = defineStore('chat', () => {
       }
       out += `\n\n<referenced_files>\n${blocks.join('\n\n')}\n</referenced_files>`
     }
-    // Passages the user selected and asked about explicitly — from a file, or
-    // quoted from an earlier reply of yours.
+    // Passages the user selected and asked about explicitly. Each block leads
+    // with where it came from — which file and section, or which of your replies
+    // — because "look into this" means different work depending on the answer.
     if (selections.length) {
-      const blocks = selections.map((s) =>
-        s.file
-          ? `Content selected from file ${s.file}:\n\`\`\`\n${s.text}\n\`\`\``
-          : `A passage quoted from an earlier reply of yours:\n\`\`\`\n${s.text}\n\`\`\``,
+      const scope = { sessionId: session.id, messages: session.uiMessages, viewing }
+      const blocks = selections.map(
+        (s) => `${describeQuote(s, scope)}:\n\`\`\`\n${s.text}\n\`\`\``,
       )
       out += `\n\n<selected_context>\n${blocks.join('\n\n')}\n</selected_context>`
     }
@@ -540,6 +542,7 @@ export const useChatStore = defineStore('chat', () => {
     trimmed: string,
     attachments: Attachment[],
     selections: SelectionRef[],
+    session: ChatSession,
   ): Promise<{ content: UserContent; ui: UiMessage }> {
     const settings = useSettingsStore()
     const files = useFilesStore()
@@ -557,6 +560,7 @@ export const useChatStore = defineStore('chat', () => {
       inline,
       settings.visionAvailable,
       selections,
+      session,
     )
     // A multimodal primary gets images inline; the AI SDK formats them per
     // provider. A text-only primary sees only the path notes (view_image tool).
@@ -613,7 +617,12 @@ export const useChatStore = defineStore('chat', () => {
     // turn. The running send loop drains the queue between segments.
     if (session.running) {
       if (providerKind === 'mock') return // the E2E mock path takes no steers
-      const { content: steerContent, ui } = await prepareUserMessage(trimmed, attachments, selections)
+      const { content: steerContent, ui } = await prepareUserMessage(
+        trimmed,
+        attachments,
+        selections,
+        session,
+      )
       session.uiMessages.push(ui)
       const q = steerQueue.get(session.id) ?? []
       q.push({ role: 'user', content: steerContent } as ModelMessage)
@@ -635,7 +644,7 @@ export const useChatStore = defineStore('chat', () => {
       session.history = []
     }
 
-    const { content, ui } = await prepareUserMessage(trimmed, attachments, selections)
+    const { content, ui } = await prepareUserMessage(trimmed, attachments, selections, session)
     session.uiMessages.push(ui)
     // reactive() is load-bearing: onEvent mutates this object from outside the
     // store's proxy — a raw object would render nothing until the turn ends (no

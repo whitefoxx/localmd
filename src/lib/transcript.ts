@@ -62,7 +62,11 @@ export function renderTranscript(s: TranscriptSession): string {
 function renderMessage(m: UiMessage): string {
   const lines: string[] = [`## t${m.id} · ${m.role === 'user' ? 'User' : 'Assistant'}`, '']
   for (const c of m.contexts ?? []) {
-    lines.push(`> 📌 ${c.file ? `Quoting ${c.file}` : 'Quoting an earlier reply'}: ${excerpt(c.text)}`, '')
+    const at = [c.from?.page ? `page ${c.from.page}` : '', c.from?.heading ?? ''].filter(Boolean)
+    const src = c.file
+      ? `Quoting ${c.file}${at.length ? ` (${at.join(' · ')})` : ''}`
+      : 'Quoting an earlier reply'
+    lines.push(`> 📌 ${src}: ${excerpt(c.text)}`, '')
   }
   if (m.attachments?.length) {
     lines.push(`> 📎 Attachments: ${m.attachments.map((a) => a.path).join(', ')}`, '')

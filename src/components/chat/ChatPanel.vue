@@ -932,8 +932,10 @@ watch(
           </div>
         </div>
         <!-- data-reply-selection: selecting text in a reply stages it as a quote
-             chip in the composer (same pin-to-keep behavior as file selections). -->
-        <div v-else class="space-y-1" data-reply-selection>
+             chip in the composer (same pin-to-keep behavior as file selections).
+             data-msg-id records WHICH reply, so the agent is told how far back
+             the quoted passage came from — see lib/quoteContext. -->
+        <div v-else class="space-y-1" data-reply-selection :data-msg-id="m.id">
           <template v-for="(part, i) in m.parts" :key="i">
             <!-- Tool call with args and/or a result: expandable disclosure. -->
             <details

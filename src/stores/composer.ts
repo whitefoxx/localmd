@@ -2,6 +2,24 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useKbStore } from '@/stores/kb'
 
+/** Where a quoted passage was taken from, captured at selection time — the view
+ *  moves on (the user scrolls, keeps chatting) but the provenance must not. The
+ *  agent gets it as prose (see lib/quoteContext); the UI stays as it was.
+ *
+ *  File quotes carry a locator (`page` for PDFs, `heading` for rendered
+ *  markdown); reply quotes carry the chat session and the UI message id of the
+ *  reply, so the agent can tell WHICH of its answers is being pointed at. */
+export interface QuoteOrigin {
+  /** PDF page the passage sat on. */
+  page?: number
+  /** Nearest heading above the passage in the rendered file. */
+  heading?: string
+  /** Chat session the quoted reply belongs to. */
+  sessionId?: string
+  /** `UiMessage.id` of the quoted reply. */
+  messageId?: number
+}
+
 /** A snapshot of text the user selected, staged in the composer as a context
  *  chip. Travels with the next message so the agent sees the exact passage the
  *  user is asking about.
@@ -16,6 +34,8 @@ export interface SelectionRef {
   file?: string
   text: string
   pinned: boolean
+  /** Provenance beyond `file` (absent on quotes staged before this existed). */
+  from?: QuoteOrigin
 }
 
 export const useComposerStore = defineStore('composer', () => {
@@ -25,9 +45,10 @@ export const useComposerStore = defineStore('composer', () => {
   let liveId: string | null = null
 
   /** Reflect the current selection as the single transient chip. `file` is the
-   *  source path, or null for a quote from an agent reply. Pinned chips are
-   *  untouched, and a selection already matching a pinned chip shows no dup. */
-  function syncLive(file: string | null, text: string): void {
+   *  source path, or null for a quote from an agent reply; `from` carries the
+   *  finer provenance. Pinned chips are untouched, and a selection already
+   *  matching a pinned chip shows no dup. */
+  function syncLive(file: string | null, text: string, from?: QuoteOrigin): void {
     const t = text.trim()
     if (!t) return
     const f = file || undefined
@@ -40,8 +61,9 @@ export const useComposerStore = defineStore('composer', () => {
     if (live) {
       live.file = f
       live.text = t
+      live.from = from
     } else {
-      const r: SelectionRef = { id: crypto.randomUUID(), file: f, text: t, pinned: false }
+      const r: SelectionRef = { id: crypto.randomUUID(), file: f, text: t, pinned: false, from }
       refs.value.push(r)
       liveId = r.id
     }
