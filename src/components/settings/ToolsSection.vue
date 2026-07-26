@@ -1,23 +1,29 @@
 <script setup lang="ts">
 /**
- * Settings → Tools. Three groups, in the order a new user needs them:
+ * Settings → Tools.
  *
- *   1. Recommended — the verified catalog, checked on or off. WebCLI leads it
- *      because installing the extension is what lets every other tool reach an
- *      endpoint that refuses browsers.
- *   2. Your tools — hand-written HTTP tools, with a Test button that runs the
- *      draft for real. A tool you can't try before saving is a tool you find
- *      out about mid-conversation.
- *   3. Tool servers — the MCP list (moved here verbatim from SettingsModal).
+ * The main page answers one question — what can the agent reach right now — so
+ * it lists only what is actually installed. Browsing the catalog, and reading
+ * the tools inside a pack or a server, are sub-pages: a page that shows every
+ * option at once stops showing the user their own setup.
  *
- * Tools the open KB carries in .agents/tools.json appear above the list and
- * stay inert until approved: they arrived with the folder, not from this user.
+ * Three groups that do not overlap, because the previous layout offered two
+ * unexplained "add" affordances:
+ *   - Recommended — presets, installed by checkbox on the catalog page, and
+ *     read-only here: their definition is ours, not the user's.
+ *   - Your tools — one HTTP request each, written here or by the agent.
+ *   - Tool servers — an external MCP program contributing a whole bundle.
+ *
+ * Keys live in their own group and are only ever typed by the user. The agent
+ * can say WHICH key a tool needs (it writes `{{secret:id}}`) and where to get
+ * it, but a value never passes through a conversation.
  */
 import { ref, computed } from 'vue'
 import { useSettingsStore, newProfileId } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
-import { sortedCatalog, type CatalogEntry } from '@/lib/toolCatalog'
+import { useUiStore } from '@/stores/ui'
+import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import {
   normalizeHttpTool,
   sanitizeToolName,
@@ -31,36 +37,68 @@ import { t } from '@/i18n'
 const store = useSettingsStore()
 const mcp = useMcpStore()
 const tools = useToolsStore()
+const ui = useUiStore()
 
 const catalogEntries = sortedCatalog()
 const RESERVED = new Set(TOOLS.map((x) => x.name))
 
-/* ── recommended catalog ───────────────────────────────────────────────── */
+/* ── navigation ────────────────────────────────────────────────────────── */
+
+type View = { name: 'main' } | { name: 'catalog' } | { name: 'entry'; id: string } | { name: 'server'; id: string }
+const view = ref<View>({ name: 'main' })
+
+function open(v: View): void {
+  view.value = v
+}
+function back(): void {
+  view.value = { name: 'main' }
+}
+
+/* ── recommended ───────────────────────────────────────────────────────── */
+
+const installedEntries = computed(() => catalogEntries.filter((e) => tools.isInstalled(e.id)))
 
 function toggleEntry(entry: CatalogEntry): void {
   if (tools.isInstalled(entry.id)) tools.uninstall(entry.id)
   else tools.install(entry.id)
 }
 
-/** For entries that install a server row, the live connection state. */
+/** The live server row an entry installed, when it installs one. */
 function entryServer(entry: CatalogEntry) {
   return entry.server ? mcp.servers.find((s) => s.config.url === entry.server!.url) : undefined
 }
 
+function entryToolCount(entry: CatalogEntry): number {
+  return entryServer(entry)?.tools.length ?? entry.tools?.length ?? 0
+}
+
 function entryStatus(entry: CatalogEntry): { label: string; cls: string } | null {
-  if (!tools.isInstalled(entry.id)) return null
   const server = entryServer(entry)
-  if (!server) {
-    const n = entry.tools?.length ?? 0
-    return { label: t('settings.status.nTools', { n }), cls: 'text-fg-3' }
-  }
-  if (server.status === 'ok') {
-    return { label: t('settings.status.nTools', { n: server.tools.length }), cls: 'text-added' }
-  }
+  if (!server) return null
+  if (server.status === 'ok') return { label: t('settings.status.nTools', { n: server.tools.length }), cls: 'text-added' }
   if (server.status === 'connecting') return { label: t('settings.status.connecting'), cls: 'text-fg-3' }
   if (server.status === 'off') return { label: t('settings.status.off'), cls: 'text-fg-3' }
   return { label: t('settings.catalogNotConnected'), cls: 'text-removed' }
 }
+
+/** Servers the user added by hand — the catalog's own are shown above instead,
+ *  so no server appears twice and each list means one thing. */
+const catalogServerUrls = computed(() => new Set(CATALOG.filter((e) => e.server).map((e) => e.server!.url)))
+const ownServers = computed(() => mcp.servers.filter((s) => !catalogServerUrls.value.has(s.config.url)))
+
+/* ── keys ──────────────────────────────────────────────────────────────── */
+
+const SECRET_META = new Map(
+  CATALOG.flatMap((e) => (e.secrets ?? []).map((s) => [s.id, { ...s, entry: e.id }] as const)),
+)
+
+/** Every key the installed tools actually reference — catalog packs and
+ *  agent-written tools alike, so a tool the agent just made has somewhere for
+ *  its key to go. */
+const requiredKeys = computed(() => {
+  const ids = new Set(tools.specs.flatMap((s) => secretRefs(s)))
+  return [...ids].map((id) => SECRET_META.get(id) ?? { id, label: id, plain: false, url: undefined })
+})
 
 function secretValue(id: string): string {
   return store.state.toolSecrets[id] ?? ''
@@ -69,7 +107,7 @@ function onSecretInput(id: string, e: Event): void {
   tools.setSecret(id, (e.target as HTMLInputElement).value.trim())
 }
 
-/* ── custom tools ──────────────────────────────────────────────────────── */
+/* ── your tools ────────────────────────────────────────────────────────── */
 
 type ParamRow = { key: string } & HttpToolParam
 
@@ -91,6 +129,13 @@ const params = ref<ParamRow[]>([])
 const testArgs = ref<Record<string, string>>({})
 const testOutput = ref('')
 const testing = ref(false)
+
+/** Hand the request to the agent instead of the form. It lands in the composer
+ *  as an editable draft, so the user still decides what gets asked. */
+function askAgent(): void {
+  ui.pendingPrompt = t('settings.agentToolPrompt')
+  ui.settingsOpen = false
+}
 
 const nameTaken = computed(() => {
   const name = sanitizeToolName(form.value.name)
@@ -233,21 +278,29 @@ async function runTest(): Promise<void> {
   }
 }
 
-/* ── MCP servers ───────────────────────────────────────────────────────── */
+/* ── tool servers ──────────────────────────────────────────────────────── */
 
+const serverFormOpen = ref(false)
 const mcpName = ref('')
 const mcpUrl = ref('')
 const mcpToken = ref('')
 const editMcpId = ref<string | null>(null)
 
 function resetMcpForm(): void {
+  serverFormOpen.value = false
   editMcpId.value = null
   mcpName.value = ''
   mcpUrl.value = ''
   mcpToken.value = ''
 }
 
+function newServer(): void {
+  resetMcpForm()
+  serverFormOpen.value = true
+}
+
 function startEditMcp(s: { id: string; name: string; url: string; token?: string }): void {
+  serverFormOpen.value = true
   editMcpId.value = s.id
   mcpName.value = s.name
   mcpUrl.value = s.url
@@ -293,15 +346,47 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
     return { label: s.error?.slice(0, 60) ?? t('settings.status.failed'), cls: 'bg-removed' }
   return { label: t('settings.status.nTools', { n: s.tools.length }), cls: 'bg-added' }
 }
+
+/* ── detail sub-page ───────────────────────────────────────────────────── */
+
+const detailEntry = computed(() => {
+  const v = view.value
+  return v.name === 'entry' ? catalogEntries.find((e) => e.id === v.id) : undefined
+})
+const detailServer = computed(() => {
+  const v = view.value
+  if (v.name === 'server') return mcp.servers.find((s) => s.config.id === v.id)
+  if (detailEntry.value) return entryServer(detailEntry.value)
+  return undefined
+})
+
+/** The tools a detail page lists: an MCP server's live list, or a pack's specs. */
+const detailTools = computed<Array<{ name: string; description: string }>>(() => {
+  if (detailServer.value) {
+    return detailServer.value.tools.map((d) => ({ name: d.name, description: d.description }))
+  }
+  return (detailEntry.value?.tools ?? []).map((s) => ({ name: s.name, description: s.description }))
+})
+
+const detailTitle = computed(() => {
+  if (detailEntry.value) return t(`settings.catalog.${detailEntry.value.id}.title`)
+  return detailServer.value?.config.name ?? ''
+})
+
+/** A catalog server still needs the two fields only the user can supply. */
+const detailServerConfig = computed(() =>
+  detailServer.value ? store.state.mcpServers.find((s) => s.id === detailServer.value!.config.id) : undefined,
+)
 </script>
 
 <template>
-  <div class="space-y-5">
-    <!-- ▸ Recommended -->
-    <div>
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.recommended') }}</span>
-      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
-    </div>
+  <!-- ═══ Recommended catalog (sub-page) ═══ -->
+  <div v-if="view.name === 'catalog'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
+    <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
+
     <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
       <div v-for="e in catalogEntries" :key="e.id" class="px-3 py-3">
         <div class="flex items-start gap-2.5">
@@ -324,48 +409,18 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
-              <span
-                v-if="e.featured"
-                class="text-[10px] px-1 rounded bg-accent/15 text-accent"
-              >{{ $t('settings.catalogFeatured') }}</span>
+              <span v-if="e.featured" class="text-[10px] px-1 rounded bg-accent/15 text-accent">
+                {{ $t('settings.catalogFeatured') }}
+              </span>
               <span
                 v-if="e.requiresWebcli"
                 class="text-[10px] px-1 rounded"
                 :class="tools.webcliConnected ? 'bg-bg-3 text-fg-3' : 'bg-removed/15 text-removed'"
               >{{ $t('settings.catalogNeedsWebcli') }}</span>
-              <span
-                v-if="entryStatus(e)"
-                class="text-[10px]"
-                :class="entryStatus(e)!.cls"
-              >{{ entryStatus(e)!.label }}</span>
             </div>
             <p class="text-xs text-fg-3 mt-0.5 leading-relaxed">
               {{ $t(`settings.catalog.${e.id}.desc`) }}
             </p>
-
-            <!-- An extension is installed here but has to exist in Chrome too. -->
-            <p
-              v-if="tools.isInstalled(e.id) && e.kind === 'extension' && entryServer(e)?.status === 'error'"
-              class="text-xs text-fg-3 mt-1.5 leading-relaxed"
-            >
-              {{ $t('settings.catalogExtensionHint') }}
-            </p>
-
-            <!-- Keys the entry needs before its tools work. -->
-            <div v-if="tools.isInstalled(e.id) && e.secrets?.length" class="mt-2 space-y-1.5">
-              <div v-for="s in e.secrets" :key="s.id" class="flex items-center gap-2">
-                <label class="text-xs text-fg-3 w-20 shrink-0">{{ s.label }}</label>
-                <input
-                  :type="s.plain ? 'text' : 'password'"
-                  class="input text-xs flex-1"
-                  autocomplete="off"
-                  :value="secretValue(s.id)"
-                  :placeholder="s.label"
-                  @input="onSecretInput(s.id, $event)"
-                />
-              </div>
-            </div>
-
             <a
               v-if="e.homepage"
               :href="e.homepage"
@@ -377,8 +432,89 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- ▸ Tools this KB carries, awaiting approval -->
+  <!-- ═══ Detail: what's inside a pack or a server (sub-page) ═══ -->
+  <div v-else-if="view.name === 'entry' || view.name === 'server'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
+    <div>
+      <div class="text-sm text-fg-1">{{ detailTitle }}</div>
+      <p v-if="detailEntry" class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+        {{ $t(`settings.catalog.${detailEntry.id}.desc`) }}
+      </p>
+      <p v-else-if="detailServer" class="text-xs text-fg-3 mt-0.5 font-mono break-all">
+        {{ detailServer.config.url }}
+      </p>
+    </div>
+
+    <!-- The only fields a preset leaves to the user. -->
+    <div v-if="detailEntry?.server && detailServerConfig" class="space-y-2">
+      <label class="block text-xs uppercase tracking-wide text-fg-3">
+        {{ detailEntry.kind === 'extension' ? $t('settings.extensionId') : $t('settings.serverUrl') }}
+      </label>
+      <input v-model="detailServerConfig.url" class="input text-xs font-mono" />
+      <input
+        v-model="detailServerConfig.token"
+        type="password"
+        class="input text-xs"
+        :placeholder="$t('settings.tokenPlaceholder')"
+        autocomplete="off"
+      />
+      <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.presetLockedHint') }}</p>
+    </div>
+
+    <div v-if="detailServer && detailServer.status === 'error'" class="text-xs text-removed">
+      {{ detailServer.error }}
+    </div>
+
+    <div>
+      <span class="text-xs uppercase tracking-wide text-fg-3">
+        {{ $t('settings.status.nTools', { n: detailTools.length }) }}
+      </span>
+      <div v-if="detailTools.length" class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <div v-for="d in detailTools" :key="d.name" class="px-3 py-2">
+          <div class="font-mono text-xs text-fg-1">{{ d.name }}</div>
+          <p class="text-xs text-fg-3 mt-0.5 leading-relaxed line-clamp-3">{{ d.description }}</p>
+        </div>
+      </div>
+      <p v-else class="mt-1.5 text-xs text-fg-3">{{ $t('settings.noToolsHere') }}</p>
+    </div>
+  </div>
+
+  <!-- ═══ Main ═══ -->
+  <div v-else class="space-y-5">
+    <!-- ▸ Recommended, installed only -->
+    <div class="flex items-center justify-between">
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.recommended') }}</span>
+      <button class="text-xs text-accent hover:underline" @click="open({ name: 'catalog' })">
+        {{ $t('settings.browseAll') }}
+      </button>
+    </div>
+    <div v-if="installedEntries.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+      <button
+        v-for="e in installedEntries"
+        :key="e.id"
+        class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+        @click="open({ name: 'entry', id: e.id })"
+      >
+        <span class="text-sm text-fg-1 shrink-0">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
+        <span
+          v-if="entryStatus(e)"
+          class="text-[10px] shrink-0"
+          :class="entryStatus(e)!.cls"
+        >{{ entryStatus(e)!.label }}</span>
+        <span v-else class="text-[10px] text-fg-3 shrink-0">
+          {{ $t('settings.status.nTools', { n: entryToolCount(e) }) }}
+        </span>
+        <span class="flex-1" />
+        <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
+      </button>
+    </div>
+    <p v-else class="text-sm text-fg-3">{{ $t('settings.noneInstalled') }}</p>
+
+    <!-- ▸ Tools the KB carries, awaiting approval -->
     <div v-if="tools.kbPending.length" class="rounded-lg border border-accent/40 bg-accent/5 px-3 py-3 space-y-2">
       <div class="text-sm text-fg-1">{{ $t('settings.kbToolsTitle') }}</div>
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.kbToolsDesc') }}</p>
@@ -388,13 +524,22 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
       <button class="btn text-xs" @click="tools.trustKbTools()">{{ $t('settings.kbToolsApprove') }}</button>
     </div>
 
-    <!-- ▸ Custom tools -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.customTools') }}</span>
-      <button v-if="!editorOpen" class="text-xs text-accent hover:underline" @click="newTool">
-        {{ $t('settings.newTool') }}
-      </button>
+    <!-- ▸ Your tools -->
+    <div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.customTools') }}</span>
+        <div v-if="!editorOpen" class="flex items-center gap-3">
+          <button class="text-xs text-accent hover:underline" @click="askAgent">
+            {{ $t('settings.askAgent') }}
+          </button>
+          <button class="text-xs text-fg-3 hover:text-fg-0" @click="newTool">
+            {{ $t('settings.addManually') }}
+          </button>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.customToolsDesc') }}</p>
     </div>
+
     <div
       v-if="store.state.httpTools.length"
       class="rounded-lg border border-border divide-y divide-border overflow-hidden"
@@ -402,19 +547,26 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
       <div
         v-for="s in store.state.httpTools"
         :key="s.id"
-        class="flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
+        class="group flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
       >
         <span class="font-mono text-fg-1 shrink-0">{{ s.name }}</span>
         <span class="text-fg-3 truncate flex-1" :title="s.request.url">{{ s.request.url }}</span>
-        <button class="text-fg-3 hover:text-fg-0 shrink-0" :title="$t('common.edit')" @click="editTool(s)">
+        <button
+          class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          :title="$t('common.edit')"
+          @click="editTool(s)"
+        >
           <span class="codicon codicon-sm codicon-edit" />
         </button>
-        <button class="text-fg-3 hover:text-removed shrink-0" :title="$t('common.delete')" @click="removeTool(s.id)">
+        <button
+          class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          :title="$t('common.delete')"
+          @click="removeTool(s.id)"
+        >
           <span class="codicon codicon-sm codicon-trash" />
         </button>
       </div>
     </div>
-    <p v-else-if="!editorOpen" class="text-sm text-fg-3">{{ $t('settings.noCustomTools') }}</p>
 
     <!-- ▸ Custom tool editor -->
     <div v-if="editorOpen" class="rounded-lg border border-border px-3 py-3 space-y-3">
@@ -463,7 +615,6 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
         <p class="text-xs text-fg-3 mt-1 leading-relaxed">{{ $t('settings.toolUrlHelp') }}</p>
       </div>
 
-      <!-- Parameters -->
       <div>
         <div class="flex items-center justify-between mb-1">
           <label class="text-xs text-fg-3">{{ $t('settings.toolParams') }}</label>
@@ -512,7 +663,6 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
         <textarea v-model="form.body" rows="2" class="input text-xs font-mono" placeholder='{"q":"{{query}}"}' />
       </div>
 
-      <!-- Response shaping — the difference between 200 tokens and 20,000. -->
       <div>
         <label class="block text-xs text-fg-3 mb-1">{{ $t('settings.toolResponse') }}</label>
         <div class="flex gap-2 mb-1.5">
@@ -541,7 +691,6 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
         {{ $t('settings.toolSecretsNote', { ids: draftSecrets.join(', ') }) }}
       </p>
 
-      <!-- Test -->
       <div class="border-t border-border pt-3 space-y-2">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs text-fg-3">{{ $t('settings.toolTest') }}</span>
@@ -573,30 +722,43 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
       </div>
     </div>
 
-    <!-- ▸ MCP servers -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectedServers') }}</span>
-      <button class="text-xs text-accent hover:underline" @click="mcp.refresh()">{{ $t('settings.reconnect') }}</button>
+    <!-- ▸ Tool servers (user-added) -->
+    <div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectedServers') }}</span>
+        <button v-if="!serverFormOpen" class="text-xs text-accent hover:underline" @click="newServer">
+          {{ $t('settings.addServer') }}
+        </button>
+      </div>
+      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.serversDesc') }}</p>
     </div>
-    <div v-if="mcp.servers.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+
+    <div v-if="ownServers.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
       <div
-        v-for="s in mcp.servers"
+        v-for="s in ownServers"
         :key="s.config.id"
-        class="flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
+        class="group flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
       >
         <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="mcpStatusLabel(s).cls" />
-        <span class="text-fg-1 shrink-0">{{ s.config.name }}</span>
+        <button class="text-fg-1 shrink-0 hover:underline" @click="open({ name: 'server', id: s.config.id })">
+          {{ s.config.name }}
+        </button>
         <span
           v-if="s.source === 'kb'"
           class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
           :title="$t('settings.kbServerTitle')"
         >KB</span>
-        <span class="text-fg-3 truncate flex-1" :title="s.config.url">
-          {{ mcpStatusLabel(s).label }}
-        </span>
+        <span class="text-fg-3 truncate flex-1" :title="s.config.url">{{ mcpStatusLabel(s).label }}</span>
         <template v-if="s.source === 'global'">
           <button
-            class="shrink-0"
+            class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            :title="$t('settings.reconnect')"
+            @click="mcp.refresh()"
+          >
+            <span class="codicon codicon-sm codicon-refresh" />
+          </button>
+          <button
+            class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             :class="editMcpId === s.config.id ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
             :title="$t('common.edit')"
             @click="startEditMcp(s.config)"
@@ -604,7 +766,7 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
             <span class="codicon codicon-sm codicon-edit" />
           </button>
           <button
-            class="text-fg-3 hover:text-fg-0 shrink-0"
+            class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             :title="s.config.enabled === false ? $t('settings.enable') : $t('settings.disable')"
             @click="toggleMcpServer(s.config.id)"
           >
@@ -613,33 +775,65 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
               :class="s.config.enabled === false ? 'codicon-circle-slash' : 'codicon-pass'"
             />
           </button>
-          <button class="text-fg-3 hover:text-removed shrink-0" :title="$t('common.delete')" @click="removeMcpServer(s.config.id)">
+          <button
+            class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            :title="$t('common.delete')"
+            @click="removeMcpServer(s.config.id)"
+          >
             <span class="codicon codicon-sm codicon-trash" />
           </button>
         </template>
       </div>
     </div>
-    <div v-else class="text-sm text-fg-3">{{ $t('settings.noGlobalServers') }}</div>
+    <p v-else-if="!serverFormOpen" class="text-sm text-fg-3">{{ $t('settings.noGlobalServers') }}</p>
 
-    <div>
-      <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent mb-1.5">
+    <div v-if="serverFormOpen" class="rounded-lg border border-border px-3 py-3 space-y-2">
+      <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent">
         <span class="codicon codicon-sm codicon-edit" />
         {{ $t('settings.editingServer', { name: mcpName || 'server' }) }}
       </div>
-      <div class="space-y-2">
-        <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
-        <input v-model="mcpUrl" class="input text-xs" :placeholder="$t('settings.urlPlaceholder')" />
-        <input v-model="mcpToken" type="password" class="input text-xs" :placeholder="$t('settings.tokenPlaceholder')" autocomplete="off" />
-        <div class="flex gap-2 pt-0.5">
-          <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
-            {{ editMcpId ? $t('common.save') : $t('common.add') }}
-          </button>
-          <button v-if="editMcpId" class="btn text-xs" @click="resetMcpForm">{{ $t('common.cancel') }}</button>
+      <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
+      <input v-model="mcpUrl" class="input text-xs font-mono" :placeholder="$t('settings.urlPlaceholder')" />
+      <input
+        v-model="mcpToken"
+        type="password"
+        class="input text-xs"
+        :placeholder="$t('settings.tokenPlaceholder')"
+        autocomplete="off"
+      />
+      <div class="flex gap-2 pt-0.5">
+        <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
+          {{ editMcpId ? $t('common.save') : $t('common.add') }}
+        </button>
+        <button class="btn text-xs" @click="resetMcpForm">{{ $t('common.cancel') }}</button>
+      </div>
+      <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.toolsHelp') }}</p>
+    </div>
+
+    <!-- ▸ Keys -->
+    <div v-if="requiredKeys.length">
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.keys') }}</span>
+      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.keysDesc') }}</p>
+      <div class="space-y-1.5">
+        <div v-for="k in requiredKeys" :key="k.id" class="flex items-center gap-2">
+          <label class="text-xs text-fg-3 w-32 shrink-0 truncate" :title="k.id">{{ k.label }}</label>
+          <input
+            :type="k.plain ? 'text' : 'password'"
+            class="input text-xs flex-1"
+            autocomplete="off"
+            :value="secretValue(k.id)"
+            :placeholder="k.id"
+            @input="onSecretInput(k.id, $event)"
+          />
+          <a
+            v-if="k.url"
+            :href="k.url"
+            target="_blank"
+            rel="noopener"
+            class="text-xs text-accent hover:underline shrink-0"
+          >{{ $t('settings.getKey') }}</a>
         </div>
       </div>
     </div>
-    <p class="text-xs text-fg-3 leading-relaxed">
-      {{ $t('settings.toolsHelp') }}
-    </p>
   </div>
 </template>

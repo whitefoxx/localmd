@@ -21,8 +21,6 @@ import type { HttpToolSpec } from '@/lib/httpTools'
  *  `externally_connectable` already lists localmd.app, so the page connects
  *  over a chrome.runtime Port — the transport McpExtensionClient speaks. */
 export const WEBCLI_EXTENSION_ID = 'hjdcccloaonnfpojpiaadabkhjggilha'
-/** The full Web Agent sibling — same transport, plus site adapters and web_task. */
-export const WEB_AGENT_EXTENSION_ID = 'gcbgpkldpnmenoejbnbkdcagjhgbemeb'
 
 /** The WebCLI tool that makes it a general HTTP transport rather than just
  *  another set of browser tools. Used to detect a usable bridge. */
@@ -409,12 +407,6 @@ export const CATALOG: CatalogEntry[] = [
     kind: 'mcp',
     homepage: 'https://context7.com/',
     server: { name: 'context7', url: 'https://mcp.context7.com/mcp' },
-  },
-  {
-    id: 'webagent',
-    kind: 'extension',
-    homepage: 'https://github.com/whitefoxx/web-agent-skills',
-    server: { name: 'webagent', url: WEB_AGENT_EXTENSION_ID },
   },
 ]
 

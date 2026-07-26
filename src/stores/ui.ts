@@ -27,6 +27,12 @@ export const useUiStore = defineStore('ui', () => {
   /** Show the editor tab bar. When hidden, files open via the Open Files list. */
   const editorTabsVisible = ref(true)
 
+  /** Text handed to the chat composer from elsewhere in the app — Settings →
+   *  Tools uses it to turn "I need a tool that…" into a message the user can
+   *  edit and send. The composer consumes it and clears it, so it is a one-shot
+   *  handoff rather than shared state. */
+  const pendingPrompt = ref('')
+
   /** Widths (px) of the resizable panels, persisted per browser. */
   const agentWidth = ref(persistedWidth(AGENT_WIDTH_KEY, DEFAULT_AGENT_WIDTH))
   const sidebarWidth = ref(persistedWidth(SIDEBAR_WIDTH_KEY, DEFAULT_SIDEBAR_WIDTH))
@@ -46,6 +52,7 @@ export const useUiStore = defineStore('ui', () => {
     healthOpen,
     settingsOpen,
     editorTabsVisible,
+    pendingPrompt,
     agentWidth,
     sidebarWidth,
   }

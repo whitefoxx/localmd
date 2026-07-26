@@ -52,6 +52,24 @@ const PLAN_ICONS = {
 const planItems = computed(() => plan.itemsFor(chat.currentSessionId))
 
 const input = ref('')
+
+/** A request handed over from elsewhere (Settings → Tools). It lands in the
+ *  composer as an editable draft rather than being sent: the user should see —
+ *  and be able to change — what the agent is about to be asked. */
+watch(
+  () => ui.pendingPrompt,
+  (prompt) => {
+    if (!prompt) return
+    ui.pendingPrompt = ''
+    input.value = input.value ? `${input.value.trimEnd()}\n${prompt}` : prompt
+    void nextTick(() => {
+      textarea.value?.focus()
+      const end = input.value.length
+      textarea.value?.setSelectionRange(end, end)
+    })
+  },
+)
+
 /** Anything to send? Also gates steering — an interjection needs real content. */
 const canSend = computed(
   () => !!input.value.trim() || attachments.value.length > 0 || composer.refs.length > 0,

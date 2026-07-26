@@ -72,6 +72,27 @@ export default {
     recommended: 'Recommended tools',
     recommendedDesc:
       'Nothing is built in: the agent can reach exactly what you check here. Every endpoint listed has been checked to work from a browser. Start with WebCLI — it fetches with your real Chrome session, so it also reaches sites that refuse browser scripts.',
+    browseAll: 'Browse all →',
+    backToTools: 'Tools',
+    noneInstalled: 'Nothing installed yet — browse the recommended list to give the agent some reach.',
+    noToolsHere: 'No tools reported. If this is an extension or a server, it may not be connected.',
+    presetLockedHint:
+      'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here. Uncheck it in the recommended list to remove it.',
+    extensionId: 'Chrome extension ID',
+    serverUrl: 'Server URL',
+    customToolsDesc:
+      'One HTTP request each — a search, a lookup, an API you use. Describe what you need and the agent will build and test it, or write it yourself.',
+    askAgent: 'Ask the agent',
+    addManually: 'Add manually',
+    serversDesc:
+      'A separate program (MCP) that contributes a whole bundle of tools at once, rather than a single request.',
+    addServer: '+ Add server',
+    keys: 'Keys',
+    keysDesc:
+      'API keys the installed tools need. They stay in this browser and are never shown to the agent — a tool refers to a key by name, so the agent can tell you which one is missing without ever seeing its value.',
+    getKey: 'Get one →',
+    agentToolPrompt:
+      'I need a new tool. Here is what it should do (which service, what I want back):\n\n',
     catalogFeatured: 'Start here',
     catalogNeedsWebcli: 'needs WebCLI',
     catalogNotConnected: 'not connected',
@@ -114,10 +135,6 @@ export default {
       context7: {
         title: 'Context7 library docs',
         desc: 'Version-correct documentation for thousands of libraries and frameworks, instead of guesses from training data.',
-      },
-      webagent: {
-        title: 'Web Agent extension',
-        desc: 'The fuller sibling of WebCLI: adds site adapters and web_task, which hands a whole browsing errand to its own agent.',
       },
     },
 
@@ -258,6 +275,25 @@ export default {
     recommended: '推荐工具',
     recommendedDesc:
       '没有任何内置工具：agent 能用什么，完全取决于你在这里勾选了什么。列出的每个服务都已实测可在浏览器中调用。建议从 WebCLI 开始 —— 它用你真实的 Chrome 会话发请求，因此也能访问那些拒绝浏览器脚本的接口。',
+    browseAll: '查看全部 →',
+    backToTools: '工具',
+    noneInstalled: '还没装任何工具 —— 去推荐列表里挑几个，agent 才有能力可用。',
+    noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
+    presetLockedHint:
+      '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。要移除它，请在推荐列表里取消勾选。',
+    extensionId: 'Chrome 扩展 ID',
+    serverUrl: '服务器 URL',
+    customToolsDesc:
+      '每个工具就是一次 HTTP 请求 —— 一次搜索、一次查询、你常用的某个 API。可以描述需求让 agent 帮你做好并测试，也可以自己写。',
+    askAgent: '让 agent 来做',
+    addManually: '手动添加',
+    serversDesc: '一个独立的程序（MCP），一次性提供一整组工具，而不是单次请求。',
+    addServer: '+ 添加服务器',
+    keys: '密钥',
+    keysDesc:
+      '已安装工具所需的 API key。它们只保存在这个浏览器里，绝不会给到 agent —— 工具只按名字引用密钥，所以 agent 能告诉你缺哪一个，却看不到它的值。',
+    getKey: '去获取 →',
+    agentToolPrompt: '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
     catalogFeatured: '首选',
     catalogNeedsWebcli: '需要 WebCLI',
     catalogNotConnected: '未连接',
@@ -299,10 +335,6 @@ export default {
       context7: {
         title: 'Context7 库文档',
         desc: '获取数千个库和框架的版本正确的文档，而不是模型凭训练数据猜测。',
-      },
-      webagent: {
-        title: 'Web Agent 扩展',
-        desc: 'WebCLI 的完整版兄弟：额外提供站点适配器和 web_task —— 把整件浏览任务交给它自带的 agent 去跑。',
       },
     },
 

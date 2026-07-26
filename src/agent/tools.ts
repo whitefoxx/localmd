@@ -617,7 +617,10 @@ Rules that will reject a spec:
 - https only, and the HOST may not contain a placeholder (a tool always talks to
   the server it was approved for).
 - {{secret:id}} reads a key the USER stored in Settings; you can reference one
-  but never read, set, or see its value.
+  but never read, set, or see its value. NEVER ask the user to paste a key or
+  token into the chat: put {{secret:<id>}} in the spec, then tell them to open
+  Settings → Tools → Keys, where the id appears with a field to fill, and say
+  where to obtain it.
 Guidance:
 - ALWAYS shape the response. A raw JSON payload can cost thousands of tokens per
   call; pick + template is the difference between 200 tokens and 20,000.
@@ -746,7 +749,7 @@ const manageTools = defineTool({
       : [...kb.tools, spec]
     const missing = secretRefs(spec).filter((id) => !toolsStore.hasSecret(id))
     const note = missing.length
-      ? `\nTell the user to add ${missing.map((m) => `"${m}"`).join(', ')} in Settings → Tools — the tool will fail until they do.`
+      ? `\nTell the user to open Settings → Tools → Keys and fill in ${missing.map((m) => `"${m}"`).join(', ')} — the tool will fail until they do. Do NOT ask them to paste the value into this chat.`
       : ''
     return (await writeKbTools(ctx, kb.raw, next, `${replacing ? 'update' : 'add'} ${spec.name}`)) + note
   },
