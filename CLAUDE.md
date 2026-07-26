@@ -31,6 +31,16 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
   simplest manual version first.
 - **Tool-neutral KB.** KB-facing conventions live in AGENTS.md / `.agents/`
   (open formats), never vendor-specific directories.
+- **Tool code provides capability, never a particular tool.** What we write is
+  the generic machinery — the spec format, templating, response shaping, types,
+  parameters, transports, config scopes. Individual tools are *data* created on
+  top of it by the user or the agent; we ship a handful as presets in the
+  recommended catalog, and those are data too. If a feature request can only be
+  met by adding a `defineTool` call, the machinery is missing something —
+  extend the machinery instead. Most tools should be reachable from WebCLI plus
+  the base capabilities, an agent skill and a prompt: "search Hacker News", "get
+  that item's discussion" are conversations, not releases. A tool earns a place
+  in the catalog by being broadly useful AND verified, not by being easy.
 
 ## Token economy
 
