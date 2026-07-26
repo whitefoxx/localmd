@@ -571,6 +571,14 @@ async function saveSession(): Promise<void> {
   window.setTimeout(() => (sessionSaved.value = ''), 2500)
 }
 
+/** Pick the interrupted work back up. Goes through the composer so it is a
+ *  normal message the user can see and the history stays honest. */
+async function continueTurn(): Promise<void> {
+  if (chat.running) return
+  input.value = t('chat.continueWord')
+  await send()
+}
+
 async function send(): Promise<void> {
   if (!settingsStore.isConfigured()) {
     // Land on the pane that fixes it, not on whichever one was last open.
@@ -1108,6 +1116,20 @@ watch(
             </div>
           </details>
           <div v-if="m.error" class="text-xs text-removed">{{ m.error }}</div>
+          <!-- Ran out of steps, not out of work. Say so and offer the obvious
+               next move, rather than letting it read as a finished answer. -->
+          <div
+            v-if="m.stoppedAtLimit && !m.error"
+            class="flex items-center gap-2 flex-wrap text-xs text-fg-3 mt-1"
+          >
+            <span class="codicon codicon-sm codicon-debug-pause" />
+            <span>{{ $t('chat.stoppedAtLimit') }}</span>
+            <button
+              class="text-accent hover:underline"
+              :disabled="chat.running"
+              @click="continueTurn"
+            >{{ $t('chat.continueRun') }}</button>
+          </div>
           <div
             v-if="chat.running && m === chat.messages[chat.messages.length - 1] && !m.parts.length"
             class="text-xs text-fg-3"

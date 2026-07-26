@@ -118,6 +118,11 @@ export interface UiMessage {
   contexts?: SelectionRef[]
   usage?: TokenUsage
   error?: string
+  /** The turn ran out of steps rather than finishing. Rendered as an explicit
+   *  notice with a Continue action — otherwise a truncated turn is
+   *  indistinguishable from a completed one, and any plan it kept looks stalled
+   *  when the work simply stopped mid-flight. */
+  stoppedAtLimit?: boolean
 }
 
 interface ChatSession {
@@ -717,6 +722,8 @@ export const useChatStore = defineStore('chat', () => {
         }
       } else if (e.type === 'image') {
         parts.push({ type: 'image', path: e.path })
+      } else if (e.type === 'limit') {
+        assistant.stoppedAtLimit = true
       } else {
         // Only id-bearing tool calls get the loading/timer treatment.
         parts.push(

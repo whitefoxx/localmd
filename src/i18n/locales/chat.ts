@@ -33,6 +33,9 @@ export default {
     noModelDesc:
       'The agent runs on a model you provide — add an API key from any provider and it can start working. The key stays in this browser and goes straight to that provider.',
     noModelAction: 'Configure a model',
+    stoppedAtLimit: 'Stopped at the step limit — the work may be unfinished.',
+    continueRun: 'Continue',
+    continueWord: 'Continue where you left off.',
     setupSave: 'Save',
     setupAlreadySet: 'A value is already saved for this key.',
     setupKeep: 'Use it',
@@ -94,6 +97,9 @@ export default {
     noModelDesc:
       'agent 依赖你自己提供的模型运行 —— 填入任意提供商的 API key 就能开始。密钥只保存在这个浏览器里，并直接发往该提供商。',
     noModelAction: '去配置模型',
+    stoppedAtLimit: '达到单轮步数上限而停下 —— 事情可能没做完。',
+    continueRun: '继续',
+    continueWord: '接着刚才没做完的继续。',
     setupSave: '保存',
     setupAlreadySet: '这个密钥已经保存过一个值。',
     setupKeep: '就用它',

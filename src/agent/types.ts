@@ -21,5 +21,10 @@ export type AgentEvent =
   /** A generated image saved into the KB (generate_image tool) — the chat shows
    *  it inline; `path` is its KB location. */
   | { type: 'image'; path: string }
+  /** The turn stopped because it ran out of steps, not because the work was
+   *  done. Without this the two are indistinguishable: the model's last
+   *  sentence often promises an action that never came, and any plan it was
+   *  keeping is left mid-flight. */
+  | { type: 'limit'; steps: number }
 
 export type AgentEventHandler = (e: AgentEvent) => void

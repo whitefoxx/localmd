@@ -223,6 +223,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   })
 
   let aborted = false
+  let steps = 0
   for await (const part of result.fullStream) {
     switch (part.type) {
       case 'text-delta':
@@ -240,6 +241,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         }
         break
       case 'finish-step':
+        steps++
         opts.onEvent(usageEvent(part.usage))
         break
       case 'abort':
@@ -261,6 +263,10 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     err.name = 'AbortError'
     throw err
   }
+
+  // Ran to the cap rather than to a conclusion — say so, or the user reads an
+  // interrupted turn as a finished one.
+  if (steps >= MAX_ITERATIONS) opts.onEvent({ type: 'limit', steps })
 
   const response = await result.response
   return [...opts.messages, ...response.messages]
