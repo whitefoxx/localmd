@@ -104,7 +104,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   {
     name: 'connect-a-service',
     description:
-      'Give the agent access to an external service (an API, a reading app, a note tool) by researching it and building the tools — use when the user asks to add, connect or integrate something.',
+      'Connect an external service (an API, a reading app, a note tool) by researching how it works and building real tools for it — use whenever the user asks to add, connect or integrate something, including "add the <name> skill".',
     body: CONNECT_A_SERVICE,
   },
 ]
