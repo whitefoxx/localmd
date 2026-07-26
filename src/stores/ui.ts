@@ -33,6 +33,17 @@ export const useUiStore = defineStore('ui', () => {
    *  handoff rather than shared state. */
   const pendingPrompt = ref('')
 
+  /** Which Settings pane to land on when the modal is opened from elsewhere —
+   *  sending someone to "Settings" and letting them hunt for the right pane is
+   *  most of the reason setup feels hard. One-shot, like pendingPrompt. */
+  const settingsSection = ref<string | null>(null)
+
+  /** Open Settings on a specific pane. */
+  function openSettings(section?: string): void {
+    if (section) settingsSection.value = section
+    settingsOpen.value = true
+  }
+
   /** Widths (px) of the resizable panels, persisted per browser. */
   const agentWidth = ref(persistedWidth(AGENT_WIDTH_KEY, DEFAULT_AGENT_WIDTH))
   const sidebarWidth = ref(persistedWidth(SIDEBAR_WIDTH_KEY, DEFAULT_SIDEBAR_WIDTH))
@@ -53,6 +64,8 @@ export const useUiStore = defineStore('ui', () => {
     settingsOpen,
     editorTabsVisible,
     pendingPrompt,
+    settingsSection,
+    openSettings,
     agentWidth,
     sidebarWidth,
   }

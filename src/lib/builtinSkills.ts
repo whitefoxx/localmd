@@ -1,0 +1,114 @@
+/**
+ * Skills the app ships, available in every KB without scaffolding anything into
+ * the user's folder.
+ *
+ * These exist for workflows that are about the APP rather than about a
+ * particular knowledge base — connecting a service is the first. Putting the
+ * playbook here rather than in the system prompt is the whole point: it is long,
+ * and it is needed by roughly one turn in a hundred. `use_skill` fetches it when
+ * that turn arrives and it costs nothing the rest of the time.
+ *
+ * A KB skill of the same name wins, so a user can always override ours.
+ */
+
+export interface BuiltinSkill {
+  name: string
+  description: string
+  body: string
+}
+
+const CONNECT_A_SERVICE = `# Connecting a service
+
+The user wants the agent to reach something it currently can't — "add WeRead",
+"can you search my Notion", "get my Readwise highlights". Everything you need is
+already available: tools in this app are DATA (a JSON spec), not code, so you
+can research a service and build working tools for it inside one conversation.
+
+Work in this order. Do not skip step 1 or step 5.
+
+## 1. Find out how the service actually works
+
+Search for its API or agent/skill documentation and READ it. You need four
+things before writing anything:
+
+- the endpoint(s), and whether one gateway serves many operations
+- how it authenticates (bearer header? query key? cookies?)
+- the request shape (which parameters, where they go)
+- the response shape (what the JSON/XML actually looks like)
+
+If the docs are vague about responses, that's fine — step 3 shows you the real
+thing. If the service publishes a machine-readable API list (WeRead's gateway
+answers \`{"api_name": "/_list"}\`), fetch it: it saves you guessing.
+
+## 2. Check what the browser can reach
+
+This app runs in a browser, so an endpoint that sends no CORS headers cannot be
+called directly. Build one spec and \`manage_tools\` \`test\` it:
+
+- it works → leave \`transport: "auto"\`
+- it fails to connect → the endpoint refuses browsers. Set
+  \`transport: "webcli"\`, which routes through the WebCLI extension's
+  service-worker fetch (no CORS, carries the user's cookies).
+
+If WebCLI isn't connected, don't just report that — call \`request_setup\` with
+\`kind: "extension"\`, \`entry_id: "webcli"\` and let the user install it.
+
+## 3. Design the output against a REAL response
+
+This is where tools are won or lost. A raw JSON payload can cost thousands of
+tokens per call; a shaped one costs a few hundred, and the shaped one is easier
+to read. So:
+
+1. \`manage_tools\` \`test\` with \`raw: true\` — you get the untouched response.
+2. Find the list you care about and write \`pick\` + a per-item \`template\`.
+3. \`test\` again (without raw) and LOOK at the output. An unfilled
+   \`{{placeholder}}\` means a wrong field name. "No match for pick" prints the
+   available keys — use them.
+
+Keep only the fields a person would want: title, who, when, an id to follow up
+with, a link. Drop covers, colour palettes, internal flags.
+
+## 4. Build the whole set, not one tool
+
+A service is worth one tool per useful operation — search, detail, list, stats.
+Give them a shared \`bundle\` name so the user approves and manages them as one
+integration, and save them together with \`manage_tools\` \`save_bundle\`.
+
+Names should read as a group: \`weread_search\`, \`weread_shelf\`, \`weread_notes\`.
+
+## 5. Collect what only the user can give
+
+NEVER ask for an API key as chat text, and never tell them to go hunting through
+settings. Put \`{{secret:<service>_api_key}}\` in the spec, then call
+\`request_setup\` with \`kind: "key"\` and that same id, a \`help\` line saying
+exactly where to get it, and a \`url\`. The app shows a field, stores what they
+type, and tells you only that a value arrived.
+
+If a decision is genuinely theirs (which of two endpoints, which account), ask
+with \`kind: "choice"\` rather than picking silently.
+
+## 6. Write down what you learned
+
+Save a skill into the KB at \`.agents/skills/<service>/SKILL.md\` describing the
+tools you built and any field meanings, units or quirks that are not obvious
+from the tool descriptions — response units, counting rules, id formats, deep
+links. Future sessions read that instead of rediscovering it.
+
+## Finally
+
+Prove it works: call one of the new tools and show the user a real result. A
+setup that was never run is not finished.
+`
+
+export const BUILTIN_SKILLS: BuiltinSkill[] = [
+  {
+    name: 'connect-a-service',
+    description:
+      'Give the agent access to an external service (an API, a reading app, a note tool) by researching it and building the tools — use when the user asks to add, connect or integrate something.',
+    body: CONNECT_A_SERVICE,
+  },
+]
+
+export function builtinSkill(name: string): BuiltinSkill | undefined {
+  return BUILTIN_SKILLS.find((s) => s.name === name)
+}

@@ -120,7 +120,7 @@ describe('save', () => {
     expect(await fs.tryReadFile(KB_TOOLS_CONFIG_PATH)).toBeNull()
   })
 
-  it('says which key the user still has to add', async () => {
+  it('points the agent at request_setup for a key the tool needs', async () => {
     const run = manage({
       action: 'save',
       tool: JSON.stringify({
@@ -129,7 +129,11 @@ describe('save', () => {
       }),
     })
     await answer(true)
-    expect(await run).toMatch(/Settings → Tools/)
+    const out = await run
+    expect(out).toMatch(/request_setup/)
+    expect(out).toMatch(/demo_key/)
+    // Collecting it as chat text is the thing this must never suggest.
+    expect(out).toMatch(/Do NOT ask them to paste it/)
   })
 })
 
@@ -157,7 +161,77 @@ describe('remove', () => {
         response: { mode: 'text' },
       },
     ]
-    expect(await manage({ action: 'remove', name: 'mine' })).toMatch(/no tool named "mine"/)
+    expect(await manage({ action: 'remove', name: 'mine' })).toMatch(
+      /no tool or bundle named "mine"/,
+    )
+  })
+})
+
+describe('save_bundle', () => {
+  const BUNDLE = [
+    { ...VALID, name: 'demo_search' },
+    {
+      ...VALID,
+      name: 'demo_detail',
+      request: { method: 'GET', url: 'https://api.example.com/d?id={{query}}' },
+    },
+  ]
+
+  it('writes a whole integration under ONE approval', async () => {
+    const run = manage({
+      action: 'save_bundle',
+      bundle: 'demo',
+      tools: JSON.stringify(BUNDLE),
+    })
+    await answer(true) // exactly one prompt for the pair
+    expect(await run).toMatch(/add the demo integration \(2 tools\)/)
+
+    const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
+      tools: Array<{ name: string; bundle?: string }>
+    }
+    expect(written.tools.map((t) => t.name)).toEqual(['demo_search', 'demo_detail'])
+    expect(written.tools.every((t) => t.bundle === 'demo')).toBe(true)
+  })
+
+  it('replaces the previous members instead of orphaning them', async () => {
+    const first = manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
+    await answer(true)
+    await first
+
+    const second = manage({
+      action: 'save_bundle',
+      bundle: 'demo',
+      tools: JSON.stringify([BUNDLE[0]]), // the second tool is gone this time
+    })
+    await answer(true)
+    await second
+
+    const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
+      tools: Array<{ name: string }>
+    }
+    expect(written.tools.map((t) => t.name)).toEqual(['demo_search'])
+  })
+
+  it('rejects the whole set when one spec is invalid', async () => {
+    const out = await manage({
+      action: 'save_bundle',
+      bundle: 'demo',
+      tools: JSON.stringify([BUNDLE[0], { ...VALID, name: 'bad', request: { url: 'http://x.dev' } }]),
+    })
+    expect(out).toMatch(/spec #2 is invalid/)
+    expect(await fs.tryReadFile(KB_TOOLS_CONFIG_PATH)).toBeNull()
+  })
+
+  it('removes an entire bundle by name', async () => {
+    const add = manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
+    await answer(true)
+    await add
+
+    const run = manage({ action: 'remove', name: 'demo' })
+    await answer(true)
+    expect(await run).toMatch(/remove the demo bundle \(2 tools\)/)
+    const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as { tools: unknown[] }
+    expect(written.tools).toEqual([])
   })
 })
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
+import { useSetupStore } from '@/stores/setup'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useReviewStore } from '@/stores/review'
@@ -840,6 +841,9 @@ export const useChatStore = defineStore('chat', () => {
       controllers.delete(session.id)
       steerQueue.delete(session.id) // drop any interjection the ended turn never consumed
       background.delete(session.id) // a detached turn that just ended is a plain stored session now
+      // A setup card only makes sense while its turn is waiting on it; an
+      // aborted turn would otherwise leave one on screen with nothing behind it.
+      useSetupStore().clearSession(session.id)
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever.
       for (const p of assistant.parts) {

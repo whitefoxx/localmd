@@ -3,6 +3,8 @@ import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useChatStore, type Attachment, type UiMessage } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
+import { useSetupStore } from '@/stores/setup'
+import SetupCard from '@/components/chat/SetupCard.vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { usePlanStore } from '@/stores/plan'
@@ -50,6 +52,12 @@ const PLAN_ICONS = {
 
 /** The ACTIVE session's plan — each chat tab keeps its own. */
 const planItems = computed(() => plan.itemsFor(chat.currentSessionId))
+
+const setup = useSetupStore()
+/** The live setup request for THIS chat tab (sessions block independently). */
+const setupRequest = computed(() =>
+  chat.currentSessionId ? setup.pendingFor(chat.currentSessionId) : undefined,
+)
 
 const input = ref('')
 
@@ -565,7 +573,8 @@ async function saveSession(): Promise<void> {
 
 async function send(): Promise<void> {
   if (!settingsStore.isConfigured()) {
-    emit('openSettings')
+    // Land on the pane that fixes it, not on whichever one was last open.
+    ui.openSettings('models')
     return
   }
   const text = input.value
@@ -1239,6 +1248,24 @@ watch(
         >
           <span class="codicon codicon-sm codicon-file shrink-0" />
           <span class="truncate">{{ p }}</span>
+        </button>
+      </div>
+
+      <!-- The agent is blocked waiting on the user: a key, an extension, a
+           choice. Sits above the composer because that is where they are
+           already looking. -->
+      <SetupCard v-if="setupRequest" :request="setupRequest" />
+
+      <!-- Nothing works without a model, so say that here rather than letting
+           the first message silently pop the Settings modal. -->
+      <div
+        v-if="!settingsStore.isConfigured()"
+        class="mb-2 rounded-xl border border-accent/40 bg-accent/5 px-3 py-2.5"
+      >
+        <div class="text-sm text-fg-1">{{ $t('chat.noModelTitle') }}</div>
+        <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('chat.noModelDesc') }}</p>
+        <button class="btn text-xs mt-2" @click="ui.openSettings('models')">
+          {{ $t('chat.noModelAction') }}
         </button>
       </div>
 

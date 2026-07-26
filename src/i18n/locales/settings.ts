@@ -72,6 +72,12 @@ export default {
     recommended: 'Recommended tools',
     recommendedDesc:
       'Nothing is built in: the agent can reach exactly what you check here. Every endpoint listed has been checked to work from a browser. Start with WebCLI — it fetches with your real Chrome session, so it also reaches sites that refuse browser scripts.',
+    connectTitle: 'Connect something',
+    connectDesc:
+      "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
+    connectAction: 'Describe it to the agent',
+    connectExamples: 'Add WeRead|Search my Notion|Read my Readwise highlights',
+    connectPrefill: '{what} — look up how it works and set it up for me.',
     browseAll: 'Browse all →',
     backToTools: 'Tools',
     noneInstalled: 'Nothing installed yet — browse the recommended list to give the agent some reach.',
@@ -151,6 +157,7 @@ export default {
     customTools: 'Your tools',
     newTool: '+ New tool',
     noCustomTools: 'No tools of your own yet. You can also just ask the agent to build one.',
+    kbToolHint: "Defined by this knowledge base's .agents/tools.json — ask the agent to change or remove it.",
     toolName: 'Name (as the agent calls it)',
     toolNameTaken: 'That name is already taken by another tool.',
     toolTransport: 'Send through',
@@ -278,6 +285,12 @@ export default {
     recommended: '推荐工具',
     recommendedDesc:
       '没有任何内置工具：agent 能用什么，完全取决于你在这里勾选了什么。列出的每个服务都已实测可在浏览器中调用。建议从 WebCLI 开始 —— 它用你真实的 Chrome 会话发请求，因此也能访问那些拒绝浏览器脚本的接口。',
+    connectTitle: '接入一个服务',
+    connectDesc:
+      '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
+    connectAction: '描述给 agent',
+    connectExamples: '接入微信读书|搜索我的 Notion|读取我的 Readwise 划线',
+    connectPrefill: '{what} —— 帮我查一下它怎么用，然后配好。',
     browseAll: '查看全部 →',
     backToTools: '工具',
     noneInstalled: '还没装任何工具 —— 去推荐列表里挑几个，agent 才有能力可用。',
@@ -353,6 +366,7 @@ export default {
     customTools: '自定义工具',
     newTool: '+ 新建工具',
     noCustomTools: '还没有自定义工具。你也可以直接让 agent 帮你做一个。',
+    kbToolHint: '由这个知识库的 .agents/tools.json 定义 —— 要改或删，跟 agent 说。',
     toolName: '名称（agent 调用时使用）',
     toolNameTaken: '这个名称已被其他工具占用。',
     toolTransport: '请求通道',

@@ -83,6 +83,13 @@ export interface HttpToolSpec {
    *  the agent has web access at all. */
   web?: boolean
   /**
+   * Groups the tools of one integration ("weread", "notion") so the user meets
+   * them as the thing they asked for rather than as eight unrelated rows —
+   * approved once, listed once, removed once. Free-form; the UI only groups by
+   * equality.
+   */
+  bundle?: string
+  /**
    * The destination is an argument, not a fixed host — a feed reader, where
    * naming one origin would defeat the point.
    *
@@ -236,7 +243,34 @@ export function normalizeHttpTool(raw: unknown, makeId?: () => string): HttpTool
       ? { transport: r.transport }
       : {}),
     ...(r.web === true ? { web: true } : {}),
+    ...(typeof r.bundle === 'string' && r.bundle.trim()
+      ? { bundle: r.bundle.trim().slice(0, 40) }
+      : {}),
   }
+}
+
+/** Group specs by bundle, keeping ungrouped tools each in their own group so a
+ *  caller can render one list. Order follows first appearance. */
+export function groupByBundle(
+  specs: readonly HttpToolSpec[],
+): Array<{ bundle: string | null; tools: HttpToolSpec[] }> {
+  const groups: Array<{ bundle: string | null; tools: HttpToolSpec[] }> = []
+  const byName = new Map<string, { bundle: string | null; tools: HttpToolSpec[] }>()
+  for (const spec of specs) {
+    if (!spec.bundle) {
+      groups.push({ bundle: null, tools: [spec] })
+      continue
+    }
+    const existing = byName.get(spec.bundle)
+    if (existing) {
+      existing.tools.push(spec)
+      continue
+    }
+    const group = { bundle: spec.bundle, tools: [spec] }
+    byName.set(spec.bundle, group)
+    groups.push(group)
+  }
+  return groups
 }
 
 /** KB-level tool file: tool-neutral location, travels with the KB via git —

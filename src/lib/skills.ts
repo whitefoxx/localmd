@@ -13,6 +13,11 @@
  * forces one with a /slash command in the chat input.
  */
 import * as fs from '@/lib/fs'
+import { BUILTIN_SKILLS, builtinSkill } from '@/lib/builtinSkills'
+
+/** Marks a skill as app-provided rather than living in the KB — not a real
+ *  path, so nothing tries to read it off disk. */
+export const BUILTIN_DIR = '<built-in>'
 
 export const SKILL_DIRS = ['.agents/skills', '.claude/skills']
 
@@ -75,6 +80,13 @@ export async function listSkills(): Promise<SkillMeta[]> {
       }
     }
   }
+  // App-provided skills come last: a KB skill of the same name overrides ours,
+  // which is the right precedence for a folder the user owns.
+  for (const s of BUILTIN_SKILLS) {
+    if (!byName.has(s.name)) {
+      byName.set(s.name, { name: s.name, description: s.description, dir: BUILTIN_DIR })
+    }
+  }
   return [...byName.values()]
 }
 
@@ -83,6 +95,10 @@ export async function loadSkill(name: string): Promise<Skill | null> {
   const metas = await listSkills()
   const meta = metas.find((s) => s.name === name)
   if (!meta) return null
+  if (meta.dir === BUILTIN_DIR) {
+    const b = builtinSkill(name)
+    return b ? { name: b.name, description: b.description, dir: BUILTIN_DIR, body: b.body, resources: [] } : null
+  }
   const md = await fs.tryReadFile(`${meta.dir}/SKILL.md`)
   if (!md) return null
   const parsed = parseSkill(md, name, meta.dir)

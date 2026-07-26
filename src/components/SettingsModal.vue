@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
+import { useUiStore } from '@/stores/ui'
 import ToolsSection from '@/components/settings/ToolsSection.vue'
 import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
 import {
@@ -120,6 +121,20 @@ const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
   { id: 'git', labelKey: 'settings.nav.git', icon: 'codicon-github' },
 ]
 const section = ref<SectionId>('models')
+
+// Opened from elsewhere with a pane in mind (the chat's "configure a model"
+// prompt, an agent asking for an extension). Consume the request so a later
+// plain open lands where the user left off.
+const ui = useUiStore()
+watch(
+  () => [props.open, ui.settingsSection] as const,
+  ([open, want]) => {
+    if (!open || !want) return
+    if (NAV.some((n) => n.id === want)) section.value = want as SectionId
+    ui.settingsSection = null
+  },
+  { immediate: true },
+)
 const sectionTitle = computed(() => {
   const n = NAV.find((n) => n.id === section.value)
   return n ? t(n.labelKey) : ''

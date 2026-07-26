@@ -28,6 +28,7 @@ import {
   normalizeHttpTool,
   sanitizeToolName,
   secretRefs,
+  groupByBundle,
   type HttpToolSpec,
   type HttpToolParam,
 } from '@/lib/httpTools'
@@ -112,6 +113,24 @@ const requiredKeys = computed(() => {
   }))
 })
 
+/** The distinct hosts a group of tools sends to — the line that matters most
+ *  when approving something that arrived with the folder. */
+function bundleHosts(specs: HttpToolSpec[]): string {
+  const hosts = specs.map((s) => {
+    try {
+      return new URL(s.request.url).host
+    } catch {
+      return s.request.url
+    }
+  })
+  return [...new Set(hosts)].join(', ')
+}
+
+/** Every key a group of tools reads, deduped. */
+function bundleSecrets(specs: HttpToolSpec[]): string[] {
+  return [...new Set(specs.flatMap((s) => secretRefs(s)))]
+}
+
 function secretValue(id: string): string {
   return store.state.toolSecrets[id] ?? ''
 }
@@ -142,10 +161,26 @@ const testArgs = ref<Record<string, string>>({})
 const testOutput = ref('')
 const testing = ref(false)
 
+/** Everything under "Your tools": the user's own plus the open KB's approved
+ *  set, grouped by integration. */
+const yourGroups = computed(() =>
+  groupByBundle([...store.state.httpTools, ...tools.kbActive]),
+)
+
+/** KB-scoped tools are defined by a file the agent and git also write, so they
+ *  are shown but not edited here. */
+function isKbTool(spec: HttpToolSpec): boolean {
+  return tools.kbActive.some((s) => s.id === spec.id)
+}
+
+/** Concrete starting points — an empty "describe what you want" box is a wall;
+ *  three examples show what kind of answer works. */
+const connectExamples = computed(() => t('settings.connectExamples').split('|'))
+
 /** Hand the request to the agent instead of the form. It lands in the composer
  *  as an editable draft, so the user still decides what gets asked. */
-function askAgent(): void {
-  ui.pendingPrompt = t('settings.agentToolPrompt')
+function askAgent(prefill?: string): void {
+  ui.pendingPrompt = prefill ? t('settings.connectPrefill', { what: prefill }) : t('settings.agentToolPrompt')
   ui.settingsOpen = false
 }
 
@@ -535,6 +570,23 @@ function removeDetail(): void {
 
   <!-- ═══ Main ═══ -->
   <div v-else class="space-y-5">
+    <!-- ▸ The front door. Most people arrive wanting a service, not a tool
+         format, and the agent can research and build one — so ask for the goal
+         instead of making them shop a catalog for a match. -->
+    <div class="rounded-xl border border-accent/40 bg-accent/5 px-3 py-3">
+      <div class="text-sm text-fg-1">{{ $t('settings.connectTitle') }}</div>
+      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
+      <div class="mt-2 flex items-center gap-2 flex-wrap">
+        <button class="btn text-xs" @click="askAgent()">{{ $t('settings.connectAction') }}</button>
+        <button
+          v-for="ex in connectExamples"
+          :key="ex"
+          class="text-xs px-2 py-1 rounded-md border border-border text-fg-2 hover:bg-bg-2 transition-colors"
+          @click="askAgent(ex)"
+        >{{ ex }}</button>
+      </div>
+    </div>
+
     <!-- ▸ Recommended, installed only -->
     <div class="flex items-center justify-between">
       <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.recommended') }}</span>
@@ -568,13 +620,20 @@ function removeDetail(): void {
     <div v-if="tools.kbPending.length" class="rounded-lg border border-accent/40 bg-accent/5 px-3 py-3 space-y-2">
       <div class="text-sm text-fg-1">{{ $t('settings.kbToolsTitle') }}</div>
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.kbToolsDesc') }}</p>
-      <ul class="text-xs font-mono text-fg-2 space-y-1">
-        <li v-for="s in tools.kbPending" :key="s.id">
-          <div class="break-all">{{ s.name }} → {{ s.request.url }}</div>
+      <!-- Grouped by integration: eight rows for one service is not more
+           informative than one row that names the host and the keys. -->
+      <ul class="text-xs font-mono text-fg-2 space-y-1.5">
+        <li v-for="(g, i) in groupByBundle(tools.kbPending)" :key="g.bundle ?? i">
+          <div v-if="g.bundle" class="break-all">
+            {{ g.bundle }} · {{ $t('settings.status.nTools', { n: g.tools.length }) }} →
+            {{ bundleHosts(g.tools) }}
+          </div>
+          <div v-else class="break-all">{{ g.tools[0].name }} → {{ g.tools[0].request.url }}</div>
+          <div v-if="g.bundle" class="pl-3 text-fg-3">{{ g.tools.map((t) => t.name).join(', ') }}</div>
           <!-- A tool arriving with the folder can name a key you already hold;
                where it sends data is only half of what you are approving. -->
-          <div v-if="secretRefs(s).length" class="text-removed">
-            ↳ {{ $t('settings.kbToolsUsesKeys', { ids: secretRefs(s).join(', ') }) }}
+          <div v-if="bundleSecrets(g.tools).length" class="text-removed">
+            ↳ {{ $t('settings.kbToolsUsesKeys', { ids: bundleSecrets(g.tools).join(', ') }) }}
           </div>
         </li>
       </ul>
@@ -586,7 +645,7 @@ function removeDetail(): void {
       <div class="flex items-center justify-between">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.customTools') }}</span>
         <div v-if="!editorOpen" class="flex items-center gap-3">
-          <button class="text-xs text-accent hover:underline" @click="askAgent">
+          <button class="text-xs text-accent hover:underline" @click="askAgent()">
             {{ $t('settings.askAgent') }}
           </button>
           <button class="text-xs text-fg-3 hover:text-fg-0" @click="newTool">
@@ -597,33 +656,58 @@ function removeDetail(): void {
       <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.customToolsDesc') }}</p>
     </div>
 
+    <!-- Your tools: global ones you can edit, plus whatever the open KB
+         contributes (approved, hence live). Grouped so an integration the agent
+         built reads as the one thing you asked for. -->
     <div
-      v-if="store.state.httpTools.length"
+      v-if="yourGroups.length"
       class="rounded-lg border border-border divide-y divide-border overflow-hidden"
     >
-      <div
-        v-for="s in store.state.httpTools"
-        :key="s.id"
-        class="group flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
-      >
-        <span class="font-mono text-fg-1 shrink-0">{{ s.name }}</span>
-        <span class="text-fg-3 truncate flex-1" :title="s.request.url">{{ s.request.url }}</span>
-        <button
-          class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          :title="$t('common.edit')"
-          @click="editTool(s)"
+      <div v-for="(g, i) in yourGroups" :key="g.bundle ?? g.tools[0].id ?? i" class="px-3 py-2.5">
+        <div v-if="g.bundle" class="flex items-center gap-1.5 mb-1">
+          <span class="text-sm text-fg-1">{{ g.bundle }}</span>
+          <span class="text-[10px] text-fg-3">{{ $t('settings.status.nTools', { n: g.tools.length }) }}</span>
+          <span
+            v-if="isKbTool(g.tools[0])"
+            class="text-[10px] px-1 rounded bg-accent/15 text-accent"
+            :title="$t('settings.kbServerTitle')"
+          >KB</span>
+        </div>
+        <div
+          v-for="s in g.tools"
+          :key="s.id"
+          class="group flex items-center gap-2 text-xs py-0.5"
+          :class="g.bundle ? 'pl-3' : ''"
         >
-          <span class="codicon codicon-sm codicon-edit" />
-        </button>
-        <button
-          class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          :title="$t('common.delete')"
-          @click="removeTool(s.id)"
-        >
-          <span class="codicon codicon-sm codicon-trash" />
-        </button>
+          <span class="font-mono text-fg-1 shrink-0">{{ s.name }}</span>
+          <span
+            v-if="!g.bundle && isKbTool(s)"
+            class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
+          >KB</span>
+          <span class="text-fg-3 truncate flex-1" :title="s.request.url">{{ s.request.url }}</span>
+          <template v-if="!isKbTool(s)">
+            <button
+              class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              :title="$t('common.edit')"
+              @click="editTool(s)"
+            >
+              <span class="codicon codicon-sm codicon-edit" />
+            </button>
+            <button
+              class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              :title="$t('common.delete')"
+              @click="removeTool(s.id)"
+            >
+              <span class="codicon codicon-sm codicon-trash" />
+            </button>
+          </template>
+        </div>
+        <p v-if="g.bundle && isKbTool(g.tools[0])" class="mt-1 pl-3 text-xs text-fg-3">
+          {{ $t('settings.kbToolHint') }}
+        </p>
       </div>
     </div>
+    <p v-else-if="!editorOpen" class="text-sm text-fg-3">{{ $t('settings.noCustomTools') }}</p>
 
     <!-- ▸ Custom tool editor -->
     <div v-if="editorOpen" class="rounded-lg border border-border px-3 py-3 space-y-3">

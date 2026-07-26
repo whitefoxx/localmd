@@ -79,6 +79,10 @@ export const useToolsStore = defineStore('tools', () => {
   )
   /** KB tools waiting on the user — surfaced in Settings, never registered. */
   const kbPending = computed(() => (kbTools.value.length && !kbTrusted.value ? kbTools.value : []))
+  /** KB tools in force. Listed in Settings so an approved integration stays
+   *  visible: approving something and then never seeing it again is how a user
+   *  loses track of what the agent can reach. */
+  const kbActive = computed(() => (kbTrusted.value ? kbTools.value : []))
 
   const catalogTools = computed(() => toolsForEntries(settings.state.toolEntries))
 
@@ -257,6 +261,7 @@ export const useToolsStore = defineStore('tools', () => {
     specs,
     catalog: CATALOG,
     kbPending,
+    kbActive,
     kbTrusted,
     webcliConnected,
     isInstalled,

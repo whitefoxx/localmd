@@ -31,6 +31,7 @@ import {
   describeHttpCall,
   normalizeHttpTool,
   normalizeHttpToolList,
+  groupByBundle,
   secretRefs,
   staticOrigin,
   KB_TOOLS_CONFIG_PATH,
@@ -48,6 +49,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
+import { useSetupStore } from '@/stores/setup'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useKbStore } from '@/stores/kb'
 
@@ -86,6 +88,8 @@ async function performWrite(
 }
 
 const MAX_READ_CHARS = 100_000
+/** A test preview is for reading structure, not for consuming the data. */
+const RAW_TEST_CHARS = 4000
 const MAX_SEARCH_RESULTS = 50
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -585,6 +589,62 @@ const useSkill = defineTool({
   },
 })
 
+/* ── guided setup ────────────────────────────────────────────────────────── */
+
+/**
+ * Ask the APP to collect something from the user mid-turn. The two things the
+ * agent genuinely cannot do for itself — a secret it must never see, and an
+ * extension only the user can install — used to end a guided setup with a
+ * navigation instruction. Now the agent describes the need and the app renders
+ * the control.
+ */
+const requestSetup = defineTool({
+  name: 'request_setup',
+  description:
+    "Ask the user for something the setup needs, as a form in the chat rather than instructions to go and find a settings page. Use for: an API key a tool references ({{secret:<id>}}) — the user types it straight into the app and you never see the value; a browser extension a tool requires; or a choice only they can make. Blocks until they answer. Never ask for a key or token as chat text — always use this.",
+  schema: z.object({
+    kind: z
+      .enum(['key', 'extension', 'choice'])
+      .describe("'key' = an API key/token, 'extension' = a browser extension, 'choice' = pick one option"),
+    label: z.string().describe('Title of the card — what you are asking for, in the user\'s terms'),
+    help: z.string().optional().describe('One line on how to obtain it (where to click, which page)'),
+    url: z.string().optional().describe('Where to get the key / install the extension'),
+    secret_id: z
+      .string()
+      .optional()
+      .describe("kind 'key': the id the tools reference, e.g. \"weread_api_key\" for {{secret:weread_api_key}}"),
+    entry_id: z
+      .string()
+      .optional()
+      .describe("kind 'extension': the recommended-tools entry to install, currently only \"webcli\""),
+    options: z.array(z.string()).optional().describe("kind 'choice': the options to offer"),
+  }),
+  describeCall: (a) => `ask user: ${a.label}`,
+  run: async (args, ctx) => {
+    if (args.kind === 'key' && !args.secret_id) return 'Error: kind "key" needs secret_id.'
+    if (args.kind === 'choice' && !args.options?.length) return 'Error: kind "choice" needs options.'
+
+    const outcome = await useSetupStore().ask({
+      id: crypto.randomUUID(),
+      sessionId: ctx.sessionId,
+      kind: args.kind,
+      label: args.label,
+      ...(args.help ? { help: args.help } : {}),
+      ...(args.url ? { url: args.url } : {}),
+      ...(args.secret_id ? { secretId: args.secret_id } : {}),
+      ...(args.entry_id ? { entryId: args.entry_id } : {}),
+      ...(args.options ? { options: args.options } : {}),
+    })
+
+    if (outcome === 'provided') {
+      return `The user saved a value for "${args.secret_id}". You cannot read it — just carry on and let the tool use it.`
+    }
+    if (outcome === 'connected') return 'The extension is connected. Continue.'
+    if (outcome.startsWith('chose:')) return `The user chose: ${outcome.slice('chose:'.length)}`
+    return 'The user skipped this. Do not ask again in a loop — say what stays unavailable without it, and continue with whatever still works.'
+  },
+})
+
 /* ── tool authoring ──────────────────────────────────────────────────────── */
 
 /**
@@ -610,7 +670,9 @@ const TOOL_SPEC_HELP = `Spec format (JSON):
     "template": "- {{title}} ({{year}}) {{url}}"
   },
   "maxChars": 20000,
-  "transport": "auto"                     // auto | direct | webcli
+  "transport": "auto",                    // auto | direct | webcli
+  "bundle": "weread"                      // group an integration's tools; set
+                                          // it via save_bundle, not by hand
 }
 
 Rules that will reject a spec:
@@ -618,17 +680,21 @@ Rules that will reject a spec:
   the server it was approved for).
 - {{secret:id}} reads a key the USER stored in Settings; you can reference one
   but never read, set, or see its value. NEVER ask the user to paste a key or
-  token into the chat: put {{secret:<id>}} in the spec, then tell them to open
-  Settings → Tools → Keys, where the id appears with a field to fill, and say
-  where to obtain it.
+  token into the chat: put {{secret:<id>}} in the spec, then call request_setup
+  with kind:"key" and that same id — the app shows them a field, stores what
+  they type, and tells you only that a value arrived.
 Guidance:
 - ALWAYS shape the response. A raw JSON payload can cost thousands of tokens per
   call; pick + template is the difference between 200 tokens and 20,000.
-- Test before saving, and read the output: an unfilled {{placeholder}} means the
-  field name is wrong.
-- If a direct call fails on CORS, set transport "webcli" (needs the extension).`
+- Test with raw:true FIRST to see the untouched response and learn the real
+  field names, then write pick + template and test again. An unfilled
+  {{placeholder}} means the field name is wrong.
+- If a direct call fails on CORS, set transport "webcli" (needs the extension).
+- Adding a SERVICE means several tools. Build them all, then save_bundle once:
+  the user approves one integration instead of clicking through five diffs.`
 
 function describeSpec(spec: HttpToolSpec, scope: string): string {
+  // (bundle shown by the caller, which groups them)
   const params = Object.entries(spec.params)
     .map(([k, p]) => `${k}${p.required ? '*' : ''}:${p.type}`)
     .join(', ')
@@ -665,25 +731,49 @@ const manageTools = defineTool({
     "Create, test, update or remove the knowledge base's own HTTP tools (stored in .agents/tools.json, so they travel with the KB). Use when the user asks you to give yourself — or the app — a new capability, e.g. \"add a tool that searches <service>\". Call action:'list' first: it returns what exists plus the exact spec format. Saving asks the user to approve the file change.",
   schema: z.object({
     action: z
-      .enum(['list', 'test', 'save', 'remove'])
-      .describe("'list' (what exists + the spec format), 'test' (run a spec without saving), 'save', 'remove'"),
+      .enum(['list', 'test', 'save', 'save_bundle', 'remove'])
+      .describe(
+        "'list' (what exists + the spec format), 'test' (run a spec without saving), 'save' (one tool), 'save_bundle' (a whole integration in ONE approval — prefer this when adding a service), 'remove' (a tool, or a whole bundle by name)",
+      ),
     tool: z.string().optional().describe('The tool spec as a JSON object string (test/save)'),
-    name: z.string().optional().describe('Tool name to remove'),
+    tools: z
+      .string()
+      .optional()
+      .describe('save_bundle: a JSON ARRAY of tool specs, saved together under one approval'),
+    bundle: z
+      .string()
+      .optional()
+      .describe('save_bundle: the integration name the tools belong to, e.g. "weread"'),
+    name: z.string().optional().describe('Tool name to remove — or a bundle name to remove all of it'),
     sample_args: z
       .string()
       .optional()
       .describe('JSON object of arguments for a test run, e.g. {"query":"cats"}'),
+    raw: z
+      .boolean()
+      .optional()
+      .describe(
+        'test only: return the untouched response instead of the shaped one — how you find the field names for pick/template',
+      ),
   }),
   describeCall: (a) => `manage_tools: ${a.action}${a.name ? ` ${a.name}` : ''}`,
-  run: async ({ action, tool, name, sample_args }, ctx) => {
+  run: async ({ action, tool, tools: toolsJson, bundle, name, sample_args, raw }, ctx) => {
     const toolsStore = useToolsStore()
 
     if (action === 'list') {
       const kb = await readKbToolFile()
       const kbNames = new Set(kb.tools.map((t) => t.name))
+      // Grouped so an existing integration reads as one thing — that is also
+      // how the agent learns which bundle name to reuse when extending it.
+      const render = (specs: HttpToolSpec[], scope: string): string[] =>
+        groupByBundle(specs).flatMap((g) =>
+          g.bundle
+            ? [`${g.bundle} (bundle, ${g.tools.length} tools) [${scope}]`, ...g.tools.map((s) => `  ${describeSpec(s, scope).slice(2)}`)]
+            : g.tools.map((s) => describeSpec(s, scope)),
+        )
       const lines = [
-        ...kb.tools.map((s) => describeSpec(s, 'this KB')),
-        ...toolsStore.specs.filter((s) => !kbNames.has(s.name)).map((s) => describeSpec(s, 'user settings')),
+        ...render(kb.tools, 'this KB'),
+        ...render(toolsStore.specs.filter((s) => !kbNames.has(s.name)), 'user settings'),
       ]
       return `${lines.length ? `Installed HTTP tools:\n${lines.join('\n')}` : 'No HTTP tools installed.'}\n\nBuilt-in names you may not reuse: ${TOOLS.map((t) => t.name).join(', ')}\n\n${TOOL_SPEC_HELP}`
     }
@@ -691,11 +781,62 @@ const manageTools = defineTool({
     if (action === 'remove') {
       if (!name) return 'Error: remove needs a "name".'
       const kb = await readKbToolFile()
-      if (!kb.tools.some((t) => t.name === name)) {
-        return `Error: this KB has no tool named "${name}" (manage_tools only edits .agents/tools.json; tools from Settings are the user's to remove).`
+      const isBundle = kb.tools.some((t) => t.bundle === name)
+      const doomed = kb.tools.filter((t) => (isBundle ? t.bundle === name : t.name === name))
+      if (!doomed.length) {
+        return `Error: this KB has no tool or bundle named "${name}" (manage_tools only edits .agents/tools.json; tools from Settings are the user's to remove).`
       }
-      const next = kb.tools.filter((t) => t.name !== name)
-      return writeKbTools(ctx, kb.raw, next, `remove ${name}`)
+      const next = kb.tools.filter((t) => !doomed.includes(t))
+      const what = isBundle ? `remove the ${name} bundle (${doomed.length} tools)` : `remove ${name}`
+      return writeKbTools(ctx, kb.raw, next, what)
+    }
+
+    if (action === 'save_bundle') {
+      if (!toolsJson) return 'Error: save_bundle needs "tools" — a JSON array of specs.'
+      if (!bundle?.trim()) return 'Error: save_bundle needs a "bundle" name.'
+      let parsedList: unknown
+      try {
+        parsedList = JSON.parse(toolsJson)
+      } catch (err) {
+        return `Error: "tools" is not valid JSON — ${(err as Error).message}`
+      }
+      if (!Array.isArray(parsedList) || !parsedList.length) {
+        return 'Error: "tools" must be a non-empty JSON array of specs.'
+      }
+      const specs = parsedList.map((raw) =>
+        normalizeHttpTool({ ...(raw as object), bundle }, () => crypto.randomUUID()),
+      )
+      const badIndex = specs.findIndex((s) => !s)
+      if (badIndex >= 0) {
+        return `Error: spec #${badIndex + 1} is invalid — every tool needs a name matching [a-z][a-z0-9_]* and an https request.url whose host contains no placeholder.`
+      }
+      const valid = specs as HttpToolSpec[]
+      const kb = await readKbToolFile()
+      // Replacing a bundle means dropping its previous members, so a second
+      // pass doesn't leave orphans from an earlier attempt.
+      const keep = kb.tools.filter((t) => t.bundle !== bundle && !valid.some((v) => v.name === t.name))
+      const clash = valid.find(
+        (v) =>
+          TOOLS.some((t) => t.name === v.name) ||
+          toolsStore.specs.some((s) => s.name === v.name && s.bundle !== bundle),
+      )
+      if (clash) {
+        return `Error: the name "${clash.name}" is already taken by a built-in or another installed tool. Rename it and try again.`
+      }
+      const missing = [...new Set(valid.flatMap((v) => secretRefs(v)))].filter(
+        (id) => !toolsStore.hasSecret(id),
+      )
+      const note = missing.length
+        ? `\nNow call request_setup with kind:"key" for ${missing.map((m) => `"${m}"`).join(', ')} — the tools fail until a value is stored, and that is the only way to collect one. Do NOT ask them to paste it into this chat.`
+        : ''
+      return (
+        (await writeKbTools(
+          ctx,
+          kb.raw,
+          [...keep, ...valid],
+          `add the ${bundle} integration (${valid.length} tools)`,
+        )) + note
+      )
     }
 
     // test / save both need a parseable, valid spec.
@@ -731,8 +872,17 @@ const manageTools = defineTool({
       if (blocked.length) {
         return `Error: this spec references ${blocked.map((s) => `{{secret:${s}}}`).join(', ')}, which no installed tool uses with ${origin}. Test it without the key (the user can add the key after saving), or check the host.`
       }
-      const out = await toolsStore.test(spec, args)
-      return `Test result (${out.length} chars — this is what a call would return):\n\n${out.slice(0, 4000)}${out.length > 4000 ? '\n\n[preview truncated]' : ''}`
+      // raw: shape nothing, so the model can read the real field names. The
+      // spec's own pick/template are what it is trying to write, so showing
+      // their output first would be circular.
+      const probe = raw
+        ? { ...spec, response: { mode: 'text' as const }, maxChars: RAW_TEST_CHARS }
+        : spec
+      const out = await toolsStore.test(probe, args)
+      const label = raw
+        ? `Raw response (${out.length} chars shown). Find the list you want, then write pick + template:`
+        : `Test result (${out.length} chars — this is what a call would return):`
+      return `${label}\n\n${out.slice(0, RAW_TEST_CHARS)}${out.length > RAW_TEST_CHARS ? '\n\n[preview truncated]' : ''}`
     }
 
     // save
@@ -749,7 +899,7 @@ const manageTools = defineTool({
       : [...kb.tools, spec]
     const missing = secretRefs(spec).filter((id) => !toolsStore.hasSecret(id))
     const note = missing.length
-      ? `\nTell the user to open Settings → Tools → Keys and fill in ${missing.map((m) => `"${m}"`).join(', ')} — the tool will fail until they do. Do NOT ask them to paste the value into this chat.`
+      ? `\nNow call request_setup with kind:"key" for ${missing.map((m) => `"${m}"`).join(', ')} — the tool fails until a value is stored, and that is the only way to collect one. Do NOT ask them to paste it into this chat.`
       : ''
     return (await writeKbTools(ctx, kb.raw, next, `${replacing ? 'update' : 'add'} ${spec.name}`)) + note
   },
@@ -1154,6 +1304,7 @@ export const TOOLS: ToolSpec[] = [
   useSkill,
   enableTools,
   manageTools,
+  requestSetup,
   gitInit,
   gitStatus,
   gitDiff,
