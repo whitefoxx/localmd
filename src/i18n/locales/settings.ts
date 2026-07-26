@@ -68,10 +68,87 @@ export default {
     allDirs: 'All directories',
     noSubdirs: 'This knowledge base has no subdirectories yet.',
 
-    // External tools
-    jinaTitle: 'Built-in web tools (Jina AI Reader)',
-    jinaDesc:
-      'Gives the agent web_search / web_fetch — no key, no extension needed. The connected browser extension below (which carries your login) is preferred; this is the fallback when the extension is unavailable. Turn it off and, with no extension connected, the agent has no web access.',
+    // External tools — recommended catalog
+    recommended: 'Recommended tools',
+    recommendedDesc:
+      'Nothing is built in: the agent can reach exactly what you check here. Every endpoint listed has been checked to work from a browser. Start with WebCLI — it fetches with your real Chrome session, so it also reaches sites that refuse browser scripts.',
+    catalogFeatured: 'Start here',
+    catalogNotConnected: 'not connected',
+    catalogExtensionHint:
+      'Added, but Chrome does not answer yet. Install/enable the extension, then use Reconnect below.',
+    catalogLearnMore: 'Learn more →',
+    catalog: {
+      webcli: {
+        title: 'WebCLI browser extension',
+        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly.",
+      },
+      jina: {
+        title: 'Jina web tools (web_search, web_fetch)',
+        desc: 'Keyless web search and page reading through Jina AI Reader. No login or cookies, so sign-in walls and heavy bot protection will fail — but it needs no install.',
+      },
+      research: {
+        title: 'Research lookup (OpenAlex, Crossref, Europe PMC)',
+        desc: 'Search papers by topic, turn a DOI into full metadata, and search biomedical literature. Keyless.',
+      },
+      reference: {
+        title: 'Reference lookup (Wikipedia, Open Library)',
+        desc: 'Search and read English Wikipedia articles, and look up books. Keyless.',
+      },
+      zotero: {
+        title: 'Zotero library',
+        desc: 'Search your own Zotero references, with their notes and tags. Needs your user ID and an API key.',
+      },
+      deepwiki: {
+        title: 'DeepWiki',
+        desc: 'Ask questions about any public GitHub repository and get answers from generated documentation. No key.',
+      },
+      context7: {
+        title: 'Context7 library docs',
+        desc: 'Version-correct documentation for thousands of libraries and frameworks, instead of guesses from training data.',
+      },
+      webagent: {
+        title: 'Web Agent extension',
+        desc: 'The fuller sibling of WebCLI: adds site adapters and web_task, which hands a whole browsing errand to its own agent.',
+      },
+    },
+
+    // KB-carried tools
+    kbToolsTitle: 'This knowledge base carries tools',
+    kbToolsDesc:
+      'Its .agents/tools.json defines the tools below. They came with the folder, so they stay off until you approve them. Check where each one sends data first.',
+    kbToolsApprove: 'Approve these tools',
+
+    // Custom tools
+    customTools: 'Your tools',
+    newTool: '+ New tool',
+    noCustomTools: 'No tools of your own yet. You can also just ask the agent to build one.',
+    toolName: 'Name (as the agent calls it)',
+    toolNameTaken: 'That name is already taken by another tool.',
+    toolTransport: 'Send through',
+    transportAuto: 'Auto (direct, then WebCLI)',
+    transportDirect: 'Direct only',
+    transportWebcli: 'WebCLI only',
+    toolDescription: 'Description',
+    toolDescriptionPlaceholder: 'What it does and when the agent should reach for it.',
+    toolUrl: 'Request',
+    toolUrlHelp:
+      'Use {{param}} for a parameter and {{secret:id}} for a stored key. Must be https, and the host cannot contain a placeholder — a tool always talks to the server you approved.',
+    toolParams: 'Parameters',
+    addParam: '+ Add',
+    paramDescription: 'What to pass (the agent reads this)',
+    paramRequired: 'Required',
+    toolHeaders: 'Headers (one per line)',
+    toolBody: 'Body',
+    toolResponse: 'Response',
+    toolResponseHelp:
+      'text returns the body as-is. json picks a list and renders each item with your template — do use it: a raw JSON payload can cost thousands of tokens per call.',
+    toolSecretsNote: 'Uses stored keys: {ids}. Add their values above, on the entry that owns them.',
+    toolTest: 'Test with:',
+    toolRunTest: 'Run test',
+    toolTesting: 'Running…',
+    toolTestChars: 'Result: {n} characters — this is what the agent sees.',
+    toolInvalid: 'Needs a name and an https URL.',
+
     connectedServers: 'Connected servers',
     reconnect: 'Reconnect',
     status: {
@@ -168,10 +245,86 @@ export default {
     allDirs: '全部目录',
     noSubdirs: '此知识库暂无子目录。',
 
-    // External tools
-    jinaTitle: '内置网页工具 (Jina AI Reader)',
-    jinaDesc:
-      '给 agent 提供 web_search / web_fetch，免 key、无需扩展。优先使用下方连接的浏览器扩展（能带上你的登录态）；扩展不可用时回退到它。关闭后，未连接扩展时 agent 将没有联网能力。',
+    // External tools — recommended catalog
+    recommended: '推荐工具',
+    recommendedDesc:
+      '没有任何内置工具：agent 能用什么，完全取决于你在这里勾选了什么。列出的每个服务都已实测可在浏览器中调用。建议从 WebCLI 开始 —— 它用你真实的 Chrome 会话发请求，因此也能访问那些拒绝浏览器脚本的接口。',
+    catalogFeatured: '首选',
+    catalogNotConnected: '未连接',
+    catalogExtensionHint: '已添加，但 Chrome 还没有响应。请先安装/启用该扩展，然后点下方的「重连」。',
+    catalogLearnMore: '了解更多 →',
+    catalog: {
+      webcli: {
+        title: 'WebCLI 浏览器扩展',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。',
+      },
+      jina: {
+        title: 'Jina 网页工具 (web_search、web_fetch)',
+        desc: '通过 Jina AI Reader 实现免 key 的网页搜索与正文抓取。不带登录态和 cookie，登录墙和强反爬页面会失败，但无需安装任何东西。',
+      },
+      research: {
+        title: '文献检索 (OpenAlex、Crossref、Europe PMC)',
+        desc: '按主题检索论文、把 DOI 换成完整元数据、检索生物医学文献。免 key。',
+      },
+      reference: {
+        title: '资料查询 (Wikipedia、Open Library)',
+        desc: '检索并阅读英文维基百科条目，以及查询图书信息。免 key。',
+      },
+      zotero: {
+        title: 'Zotero 文献库',
+        desc: '检索你自己的 Zotero 文献（含笔记和标签）。需要填写 User ID 和 API key。',
+      },
+      deepwiki: {
+        title: 'DeepWiki',
+        desc: '针对任意公开 GitHub 仓库提问，从自动生成的文档中得到答案。免 key。',
+      },
+      context7: {
+        title: 'Context7 库文档',
+        desc: '获取数千个库和框架的版本正确的文档，而不是模型凭训练数据猜测。',
+      },
+      webagent: {
+        title: 'Web Agent 扩展',
+        desc: 'WebCLI 的完整版兄弟：额外提供站点适配器和 web_task —— 把整件浏览任务交给它自带的 agent 去跑。',
+      },
+    },
+
+    // KB-carried tools
+    kbToolsTitle: '这个知识库自带工具',
+    kbToolsDesc:
+      '它的 .agents/tools.json 定义了下列工具。它们是跟着文件夹一起来的，所以在你确认之前不会启用。请先看清每个工具会把数据发到哪里。',
+    kbToolsApprove: '确认启用这些工具',
+
+    // Custom tools
+    customTools: '自定义工具',
+    newTool: '+ 新建工具',
+    noCustomTools: '还没有自定义工具。你也可以直接让 agent 帮你做一个。',
+    toolName: '名称（agent 调用时使用）',
+    toolNameTaken: '这个名称已被其他工具占用。',
+    toolTransport: '请求通道',
+    transportAuto: '自动（先直连，失败走 WebCLI）',
+    transportDirect: '仅直连',
+    transportWebcli: '仅 WebCLI',
+    toolDescription: '描述',
+    toolDescriptionPlaceholder: '这个工具做什么、agent 什么时候该用它。',
+    toolUrl: '请求',
+    toolUrlHelp:
+      '用 {{参数名}} 插入参数，用 {{secret:id}} 插入已保存的密钥。必须是 https，且域名部分不能含占位符 —— 工具只会访问你确认过的那台服务器。',
+    toolParams: '参数',
+    addParam: '+ 添加',
+    paramDescription: '该传什么（agent 会读这段）',
+    paramRequired: '必填',
+    toolHeaders: '请求头（每行一条）',
+    toolBody: '请求体',
+    toolResponse: '响应处理',
+    toolResponseHelp:
+      'text 原样返回响应体。json 会取出一个列表并用你的模板渲染每一项 —— 建议用它：原始 JSON 一次调用就可能消耗几千 token。',
+    toolSecretsNote: '使用了已保存的密钥：{ids}。请在上方拥有它们的条目里填写。',
+    toolTest: '测试参数：',
+    toolRunTest: '运行测试',
+    toolTesting: '运行中…',
+    toolTestChars: '结果 {n} 个字符 —— 这就是 agent 看到的内容。',
+    toolInvalid: '需要填写名称和 https URL。',
+
     connectedServers: '已连接的服务器',
     reconnect: '重连',
     status: {

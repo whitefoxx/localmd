@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
-import { useMcpStore } from '@/stores/mcp'
 import { useFilesStore } from '@/stores/files'
+import ToolsSection from '@/components/settings/ToolsSection.vue'
 import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
 import {
   HOTKEYS,
@@ -37,7 +37,6 @@ onUnmounted(() => {
 })
 
 const store = useSettingsStore()
-const mcp = useMcpStore()
 const files = useFilesStore()
 
 /* KB health scope — pick which top-level dirs the health check covers. */
@@ -129,7 +128,6 @@ function goSection(id: SectionId): void {
   section.value = id
   editing.value = null // leaving the models pane cancels an in-progress edit
   cancelRecording()
-  resetMcpForm()
 }
 
 /** Only providers with an AI SDK image model can fill the image-generation slot. */
@@ -142,66 +140,6 @@ const editing = ref<LlmProfile | null>(null)
 const isExistingProfile = computed(
   () => !!editing.value && store.state.profiles.some((p) => p.id === editing.value!.id),
 )
-
-/* MCP server add / edit form (editMcpId set = editing that server in place) */
-const mcpName = ref('')
-const mcpUrl = ref('')
-const mcpToken = ref('')
-const editMcpId = ref<string | null>(null)
-
-function resetMcpForm(): void {
-  editMcpId.value = null
-  mcpName.value = ''
-  mcpUrl.value = ''
-  mcpToken.value = ''
-}
-
-function startEditMcp(s: { id: string; name: string; url: string; token?: string }): void {
-  editMcpId.value = s.id
-  mcpName.value = s.name
-  mcpUrl.value = s.url
-  mcpToken.value = s.token ?? ''
-}
-
-function submitMcpServer(): void {
-  if (!mcpUrl.value.trim()) return
-  const token = mcpToken.value.trim()
-  if (editMcpId.value) {
-    const s = store.state.mcpServers.find((x) => x.id === editMcpId.value)
-    if (s) {
-      s.name = mcpName.value.trim() || 'server'
-      s.url = mcpUrl.value.trim()
-      if (token) s.token = token
-      else delete s.token
-    }
-  } else {
-    store.state.mcpServers.push({
-      id: newProfileId(),
-      name: mcpName.value.trim() || 'server',
-      url: mcpUrl.value.trim(),
-      ...(token ? { token } : {}),
-    })
-  }
-  resetMcpForm()
-}
-
-function removeMcpServer(id: string): void {
-  store.state.mcpServers = store.state.mcpServers.filter((s) => s.id !== id)
-  if (editMcpId.value === id) resetMcpForm()
-}
-
-function toggleMcpServer(id: string): void {
-  const s = store.state.mcpServers.find((x) => x.id === id)
-  if (s) s.enabled = s.enabled === false ? true : false
-}
-
-function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: string } {
-  if (s.status === 'off') return { label: t('settings.status.off'), cls: 'bg-fg-3' }
-  if (s.status === 'connecting') return { label: t('settings.status.connecting'), cls: 'bg-fg-3' }
-  if (s.status === 'error')
-    return { label: s.error?.slice(0, 60) ?? t('settings.status.failed'), cls: 'bg-removed' }
-  return { label: t('settings.status.nTools', { n: s.tools.length }), cls: 'bg-added' }
-}
 
 function addProfile(): void {
   editing.value = {
@@ -608,101 +546,7 @@ function slotBadges(p: LlmProfile): string[] {
               <p v-if="!kbDirs.length" class="text-xs text-fg-3">{{ $t('settings.noSubdirs') }}</p>
             </div>
 
-            <!-- ▸ External tools (MCP) -->
-            <div v-else-if="section === 'tools'" class="space-y-4">
-              <!-- Built-in web access (Jina AI Reader) -->
-              <div class="rounded-lg border border-border overflow-hidden">
-                <div class="px-3 py-3 flex items-center justify-between gap-4">
-                  <div class="min-w-0">
-                    <div class="text-sm text-fg-1">{{ $t('settings.jinaTitle') }}</div>
-                    <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-                      {{ $t('settings.jinaDesc') }}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    :aria-checked="store.state.jinaReader"
-                    class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
-                    :class="store.state.jinaReader ? 'bg-accent' : 'bg-bg-3'"
-                    @click="store.state.jinaReader = !store.state.jinaReader"
-                  >
-                    <span
-                      class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                      :class="store.state.jinaReader ? 'translate-x-4' : 'translate-x-0.5'"
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectedServers') }}</span>
-                <button class="text-xs text-accent hover:underline" @click="mcp.refresh()">{{ $t('settings.reconnect') }}</button>
-              </div>
-              <div v-if="mcp.servers.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
-                <div
-                  v-for="s in mcp.servers"
-                  :key="s.config.id"
-                  class="flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
-                >
-                  <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="mcpStatusLabel(s).cls" />
-                  <span class="text-fg-1 shrink-0">{{ s.config.name }}</span>
-                  <span
-                    v-if="s.source === 'kb'"
-                    class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
-                    :title="$t('settings.kbServerTitle')"
-                  >KB</span>
-                  <span class="text-fg-3 truncate flex-1" :title="s.config.url">
-                    {{ mcpStatusLabel(s).label }}
-                  </span>
-                  <template v-if="s.source === 'global'">
-                    <button
-                      class="shrink-0"
-                      :class="editMcpId === s.config.id ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
-                      :title="$t('common.edit')"
-                      @click="startEditMcp(s.config)"
-                    >
-                      <span class="codicon codicon-sm codicon-edit" />
-                    </button>
-                    <button
-                      class="text-fg-3 hover:text-fg-0 shrink-0"
-                      :title="s.config.enabled === false ? $t('settings.enable') : $t('settings.disable')"
-                      @click="toggleMcpServer(s.config.id)"
-                    >
-                      <span
-                        class="codicon codicon-sm"
-                        :class="s.config.enabled === false ? 'codicon-circle-slash' : 'codicon-pass'"
-                      />
-                    </button>
-                    <button class="text-fg-3 hover:text-removed shrink-0" :title="$t('common.delete')" @click="removeMcpServer(s.config.id)">
-                      <span class="codicon codicon-sm codicon-trash" />
-                    </button>
-                  </template>
-                </div>
-              </div>
-              <div v-else class="text-sm text-fg-3">{{ $t('settings.noGlobalServers') }}</div>
-
-              <div>
-                <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent mb-1.5">
-                  <span class="codicon codicon-sm codicon-edit" />
-                  {{ $t('settings.editingServer', { name: mcpName || 'server' }) }}
-                </div>
-                <div class="space-y-2">
-                  <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
-                  <input v-model="mcpUrl" class="input text-xs" :placeholder="$t('settings.urlPlaceholder')" />
-                  <input v-model="mcpToken" type="password" class="input text-xs" :placeholder="$t('settings.tokenPlaceholder')" autocomplete="off" />
-                  <div class="flex gap-2 pt-0.5">
-                    <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
-                      {{ editMcpId ? $t('common.save') : $t('common.add') }}
-                    </button>
-                    <button v-if="editMcpId" class="btn text-xs" @click="resetMcpForm">{{ $t('common.cancel') }}</button>
-                  </div>
-                </div>
-              </div>
-              <p class="text-xs text-fg-3 leading-relaxed">
-                {{ $t('settings.toolsHelp') }}
-              </p>
-            </div>
+            <ToolsSection v-else-if="section === 'tools'" />
 
             <!-- ▸ Git & GitHub -->
             <div v-else-if="section === 'git'" class="space-y-4 max-w-md">
