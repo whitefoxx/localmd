@@ -10,6 +10,9 @@ import {
   renderItem,
   shapeResponse,
   clip,
+  pickFirst,
+  parseXml,
+  xmlToValue,
   runHttpTool,
   describeHttpCall,
   HttpToolError,
@@ -186,7 +189,14 @@ describe('pickPath', () => {
   })
   it('returns undefined for a path that does not fit the data', () => {
     expect(pickPath(data, 'missing.deep')).toBeUndefined()
-    expect(pickPath(data, 'n[]')).toBeUndefined()
+    expect(pickPath(data, 'missing[]')).toBeUndefined()
+  })
+
+  /** XML carries no arity: a feed with one <entry> must shape like one with
+   *  twenty, so [] treats a lone value as a list of one. */
+  it('treats a lone value as a one-element list', () => {
+    expect(pickPath(data, 'n[]')).toEqual([2])
+    expect(pickPath({ feed: { entry: { title: 'only' } } }, 'feed.entry[].title')).toEqual(['only'])
   })
 
   it('indexes arrays numerically — Crossref boxes every field in one', () => {
@@ -242,9 +252,11 @@ describe('shapeResponse', () => {
     expect(shapeResponse(s, 'not json')).toBe('not json')
   })
 
-  it('falls back to the whole payload when the pick misses', () => {
+  it('names the miss and shows the shape when a pick matches nothing', () => {
     const s = spec({ response: { mode: 'json', pick: 'nope[]', template: '{{x}}' } })
-    expect(shapeResponse(s, '{"a":1}')).toContain('"a": 1')
+    const out = shapeResponse(s, '{"a":1,"b":2}')
+    expect(out).toContain('No match for pick "nope[]"')
+    expect(out).toContain('Top-level keys: a, b')
   })
 
   it('strips markup that arrives inside JSON fields', () => {
@@ -267,6 +279,129 @@ describe('shapeResponse', () => {
     const s = spec({ response: { mode: 'text', transform: 'ddg-links' } })
     const out = shapeResponse(s, `[R](https://duckduckgo.com/l/?uddg=${enc}&rut=x)`)
     expect(out).toBe('[R](https://real.org/doc)')
+  })
+})
+
+describe('XML', () => {
+  const ATOM = `<?xml version="1.0"?>
+<!-- a comment -->
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+  <title>My feed</title>
+  <entry>
+    <title>First &amp; foremost</title>
+    <published>2026-01-02</published>
+    <link href="https://example.com/1" rel="alternate"/>
+    <link href="https://example.com/1.pdf" rel="related"/>
+    <author><name>Ada</name></author>
+    <author><name>Grace</name></author>
+    <arxiv:primary_category term="cs.CL"/>
+  </entry>
+</feed>`
+
+  const RSS = `<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel>
+  <title>Chan</title>
+  <item>
+    <title><![CDATA[Bracketed <title> here]]></title>
+    <link>https://example.com/a</link>
+    <pubDate>Sun, 26 Jul 2026 04:19:59 +0000</pubDate>
+    <dc:creator>someone</dc:creator>
+    <guid isPermaLink="false">urn:x</guid>
+  </item>
+</channel></rss>`
+
+  it('reads a leaf as its text and decodes entities', () => {
+    const v = xmlToValue(ATOM) as Record<string, Record<string, unknown>>
+    expect(pickPath(v, 'feed.title')).toBe('My feed')
+    expect(pickPath(v, 'feed.entry.title')).toBe('First & foremost')
+  })
+
+  it('exposes attributes, repeated elements and nested children', () => {
+    const v = xmlToValue(ATOM)
+    expect(pickPath(v, 'feed.entry.link.0.href')).toBe('https://example.com/1')
+    expect(pickPath(v, 'feed.entry.author[].name')).toEqual(['Ada', 'Grace'])
+    // Namespace prefixes are dropped — a ':' would collide with {{secret:…}}.
+    expect(pickPath(v, 'feed.entry.primary_category.term')).toBe('cs.CL')
+  })
+
+  it('keeps CDATA verbatim and pairs an attribute with element text', () => {
+    const v = xmlToValue(RSS)
+    expect(pickPath(v, 'rss.channel.item.title')).toBe('Bracketed <title> here')
+    expect(pickPath(v, 'rss.channel.item.guid.isPermaLink')).toBe('false')
+    expect(pickPath(v, 'rss.channel.item.guid.value')).toBe('urn:x')
+    expect(pickPath(v, 'rss.channel.item.creator')).toBe('someone')
+  })
+
+  it('shapes a feed through the same pick/template grammar as JSON', () => {
+    const s = spec({
+      response: { mode: 'xml', pick: 'feed.entry[]', template: '- {{title}} ({{published}}) {{link.0.href}}' },
+    })
+    expect(shapeResponse(s, ATOM)).toBe('- First & foremost (2026-01-02) https://example.com/1')
+  })
+
+  it('survives junk rather than throwing', () => {
+    expect(parseXml('')).toBeNull()
+    expect(parseXml('not xml at all')).toBeNull()
+    expect(() => xmlToValue('<a><b>unclosed')).not.toThrow()
+  })
+
+  it('falls back to the raw body when the payload is not XML', () => {
+    const s = spec({ response: { mode: 'xml', pick: 'feed.entry[]' } })
+    expect(shapeResponse(s, 'plain text')).toBe('plain text')
+  })
+})
+
+describe('pickFirst', () => {
+  it('takes the first alternative that matches — one tool, RSS or Atom', () => {
+    const rss = { rss: { channel: { item: [{ title: 'r' }] } } }
+    const atom = { feed: { entry: [{ title: 'a' }] } }
+    const pick = 'rss.channel.item[]|feed.entry[]'
+    expect(pickFirst(rss, pick)).toEqual([{ title: 'r' }])
+    expect(pickFirst(atom, pick)).toEqual([{ title: 'a' }])
+    expect(pickFirst({ other: 1 }, pick)).toBeUndefined()
+  })
+
+  it('skips an alternative that matches an empty list', () => {
+    expect(pickFirst({ a: [], b: [1] }, 'a[]|b[]')).toEqual([1])
+  })
+})
+
+describe('anyOrigin', () => {
+  const feed = (over = {}): HttpToolSpec =>
+    spec({
+      name: 'read_feed',
+      params: { url: { type: 'string', required: true } },
+      request: { method: 'GET', url: '{{url}}' },
+      anyOrigin: true,
+      ...over,
+    })
+
+  it('passes a whole URL through instead of percent-encoding it', () => {
+    const req = buildRequest(feed(), { url: 'https://example.com/feed.xml?a=1&b=2' }, noSecrets)
+    expect(req.url).toBe('https://example.com/feed.xml?a=1&b=2')
+  })
+
+  it('demands https and rejects anything that is not a URL', () => {
+    expect(() => buildRequest(feed(), { url: 'http://example.com/f' }, noSecrets)).toThrow(/https/)
+    expect(() => buildRequest(feed(), { url: 'javascript:alert(1)' }, noSecrets)).toThrow(/https/)
+    expect(() => buildRequest(feed(), { url: 'not a url' }, noSecrets)).toThrow(/https/)
+  })
+
+  it('refuses to combine an open destination with a stored key', () => {
+    const s = feed({
+      request: { method: 'GET', url: '{{url}}', headers: { Authorization: '{{secret:k}}' } },
+    })
+    expect(() => buildRequest(s, { url: 'https://example.com/f' }, () => 'key')).toThrow(
+      /open destination with a stored key/,
+    )
+  })
+
+  it('is stripped from any spec that did not ship with the app', () => {
+    const parsed = normalizeHttpTool({
+      name: 'sneaky',
+      request: { url: 'https://api.example.com/x' },
+      anyOrigin: true,
+    })
+    expect(parsed?.anyOrigin).toBeUndefined()
   })
 })
 

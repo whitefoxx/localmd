@@ -54,9 +54,12 @@ export interface HttpToolRequest {
 }
 
 export interface HttpToolResponse {
-  /** text: hand back the body (after `transform`). json: parse → pick → render. */
-  mode: 'text' | 'json'
-  /** Path to the interesting part, e.g. "results[]" or "data.items[]". */
+  /** text: hand back the body (after `transform`). json/xml: parse → pick →
+   *  render, both through the same path grammar. */
+  mode: 'text' | 'json' | 'xml'
+  /** Path to the interesting part, e.g. "results[]" or "data.items[]".
+   *  Alternatives may be separated by "|"; the first that matches wins, which
+   *  is how one feed tool serves both RSS and Atom. */
   pick?: string
   /** Per-item line template with `{{field}}` / `{{nested.field}}` lookups. */
   template?: string
@@ -79,6 +82,18 @@ export interface HttpToolSpec {
   /** Marks a tool that reads arbitrary web content, so the system prompt knows
    *  the agent has web access at all. */
   web?: boolean
+  /**
+   * The destination is an argument, not a fixed host — a feed reader, where
+   * naming one origin would defeat the point.
+   *
+   * FIRST-PARTY ONLY: normalizeHttpTool strips this, so a spec from the KB
+   * file, the Settings editor or a model can never set it; only a catalog
+   * literal can. It also may not combine with {{secret:…}}, so an open
+   * destination can never carry the user's keys. The capability itself is not
+   * new — web_fetch already takes any URL — but the static-origin rule stays
+   * absolute exactly where it earns its keep: specs we did not write.
+   */
+  anyOrigin?: boolean
 }
 
 export const DEFAULT_MAX_CHARS = 20_000
@@ -93,24 +108,27 @@ export const TRANSFORMS: Record<string, (s: string) => string> = {
   'strip-html': stripHtml,
 }
 
-/** Drop tags and decode the handful of entities that survive into API text
- *  (Wikipedia's search excerpts wrap matches in <span>, MediaWiki escapes
- *  quotes). Markup the model can't use is markup the user pays for. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
+}
+
+/** Decode the entities that actually survive into API text and XML feeds. */
+export function decodeEntities(s: string): string {
+  return String(s ?? '').replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (whole, ref: string) => {
+    if (ref.startsWith('#')) {
+      const code =
+        ref[1] === 'x' || ref[1] === 'X' ? parseInt(ref.slice(2), 16) : parseInt(ref.slice(1), 10)
+      return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : whole
+    }
+    return NAMED_ENTITIES[ref.toLowerCase()] ?? whole
+  })
+}
+
+/** Drop tags and decode entities (Wikipedia's search excerpts wrap matches in
+ *  <span>, Crossref deposits abstracts as JATS XML). Markup the model can't use
+ *  is markup the user pays for. */
 export function stripHtml(s: string): string {
-  return String(s ?? '')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (whole, ref: string) => {
-      const named: Record<string, string> = {
-        amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ndash: '–', mdash: '—',
-      }
-      if (ref.startsWith('#')) {
-        const code = ref[1] === 'x' || ref[1] === 'X'
-          ? parseInt(ref.slice(2), 16)
-          : parseInt(ref.slice(1), 10)
-        return Number.isFinite(code) && code > 0 ? String.fromCodePoint(code) : whole
-      }
-      return named[ref.toLowerCase()] ?? whole
-    })
+  return decodeEntities(String(s ?? '').replace(/<[^>]*>/g, ''))
 }
 
 /* ── validation / normalization ──────────────────────────────────────────── */
@@ -206,7 +224,7 @@ export function normalizeHttpTool(raw: unknown, makeId?: () => string): HttpTool
       ...(req.bodyType === 'form' ? { bodyType: 'form' as const } : {}),
     },
     response: {
-      mode: res.mode === 'json' ? 'json' : 'text',
+      mode: res.mode === 'json' ? 'json' : res.mode === 'xml' ? 'xml' : 'text',
       ...(res.pick ? { pick: String(res.pick) } : {}),
       ...(res.template ? { template: String(res.template) } : {}),
       ...(transform ? { transform } : {}),
@@ -326,10 +344,16 @@ export interface BuiltRequest {
 
 export class HttpToolError extends Error {}
 
+type Slot = 'url' | 'urlwhole' | 'json' | 'form' | 'header'
+
 /** Escape a value for the slot it lands in. */
-function escapeFor(where: 'url' | 'json' | 'form' | 'header', v: string): string {
+function escapeFor(where: Slot, v: string): string {
   if (where === 'url' || where === 'form') return encodeURIComponent(v)
   if (where === 'json') return JSON.stringify(v).slice(1, -1)
+  // urlwhole: the argument IS the destination (anyOrigin), so percent-encoding
+  // it would destroy the URL. Strip only what could smuggle in another request;
+  // the result is validated as https by buildRequest.
+  if (where === 'urlwhole') return v.trim().replace(/[\s\r\n\0"'<>\\^`{}|]/g, '')
   return v.replace(/[\r\n\0]/g, '') // header: no request splitting
 }
 
@@ -344,12 +368,20 @@ export function buildRequest(
   resolveSecret: (id: string) => string | undefined,
 ): BuiltRequest {
   const origin = staticOrigin(spec.request.url)
-  if (!origin) throw new HttpToolError(`tool "${spec.name}" has no fixed https origin`)
+  if (!origin && !spec.anyOrigin) {
+    throw new HttpToolError(`tool "${spec.name}" has no fixed https origin`)
+  }
+  if (spec.anyOrigin && secretRefs(spec).length) {
+    throw new HttpToolError(
+      `tool "${spec.name}" may not combine an open destination with a stored key`,
+    )
+  }
+  const urlSlot: Slot = spec.anyOrigin ? 'urlwhole' : 'url'
 
-  // One resolver, three escapings. `redact` swaps secret values for *** so the
+  // One resolver, several escapings. `redact` swaps secret values for *** so the
   // same template renders a loggable twin of the real URL.
   const make =
-    (where: 'url' | 'json' | 'form' | 'header', redact: boolean) =>
+    (where: Slot, redact: boolean) =>
     (key: string): string => {
       if (key.startsWith('secret:')) {
         const id = key.slice('secret:'.length)
@@ -370,10 +402,21 @@ export function buildRequest(
       return escapeFor(where, coerce(raw, param.type))
     }
 
-  const url = renderTemplate(spec.request.url, make('url', false))
-  // Belt and braces: arguments are URL-encoded, so they cannot introduce a host,
-  // but a template typo could. Verify what we actually built.
-  if (staticOrigin(url) !== origin) {
+  const url = renderTemplate(spec.request.url, make(urlSlot, false))
+  if (spec.anyOrigin) {
+    // The caller chose the host, so the only guarantee left is the scheme.
+    let parsed: URL | null = null
+    try {
+      parsed = new URL(url)
+    } catch {
+      /* handled below */
+    }
+    if (parsed?.protocol !== 'https:') {
+      throw new HttpToolError(`tool "${spec.name}" needs a full https:// URL (got "${url.slice(0, 80)}")`)
+    }
+  } else if (staticOrigin(url) !== origin) {
+    // Belt and braces: arguments are URL-encoded, so they cannot introduce a
+    // host, but a template typo could. Verify what we actually built.
     throw new HttpToolError(`tool "${spec.name}" resolved to a different origin`)
   }
 
@@ -397,8 +440,130 @@ export function buildRequest(
     url,
     headers,
     ...(body !== undefined ? { body } : {}),
-    redactedUrl: renderTemplate(spec.request.url, make('url', true)),
+    redactedUrl: renderTemplate(spec.request.url, make(urlSlot, true)),
   }
+}
+
+/* ── XML → plain values ──────────────────────────────────────────────────── */
+
+/**
+ * Parse XML into the same plain objects `pick`/`template` already walk, so a
+ * feed is shaped with the grammar JSON uses rather than a second one.
+ *
+ * Deliberately tolerant rather than conformant: this exists for Atom, RSS and
+ * the handful of XML APIs that never got a JSON endpoint (arXiv), and a parse
+ * that goes wrong degrades to the raw body — the same fallback a malformed JSON
+ * response takes. That is why it is ~70 lines here instead of a DOM dependency
+ * the browser bundle would have to carry.
+ *
+ * Namespace prefixes are dropped (`arxiv:primary_category` → `primary_category`)
+ * for two reasons: paths stay readable, and a `:` in a placeholder would collide
+ * with the `{{secret:…}}` form.
+ */
+interface XmlNode {
+  name: string
+  attrs: Record<string, string>
+  children: XmlNode[]
+  text: string
+}
+
+const localName = (raw: string): string => raw.slice(raw.indexOf(':') + 1)
+
+function parseAttrs(source: string): Record<string, string> {
+  const attrs: Record<string, string> = {}
+  for (const m of source.matchAll(/([A-Za-z_:][-\w.:]*)\s*=\s*("([^"]*)"|'([^']*)')/g)) {
+    attrs[localName(m[1])] = decodeEntities(m[3] ?? m[4] ?? '')
+  }
+  return attrs
+}
+
+export function parseXml(xml: string): XmlNode | null {
+  const source = String(xml ?? '')
+  const root: XmlNode = { name: '#root', attrs: {}, children: [], text: '' }
+  const stack: XmlNode[] = [root]
+  let i = 0
+  while (i < source.length) {
+    const lt = source.indexOf('<', i)
+    if (lt < 0) break
+    if (lt > i) stack[stack.length - 1].text += source.slice(i, lt)
+
+    // Declarations, comments and CDATA: skip, except CDATA whose payload is text.
+    if (source.startsWith('<![CDATA[', lt)) {
+      const end = source.indexOf(']]>', lt)
+      if (end < 0) break
+      stack[stack.length - 1].text += source.slice(lt + 9, end)
+      i = end + 3
+      continue
+    }
+    if (source.startsWith('<!--', lt)) {
+      const end = source.indexOf('-->', lt)
+      i = end < 0 ? source.length : end + 3
+      continue
+    }
+    if (source.startsWith('<?', lt) || source.startsWith('<!', lt)) {
+      const end = source.indexOf('>', lt)
+      i = end < 0 ? source.length : end + 1
+      continue
+    }
+
+    const gt = source.indexOf('>', lt)
+    if (gt < 0) break
+    const inner = source.slice(lt + 1, gt)
+    i = gt + 1
+
+    if (inner.startsWith('/')) {
+      // Close the matching element; an unmatched tag is ignored rather than fatal.
+      const name = localName(inner.slice(1).trim())
+      for (let d = stack.length - 1; d > 0; d--) {
+        if (stack[d].name === name) {
+          stack.length = d
+          break
+        }
+      }
+      continue
+    }
+
+    const selfClosing = inner.endsWith('/')
+    const body = selfClosing ? inner.slice(0, -1) : inner
+    const space = body.search(/\s/)
+    const node: XmlNode = {
+      name: localName((space < 0 ? body : body.slice(0, space)).trim()),
+      attrs: space < 0 ? {} : parseAttrs(body.slice(space)),
+      children: [],
+      text: '',
+    }
+    stack[stack.length - 1].children.push(node)
+    if (!selfClosing) stack.push(node)
+  }
+  return root.children.length ? root.children[0] : null
+}
+
+/** A node becomes its text when it is a plain leaf, else an object of children
+ *  and attributes — so `{{title}}` reads a leaf directly while `{{link.0.href}}`
+ *  still reaches an attribute. Repeated children collapse into arrays. */
+export function xmlNodeToValue(node: XmlNode): unknown {
+  const text = decodeEntities(node.text).trim()
+  if (!node.children.length && !Object.keys(node.attrs).length) return text
+
+  const out: Record<string, unknown> = { ...node.attrs }
+  const seen = new Map<string, unknown[]>()
+  for (const child of node.children) {
+    const list = seen.get(child.name) ?? []
+    list.push(xmlNodeToValue(child))
+    seen.set(child.name, list)
+  }
+  // Children win over an attribute of the same name — the nested value is the
+  // one a template almost certainly meant.
+  for (const [name, values] of seen) out[name] = values.length === 1 ? values[0] : values
+  if (text && !('value' in out)) out.value = text
+  return out
+}
+
+/** Parsed XML as `{ <rootName>: … }`, so a pick reads like the document does
+ *  (`feed.entry[]`, `rss.channel.item[]`). */
+export function xmlToValue(xml: string): unknown {
+  const root = parseXml(xml)
+  return root ? { [root.name]: xmlNodeToValue(root) } : null
 }
 
 /* ── response shaping ────────────────────────────────────────────────────── */
@@ -426,16 +591,43 @@ export function pickPath(data: unknown, path: string): unknown {
         : (current as Record<string, unknown>)[key]
     }
     if (isArray) {
-      if (!Array.isArray(current)) return undefined
+      if (current === undefined || current === null) return undefined
+      // A lone element is a list of one. XML carries no arity — a feed with a
+      // single <entry> must shape the same as a feed with twenty — and JSON
+      // APIs that collapse one-element arrays get the same courtesy.
+      const list = Array.isArray(current) ? current : [current]
       const rest = segments.slice(i + 1).join('.')
-      if (!rest) return current
-      return current.flatMap((item) => {
+      if (!rest) return list
+      return list.flatMap((item) => {
         const v = pickPath(item, rest)
         return v === undefined ? [] : [v]
       })
     }
   }
   return current
+}
+
+/** Try each `|`-separated alternative, first match wins — one feed tool can
+ *  then serve RSS (`rss.channel.item[]`) and Atom (`feed.entry[]`) alike. */
+export function pickFirst(data: unknown, pick: string): unknown {
+  for (const candidate of String(pick ?? '').split('|')) {
+    const path = candidate.trim()
+    if (!path) continue
+    const value = pickPath(data, path)
+    if (value !== undefined && value !== null && !(Array.isArray(value) && !value.length)) {
+      return value
+    }
+  }
+  return undefined
+}
+
+const MISS_SAMPLE = 600
+
+/** Readable shape hint for a failed pick. */
+function topKeys(value: unknown): string {
+  if (Array.isArray(value)) return `(array of ${value.length})`
+  if (value && typeof value === 'object') return Object.keys(value).slice(0, 20).join(', ') || '(none)'
+  return `(${typeof value})`
 }
 
 function scalar(v: unknown): string {
@@ -465,21 +657,22 @@ export function clip(text: string, maxChars = DEFAULT_MAX_CHARS): string {
 export function shapeResponse(spec: HttpToolSpec, body: string): string {
   const max = spec.maxChars ?? DEFAULT_MAX_CHARS
   const transform = spec.response.transform ? TRANSFORMS[spec.response.transform] : undefined
-  if (spec.response.mode !== 'json') {
-    const out = transform ? transform(body) : body
-    return clip(out.trim(), max)
-  }
+  const raw = (): string => clip((transform ? transform(body) : body).trim(), max)
+  if (spec.response.mode === 'text') return raw()
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(body)
+    parsed = spec.response.mode === 'xml' ? xmlToValue(body) : JSON.parse(body)
   } catch {
-    return clip((transform ? transform(body) : body).trim(), max)
+    return raw()
   }
+  if (parsed === null || parsed === undefined) return raw()
 
-  const picked = spec.response.pick ? pickPath(parsed, spec.response.pick) : parsed
+  const picked = spec.response.pick ? pickFirst(parsed, spec.response.pick) : parsed
   if (picked === undefined || picked === null) {
-    return clip(JSON.stringify(parsed, null, 1), max)
+    // Dumping the whole payload here used to cost thousands of tokens and still
+    // not say what went wrong. Name the miss and show the shape instead.
+    return `No match for pick "${spec.response.pick}". Top-level keys: ${topKeys(parsed)}\n\nFirst ${MISS_SAMPLE} chars of the response:\n${JSON.stringify(parsed, null, 1).slice(0, MISS_SAMPLE)}`
   }
   const tpl = spec.response.template
   let out: string

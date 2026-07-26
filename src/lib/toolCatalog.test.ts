@@ -40,9 +40,26 @@ describe('catalog shape', () => {
 
 describe('catalog tool specs', () => {
   it('every shipped spec survives normalization', () => {
-    for (const tool of allTools) {
+    for (const tool of allTools.filter((t) => !t.anyOrigin)) {
       expect(normalizeHttpTool(tool), tool.name).not.toBeNull()
       expect(staticOrigin(tool.request.url), tool.name).toBeTruthy()
+    }
+  })
+
+  /** anyOrigin is first-party only, and never alongside a key. */
+  it('keeps open-destination tools out of untrusted specs and away from secrets', () => {
+    for (const tool of allTools.filter((t) => t.anyOrigin)) {
+      expect(secretRefs(tool), tool.name).toEqual([])
+      expect(normalizeHttpTool(tool)?.anyOrigin, tool.name).toBeUndefined()
+    }
+  })
+
+  it('routes tools through WebCLI exactly when their entry says they need it', () => {
+    for (const entry of httpEntries) {
+      for (const tool of entry.tools ?? []) {
+        if (entry.requiresWebcli) expect(tool.transport, tool.name).toBe('webcli')
+        else expect(tool.transport, tool.name).not.toBe('webcli')
+      }
     }
   })
 
@@ -103,6 +120,7 @@ describe('catalog tool specs', () => {
 describe('selection helpers', () => {
   it('collects tools and servers for the installed set only', () => {
     expect(toolsForEntries(['jina']).map((t) => t.name).sort()).toEqual(['web_fetch', 'web_search'])
+    expect(toolsForEntries(['feeds']).map((t) => t.name).sort()).toEqual(['atom_feed', 'rss_feed'])
     expect(toolsForEntries([])).toEqual([])
     expect(serversForEntries(['webcli'])).toEqual([
       { entryId: 'webcli', name: 'webcli', url: expect.any(String) },

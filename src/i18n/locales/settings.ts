@@ -73,6 +73,7 @@ export default {
     recommendedDesc:
       'Nothing is built in: the agent can reach exactly what you check here. Every endpoint listed has been checked to work from a browser. Start with WebCLI — it fetches with your real Chrome session, so it also reaches sites that refuse browser scripts.',
     catalogFeatured: 'Start here',
+    catalogNeedsWebcli: 'needs WebCLI',
     catalogNotConnected: 'not connected',
     catalogExtensionHint:
       'Added, but Chrome does not answer yet. Install/enable the extension, then use Reconnect below.',
@@ -93,6 +94,14 @@ export default {
       reference: {
         title: 'Reference lookup (Wikipedia, Open Library)',
         desc: 'Search and read English Wikipedia articles, and look up books. Keyless.',
+      },
+      feeds: {
+        title: 'Feeds (RSS, Atom)',
+        desc: 'Read any RSS or Atom feed by URL and get recent items as a short list — for following a blog, journal or podcast into the knowledge base.',
+      },
+      arxiv: {
+        title: 'arXiv preprints',
+        desc: 'Search arXiv and get titles, authors, dates and abstracts. arXiv refuses browser requests, so this one needs the WebCLI extension above.',
       },
       zotero: {
         title: 'Zotero library',
@@ -250,6 +259,7 @@ export default {
     recommendedDesc:
       '没有任何内置工具：agent 能用什么，完全取决于你在这里勾选了什么。列出的每个服务都已实测可在浏览器中调用。建议从 WebCLI 开始 —— 它用你真实的 Chrome 会话发请求，因此也能访问那些拒绝浏览器脚本的接口。',
     catalogFeatured: '首选',
+    catalogNeedsWebcli: '需要 WebCLI',
     catalogNotConnected: '未连接',
     catalogExtensionHint: '已添加，但 Chrome 还没有响应。请先安装/启用该扩展，然后点下方的「重连」。',
     catalogLearnMore: '了解更多 →',
@@ -269,6 +279,14 @@ export default {
       reference: {
         title: '资料查询 (Wikipedia、Open Library)',
         desc: '检索并阅读英文维基百科条目，以及查询图书信息。免 key。',
+      },
+      feeds: {
+        title: '订阅源 (RSS、Atom)',
+        desc: '按 URL 读取任意 RSS/Atom 源，返回精简的最新条目列表 —— 用于把关注的博客、期刊、播客追进知识库。',
+      },
+      arxiv: {
+        title: 'arXiv 预印本',
+        desc: '检索 arXiv，返回标题、作者、日期和摘要。arXiv 拒绝浏览器直连，所以这一项需要上面的 WebCLI 扩展。',
       },
       zotero: {
         title: 'Zotero 文献库',

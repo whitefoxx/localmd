@@ -82,7 +82,7 @@ const form = ref({
   url: '',
   headers: '',
   body: '',
-  mode: 'text' as 'text' | 'json',
+  mode: 'text' as 'text' | 'json' | 'xml',
   pick: '',
   template: '',
   transport: 'auto' as 'auto' | 'direct' | 'webcli',
@@ -329,6 +329,11 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
                 class="text-[10px] px-1 rounded bg-accent/15 text-accent"
               >{{ $t('settings.catalogFeatured') }}</span>
               <span
+                v-if="e.requiresWebcli"
+                class="text-[10px] px-1 rounded"
+                :class="tools.webcliConnected ? 'bg-bg-3 text-fg-3' : 'bg-removed/15 text-removed'"
+              >{{ $t('settings.catalogNeedsWebcli') }}</span>
+              <span
                 v-if="entryStatus(e)"
                 class="text-[10px]"
                 :class="entryStatus(e)!.cls"
@@ -514,16 +519,17 @@ function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: 
           <select v-model="form.mode" class="input text-xs w-28 shrink-0">
             <option value="text">text</option>
             <option value="json">json</option>
+            <option value="xml">xml</option>
           </select>
           <input
-            v-if="form.mode === 'json'"
+            v-if="form.mode !== 'text'"
             v-model="form.pick"
             class="input text-xs font-mono flex-1"
             placeholder="results[]"
           />
         </div>
         <input
-          v-if="form.mode === 'json'"
+          v-if="form.mode !== 'text'"
           v-model="form.template"
           class="input text-xs font-mono"
           placeholder="- {{title}} ({{year}}) {{url}}"

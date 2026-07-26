@@ -56,6 +56,10 @@ export interface CatalogEntry {
   server?: { name: string; url: string }
   /** kind 'http': the tools an install registers. */
   tools?: HttpToolSpec[]
+  /** The endpoint refuses browsers, so these tools only work with the WebCLI
+   *  extension connected. Surfaced on the card rather than discovered on the
+   *  first failed call. */
+  requiresWebcli?: boolean
   /** Values the user must supply before the tools work. */
   secrets?: CatalogSecret[]
 }
@@ -168,6 +172,39 @@ const RESEARCH_TOOLS: HttpToolSpec[] = [
   },
 ]
 
+/** arXiv has no JSON endpoint and sends no CORS headers, so it is the one
+ *  catalog entry that genuinely needs the extension — and the reason `xml` mode
+ *  exists at all. OpenAlex covers arXiv preprints too, but without the abstract,
+ *  the version, or same-day postings. */
+const ARXIV_TOOLS: HttpToolSpec[] = [
+  {
+    id: 'arxiv.arxiv_search',
+    name: 'arxiv_search',
+    description:
+      'Search arXiv preprints (physics, maths, CS, biology, economics) and return title, authors, date, abstract and links. Use for recent or unpublished research, where arXiv is often months ahead of a journal; use openalex_search instead for published work and citation counts.',
+    params: {
+      query: {
+        type: 'string',
+        required: true,
+        description: 'Search terms; arXiv field prefixes work, e.g. "ti:transformer" or "cat:cs.CL"',
+      },
+      limit: { type: 'number', default: 5, description: 'How many results (default 5)' },
+    },
+    request: {
+      method: 'GET',
+      url: 'https://export.arxiv.org/api/query?search_query=all:{{query}}&max_results={{limit}}&sortBy=relevance',
+    },
+    response: {
+      mode: 'xml',
+      pick: 'feed.entry[]',
+      template: '- {{title}} ({{published}})\n  {{author[].name}}\n  {{summary}}\n  {{id}}',
+    },
+    maxChars: 24_000,
+    // arXiv sends no Access-Control-Allow-Origin, verified from the app origin.
+    transport: 'webcli',
+  },
+]
+
 /** General reference. Wikipedia's host is fixed at en. by the static-origin rule
  *  (no placeholder may sit in a hostname); another language is a one-field copy
  *  of the tool, which the editor — or the agent — can make in seconds. */
@@ -233,6 +270,55 @@ const REFERENCE_TOOLS: HttpToolSpec[] = [
   },
 ]
 
+/**
+ * Feeds. The destination is the whole point here, so these carry `anyOrigin` —
+ * a flag only a first-party catalog literal can set (see HttpToolSpec).
+ *
+ * RSS and Atom are kept as two tools rather than one with alternation: their
+ * item shapes genuinely differ (RSS `link` is a string; Atom's is an element
+ * with an href attribute, sometimes repeated), so a single template would print
+ * a JSON blob for one of them. Picking the wrong one is cheap — the pick-miss
+ * diagnostic names the root element, so the agent switches on the next call.
+ */
+const FEED_TOOLS: HttpToolSpec[] = [
+  {
+    id: 'feeds.rss_feed',
+    name: 'rss_feed',
+    description:
+      "Read an RSS 2.0 feed by URL and return its recent items — title, date and link. Use for a blog, news or podcast feed whose URL you have. If the result says the root element is 'feed', it is Atom: call atom_feed instead.",
+    params: {
+      url: { type: 'string', required: true, description: 'Full https URL of the RSS feed' },
+    },
+    request: { method: 'GET', url: '{{url}}' },
+    response: {
+      mode: 'xml',
+      pick: 'rss.channel.item[]',
+      template: '- {{title}} · {{pubDate}}\n  {{link}}',
+    },
+    maxChars: 20_000,
+    transport: 'auto',
+    anyOrigin: true,
+  },
+  {
+    id: 'feeds.atom_feed',
+    name: 'atom_feed',
+    description:
+      "Read an Atom feed by URL and return its recent entries — title, date and link. Use for a blog or project feed whose URL you have. If the result says the root element is 'rss', call rss_feed instead.",
+    params: {
+      url: { type: 'string', required: true, description: 'Full https URL of the Atom feed' },
+    },
+    request: { method: 'GET', url: '{{url}}' },
+    response: {
+      mode: 'xml',
+      pick: 'feed.entry[]',
+      template: '- {{title}} · {{published}}\n  {{id}}',
+    },
+    maxChars: 20_000,
+    transport: 'auto',
+    anyOrigin: true,
+  },
+]
+
 /** The user's own reference library. Zotero's API allowlists its `Zotero-API-Key`
  *  header for browser preflights, so this works direct from the page. */
 const ZOTERO_TOOLS: HttpToolSpec[] = [
@@ -288,6 +374,19 @@ export const CATALOG: CatalogEntry[] = [
     kind: 'http',
     homepage: 'https://www.wikipedia.org/',
     tools: REFERENCE_TOOLS,
+  },
+  {
+    id: 'feeds',
+    kind: 'http',
+    homepage: 'https://en.wikipedia.org/wiki/RSS',
+    tools: FEED_TOOLS,
+  },
+  {
+    id: 'arxiv',
+    kind: 'http',
+    homepage: 'https://arxiv.org/',
+    tools: ARXIV_TOOLS,
+    requiresWebcli: true,
   },
   {
     id: 'zotero',
