@@ -87,13 +87,49 @@ describe('normalizeSettings — multi-profile shape', () => {
       mcpServers: [],
       hotkeys: {},
       healthDirs: [],
-      jinaReader: true,
+      toolEntries: ['jina'],
+      httpTools: [],
+      toolSecrets: {},
       ttsVoice: '',
       ttsRate: 1,
     }
     expect(normalizeSettings(null)).toEqual(empty)
     expect(normalizeSettings('x')).toEqual(empty)
     expect(normalizeSettings({})).toEqual(empty)
+  })
+
+  describe('tool catalog migration', () => {
+    it('carries a legacy jinaReader flag over to the catalog entry', () => {
+      expect(normalizeSettings({ profiles: [], jinaReader: true }).toolEntries).toEqual(['jina'])
+      expect(normalizeSettings({ profiles: [], jinaReader: false }).toolEntries).toEqual([])
+    })
+
+    it('prefers a stored entry list, including an empty one', () => {
+      expect(
+        normalizeSettings({ profiles: [], jinaReader: true, toolEntries: ['research'] }).toolEntries,
+      ).toEqual(['research'])
+      expect(normalizeSettings({ profiles: [], toolEntries: [] }).toolEntries).toEqual([])
+    })
+
+    it('drops custom tools that could never run', () => {
+      const s = normalizeSettings({
+        profiles: [],
+        httpTools: [
+          { name: 'ok_tool', request: { url: 'https://api.test.dev/x' } },
+          { name: 'insecure', request: { url: 'http://api.test.dev/x' } },
+          { name: 'templated_host', request: { url: 'https://{{host}}/x' } },
+        ],
+      })
+      expect(s.httpTools.map((t) => t.name)).toEqual(['ok_tool'])
+    })
+
+    it('keeps only well-formed secret entries', () => {
+      const s = normalizeSettings({
+        profiles: [],
+        toolSecrets: { zotero_key: 'abc', '': 'x', bad: 12, ok2: 'y' },
+      })
+      expect(s.toolSecrets).toEqual({ zotero_key: 'abc', ok2: 'y' })
+    })
   })
 
   it('keeps git/github fields through normalization', () => {

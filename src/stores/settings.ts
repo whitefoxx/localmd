@@ -20,6 +20,8 @@ import {
   needsBaseUrl,
 } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
+import { normalizeHttpToolList, type HttpToolSpec } from '@/lib/httpTools'
+import { defaultInstalledIds } from '@/lib/toolCatalog'
 import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
 
@@ -61,9 +63,14 @@ export interface SettingsState {
   hotkeys: HotkeyOverrides
   /** Top-level dirs the KB health check is scoped to; empty = whole KB. */
   healthDirs: string[]
-  /** Built-in web_search / web_fetch via Jina AI Reader (no key). On by default;
-   *  a fallback when the web-agent browser extension isn't connected. */
-  jinaReader: boolean
+  /** Installed recommended-catalog entry ids (see lib/toolCatalog.ts). Nothing
+   *  is built in: web access included, the agent gets what is listed here. */
+  toolEntries: string[]
+  /** User-authored HTTP tools, global scope (KB-scoped ones live in the KB). */
+  httpTools: HttpToolSpec[]
+  /** Values referenced from a tool as {{secret:<id>}} — API keys and the like.
+   *  Same localStorage trust model as the LLM keys; never sent to the model. */
+  toolSecrets: Record<string, string>
   /** Read-aloud (TTS): chosen Web Speech voice name (empty = auto-pick a Google
    *  voice for the content language) and speech rate (0.5–2). */
   ttsVoice: string
@@ -106,9 +113,34 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   mcpServers: [],
   hotkeys: {},
   healthDirs: [],
-  jinaReader: true,
+  toolEntries: defaultInstalledIds(),
+  httpTools: [],
+  toolSecrets: {},
   ttsVoice: '',
   ttsRate: 1,
+}
+
+/**
+ * Installed catalog entries. A stored list wins; without one this is a profile
+ * from before the catalog existed, so the old `jinaReader` boolean decides
+ * whether the Jina pack (which is exactly what that flag used to switch on)
+ * comes across. Anything else — including a fresh profile — gets the defaults.
+ */
+function toolEntriesFrom(obj: Record<string, unknown>): string[] {
+  if (Array.isArray(obj.toolEntries)) {
+    return obj.toolEntries.filter((x): x is string => typeof x === 'string' && !!x)
+  }
+  if ('jinaReader' in obj) return obj.jinaReader === false ? [] : ['jina']
+  return defaultInstalledIds()
+}
+
+function toolSecretsFrom(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (/^[a-z][a-z0-9_]*$/i.test(k) && typeof v === 'string' && v) out[k] = v
+  }
+  return out
 }
 
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
@@ -124,7 +156,9 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     healthDirs: Array.isArray(obj.healthDirs)
       ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
       : [],
-    jinaReader: obj.jinaReader !== false, // default on; only an explicit false disables
+    toolEntries: toolEntriesFrom(obj),
+    httpTools: normalizeHttpToolList(obj.httpTools, newProfileId),
+    toolSecrets: toolSecretsFrom(obj.toolSecrets),
     ttsVoice: String(obj.ttsVoice ?? ''),
     ttsRate: clampRate(obj.ttsRate),
   }
