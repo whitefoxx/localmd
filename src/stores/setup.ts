@@ -16,6 +16,19 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+/** Ids only — the values live in settings and never come here. */
+const PROVIDED_KEY = 'browser-md:provided-secrets:v1'
+
+function readProvided(): string[] {
+  try {
+    const raw = localStorage.getItem(PROVIDED_KEY)
+    const list = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 export type SetupKind = 'key' | 'extension' | 'choice'
 
 export interface SetupRequest {
@@ -44,6 +57,31 @@ export const useSetupStore = defineStore('setup', () => {
   const pending = ref<SetupRequest[]>([])
   const resolvers = new Map<string, (outcome: SetupOutcome) => void>()
 
+  /**
+   * Secret ids the user filled in through a setup card — the ids only, never
+   * the values, which stay in settings.
+   *
+   * This is the difference between "a key that happens to exist" and "a key the
+   * user handed over for something being set up", and it is what lets a
+   * brand-new integration be tested before it is saved. Without it the guard
+   * deadlocks: test refuses an unvouched key, so the agent saves untested tools
+   * instead — worse on both counts.
+   *
+   * Persisted because the distinction outlives a page reload; a setup
+   * interrupted halfway should not have to ask for the same key twice.
+   */
+  const providedSecrets = ref(new Set<string>(readProvided()))
+
+  function rememberProvided(id: string): void {
+    if (providedSecrets.value.has(id)) return
+    providedSecrets.value = new Set(providedSecrets.value).add(id)
+    try {
+      localStorage.setItem(PROVIDED_KEY, JSON.stringify([...providedSecrets.value]))
+    } catch {
+      /* private mode — the agent just has to re-ask after a reload */
+    }
+  }
+
   function pendingFor(sessionId: string): SetupRequest | undefined {
     return pending.value.find((r) => r.sessionId === sessionId)
   }
@@ -63,6 +101,8 @@ export const useSetupStore = defineStore('setup', () => {
   function settle(id: string, outcome: SetupOutcome): void {
     const resolve = resolvers.get(id)
     if (!resolve) return
+    const request = pending.value.find((r) => r.id === id)
+    if (outcome === 'provided' && request?.secretId) rememberProvided(request.secretId)
     resolvers.delete(id)
     pending.value = pending.value.filter((r) => r.id !== id)
     resolve(outcome)
@@ -75,5 +115,5 @@ export const useSetupStore = defineStore('setup', () => {
     }
   }
 
-  return { pending, pendingFor, ask, settle, clearSession }
+  return { pending, pendingFor, providedSecrets, ask, settle, clearSession }
 })

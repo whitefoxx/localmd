@@ -7,7 +7,7 @@
  * that a value arrived — the one path by which a secret can reach the app
  * during a conversation without passing through the model.
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useToolsStore } from '@/stores/tools'
 import { useSetupStore, type SetupRequest } from '@/stores/setup'
 import { useMcpStore } from '@/stores/mcp'
@@ -21,6 +21,15 @@ const mcp = useMcpStore()
 const value = ref('')
 const checking = ref(false)
 const checkFailed = ref(false)
+
+/** A value is already stored under this id — from an earlier setup, or the
+ *  same one interrupted. Re-typing a key you already gave is pure friction, so
+ *  offer to keep it and let Save mean "replace". */
+const alreadySet = computed(() => !!props.request.secretId && tools.hasSecret(props.request.secretId))
+
+function keepExisting(): void {
+  setup.settle(props.request.id, 'provided')
+}
 
 function saveKey(): void {
   const v = value.value.trim()
@@ -58,18 +67,26 @@ async function checkExtension(): Promise<void> {
     <p v-if="request.help" class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ request.help }}</p>
 
     <!-- A key: straight into settings, never back to the model. -->
-    <div v-if="request.kind === 'key'" class="mt-2 flex items-center gap-2">
-      <input
-        v-model="value"
-        type="password"
-        class="input text-xs flex-1"
-        autocomplete="off"
-        :placeholder="request.secretId"
-        @keydown.enter.prevent="saveKey"
-      />
-      <button class="btn text-xs shrink-0" :disabled="!value.trim()" @click="saveKey">
-        {{ $t('chat.setupSave') }}
-      </button>
+    <div v-if="request.kind === 'key'" class="mt-2 space-y-1.5">
+      <div class="flex items-center gap-2">
+        <input
+          v-model="value"
+          type="password"
+          class="input text-xs flex-1"
+          autocomplete="off"
+          :placeholder="alreadySet ? $t('chat.setupReplace') : request.secretId"
+          @keydown.enter.prevent="saveKey"
+        />
+        <button class="btn text-xs shrink-0" :disabled="!value.trim()" @click="saveKey">
+          {{ $t('chat.setupSave') }}
+        </button>
+      </div>
+      <div v-if="alreadySet" class="flex items-center gap-2 text-xs">
+        <span class="text-fg-3">{{ $t('chat.setupAlreadySet') }}</span>
+        <button class="text-accent hover:underline" @click="keepExisting">
+          {{ $t('chat.setupKeep') }}
+        </button>
+      </div>
     </div>
 
     <!-- An extension: install, then re-check. -->

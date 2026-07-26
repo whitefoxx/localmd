@@ -862,15 +862,32 @@ const manageTools = defineTool({
         }
       }
       const origin = staticOrigin(spec.request.url)
-      // A key may only follow the origin it is already trusted with.
-      const allowedSecrets = new Set(
+      // A key may not be DIVERTED: an existing one only follows the origin an
+      // installed tool already uses it with. But a key the user just handed
+      // over through request_setup has no origin yet — refusing it there made
+      // a first-time setup untestable, which pushed the agent to save
+      // unverified tools instead. So: usable while it is still unattached,
+      // pinned to whatever installed tools use it from then on.
+      const usedWith = (id: string): string[] =>
         toolsStore.specs
-          .filter((s) => staticOrigin(s.request.url) === origin)
-          .flatMap((s) => secretRefs(s)),
-      )
-      const blocked = secretRefs(spec).filter((id) => !allowedSecrets.has(id))
+          .filter((s) => secretRefs(s).includes(id))
+          .map((s) => staticOrigin(s.request.url) ?? '?')
+      const justProvided = useSetupStore().providedSecrets
+      const blocked = secretRefs(spec)
+        .map((id) => ({ id, origins: usedWith(id) }))
+        .filter(({ id, origins }) => {
+          if (origins.includes(origin ?? '?')) return false
+          return !(justProvided.has(id) && origins.length === 0)
+        })
       if (blocked.length) {
-        return `Error: this spec references ${blocked.map((s) => `{{secret:${s}}}`).join(', ')}, which no installed tool uses with ${origin}. Test it without the key (the user can add the key after saving), or check the host.`
+        const why = blocked
+          .map(({ id, origins }) =>
+            origins.length
+              ? `{{secret:${id}}} is used by installed tools with ${[...new Set(origins)].join(', ')}, not ${origin}`
+              : `{{secret:${id}}} is a stored key that nothing currently uses`,
+          )
+          .join('; ')
+        return `Error: ${why}. A stored key does not follow a spec to a new host. If this key belongs to the service you are setting up, collect it with request_setup (kind:"key", the same id) — a key the user hands over for this setup can be tested straight away. Otherwise check the URL.`
       }
       // raw: shape nothing, so the model can read the real field names. The
       // spec's own pick/template are what it is trying to write, so showing

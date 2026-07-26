@@ -24,7 +24,7 @@ The user wants the agent to reach something it currently can't — "add WeRead",
 already available: tools in this app are DATA (a JSON spec), not code, so you
 can research a service and build working tools for it inside one conversation.
 
-Work in this order. Do not skip step 1 or step 5.
+Work in this order. Do not skip step 1, and do not leave step 2 until the end.
 
 ## 1. Find out how the service actually works
 
@@ -40,7 +40,18 @@ If the docs are vague about responses, that's fine — step 3 shows you the real
 thing. If the service publishes a machine-readable API list (WeRead's gateway
 answers \`{"api_name": "/_list"}\`), fetch it: it saves you guessing.
 
-## 2. Check what the browser can reach
+## 2. Collect the key first, if there is one
+
+If the service authenticates, you cannot test anything without it — so ask now,
+not at the end. Call \`request_setup\` with \`kind: "key"\`, an id you will use in
+the specs (\`<service>_api_key\`), a \`help\` line saying exactly where to get it,
+and a \`url\`. NEVER ask for it as chat text. A key the user hands over this way
+can be used immediately, including in test.
+
+If they skip it, keep going: build and save the tools anyway and tell them the
+tools will start working once the key is filled in under Settings → Tools → Keys.
+
+## 3. Check what the browser can reach
 
 This app runs in a browser, so an endpoint that sends no CORS headers cannot be
 called directly. Build one spec and \`manage_tools\` \`test\` it:
@@ -53,7 +64,7 @@ called directly. Build one spec and \`manage_tools\` \`test\` it:
 If WebCLI isn't connected, don't just report that — call \`request_setup\` with
 \`kind: "extension"\`, \`entry_id: "webcli"\` and let the user install it.
 
-## 3. Design the output against a REAL response
+## 4. Design the output against a REAL response
 
 This is where tools are won or lost. A raw JSON payload can cost thousands of
 tokens per call; a shaped one costs a few hundred, and the shaped one is easier
@@ -68,7 +79,7 @@ to read. So:
 Keep only the fields a person would want: title, who, when, an id to follow up
 with, a link. Drop covers, colour palettes, internal flags.
 
-## 4. Build the whole set, not one tool
+## 5. Build the whole set, not one tool
 
 A service is worth one tool per useful operation — search, detail, list, stats.
 Give them a shared \`bundle\` name so the user approves and manages them as one
@@ -76,18 +87,12 @@ integration, and save them together with \`manage_tools\` \`save_bundle\`.
 
 Names should read as a group: \`weread_search\`, \`weread_shelf\`, \`weread_notes\`.
 
-## 5. Collect what only the user can give
+## 6. Ask, don't guess, when the choice is theirs
 
-NEVER ask for an API key as chat text, and never tell them to go hunting through
-settings. Put \`{{secret:<service>_api_key}}\` in the spec, then call
-\`request_setup\` with \`kind: "key"\` and that same id, a \`help\` line saying
-exactly where to get it, and a \`url\`. The app shows a field, stores what they
-type, and tells you only that a value arrived.
+If a decision is genuinely the user's (which of two endpoints, which account),
+ask with \`request_setup\` \`kind: "choice"\` rather than picking silently.
 
-If a decision is genuinely theirs (which of two endpoints, which account), ask
-with \`kind: "choice"\` rather than picking silently.
-
-## 6. Write down what you learned
+## 7. Write down what you learned
 
 Save a skill into the KB at \`.agents/skills/<service>/SKILL.md\` describing the
 tools you built and any field meanings, units or quirks that are not obvious
