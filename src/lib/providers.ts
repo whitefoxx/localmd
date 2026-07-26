@@ -8,7 +8,8 @@
  * A pure web app can still only reach endpoints that allow browser CORS. The
  * dedicated packages remove the *adapter* work, not the CORS fact — the chat
  * surface shows a CORS hint when a connection error occurs. The Chinese and
- * OpenAI endpoints below answered the CORS preflight when verified (2026-07);
+ * OpenAI endpoints below answered the CORS preflight when verified (2026-07),
+ * as did OpenRouter (`access-control-allow-origin: *`, verified 2026-07-26);
  * Google/xAI/Groq are offered for BYO-key use but their browser-CORS behavior
  * is not individually verified here.
  */
@@ -42,6 +43,27 @@ export interface ProviderPreset {
 /** OpenAI-compatible presets: one `@ai-sdk/openai-compatible` package, base URL
  *  supplied from this table so the user never types it (except Custom). */
 export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    sdk: 'openai-compatible',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    // Models are `vendor/model` slugs; the full catalog is openrouter.ai/models.
+    // Note this route gets no Anthropic prompt caching (see run.ts) — a Claude
+    // primary is cheaper on the dedicated Anthropic preset.
+    defaultModel: 'anthropic/claude-sonnet-5',
+    models: [
+      'anthropic/claude-sonnet-5',
+      'anthropic/claude-opus-5',
+      'openai/gpt-5.6-terra',
+      'openai/gpt-5.6-luna',
+      'google/gemini-3.5-flash',
+      'x-ai/grok-4.5',
+      'deepseek/deepseek-v4-pro',
+      'z-ai/glm-5.2',
+      'moonshotai/kimi-k3',
+    ],
+  },
   {
     id: 'qwen',
     label: 'Qwen (Alibaba Cloud Bailian)',
@@ -187,8 +209,10 @@ export function isMultimodalProvider(providerId: string): boolean {
 /** Providers that can fill the image slot: OpenAI (DALL·E), Google (Imagen),
  *  xAI (Grok image), and any OpenAI-compatible endpoint exposing
  *  `/images/generations` (GLM CogView, Qwen, custom). Anthropic / DeepSeek /
- *  Groq have no image generation, so they're excluded. */
+ *  Groq have no image generation, so they're excluded — as is OpenRouter,
+ *  which proxies chat completions only. */
 export function providerHasImageModel(providerId: string): boolean {
+  if (providerId === 'openrouter') return false
   const kind = sdkKindFor(providerId)
   return (
     kind === 'openai' || kind === 'google' || kind === 'xai' || kind === 'openai-compatible'
