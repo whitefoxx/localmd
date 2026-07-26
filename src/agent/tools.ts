@@ -26,7 +26,16 @@ import { renderFileList } from '@/lib/fileList'
 import { fileKind } from '@/lib/filetypes'
 import { refreshGitStatus } from '@/lib/fileOps'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
-import { jinaRead, jinaSearch } from '@/lib/webread'
+import {
+  httpToolJsonSchema,
+  describeHttpCall,
+  normalizeHttpTool,
+  normalizeHttpToolList,
+  secretRefs,
+  staticOrigin,
+  KB_TOOLS_CONFIG_PATH,
+  type HttpToolSpec,
+} from '@/lib/httpTools'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { formatLintReport } from '@/lib/lint'
@@ -38,6 +47,7 @@ import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
 import { useGitStore } from '@/stores/git'
 import { useMcpStore } from '@/stores/mcp'
+import { useToolsStore } from '@/stores/tools'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useKbStore } from '@/stores/kb'
 
@@ -575,6 +585,192 @@ const useSkill = defineTool({
   },
 })
 
+/* ── tool authoring ──────────────────────────────────────────────────────── */
+
+/**
+ * The format reference, delivered by `list` rather than carried in the tool
+ * description — always-on prompt bytes are paid on every step of every turn,
+ * and this is only needed by the rare turn that actually authors a tool.
+ */
+const TOOL_SPEC_HELP = `Spec format (JSON):
+{
+  "name": "openalex_search",              // [a-z][a-z0-9_]*, must not collide
+  "description": "What it does and when to use it — the agent reads only this.",
+  "params": { "query": {"type":"string","required":true,"description":"…"},
+              "limit": {"type":"number","default":5} },
+  "request": {
+    "method": "GET",                      // GET|POST|PUT|PATCH|DELETE
+    "url": "https://api.example.com/s?q={{query}}&n={{limit}}",
+    "headers": {"Authorization":"Bearer {{secret:my_key}}"},
+    "body": "{\\"q\\":\\"{{query}}\\"}"    // non-GET only
+  },
+  "response": {
+    "mode": "json",                       // "text" = body as-is; "json" = pick+template
+    "pick": "results[]",                  // path: a.b[] maps, a.b.0 indexes
+    "template": "- {{title}} ({{year}}) {{url}}"
+  },
+  "maxChars": 20000,
+  "transport": "auto"                     // auto | direct | webcli
+}
+
+Rules that will reject a spec:
+- https only, and the HOST may not contain a placeholder (a tool always talks to
+  the server it was approved for).
+- {{secret:id}} reads a key the USER stored in Settings; you can reference one
+  but never read, set, or see its value.
+Guidance:
+- ALWAYS shape the response. A raw JSON payload can cost thousands of tokens per
+  call; pick + template is the difference between 200 tokens and 20,000.
+- Test before saving, and read the output: an unfilled {{placeholder}} means the
+  field name is wrong.
+- If a direct call fails on CORS, set transport "webcli" (needs the extension).`
+
+function describeSpec(spec: HttpToolSpec, scope: string): string {
+  const params = Object.entries(spec.params)
+    .map(([k, p]) => `${k}${p.required ? '*' : ''}:${p.type}`)
+    .join(', ')
+  return `- ${spec.name}(${params}) [${scope}] → ${spec.request.method} ${staticOrigin(spec.request.url)}`
+}
+
+/** Read the KB's tool file as a spec list plus its raw text (for the diff). */
+async function readKbToolFile(): Promise<{ raw: string | null; tools: HttpToolSpec[] }> {
+  const raw = await fs.tryReadFile(KB_TOOLS_CONFIG_PATH)
+  if (!raw) return { raw: null, tools: [] }
+  try {
+    const parsed = JSON.parse(raw) as { tools?: unknown }
+    return { raw, tools: normalizeHttpToolList(parsed.tools, () => crypto.randomUUID()) }
+  } catch {
+    return { raw, tools: [] }
+  }
+}
+
+/**
+ * Author tools by conversation. Saving is the only gated action, and it is
+ * gated on the real file diff — the user approves the exact bytes, seeing the
+ * name and the destination host, whatever their write mode says.
+ *
+ * `test` deliberately is NOT gated: an arbitrary outbound request is already
+ * within reach of any installed web tool, so a confirmation there would buy
+ * nothing and cost the author loop its iteration. What test does NOT do is hand
+ * over the user's stored keys — a secret resolves only for an origin that an
+ * already-installed tool uses it with, so a freshly-proposed spec can never
+ * carry a key somewhere new.
+ */
+const manageTools = defineTool({
+  name: 'manage_tools',
+  description:
+    "Create, test, update or remove the knowledge base's own HTTP tools (stored in .agents/tools.json, so they travel with the KB). Use when the user asks you to give yourself — or the app — a new capability, e.g. \"add a tool that searches <service>\". Call action:'list' first: it returns what exists plus the exact spec format. Saving asks the user to approve the file change.",
+  schema: z.object({
+    action: z
+      .enum(['list', 'test', 'save', 'remove'])
+      .describe("'list' (what exists + the spec format), 'test' (run a spec without saving), 'save', 'remove'"),
+    tool: z.string().optional().describe('The tool spec as a JSON object string (test/save)'),
+    name: z.string().optional().describe('Tool name to remove'),
+    sample_args: z
+      .string()
+      .optional()
+      .describe('JSON object of arguments for a test run, e.g. {"query":"cats"}'),
+  }),
+  describeCall: (a) => `manage_tools: ${a.action}${a.name ? ` ${a.name}` : ''}`,
+  run: async ({ action, tool, name, sample_args }, ctx) => {
+    const toolsStore = useToolsStore()
+
+    if (action === 'list') {
+      const kb = await readKbToolFile()
+      const kbNames = new Set(kb.tools.map((t) => t.name))
+      const lines = [
+        ...kb.tools.map((s) => describeSpec(s, 'this KB')),
+        ...toolsStore.specs.filter((s) => !kbNames.has(s.name)).map((s) => describeSpec(s, 'user settings')),
+      ]
+      return `${lines.length ? `Installed HTTP tools:\n${lines.join('\n')}` : 'No HTTP tools installed.'}\n\nBuilt-in names you may not reuse: ${TOOLS.map((t) => t.name).join(', ')}\n\n${TOOL_SPEC_HELP}`
+    }
+
+    if (action === 'remove') {
+      if (!name) return 'Error: remove needs a "name".'
+      const kb = await readKbToolFile()
+      if (!kb.tools.some((t) => t.name === name)) {
+        return `Error: this KB has no tool named "${name}" (manage_tools only edits .agents/tools.json; tools from Settings are the user's to remove).`
+      }
+      const next = kb.tools.filter((t) => t.name !== name)
+      return writeKbTools(ctx, kb.raw, next, `remove ${name}`)
+    }
+
+    // test / save both need a parseable, valid spec.
+    if (!tool) return `Error: ${action} needs a "tool" spec. Call action:'list' for the format.`
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(tool)
+    } catch (err) {
+      return `Error: "tool" is not valid JSON — ${(err as Error).message}`
+    }
+    const spec = normalizeHttpTool(parsed, () => crypto.randomUUID())
+    if (!spec) {
+      return 'Error: invalid spec. It needs a name matching [a-z][a-z0-9_]*, and request.url must be an https URL whose host contains no placeholder.'
+    }
+
+    if (action === 'test') {
+      let args: Record<string, unknown> = {}
+      if (sample_args) {
+        try {
+          args = JSON.parse(sample_args) as Record<string, unknown>
+        } catch (err) {
+          return `Error: "sample_args" is not valid JSON — ${(err as Error).message}`
+        }
+      }
+      const origin = staticOrigin(spec.request.url)
+      // A key may only follow the origin it is already trusted with.
+      const allowedSecrets = new Set(
+        toolsStore.specs
+          .filter((s) => staticOrigin(s.request.url) === origin)
+          .flatMap((s) => secretRefs(s)),
+      )
+      const blocked = secretRefs(spec).filter((id) => !allowedSecrets.has(id))
+      if (blocked.length) {
+        return `Error: this spec references ${blocked.map((s) => `{{secret:${s}}}`).join(', ')}, which no installed tool uses with ${origin}. Test it without the key (the user can add the key after saving), or check the host.`
+      }
+      const out = await toolsStore.test(spec, args)
+      return `Test result (${out.length} chars — this is what a call would return):\n\n${out.slice(0, 4000)}${out.length > 4000 ? '\n\n[preview truncated]' : ''}`
+    }
+
+    // save
+    const clash =
+      TOOLS.some((t) => t.name === spec.name) ||
+      toolsStore.specs.some((s) => s.name === spec.name && s.id !== spec.id)
+    const kb = await readKbToolFile()
+    const replacing = kb.tools.find((t) => t.name === spec.name)
+    if (clash && !replacing) {
+      return `Error: the name "${spec.name}" is already taken by a built-in or an installed tool. Pick another.`
+    }
+    const next = replacing
+      ? kb.tools.map((t) => (t.name === spec.name ? { ...spec, id: t.id } : t))
+      : [...kb.tools, spec]
+    const missing = secretRefs(spec).filter((id) => !toolsStore.hasSecret(id))
+    const note = missing.length
+      ? `\nTell the user to add ${missing.map((m) => `"${m}"`).join(', ')} in Settings → Tools — the tool will fail until they do.`
+      : ''
+    return (await writeKbTools(ctx, kb.raw, next, `${replacing ? 'update' : 'add'} ${spec.name}`)) + note
+  },
+})
+
+/** Serialize, ask the user to approve the diff, write, and re-register. */
+async function writeKbTools(
+  ctx: ToolCtx,
+  before: string | null,
+  tools: HttpToolSpec[],
+  what: string,
+): Promise<string> {
+  const after = `${JSON.stringify({ tools }, null, 2)}\n`
+  const ok = await useReviewStore().askApproval(ctx.sessionId, KB_TOOLS_CONFIG_PATH, before, after)
+  if (!ok) return `The user declined the change (${what}). Ask what they want instead.`
+  await performWrite(KB_TOOLS_CONFIG_PATH, before, after)
+  const store = useToolsStore()
+  await store.reloadKbTools()
+  // The trust gate guards tools that arrive unseen with a cloned KB. These the
+  // user just approved by diff, so approving twice would only be noise.
+  store.trustKbTools()
+  return `Done: ${what}. ${KB_TOOLS_CONFIG_PATH} now defines ${tools.length} tool(s); they are callable from your next message.`
+}
+
 /* ── git tools ───────────────────────────────────────────────────────────── */
 
 /** Run a git-mutating tool body under the app-wide git lock. On contention
@@ -920,49 +1116,22 @@ export function allExternalToolSpecs(sessionId: string): ExternalToolSpec[] {
   )
 }
 
-const MAX_WEB_CHARS = 60_000
-
-/* Built-in web access via Jina AI Reader — NOT in TOOLS; run.ts adds them only
- * when the setting is on (a fallback for when the browser extension is absent).
- * They carry no login/cookies, so the prompt tells the model to prefer the
- * mcp__* browser tools when connected. */
-export const webFetch = defineTool({
-  name: 'web_fetch',
-  description:
-    "Fetch a single web page by URL and return its main content as markdown (via Jina AI Reader — no login or cookies). Use to read a page you have the URL for. Login-walled or heavily bot-protected pages may fail. If mcp__* browser tools are connected, prefer those — they carry the user's real session.",
-  schema: z.object({
-    url: z.string().describe('Full URL to read, e.g. "https://example.com/article"'),
-  }),
-  describeCall: (a) => `fetch ${a.url}`,
-  run: async ({ url }) => {
-    try {
-      const text = await jinaRead(url)
-      if (!text) return `Error: empty response reading ${url}`
-      return text.length > MAX_WEB_CHARS
-        ? text.slice(0, MAX_WEB_CHARS) + `\n\n[truncated: page is ${text.length} chars]`
-        : text
-    } catch (err) {
-      return `Error: could not fetch ${url} — ${(err as Error).message}`
-    }
-  },
-})
-
-export const webSearch = defineTool({
-  name: 'web_search',
-  description:
-    'Search the web and return result titles, URLs and snippets as markdown (DuckDuckGo, read via Jina AI Reader). Use when you need to FIND pages and have no URL; then read a promising result with web_fetch (or a browser tool). Prefer connected mcp__* browser tools when available.',
-  schema: z.object({ query: z.string().describe('Search query') }),
-  describeCall: (a) => `search "${a.query}"`,
-  run: async ({ query }) => {
-    try {
-      const text = await jinaSearch(query)
-      if (!text) return `Error: no results for "${query}"`
-      return text.length > MAX_WEB_CHARS ? text.slice(0, MAX_WEB_CHARS) + '\n\n[truncated]' : text
-    } catch (err) {
-      return `Error: search failed for "${query}" — ${(err as Error).message}`
-    }
-  },
-})
+/**
+ * Installed HTTP tools (recommended catalog + the user's own + the KB's),
+ * shaped like external tools so the runner registers them the same way. There
+ * are no built-in web tools any more: web access is whatever the user installed
+ * in Settings → Tools, which is why this list can legitimately be empty.
+ */
+export function httpToolSpecs(): ExternalToolSpec[] {
+  const store = useToolsStore()
+  return store.specs.map((spec) => ({
+    name: spec.name,
+    description: spec.description,
+    jsonSchema: httpToolJsonSchema(spec),
+    describeCall: (args) => describeHttpCall(spec, args),
+    run: (args) => store.run(spec, args),
+  }))
+}
 
 export const TOOLS: ToolSpec[] = [
   listFiles,
@@ -981,6 +1150,7 @@ export const TOOLS: ToolSpec[] = [
   updatePlan,
   useSkill,
   enableTools,
+  manageTools,
   gitInit,
   gitStatus,
   gitDiff,

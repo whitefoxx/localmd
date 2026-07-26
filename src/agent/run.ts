@@ -28,11 +28,10 @@ import {
 import { z } from 'zod'
 import {
   TOOLS,
-  webSearch,
-  webFetch,
+  httpToolSpecs,
   externalToolSpecs,
   allExternalToolSpecs,
-  type ToolSpec,
+  type ExternalToolSpec,
   type ToolCtx,
 } from './tools'
 import { toLanguageModel } from './model'
@@ -74,8 +73,6 @@ export interface RunTurnOptions {
   signal: AbortSignal
   /** Offer run_subagent (disabled inside subagents — depth 1 only). */
   allowSubagent?: boolean
-  /** Offer the built-in web_search / web_fetch tools (Jina AI Reader fallback). */
-  jinaReader?: boolean
   /** Peek whether the user has queued a mid-turn steer message. When it returns
    *  true the step loop stops at the next clean boundary (tool results settled,
    *  no dangling call) so the caller can append the steer and continue. */
@@ -108,12 +105,9 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   let toolSeq = 0
   const nextToolId = (): number => toolSeq++
 
-  // Built-in + view_image + run_subagent tools (always active). The Jina web
-  // tools ride along only when enabled (a fallback for when the browser
-  // extension isn't connected).
+  // Built-in + view_image + run_subagent tools (always active).
   const tools: ToolSet = {}
-  const builtins: ToolSpec[] = opts.jinaReader ? [...TOOLS, webSearch, webFetch] : TOOLS
-  for (const t of builtins) {
+  for (const t of TOOLS) {
     tools[t.name] = tool({
       description: t.description,
       inputSchema: t.schema,
@@ -136,19 +130,9 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
       },
     })
   }
-  if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts, nextToolId)
-  if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts, nextToolId)
-  // Registered in subagents too (as a refusing stub) so the serialized tool
-  // list — and with it the provider's prompt-cache prefix — matches the main
-  // loop's byte for byte.
-  tools['run_subagent'] = opts.allowSubagent
-    ? buildSubagentTool(opts, nextToolId)
-    : buildSubagentStub()
-  const staticNames = Object.keys(tools)
-
-  // Register EVERY external tool (active + deferred) so a deferred one can be
-  // gated into the active set mid-turn; only active names are sent each step.
-  for (const ext of allExternalToolSpecs(opts.sessionId)) {
+  // A tool whose schema is plain JSON Schema rather than Zod: the installed
+  // HTTP tools and every external MCP tool.
+  const registerDynamic = (ext: ExternalToolSpec): void => {
     tools[ext.name] = dynamicTool({
       description: ext.description,
       inputSchema: jsonSchema(ext.jsonSchema),
@@ -169,6 +153,27 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
       },
     })
   }
+
+  // Installed HTTP tools (Settings → Tools). Always active, like the built-ins.
+  // A tool may not shadow a built-in: the KB's own file and a model-authored
+  // spec both reach this list, and read_file must stay read_file.
+  for (const httpTool of httpToolSpecs()) {
+    if (httpTool.name in tools) continue
+    registerDynamic(httpTool)
+  }
+  if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts, nextToolId)
+  if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts, nextToolId)
+  // Registered in subagents too (as a refusing stub) so the serialized tool
+  // list — and with it the provider's prompt-cache prefix — matches the main
+  // loop's byte for byte.
+  tools['run_subagent'] = opts.allowSubagent
+    ? buildSubagentTool(opts, nextToolId)
+    : buildSubagentStub()
+  const staticNames = Object.keys(tools)
+
+  // Register EVERY external tool (active + deferred) so a deferred one can be
+  // gated into the active set mid-turn; only active names are sent each step.
+  for (const ext of allExternalToolSpecs(opts.sessionId)) registerDynamic(ext)
 
   // Tools sent to the model this step: built-ins + currently-active externals.
   const activeToolNames = (): string[] => [

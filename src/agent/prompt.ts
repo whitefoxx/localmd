@@ -11,7 +11,7 @@ import { listSkills } from '@/lib/skills'
 import { readMemory, MEMORY_FILE } from '@/lib/memory'
 import { catalogEntry } from '@/lib/mcp'
 import { useMcpStore } from '@/stores/mcp'
-import { useSettingsStore } from '@/stores/settings'
+import { useToolsStore } from '@/stores/tools'
 import { useKbStore } from '@/stores/kb'
 import { getLocale, LOCALE_NAMES } from '@/i18n'
 
@@ -116,20 +116,22 @@ Browser access: never guess live web content — use the connected browser tools
     }
   }
 
-  // Built-in Jina web tools + the fallback ordering between them and the
-  // extension. Four states (extension × jina reader) → the right guidance.
-  const jinaOn = useSettingsStore().state.jinaReader
-  if (jinaOn && hasExtension) {
+  // Installed HTTP tools that read arbitrary web pages (the Jina pack, say).
+  // Nothing is built in, so "the agent can reach the web at all" is a fact
+  // about the user's Settings → Tools choices, not a constant.
+  const webTools = useToolsStore().specs.filter((t) => t.web)
+  const webToolNames = webTools.map((t) => t.name).join(', ')
+  if (webTools.length && hasExtension) {
     prompt += `
-- FALLBACK (web_search, web_fetch): built-in web search (DuckDuckGo) and page reader (Jina AI Reader), no login/cookies. Use these only when the browser tools above are unavailable or a call fails — the browser tools carry the user's real session and should come first.`
-  } else if (jinaOn) {
+- FALLBACK (${webToolNames}): keyless web tools with no login or cookies. Use these only when the browser tools above are unavailable or a call fails — the browser tools carry the user's real session and should come first.`
+  } else if (webTools.length) {
     prompt += `
 
-Browser access: web_search (find pages via DuckDuckGo) and web_fetch (read a URL) are available, powered by Jina AI Reader — use them for anything about live web content instead of guessing. They carry no login or cookies, so pages behind a sign-in or aggressive bot-protection may fail; say so if one does. A URL you cite MUST be one you actually fetched this session.`
+Browser access: ${webToolNames} — use them for anything about live web content instead of guessing. They carry no login or cookies, so pages behind a sign-in or aggressive bot-protection may fail; say so if one does. A URL you cite MUST be one you actually fetched this session.`
   } else if (!hasExtension) {
     prompt += `
 
-Browser access: NONE this session — the browser extension isn't connected and the built-in web tools (Jina AI Reader) are disabled. You cannot search the web or fetch pages. If the user needs that, tell them to connect the web-agent browser extension or enable "Built-in web tools (Jina AI Reader)" in Settings → Tools — and never fabricate web content or URLs in the meantime.`
+Browser access: NONE this session — no browser extension is connected and no web tool is installed. You cannot search the web or fetch pages. If the user needs that, point them at Settings → Tools, where the recommended list installs the WebCLI browser extension (their real, logged-in session) or the keyless Jina web tools — and never fabricate web content or URLs in the meantime.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))

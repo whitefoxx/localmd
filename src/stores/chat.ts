@@ -809,7 +809,6 @@ export const useChatStore = defineStore('chat', () => {
             onEvent,
             signal: controller.signal,
             allowSubagent: true,
-            jinaReader: settings.state.jinaReader,
             steerPending: () => steerPending(session.id),
           })
           session.history = next
