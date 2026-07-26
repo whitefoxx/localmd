@@ -24,7 +24,7 @@ export default {
     binaryNoPreview: 'Binary file — no preview',
     emptyFolderTitle: 'This folder is empty',
     scaffoldDesc:
-      'You can initialize it as a knowledge base: create raw/ (source collection), wiki/ (LLM-maintained pages), AGENTS.md (conventions), and two starter skills (ingest / lint).',
+      'You can initialize it as a knowledge base: create raw/ (source collection), wiki/ (LLM-maintained pages), AGENTS.md (conventions), and three starter skills (ingest / lint / harvest). Nothing outside this folder is touched, and existing files are never overwritten.',
     scaffoldInit: 'Initialize knowledge base',
     scaffoldSkip: 'Not now',
     selectFile: 'Select a file to start',
@@ -60,7 +60,7 @@ export default {
     binaryNoPreview: '二进制文件——无法预览',
     emptyFolderTitle: '这个文件夹还是空的',
     scaffoldDesc:
-      '可以初始化为知识库：创建 raw/（源文件收集）、wiki/（LLM 维护的页面）、AGENTS.md（约定），以及 ingest / lint 两个起步技能。',
+      '可以初始化为知识库：创建 raw/（源文件收集）、wiki/（LLM 维护的页面）、AGENTS.md（约定），以及 ingest / lint / harvest 三个起步技能。只在这个文件夹内创建，已有文件不会被覆盖。',
     scaffoldInit: '初始化知识库',
     scaffoldSkip: '先不用',
     selectFile: '选择一个文件开始',

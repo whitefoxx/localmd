@@ -2,9 +2,7 @@
 import { computed } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
-import { useSkillsStore } from '@/stores/skillsStore'
 import { isSupported } from '@/lib/fs'
-import { scaffoldKb } from '@/lib/scaffold'
 import { t } from '@/i18n'
 import LandingAbout from '@/components/LandingAbout.vue'
 import type { RecentKb } from '@/lib/idb'
@@ -23,17 +21,6 @@ async function open(): Promise<void> {
   if (await kb.pickAndOpen()) {
     await files.refreshTree()
     await files.restoreTabs()
-  }
-}
-
-/** Pick a folder and lay down the starter KB layout (existing files are kept). */
-async function newKb(): Promise<void> {
-  if (await kb.pickAndOpen()) {
-    await scaffoldKb()
-    await files.refreshTree()
-    await useSkillsStore().refresh()
-    await files.restoreTabs()
-    await files.openFile('wiki/index.md')
   }
 }
 
@@ -79,9 +66,12 @@ async function forget(entry: RecentKb): Promise<void> {
             <span class="codicon codicon-folder-opened mr-2" />{{ $t('openKb.openFolder') }}
           </button>
 
+          <!-- Starting fresh is the same action — pick a folder. Opening one
+               never writes to it; if it turns out to be empty, the app offers
+               the starter layout inside, and only then on the user's word. -->
           <button
             class="mt-2 w-full py-1.5 text-sm text-fg-2 hover:text-fg-0 hover:bg-bg-2 rounded transition-colors flex items-center justify-center gap-1.5"
-            @click="newKb"
+            @click="open"
           >
             <span class="codicon codicon-sm codicon-add" />{{ $t('openKb.newKb') }}
           </button>

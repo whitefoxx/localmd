@@ -226,31 +226,27 @@ function toggleKbMenu(): void {
   if (kbMenuOpen.value) void kb.refreshRecents()
 }
 
-/** Flush the current KB, swap to another, then reload the tree (and optionally
- *  scaffold a brand-new one). A cancelled picker leaves the current KB intact. */
-async function switchKb(pick: () => Promise<boolean>, scaffold = false): Promise<void> {
+/** Flush the current KB, swap to another, then reload the tree. A cancelled
+ *  picker leaves the current KB intact. Opening a folder never writes to it —
+ *  an empty one gets the scaffold offer below, which the user accepts or not. */
+async function switchKb(pick: () => Promise<boolean>): Promise<void> {
   kbMenuOpen.value = false
   await files.flush()
   if (!(await pick())) return
   files.reset()
   kbIndex.reset()
-  if (scaffold) {
-    await scaffoldKb()
-    await files.refreshTree()
-    await useSkillsStore().refresh()
-    await files.restoreTabs() // no saved tabs for a new KB; just enables persistence
-    await files.openFile('wiki/index.md')
-  } else {
-    await files.refreshTree()
-    await files.restoreTabs()
-  }
+  scaffoldDismissed.value = false // a "not now" applied to the folder we just left
+  await files.refreshTree()
+  await files.restoreTabs()
 }
 
 function openFolder(): void {
   void switchKb(() => kb.pickAndOpen())
 }
+/** Same picker as Open Folder — "new" is the user's intent, not a different
+ *  action: an empty folder is offered the starter layout once it's open. */
 function newKb(): void {
-  void switchKb(() => kb.pickAndOpen(), true)
+  void switchKb(() => kb.pickAndOpen())
 }
 function openRecentEntry(entry: RecentKb): void {
   void switchKb(() => kb.openRecent(entry))
