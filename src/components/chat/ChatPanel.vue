@@ -18,6 +18,7 @@ import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
+import ThinkingText from './ThinkingText.vue'
 import type { MessagePart } from '@/stores/chat'
 import { t } from '@/i18n'
 
@@ -1006,9 +1007,7 @@ watch(
                 <span class="codicon codicon-sm codicon-lightbulb mr-1" />{{ $t('chat.thinking') }}
                 <span v-if="thinkTime(part)" class="ml-1 tabular-nums text-fg-3">· {{ thinkTime(part) }}</span>
               </summary>
-              <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">
-                {{ part.text }}
-              </div>
+              <ThinkingText :text="part.text" :streaming="thinkingStreaming(m, i)" />
             </details>
             <button
               v-else-if="part.type === 'artifact'"
