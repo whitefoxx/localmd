@@ -102,6 +102,14 @@
   .input {
     @apply w-full px-2 py-1 text-sm rounded border border-border bg-bg-1 text-fg-0 placeholder-fg-3 focus:outline-none focus:border-accent;
   }
+  /* A select paints its disclosure arrow inside its own padding box, over the
+     text — so it needs the right edge kept clear, and an option label too long
+     for the control (a model slug, say) should ellipsize rather than slide
+     under the arrow. */
+  select.input {
+    @apply pr-6;
+    text-overflow: ellipsis;
+  }
   .panel-scroll {
     @apply overflow-auto;
     scrollbar-width: thin;

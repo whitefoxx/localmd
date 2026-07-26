@@ -428,7 +428,7 @@ function slotBadges(p: LlmProfile): string[] {
                     <div class="text-sm text-fg-1">{{ $t('settings.slot.primary') }}</div>
                     <select
                       :value="store.state.slots.primary ?? ''"
-                      class="input w-48 shrink-0"
+                      class="input w-64 shrink-0"
                       @change="store.setSlot('primary', ($event.target as HTMLSelectElement).value || null)"
                     >
                       <option v-for="p in store.state.profiles" :key="p.id" :value="p.id">{{ p.label }}</option>
@@ -438,7 +438,7 @@ function slotBadges(p: LlmProfile): string[] {
                     <div class="text-sm text-fg-1">{{ $t('settings.slot.vision') }}</div>
                     <select
                       :value="store.state.slots.vision ?? ''"
-                      class="input w-48 shrink-0"
+                      class="input w-64 shrink-0"
                       @change="store.setSlot('vision', ($event.target as HTMLSelectElement).value || null)"
                     >
                       <option value="">{{ $t('settings.notConfigured') }}</option>
@@ -449,7 +449,7 @@ function slotBadges(p: LlmProfile): string[] {
                     <div class="text-sm text-fg-1">{{ $t('settings.slot.image') }}</div>
                     <select
                       :value="store.state.slots.image ?? ''"
-                      class="input w-48 shrink-0"
+                      class="input w-64 shrink-0"
                       @change="store.setSlot('image', ($event.target as HTMLSelectElement).value || null)"
                     >
                       <option value="">{{ $t('settings.notConfigured') }}</option>
