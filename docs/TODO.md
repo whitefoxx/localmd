@@ -37,6 +37,30 @@ web-agent(Chrome 扩展)有 host 权限与完整的浏览 agent 引擎。桥接�
 
 ## Backlog(已确认暂缓)
 
+- **MCP OAuth 2.1 (deferred 2026-07-26).** Today an MCP server is reachable only
+  with a static bearer token, which is the single thing keeping the big hosted
+  servers out. Measured with an `Origin: https://localmd.app` preflight + a real
+  `initialize`: browser CORS is *not* the blocker — Linear, Notion (both reflect
+  the Origin), GitHub, Exa, Context7, DeepWiki and Cloudflare Docs all answer.
+  DeepWiki and Context7 need no auth and work now (both are in the catalog);
+  Linear and Notion return `401` + `WWW-Authenticate: Bearer …
+  resource_metadata="…/.well-known/oauth-protected-resource"`, i.e. the standard
+  MCP authorization handshake.
+
+  To unlock those: RFC 9728 protected-resource discovery, RFC 7591 dynamic
+  client registration, and an authorization-code + PKCE (S256) flow with the app
+  origin as redirect URI. A browser is the natural client for this — public
+  client, real redirects, no client secret to hide. Estimated 2–3 days.
+
+  Verify before building: neither Linear nor Notion advertises
+  `Access-Control-Expose-Headers: Mcp-Session-Id` on the preflight, so confirm
+  they run stateless — otherwise the browser cannot read the session id back and
+  multi-call sessions break. (Context7 does expose it.)
+
+  Weigh against: these servers mostly *sync content in* from elsewhere, which
+  overlaps what the declarative HTTP tools already do (Zotero ships in the
+  catalog; Readwise and Raindrop both allow browser CORS and are a form away).
+
 - **GitHub 同步 live 验证**:push/pull 代码与错误路径已测,但真实推送需用户 PAT
   (Settings → Git & GitHub;README 有 token 指南)
 - **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(trace-app 用 macOS Vision,
