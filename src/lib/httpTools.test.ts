@@ -209,6 +209,23 @@ describe('pickPath', () => {
   it('reads a root-level array with []', () => {
     expect(pickPath([{ a: 1 }, { a: 2 }], '[]')).toHaveLength(2)
   })
+
+  /** Grouped results (a list of groups, each holding a list) must flatten to
+   *  one list — anything else cannot be rendered by a per-item template. */
+  it('flattens nested [] segments', () => {
+    const grouped = {
+      results: [
+        { books: [{ info: { t: 'a' } }, { info: { t: 'b' } }] },
+        { books: [{ info: { t: 'c' } }] },
+      ],
+    }
+    expect(pickPath(grouped, 'results[].books[].info')).toEqual([
+      { t: 'a' },
+      { t: 'b' },
+      { t: 'c' },
+    ])
+    expect(pickPath(grouped, 'results[].books[].info.t')).toEqual(['a', 'b', 'c'])
+  })
 })
 
 describe('renderItem', () => {

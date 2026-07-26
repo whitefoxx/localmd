@@ -377,6 +377,24 @@ const detailTitle = computed(() => {
 const detailServerConfig = computed(() =>
   detailServer.value ? store.state.mcpServers.find((s) => s.id === detailServer.value!.config.id) : undefined,
 )
+
+/** Disable only exists where there is configuration worth keeping — a server's
+ *  URL, extension id and token. An HTTP pack has none, so for those "off" and
+ *  "removed" are the same thing and only Remove is offered. */
+const detailCanDisable = computed(() => !!detailServerConfig.value)
+const detailDisabled = computed(() => detailServerConfig.value?.enabled === false)
+
+function toggleDetail(): void {
+  const cfg = detailServerConfig.value
+  if (cfg) cfg.enabled = cfg.enabled === false ? true : false
+}
+
+function removeDetail(): void {
+  const v = view.value
+  if (v.name === 'entry') tools.uninstall(v.id)
+  else if (v.name === 'server') removeMcpServer(v.id)
+  back()
+}
 </script>
 
 <template>
@@ -439,14 +457,34 @@ const detailServerConfig = computed(() =>
     <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
       <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
     </button>
-    <div>
-      <div class="text-sm text-fg-1">{{ detailTitle }}</div>
-      <p v-if="detailEntry" class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-        {{ $t(`settings.catalog.${detailEntry.id}.desc`) }}
-      </p>
-      <p v-else-if="detailServer" class="text-xs text-fg-3 mt-0.5 font-mono break-all">
-        {{ detailServer.config.url }}
-      </p>
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="flex items-center gap-1.5">
+          <span class="text-sm text-fg-1">{{ detailTitle }}</span>
+          <span
+            v-if="detailDisabled"
+            class="text-[10px] px-1 rounded bg-bg-3 text-fg-3"
+          >{{ $t('settings.status.off') }}</span>
+        </div>
+        <p v-if="detailEntry" class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+          {{ $t(`settings.catalog.${detailEntry.id}.desc`) }}
+        </p>
+        <p v-else-if="detailServer" class="text-xs text-fg-3 mt-0.5 font-mono break-all">
+          {{ detailServer.config.url }}
+        </p>
+      </div>
+      <!-- Up here rather than after the tool list: a server can contribute 25
+           tools, and "turn this off" should not be behind a scroll. -->
+      <div v-if="detailEntry || detailServerConfig" class="flex items-center gap-3 shrink-0 pt-0.5">
+        <button
+          v-if="detailCanDisable"
+          class="text-xs text-fg-3 hover:text-fg-0"
+          @click="toggleDetail"
+        >{{ detailDisabled ? $t('settings.enable') : $t('settings.disable') }}</button>
+        <button class="text-xs text-fg-3 hover:text-removed" @click="removeDetail">
+          {{ $t('settings.removeEntry') }}
+        </button>
+      </div>
     </div>
 
     <!-- The only fields a preset leaves to the user. -->

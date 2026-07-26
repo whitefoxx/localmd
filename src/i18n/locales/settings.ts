@@ -76,8 +76,9 @@ export default {
     backToTools: 'Tools',
     noneInstalled: 'Nothing installed yet — browse the recommended list to give the agent some reach.',
     noToolsHere: 'No tools reported. If this is an extension or a server, it may not be connected.',
+    removeEntry: 'Remove',
     presetLockedHint:
-      'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here. Uncheck it in the recommended list to remove it.',
+      'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here.',
     extensionId: 'Chrome extension ID',
     serverUrl: 'Server URL',
     customToolsDesc:
@@ -279,8 +280,8 @@ export default {
     backToTools: '工具',
     noneInstalled: '还没装任何工具 —— 去推荐列表里挑几个，agent 才有能力可用。',
     noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
-    presetLockedHint:
-      '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。要移除它，请在推荐列表里取消勾选。',
+    removeEntry: '移除',
+    presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
     extensionId: 'Chrome 扩展 ID',
     serverUrl: '服务器 URL',
     customToolsDesc:

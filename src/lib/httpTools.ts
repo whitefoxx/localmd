@@ -600,7 +600,12 @@ export function pickPath(data: unknown, path: string): unknown {
       if (!rest) return list
       return list.flatMap((item) => {
         const v = pickPath(item, rest)
-        return v === undefined ? [] : [v]
+        if (v === undefined) return []
+        // A nested [] flattens rather than nesting: `results[].books[].info`
+        // should be one list of infos, which is what a per-item template can
+        // actually render. Real APIs group results (WeRead groups by scope,
+        // and it is the shape that caught this).
+        return Array.isArray(v) ? v : [v]
       })
     }
   }
