@@ -68,6 +68,15 @@ agent pipeline (docs/token-optimization.md has the full log):
   `npm run test:e2e`
 - e2e runs ONLY through Playwright (`npm run test:e2e`) — never open `?e2e=1`
   in a real browser profile.
+- **Verify browser-facing work in a real browser.** typecheck and vitest cannot
+  see the three things this app actually lives on: CORS, the Chrome-extension
+  transports, and the File System Access API. Drive the running dev server
+  through **Claude for Chrome** (`mcp__claude-in-chrome__*`) or **WebCLI** —
+  plain browsing of the app, never `?e2e=1`. Before claiming an endpoint works,
+  `fetch` it from the page origin; before claiming a feature works, click the
+  path a user would rather than only the store beneath it. This is not
+  ceremony: shaping real API responses caught a placeholder-regex bug that a
+  fully green suite did not. Restore any real settings you mutate while testing.
 - Every UI string goes through `t('ns.key')` with both `en` and `zh` entries
   (tests enforce catalog parity and key existence).
 - Commit in stages, one concern per commit; ask before committing.
