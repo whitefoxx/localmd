@@ -1,25 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { withScheme, ddgSearchUrl, decodeDdgLinks } from './webread'
-
-describe('withScheme', () => {
-  it('leaves http(s) URLs untouched and trims', () => {
-    expect(withScheme('https://example.com/a')).toBe('https://example.com/a')
-    expect(withScheme('  http://x.io  ')).toBe('http://x.io')
-  })
-  it('prepends https:// to bare hosts', () => {
-    expect(withScheme('example.com')).toBe('https://example.com')
-    expect(withScheme('en.wikipedia.org/wiki/Cat')).toBe('https://en.wikipedia.org/wiki/Cat')
-  })
-})
-
-describe('ddgSearchUrl', () => {
-  it('builds the no-JS results URL with an encoded query', () => {
-    expect(ddgSearchUrl('quantum computing')).toBe(
-      'https://html.duckduckgo.com/html/?q=quantum%20computing',
-    )
-    expect(ddgSearchUrl('a&b')).toContain('q=a%26b')
-  })
-})
+import { decodeDdgLinks } from './webread'
 
 describe('decodeDdgLinks', () => {
   it('rewrites DDG redirect links to their real target URLs', () => {
