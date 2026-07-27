@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
+  McpExtensionClient,
+  isRecoverable,
   sanitizeServerName,
   externalToolName,
   parseExternalToolName,
@@ -150,5 +152,135 @@ describe('recallTouch', () => {
     const list = ['a', 'b']
     recallTouch(list, 'c')
     expect(list).toEqual(['a', 'b'])
+  })
+})
+
+describe('isRecoverable', () => {
+  it('accepts failures where the request never reached the server', () => {
+    expect(isRecoverable(new Error('MCP server not connected: x'))).toBe(true)
+    expect(isRecoverable(new Error('Extension connection closed'))).toBe(true)
+    expect(isRecoverable(new Error('MCP tools/call HTTP 404: session expired'))).toBe(true)
+  })
+
+  it('refuses failures that may have already run the tool', () => {
+    // A retry here could book the flight twice.
+    expect(isRecoverable(new Error('MCP tools/call HTTP 500: boom'))).toBe(false)
+    expect(isRecoverable(new Error('MCP tools/call timed out (600s)'))).toBe(false)
+    expect(isRecoverable(new Error('Error: the page had no such element'))).toBe(false)
+  })
+})
+
+/* ── extension transport ─────────────────────────────────────────────────── */
+
+/** A chrome.runtime stand-in: every request gets an empty result back, and the
+ *  test can drop the port the way a reloading extension does. */
+function fakeChrome() {
+  const sent: Array<{ method: string; id?: number }> = []
+  let drop = () => {}
+  let connects = 0
+  const runtime = {
+    connect() {
+      connects++
+      let onMessage: (m: unknown) => void = () => {}
+      const port = {
+        postMessage(msg: unknown) {
+          const m = msg as { id?: number; method: string }
+          sent.push({ method: m.method, id: m.id })
+          if (m.id !== undefined) {
+            const result = m.method === 'tools/list' ? { tools: [] } : {}
+            queueMicrotask(() => onMessage({ jsonrpc: '2.0', id: m.id, result }))
+          }
+        },
+        disconnect() {
+          drop()
+        },
+        onMessage: { addListener: (cb: (m: unknown) => void) => (onMessage = cb) },
+        onDisconnect: { addListener: (cb: () => void) => (drop = cb) },
+      }
+      return port
+    },
+  }
+  return {
+    runtime,
+    sent,
+    get connects() {
+      return connects
+    },
+    /** What a reloaded extension does to the page's port. */
+    dropPort: () => drop(),
+  }
+}
+
+const EXT_CFG = { id: 's1', name: 'webcli', url: 'a'.repeat(32), enabled: true }
+
+afterEach(() => {
+  delete (globalThis as { chrome?: unknown }).chrome
+})
+
+describe('McpExtensionClient', () => {
+  it('re-handshakes on a port the extension replaced under us', async () => {
+    const chrome = fakeChrome()
+    ;(globalThis as { chrome?: unknown }).chrome = chrome
+    const client = new McpExtensionClient(EXT_CFG)
+    await client.connect()
+    expect(chrome.sent.map((s) => s.method)).toEqual([
+      'initialize',
+      'notifications/initialized',
+      'tools/list',
+    ])
+
+    chrome.dropPort() // extension reloaded
+    chrome.sent.length = 0
+    await client.callTool('do_thing', {})
+
+    // The fresh port is introduced to before it is used — sending tools/call
+    // straight down an un-initialized port is what used to break after a reload.
+    expect(chrome.sent[0].method).toBe('initialize')
+    expect(chrome.sent.map((s) => s.method)).toContain('tools/call')
+    expect(chrome.connects).toBe(2)
+  })
+
+  it('reports a drop that killed work in flight', async () => {
+    const chrome = fakeChrome()
+    ;(globalThis as { chrome?: unknown }).chrome = chrome
+    const client = new McpExtensionClient(EXT_CFG)
+    const lost: string[] = []
+    client.onLost = (reason) => lost.push(reason)
+    // Dropped mid-handshake: the in-flight rpc rejects, which is the point.
+    const connecting = client.connect().catch(() => {})
+
+    chrome.dropPort()
+    await connecting
+    expect(lost).toHaveLength(1)
+    expect(lost[0]).toMatch(/closed/i)
+  })
+
+  it('says nothing when an idle port closes — dormant is not broken', async () => {
+    const chrome = fakeChrome()
+    ;(globalThis as { chrome?: unknown }).chrome = chrome
+    const client = new McpExtensionClient(EXT_CFG)
+    await client.connect()
+    const lost: string[] = []
+    client.onLost = (reason) => lost.push(reason)
+
+    chrome.dropPort() // extension service worker went to sleep
+    expect(lost).toEqual([])
+
+    // …and the connection is still usable: it simply re-introduces itself.
+    chrome.sent.length = 0
+    await client.callTool('do_thing', {})
+    expect(chrome.sent[0].method).toBe('initialize')
+  })
+
+  it('stays quiet when WE are the one closing the port', async () => {
+    const chrome = fakeChrome()
+    ;(globalThis as { chrome?: unknown }).chrome = chrome
+    const client = new McpExtensionClient(EXT_CFG)
+    const lost: string[] = []
+    client.onLost = (reason) => lost.push(reason)
+    await client.connect()
+
+    client.dispose()
+    expect(lost).toEqual([])
   })
 })

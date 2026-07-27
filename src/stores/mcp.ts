@@ -18,6 +18,7 @@ import {
   normalizeMcpServerList,
   mergeMcpConfigs,
   isDeferredTool,
+  isRecoverable,
   recallTouch,
   KB_MCP_CONFIG_PATH,
   type McpClientLike,
@@ -199,12 +200,44 @@ export const useMcpStore = defineStore('mcp', () => {
     }
   }
 
+  /** Write a row by id rather than by index: connects run concurrently and a
+   *  refresh can rebuild the array underneath one of them. */
+  function patch(serverId: string, next: Partial<McpServerState>): void {
+    const i = servers.value.findIndex((s) => s.config.id === serverId)
+    if (i >= 0) servers.value[i] = { ...servers.value[i], ...next }
+  }
+
+  /** Build a client for one row and handshake it. Any previous client for that
+   *  id is disposed first, so ports and HTTP sessions never pile up. */
+  async function connectServer(config: McpServerConfig): Promise<void> {
+    clients.get(config.id)?.dispose()
+    // A Chrome extension ID in the url field selects the Port transport
+    // (web-agent bridge); anything else is a Streamable-HTTP endpoint.
+    const client: McpClientLike = isExtensionId(config.url)
+      ? new McpExtensionClient(config)
+      : new McpHttpClient(config)
+    // A transport that drops on its own must show up as red, not stay green
+    // until someone happens to run a tool.
+    client.onLost = (reason) => {
+      if (clients.get(config.id) === client) patch(config.id, { status: 'error', error: reason })
+    }
+    clients.set(config.id, client)
+    patch(config.id, { status: 'connecting', error: undefined })
+    try {
+      const tools = await client.connect()
+      patch(config.id, { status: 'ok', error: undefined, tools })
+    } catch (err) {
+      patch(config.id, { status: 'error', error: (err as Error).message, tools: [] })
+    }
+  }
+
   async function refresh(): Promise<void> {
     const settings = useSettingsStore()
     const kb = useKbStore()
     const kbServers = kb.isOpen ? await loadKbServers() : []
     const merged = mergeMcpConfigs(settings.state.mcpServers, kbServers)
 
+    for (const client of clients.values()) client.dispose()
     clients.clear()
     servers.value = merged.map(({ source, ...config }) => ({
       config,
@@ -213,28 +246,24 @@ export const useMcpStore = defineStore('mcp', () => {
       tools: [],
     }))
     await Promise.all(
-      servers.value.map(async (state, i) => {
-        if (state.status === 'off') return
-        const config = state.config
-        // A Chrome extension ID in the url field selects the Port transport
-        // (web-agent bridge); anything else is a Streamable-HTTP endpoint.
-        const client: McpClientLike = isExtensionId(config.url)
-          ? new McpExtensionClient(config)
-          : new McpHttpClient(config)
-        clients.set(config.id, client)
-        try {
-          const tools = await client.connect()
-          servers.value[i] = { ...servers.value[i], status: 'ok', tools }
-        } catch (err) {
-          servers.value[i] = {
-            ...servers.value[i],
-            status: 'error',
-            error: (err as Error).message,
-            tools: [],
-          }
-        }
-      }),
+      servers.value.filter((s) => s.status !== 'off').map((s) => connectServer(s.config)),
     )
+  }
+
+  /** Reconnect ONE server, leaving every healthy connection alone — the button
+   *  in Settings, and what an auto-retry uses. */
+  async function reconnect(serverId: string): Promise<void> {
+    const state = servers.value.find((s) => s.config.id === serverId)
+    if (!state || state.config.enabled === false) return
+    await connectServer(state.config)
+  }
+
+  /** Re-probe only the rows that are currently failing. Cheap enough to run
+   *  whenever the user comes back to the tab: a server that came up while they
+   *  were away, or an extension that finished reloading, heals by itself. */
+  async function retryFailed(): Promise<void> {
+    const dead = servers.value.filter((s) => s.status === 'error').map((s) => s.config.id)
+    await Promise.all(dead.map((id) => reconnect(id)))
   }
 
   async function callTool(
@@ -243,9 +272,25 @@ export const useMcpStore = defineStore('mcp', () => {
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<string> {
-    const client = clients.get(serverId)
-    if (!client) throw new Error(`MCP server not connected: ${serverId}`)
-    return client.callTool(tool, args, signal)
+    try {
+      const client = clients.get(serverId)
+      if (!client) throw new Error(`MCP server not connected: ${serverId}`)
+      const out = await client.callTool(tool, args, signal)
+      // The call proves the connection is alive — say so if the row had gone red.
+      patch(serverId, { status: 'ok', error: undefined })
+      return out
+    } catch (err) {
+      if (signal?.aborted || !isRecoverable(err)) {
+        patch(serverId, { status: 'error', error: (err as Error).message })
+        throw err
+      }
+      // The request never landed (dead port, expired session), so sending it
+      // again cannot run the tool twice. One attempt, then the error stands.
+      await reconnect(serverId)
+      const client = clients.get(serverId)
+      if (!client) throw err
+      return client.callTool(tool, args, signal)
+    }
   }
 
   // Reconnect when the global config or the opened KB changes.
@@ -278,6 +323,8 @@ export const useMcpStore = defineStore('mcp', () => {
     rememberUse,
     clearActivated,
     refresh,
+    reconnect,
+    retryFailed,
     callTool,
   }
 })

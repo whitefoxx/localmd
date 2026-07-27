@@ -9,6 +9,7 @@ import { useReviewStore } from '@/stores/review'
 import { useChatStore } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useTtsStore } from '@/stores/tts'
+import { useMcpStore } from '@/stores/mcp'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import TtsBar from '@/components/TtsBar.vue'
@@ -29,6 +30,10 @@ watch(() => files.currentPath, () => tts.stop())
 function onFocus(): void {
   void files.refreshOnFocus()
   void git.refresh() // terminal commits/edits while the app was unfocused
+  // A tool server that was down, or an extension that was mid-reload, often
+  // came back while the user was away. Only failing rows are re-probed — and
+  // only with a KB open, so the landing screen still connects to nothing.
+  if (kb.isOpen) void useMcpStore().retryFailed()
 }
 
 /** What each command does. Key bindings live in the registry (@/lib/hotkeys);

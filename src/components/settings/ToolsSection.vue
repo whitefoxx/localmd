@@ -699,6 +699,17 @@ function removeDetail(): void {
           class="text-xs text-fg-3 hover:text-fg-0"
           @click="toggleDetail"
         >{{ detailDisabled ? $t('settings.enable') : $t('settings.disable') }}</button>
+        <!-- Available whatever the dot says: "it worked a minute ago" is exactly
+             the state a stale connection is in, and this row is the only place
+             to do something about it. -->
+        <button
+          v-if="detailServer && !detailDisabled"
+          class="text-xs text-fg-3 hover:text-fg-0 disabled:opacity-50"
+          :disabled="detailServer.status === 'connecting'"
+          @click="mcp.reconnect(detailServer.config.id)"
+        >
+          {{ detailServer.status === 'connecting' ? $t('settings.status.connecting') : $t('settings.reconnect') }}
+        </button>
         <button class="text-xs text-fg-3 hover:text-removed" @click="removeDetail">
           {{ $t('settings.removeEntry') }}
         </button>
@@ -735,7 +746,10 @@ function removeDetail(): void {
 
     <div v-if="detailServer && detailServer.status === 'error'" class="flex items-baseline gap-2 text-xs">
       <span class="text-removed">{{ detailServer.error }}</span>
-      <button class="text-accent hover:underline shrink-0" @click="mcp.refresh()">
+      <button
+        class="text-accent hover:underline shrink-0"
+        @click="mcp.reconnect(detailServer.config.id)"
+      >
         {{ $t('settings.reconnect') }}
       </button>
     </div>

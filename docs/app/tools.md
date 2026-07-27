@@ -56,7 +56,22 @@ separate program the app connects to, rather than a set of web requests.
   configuration itself and is simply always true.
 
 Grey is not a problem. A red dot is: it means a connection failed, and the row
-says why.
+says why. A connection that dies later — the program stops, the extension
+reloads — turns red too, rather than pretending to still be there.
+
+## When a connection drops
+
+Mostly it repairs itself:
+
+- Reloading the page reconnects everything.
+- Coming back to the tab re-tries whatever was failing, so a server that came
+  back up while you were elsewhere is simply working again.
+- If the assistant uses a tool whose connection died in the meantime, the app
+  reconnects and sends it once more. (Only when the request provably never
+  arrived — nothing is ever run twice on a guess.)
+
+When you want to force it, open the row and press **Reconnect**. It re-connects
+that one integration and leaves everything else alone.
 
 ## Tools that come with a folder
 

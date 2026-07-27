@@ -89,11 +89,29 @@ interface RpcError {
   message: string
 }
 
-export class McpHttpClient {
+export class McpHttpClient implements McpClientLike {
   private nextId = 1
   private sessionId: string | null = null
+  onLost?: (reason: string) => void
 
   constructor(private cfg: McpServerConfig) {}
+
+  /** Tell the server the session is over (spec teardown), best-effort: we are
+   *  dropping this client either way, and a server that ignores DELETE is fine. */
+  dispose(): void {
+    const session = this.sessionId
+    this.sessionId = null
+    if (!session) return
+    void fetch(this.cfg.url, {
+      method: 'DELETE',
+      headers: {
+        ...(this.cfg.token ? { Authorization: `Bearer ${this.cfg.token}` } : {}),
+        'Mcp-Session-Id': session,
+      },
+    }).catch(() => {
+      /* the session dies with the page anyway */
+    })
+  }
 
   private headers(json: boolean): Record<string, string> {
     return {
@@ -182,6 +200,27 @@ export function isExtensionId(s: string): boolean {
 export interface McpClientLike {
   connect(): Promise<McpToolDef[]>
   callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string>
+  /** Release the transport. The client is dead afterwards — a replacement is
+   *  built by whoever reconnects, so nothing here has to survive. */
+  dispose(): void
+  /** Set by the store: the transport dropped on its own (extension reloaded,
+   *  browser closed the port). Without it a dead connection keeps its green dot. */
+  onLost?: (reason: string) => void
+}
+
+/** Failures where the request provably never reached the server, so reconnecting
+ *  and sending it again cannot run the tool twice: the session was gone, the
+ *  port was closed, or we never had a connection to begin with. A plain tool
+ *  error, a timeout, or a 500 is NOT in here — those may have had effects. */
+export function isRecoverable(err: unknown): boolean {
+  const m = (err as Error)?.message ?? ''
+  return (
+    /not connected/i.test(m) ||
+    /connection closed/i.test(m) ||
+    /chrome\.runtime is unavailable/i.test(m) ||
+    /HTTP 404/.test(m) ||
+    /session/i.test(m)
+  )
 }
 
 interface ChromePort {
@@ -206,8 +245,20 @@ export class McpExtensionClient implements McpClientLike {
   private port: ChromePort | null = null
   private nextId = 1
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
+  /** Whether the port behind us has been through `initialize`. A reloaded
+   *  extension gives us a brand-new port that has never been introduced to. */
+  private handshaken = false
+  onLost?: (reason: string) => void
 
   constructor(private cfg: McpServerConfig) {}
+
+  dispose(): void {
+    this.handshaken = false
+    const port = this.port
+    this.port = null
+    this.onLost = undefined // a disconnect we asked for is not a loss
+    port?.disconnect()
+  }
 
   private ensurePort(): ChromePort {
     if (this.port) return this.port
@@ -221,10 +272,18 @@ export class McpExtensionClient implements McpClientLike {
     port.onMessage.addListener((msg) => this.onMessage(msg))
     port.onDisconnect.addListener(() => {
       this.port = null
+      this.handshaken = false
       const detail = chrome.runtime?.lastError?.message
-      const err = new Error(`Extension connection closed${detail ? `: ${detail}` : ''}`)
+      const reason = `Extension connection closed${detail ? `: ${detail}` : ''}`
+      const err = new Error(reason)
+      // An idle port closing is normal — an extension service worker sleeps and
+      // Chrome tears the port down. That is dormant, not broken: the next call
+      // re-opens and re-handshakes. Only a drop that killed work in flight is
+      // worth reporting, because that one the user actually lost something to.
+      const interrupted = this.pending.size > 0
       for (const p of this.pending.values()) p.reject(err)
       this.pending.clear()
+      if (interrupted) this.onLost?.(reason)
     })
     this.port = port
     return port
@@ -268,7 +327,8 @@ export class McpExtensionClient implements McpClientLike {
     })
   }
 
-  async connect(): Promise<McpToolDef[]> {
+  /** initialize + initialized on whatever port we currently hold. */
+  private async handshake(): Promise<void> {
     await this.rpc(
       'initialize',
       {
@@ -279,6 +339,11 @@ export class McpExtensionClient implements McpClientLike {
       HANDSHAKE_TIMEOUT_MS,
     )
     this.port?.postMessage({ jsonrpc: '2.0', method: 'notifications/initialized' })
+    this.handshaken = true
+  }
+
+  async connect(): Promise<McpToolDef[]> {
+    await this.handshake()
     const result = (await this.rpc('tools/list', {}, HANDSHAKE_TIMEOUT_MS)) as {
       tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
     }
@@ -290,6 +355,11 @@ export class McpExtensionClient implements McpClientLike {
   }
 
   async callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
+    // The extension can be reloaded under us; ensurePort() would then hand out a
+    // fresh port that has never seen `initialize`. Re-introduce ourselves before
+    // speaking — this is the one retry that is always safe, since nothing has
+    // been sent yet.
+    if (!this.handshaken) await this.handshake()
     const result = (await this.rpc('tools/call', { name, arguments: args }, CALL_TIMEOUT_MS, signal)) as {
       content?: Array<Record<string, unknown>>
       isError?: boolean
