@@ -670,50 +670,53 @@ function removeDetail(): void {
     <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
       <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
     </button>
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
-        <div class="flex items-center gap-1.5">
-          <span class="text-sm text-fg-1">{{ detailTitle }}</span>
+    <!-- Name and its actions share a line; the description gets the width to
+         itself below, instead of being squeezed into whatever the buttons left.
+         The actions sit up here rather than after the tool list because a server
+         can contribute 25 tools, and "turn this off" should not be behind a
+         scroll. -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-1.5 min-w-0">
+          <span class="text-sm text-fg-1 truncate">{{ detailTitle }}</span>
           <span
             v-if="detailDisabled"
-            class="text-[10px] px-1 rounded bg-bg-3 text-fg-3"
+            class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0"
           >{{ $t('settings.status.off') }}</span>
         </div>
-        <p v-if="detailEntry" class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-          {{ $t(`settings.catalog.${detailEntry.id}.desc`) }}
-        </p>
-        <p v-else-if="detailServer" class="text-xs text-fg-3 mt-0.5 font-mono break-all">
-          {{ detailServer.config.url }}
-        </p>
+        <div v-if="detailEntry || detailServerConfig" class="flex items-center gap-1.5 shrink-0">
+          <!-- Available whatever the dot says: "it worked a minute ago" is
+               exactly the state a stale connection is in, and this row is the
+               only place to do something about it. -->
+          <button
+            v-if="detailServer && !detailDisabled"
+            class="btn text-xs"
+            :disabled="detailServer.status === 'connecting'"
+            @click="mcp.reconnect(detailServer.config.id)"
+          >
+            {{ detailServer.status === 'connecting' ? $t('settings.status.connecting') : $t('settings.reconnect') }}
+          </button>
+          <button
+            v-if="view.name === 'server' && detailServerConfig"
+            class="btn text-xs"
+            @click="startEditMcp(detailServerConfig)"
+          >{{ $t('common.edit') }}</button>
+          <button
+            v-if="detailCanDisable"
+            class="btn text-xs"
+            @click="toggleDetail"
+          >{{ detailDisabled ? $t('settings.enable') : $t('settings.disable') }}</button>
+          <button class="btn text-xs hover:!text-removed" @click="removeDetail">
+            {{ $t('settings.removeEntry') }}
+          </button>
+        </div>
       </div>
-      <!-- Up here rather than after the tool list: a server can contribute 25
-           tools, and "turn this off" should not be behind a scroll. -->
-      <div v-if="detailEntry || detailServerConfig" class="flex items-center gap-3 shrink-0 pt-0.5">
-        <button
-          v-if="view.name === 'server' && detailServerConfig"
-          class="text-xs text-fg-3 hover:text-fg-0"
-          @click="startEditMcp(detailServerConfig)"
-        >{{ $t('common.edit') }}</button>
-        <button
-          v-if="detailCanDisable"
-          class="text-xs text-fg-3 hover:text-fg-0"
-          @click="toggleDetail"
-        >{{ detailDisabled ? $t('settings.enable') : $t('settings.disable') }}</button>
-        <!-- Available whatever the dot says: "it worked a minute ago" is exactly
-             the state a stale connection is in, and this row is the only place
-             to do something about it. -->
-        <button
-          v-if="detailServer && !detailDisabled"
-          class="text-xs text-fg-3 hover:text-fg-0 disabled:opacity-50"
-          :disabled="detailServer.status === 'connecting'"
-          @click="mcp.reconnect(detailServer.config.id)"
-        >
-          {{ detailServer.status === 'connecting' ? $t('settings.status.connecting') : $t('settings.reconnect') }}
-        </button>
-        <button class="text-xs text-fg-3 hover:text-removed" @click="removeDetail">
-          {{ $t('settings.removeEntry') }}
-        </button>
-      </div>
+      <p v-if="detailEntry" class="text-xs text-fg-3 leading-relaxed">
+        {{ $t(`settings.catalog.${detailEntry.id}.desc`) }}
+      </p>
+      <p v-else-if="detailServer" class="text-xs text-fg-3 font-mono break-all">
+        {{ detailServer.config.url }}
+      </p>
     </div>
 
     <!-- An extension's id is pinned by the app (it IS the store listing's id),
