@@ -280,7 +280,10 @@ export const useMcpStore = defineStore('mcp', () => {
       patch(serverId, { status: 'ok', error: undefined })
       return out
     } catch (err) {
-      if (signal?.aborted || !isRecoverable(err)) {
+      // The user stopping their turn says nothing about the server: leave the
+      // row alone and don't retry — they asked for it to stop, not to happen.
+      if (signal?.aborted) throw err
+      if (!isRecoverable(err)) {
         patch(serverId, { status: 'error', error: (err as Error).message })
         throw err
       }

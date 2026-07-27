@@ -35,7 +35,7 @@ import {
   type ToolCtx,
 } from './tools'
 import { toLanguageModel } from './model'
-import { mapLimit } from '@/lib/async'
+import { mapLimit, untilAborted } from '@/lib/async'
 import { sdkKindFor } from '@/lib/providers'
 import { withMovingBreakpoint } from '@/lib/promptCache'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
@@ -79,6 +79,15 @@ export interface RunTurnOptions {
   steerPending?: () => boolean
 }
 
+/** What a tool call that the user stopped reports back. The turn is discarded
+ *  either way; this only has to be honest if it ever reaches the model. */
+const STOPPED_RESULT = 'Stopped by the user before this tool finished.'
+
+function isAbort(err: unknown): boolean {
+  const name = (err as Error)?.name
+  return name === 'AbortError' || name === 'APIUserAbortError'
+}
+
 /** Extract the plain text of the last assistant message (for subagent replies). */
 function lastAssistantText(history: ModelMessage[]): string {
   const last = [...history].reverse().find((m) => m.role === 'assistant')
@@ -98,7 +107,9 @@ const viewImageSchema = z.object({
 /** Runs one agent turn; returns the updated conversation history. */
 export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   const model = toLanguageModel(opts.profile)
-  const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent }
+  // Per-call: each execute adds the SDK's own abortSignal, which is the turn's
+  // signal — a tool must be cancellable, not merely started by a live turn.
+  const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent, signal: opts.signal }
   // Monotonic id per turn correlating a tool's start with its result so the UI
   // can show a spinner + timer (git push / image gen etc. can be slow — the user
   // needs to see it's working). Subagents wrap onEvent and drop ids.
@@ -111,18 +122,19 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     tools[t.name] = tool({
       description: t.description,
       inputSchema: t.schema,
-      execute: async (input) => {
+      execute: async (input, { abortSignal }) => {
         const id = nextToolId()
         opts.onEvent({ type: 'tool', name: t.name, detail: t.describeCall(input), id })
         let ok = false
         let out = ''
         try {
-          const result = await t.run(input, ctx)
+          const signal = abortSignal ?? opts.signal
+          const result = await untilAborted(t.run(input, { ...ctx, signal }), signal)
           ok = !(typeof result === 'string' && result.startsWith('Error'))
           out = typeof result === 'string' ? result : JSON.stringify(result)
           return result
         } catch (err) {
-          out = `Error: ${(err as Error).message}`
+          out = isAbort(err) ? STOPPED_RESULT : `Error: ${(err as Error).message}`
           return out
         } finally {
           opts.onEvent({ type: 'tool_result', id, ok, result: out })
@@ -136,17 +148,21 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     tools[ext.name] = dynamicTool({
       description: ext.description,
       inputSchema: jsonSchema(ext.jsonSchema),
-      execute: async (input) => {
+      execute: async (input, { abortSignal }) => {
         const args = (input ?? {}) as Record<string, unknown>
         const id = nextToolId()
         opts.onEvent({ type: 'tool', name: ext.name, detail: ext.describeCall(args), id, args })
         let ok = false
         let out = ''
         try {
-          const result = await ext.run(args)
+          const signal = abortSignal ?? opts.signal
+          const result = await untilAborted(ext.run(args, signal), signal)
           ok = !result.startsWith('Error')
           out = result
           return result
+        } catch (err) {
+          out = isAbort(err) ? STOPPED_RESULT : `Error: ${(err as Error).message}`
+          return out
         } finally {
           opts.onEvent({ type: 'tool_result', id, ok, result: out })
         }

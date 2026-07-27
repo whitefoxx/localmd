@@ -4,6 +4,7 @@
  *
  *   echo <text>              stream <text> back (chunked)
  *   think <text>             stream <text> as a thinking trail, then reply
+ *   hang [ms]                a tool call that ignores the abort signal (stop tests)
  *   write <path> <content>   run the real write_file tool, then confirm
  *   delete <path>            run the real delete_path tool (recursive)
  *   plan                     exercise update_plan (3 steps, all done)
@@ -46,7 +47,11 @@ async function runTool(
   let ok = false
   let out = ''
   try {
-    const result = await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
+    const result = await spec.run(args, {
+      sessionId: opts.sessionId,
+      emit: opts.onEvent,
+      signal: opts.signal,
+    })
     ok = !(typeof result === 'string' && result.startsWith('Error'))
     out = typeof result === 'string' ? result : JSON.stringify(result)
     return result
@@ -84,6 +89,16 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
       await sleep(20)
     }
     reply = 'Done thinking'
+    await streamText(reply, opts.onEvent)
+  } else if (script.startsWith('hang')) {
+    // Stands in for the tools that cannot be cancelled — a push already in
+    // flight, a document index mid-parse: it keeps going after the abort, and
+    // the UI must not wait for it.
+    const id = mockToolSeq++
+    opts.onEvent({ type: 'tool', name: 'hang', detail: 'uncancellable work', id })
+    await sleep(Number(script.slice('hang'.length).trim()) || 5_000)
+    opts.onEvent({ type: 'tool_result', id, ok: true, result: 'done' })
+    reply = 'Finished the slow thing'
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('delete ')) {
     const target = script.slice('delete '.length).trim()
