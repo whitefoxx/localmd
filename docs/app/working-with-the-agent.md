@@ -63,6 +63,11 @@ can have several going at once.
 A running session keeps running if you switch tabs or close its tab. It stops
 only when you press stop, delete the session, or close the page.
 
+Stop means stop: the request in flight is cancelled too, not just the reply.
+The conversation closes off immediately. A few things cannot be called back
+once they are under way — a push already sent, a document part-way through
+indexing — and those finish in the background; nothing waits for them.
+
 ## Saving a conversation
 
 Two different things, and the difference matters:
