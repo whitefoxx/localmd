@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
+import { useThemeStore } from '@/stores/theme'
 import ToolsSection from '@/components/settings/ToolsSection.vue'
 import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
 import {
@@ -39,6 +40,7 @@ onUnmounted(() => {
 
 const store = useSettingsStore()
 const files = useFilesStore()
+const theme = useThemeStore()
 
 /* KB health scope — pick which top-level dirs the health check covers. */
 const kbDirs = computed(() => {
@@ -328,6 +330,17 @@ function slotBadges(p: LlmProfile): string[] {
                   <option v-for="l in LOCALES" :key="l.value" :value="l.value">{{ l.label }}</option>
                 </select>
                 <p class="text-xs text-fg-3 leading-relaxed mt-2">{{ $t('settings.languageDesc') }}</p>
+              </div>
+              <!-- Same preference as the theme icon in the activity bar, which
+                   only cycles: here it can be picked outright and read off. -->
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.appearance') }}</label>
+                <select v-model="theme.pref" class="input">
+                  <option value="system">{{ $t('layout.themeSystem') }}</option>
+                  <option value="light">{{ $t('layout.themeLight') }}</option>
+                  <option value="dark">{{ $t('layout.themeDark') }}</option>
+                </select>
+                <p class="text-xs text-fg-3 leading-relaxed mt-2">{{ $t('settings.appearanceDesc') }}</p>
               </div>
             </div>
 

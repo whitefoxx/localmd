@@ -28,6 +28,7 @@ import {
 } from '@/lib/toolCatalog'
 import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
+import type { ThemePref } from '@/stores/theme'
 
 export interface LlmProfile {
   id: string
@@ -79,6 +80,9 @@ export interface SettingsState {
    *  voice for the content language) and speech rate (0.5–2). */
   ttsVoice: string
   ttsRate: number
+  /** Colour scheme; 'system' follows the OS. Lives here rather than in the theme
+   *  store so it persists with everything else and the agent can set it. */
+  theme: ThemePref
 }
 
 const STORAGE_KEY = 'browser-md:settings'
@@ -122,6 +126,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   toolSecrets: {},
   ttsVoice: '',
   ttsRate: 1,
+  theme: 'system',
 }
 
 /**
@@ -173,6 +178,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     toolSecrets: toolSecretsFrom(obj.toolSecrets),
     ttsVoice: String(obj.ttsVoice ?? ''),
     ttsRate: clampRate(obj.ttsRate),
+    theme: obj.theme === 'light' || obj.theme === 'dark' ? obj.theme : 'system',
   }
 }
 

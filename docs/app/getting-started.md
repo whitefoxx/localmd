@@ -46,6 +46,10 @@ can wait until you want them.
 
 You can drag the edges to resize, and hide the side panels entirely.
 
+**Settings → General** holds the interface language and the appearance (system,
+light or dark). The theme icon in the bar is a shortcut for the same setting,
+and you can simply ask the assistant to switch it.
+
 ## What the assistant can do
 
 Most of it. It reads and writes files in your folder, searches them, files new

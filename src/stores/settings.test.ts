@@ -92,6 +92,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       toolSecrets: {},
       ttsVoice: '',
       ttsRate: 1,
+      theme: 'system',
     }
     expect(normalizeSettings(null)).toEqual(empty)
     expect(normalizeSettings('x')).toEqual(empty)

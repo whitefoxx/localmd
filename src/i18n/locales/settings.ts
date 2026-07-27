@@ -18,6 +18,9 @@ export default {
     // General
     language: 'Language',
     languageDesc: 'Interface language. Agent replies follow this setting too.',
+    appearance: 'Appearance',
+    appearanceDesc:
+      'Colour scheme. “System” follows your operating system. The theme icon at the bottom of the icon bar switches the same setting.',
 
     // Profile editor
     labelOptional: 'Label (optional)',
@@ -238,6 +241,8 @@ export default {
     // General
     language: '语言',
     languageDesc: '界面语言。agent 的回复也会跟随这个设置。',
+    appearance: '外观',
+    appearanceDesc: '配色方案。「跟随系统」跟着操作系统走。图标栏底部的主题图标切换的是同一个设置。',
 
     // Profile editor
     labelOptional: 'Label（可选）',

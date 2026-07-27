@@ -119,6 +119,15 @@ export const WRITABLE: WritableField[] = [
       s.agentMaxTabs = v
     },
   ),
+  choice(
+    'theme',
+    'colour scheme of the app; system follows the operating system',
+    ['system', 'light', 'dark'],
+    (s) => s.theme,
+    (s, v) => {
+      s.theme = v as SettingsState['theme']
+    },
+  ),
   int(
     'tts_rate',
     'read-aloud speed, 0.5 (slow) to 2 (fast)',
