@@ -42,6 +42,33 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
   that item's discussion" are conversations, not releases. A tool earns a place
   in the catalog by being broadly useful AND verified, not by being easy.
 
+## The app's own manual is part of the app
+
+`docs/app/*.md` is the user manual, and it has two readers: the Help panel, and
+the agent via `app_help`. One source, so what the agent says in chat and what
+the Help page shows can never disagree.
+
+**A user-visible change is not finished until the manual matches it.** Renaming
+a settings section, moving a control, changing what a tag means, adding a
+capability — if a doc describes the old behaviour, it is now telling users
+something false, and telling the agent to repeat it. Treat a stale doc as a bug
+of the same severity as stale code.
+
+- Every topic exists in `<id>.md` (English, canonical) and `<id>.zh.md`. Tests
+  enforce the pairing, that both have a title/summary, and that every
+  cross-reference resolves.
+- Write for a non-technical reader: what it does and why they'd care, not how
+  it is implemented. Reading order lives in `ORDER` in `src/lib/appDocs.ts`.
+- Cross-reference a sibling as `` `topic-id` `` — the Help panel turns those
+  into links, and the test catches dangling ones.
+- Nothing about the app belongs in the system prompt: the manual is fetched on
+  demand precisely so it can grow without costing tokens on every turn.
+
+What the agent may CHANGE is an allowlist in `src/lib/appSettings.ts`. Adding a
+field there is a deliberate act; anything not listed — every key, token and
+secret — stays invisible to the agent by default. Never widen it to include
+something that could carry a credential.
+
 ## Token economy
 
 The request prefix is a cache key — every LLM provider bills repeated bytes at
