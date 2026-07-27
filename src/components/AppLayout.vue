@@ -567,11 +567,11 @@ function closeKb(): void {
     <!-- Floating agent button — opens the panel, hides while it is open -->
     <button
       v-if="!ui.agentOpen"
-      class="absolute bottom-5 right-5 z-30 w-12 h-12 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+      class="absolute bottom-5 right-2 z-30 w-9 h-9 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
       :title="$t('layout.openAgent')"
       @click="ui.agentOpen = true"
     >
-      <span class="codicon codicon-lg codicon-sparkle" />
+      <span class="codicon codicon-sparkle" />
     </button>
 
     <ReviewPanel />
