@@ -428,6 +428,21 @@ export const useChatStore = defineStore('chat', () => {
     return { name: sessionFileName(s.title, s.createdAt), content: renderTranscriptFile(s) }
   }
 
+  /** Close off whatever a turn left mid-flight in one message: a tool still
+   *  spinning, a thinking block with no duration. Called both when the turn
+   *  ends and when the user stops it, so the transcript never shows work that
+   *  nothing is waiting for. */
+  function settleOpenParts(m: UiMessage, errored: boolean): void {
+    for (const p of m.parts) {
+      if (p.type === 'tool' && p.status === 'running') {
+        p.status = errored ? 'error' : 'done'
+        p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
+      } else if (p.type === 'thinking' && p.startedAt != null && p.elapsedMs == null) {
+        p.elapsedMs = Date.now() - p.startedAt
+      }
+    }
+  }
+
   /** Stop a single session's turn (the active one by default). Only that
    *  session's paused approvals are rejected — others keep waiting. */
   function stop(id: string | null = activeId.value): void {
@@ -437,7 +452,15 @@ export const useChatStore = defineStore('chat', () => {
     steerQueue.delete(id) // a stopped turn must not later consume queued steers
     background.delete(id)
     const t = tabs.value.find((x) => x.id === id)
-    if (t) t.running = false
+    if (t) {
+      t.running = false
+      // Don't make the user watch a spinner for work they just cancelled. The
+      // turn may take a moment to unwind (a tool that cannot be cancelled runs
+      // on in the background), but as far as this conversation is concerned it
+      // is over now.
+      const last = t.uiMessages[t.uiMessages.length - 1]
+      if (last?.role === 'assistant') settleOpenParts(last, true)
+    }
     // Writes paused for approval must not dangle after the turn dies.
     useReviewStore().rejectAwaiting(id)
   }
@@ -844,23 +867,23 @@ export const useChatStore = defineStore('chat', () => {
         assistant.error = msg
       }
     } finally {
-      session.running = false
-      controllers.delete(session.id)
-      steerQueue.delete(session.id) // drop any interjection the ended turn never consumed
-      background.delete(session.id) // a detached turn that just ended is a plain stored session now
-      // A setup card only makes sense while its turn is waiting on it; an
-      // aborted turn would otherwise leave one on screen with nothing behind it.
-      useSetupStore().clearSession(session.id)
-      // A tool still "running" means the turn died mid-call (abort/error) before
-      // its tool_result — settle it so the spinner doesn't spin forever.
-      for (const p of assistant.parts) {
-        if (p.type === 'tool' && p.status === 'running') {
-          p.status = assistant.error ? 'error' : 'done'
-          p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())
-        } else if (p.type === 'thinking' && p.startedAt != null && p.elapsedMs == null) {
-          p.elapsedMs = Date.now() - p.startedAt
-        }
+      // A stopped turn can unwind long after the user started the NEXT one (an
+      // uncancellable tool finishing in the background). Only tear down what is
+      // still ours, or this clears the successor's controller — leaving a turn
+      // nothing can stop — and its running flag with it.
+      if (controllers.get(session.id) === controller) {
+        session.running = false
+        controllers.delete(session.id)
+        steerQueue.delete(session.id) // drop any interjection the ended turn never consumed
+        background.delete(session.id) // a detached turn that just ended is a plain stored session now
+        // A setup card only makes sense while its turn is waiting on it; an
+        // aborted turn would otherwise leave one on screen with nothing behind it.
+        useSetupStore().clearSession(session.id)
       }
+      // A tool still "running" means the turn died mid-call (abort/error) before
+      // its tool_result — settle it so the spinner doesn't spin forever. Scoped
+      // to this turn's own message, so a successor's stream is never touched.
+      settleOpenParts(assistant, !!assistant.error)
       // A still-pending artifact means the turn died before the file was
       // written — drop the loading card so it doesn't spin forever.
       assistant.parts = assistant.parts.filter((p) => !(p.type === 'artifact' && p.pending))
