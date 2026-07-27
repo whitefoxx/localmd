@@ -60,7 +60,6 @@ type View =
   | { name: 'group'; key: string }
   | { name: 'editor' }
   | { name: 'serverForm' }
-  | { name: 'help' }
 
 const view = ref<View>({ name: 'main' })
 /** Where an editor returns to — it can be opened from main or from a detail
@@ -237,11 +236,14 @@ const SOURCE_LABEL: Record<Source, string> = {
   kb: 'settings.sourceKb',
 }
 
-/** The help page's sections, in order. Reference material rather than a
- *  primary action, so it lives one click away instead of on the main page —
- *  but it is the only place that states where each thing is written, which is
- *  the question every tag on the list raises and none of them answers. */
-const HELP_SECTIONS = ['what', 'sources', 'storage', 'kbSwitch', 'keys', 'gotchas'] as const
+/** Where each thing is stored, what the tags mean, what a KB switch changes —
+ *  the questions this list raises and none of its rows answer. Lives in the
+ *  Help panel, which is also what the agent reads, so the answer is the same
+ *  whether you open it or ask for it. */
+function openToolsHelp(): void {
+  ui.settingsOpen = false
+  ui.openHelp('tools')
+}
 
 /** "1 tools" reads as a bug, and single-tool rows are the common case now that
  *  every integration is one row. The catalog has no plural machinery — two
@@ -990,22 +992,6 @@ function removeDetail(): void {
     </div>
   </div>
 
-  <!-- ═══ Help (sub-page) ═══ -->
-  <div v-else-if="view.name === 'help'" class="space-y-4">
-    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
-      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
-    </button>
-    <span class="text-sm text-fg-1">{{ $t('settings.helpTitle') }}</span>
-    <div class="space-y-4">
-      <div v-for="s in HELP_SECTIONS" :key="s">
-        <div class="text-xs uppercase tracking-wide text-fg-3">{{ $t(`settings.help.${s}.title`) }}</div>
-        <p class="mt-1 text-xs text-fg-2 leading-relaxed whitespace-pre-line">
-          {{ $t(`settings.help.${s}.body`) }}
-        </p>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ MCP server form (sub-page) ═══ -->
   <div v-else-if="view.name === 'serverForm'" class="space-y-4">
     <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="closeMcpForm">
@@ -1166,7 +1152,9 @@ function removeDetail(): void {
       </div>
     </div>
 
-    <button class="text-xs text-accent hover:underline" @click="open({ name: 'help' })">
+    <!-- Into the Help panel rather than a page of its own: the manual is one
+         set of files, and a second copy here would drift from it. -->
+    <button class="text-xs text-accent hover:underline" @click="openToolsHelp">
       {{ $t('settings.helpLink') }}
     </button>
   </div>

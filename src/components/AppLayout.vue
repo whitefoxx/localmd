@@ -18,6 +18,7 @@ import SettingsModal from '@/components/SettingsModal.vue'
 import SearchPalette from '@/components/SearchPalette.vue'
 import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
+import HelpPanel from '@/components/HelpPanel.vue'
 import BacklinksPanel from '@/components/BacklinksPanel.vue'
 import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
@@ -338,6 +339,9 @@ function closeKb(): void {
         <button :class="actBtn" :title="$t('common.settings')" @click="ui.settingsOpen = true">
           <span class="codicon codicon-settings-gear" :class="{ 'text-accent': ui.settingsOpen }" />
         </button>
+        <button :class="actBtn" :title="$t('help.title')" @click="ui.openHelp()">
+          <span class="codicon codicon-question" :class="{ 'text-accent': ui.helpOpen }" />
+        </button>
         <button :class="actBtn" :title="themeLabel" @click="theme.cycle()">
           <span class="codicon" :class="themeIcon" />
         </button>
@@ -572,6 +576,7 @@ function closeKb(): void {
     <SettingsModal :open="ui.settingsOpen" @close="ui.settingsOpen = false" />
     <SearchPalette />
     <HealthPanel />
+    <HelpPanel />
 
     <!-- While resizing a panel, capture the pointer above all iframes -->
     <div v-if="resizing" class="fixed inset-0 z-50 cursor-col-resize" />

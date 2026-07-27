@@ -155,35 +155,7 @@ export default {
       },
     },
 
-    // Help sub-page
     helpLink: 'How tools work, and where they are stored →',
-    helpTitle: 'How tools work',
-    help: {
-      what: {
-        title: 'Two kinds of thing',
-        body: "A tool is one HTTP request the agent can make: a URL template, its parameters, and how to trim the response. It always exists — there is nothing to connect to, so its count is a fact about the config.\n\nAn MCP server (or a browser extension, which speaks the same protocol) is a separate program. You give it an address; it answers with a list of tools that can change between sessions. That is why only these rows get a status dot: they are the only ones that can be down.",
-      },
-      sources: {
-        title: 'The tags on each row',
-        body: 'Preset — from the recommended catalog. Defined by the app, so only the fields you must supply are editable.\nYours — you wrote it here, or the agent built it for you.\nKB — it came with the open knowledge base folder. Shown but not editable here; ask the agent, or edit the file.\n\nMCP / Extension marks a live connection. A row without one is a set of HTTP requests.',
-      },
-      storage: {
-        title: 'Where each is saved',
-        body: "In this browser (localStorage, key `browser-md:settings`): which presets are installed, the tools you wrote, every MCP server address and token, and your API keys. These follow the browser, not the folder — they survive switching knowledge bases and are lost if you clear site data.\n\nIn the knowledge base folder: `.agents/tools.json` for its tools, `.agents/mcp.json` for its servers. These travel with the folder through git, so anyone who clones it gets them.",
-      },
-      kbSwitch: {
-        title: 'What happens when you switch KB',
-        body: 'Everything tagged KB is replaced by whatever the newly opened folder carries — its tools and servers, or none. Everything else (presets, your own tools, your servers, your keys) stays exactly as it is.\n\nA folder\'s tools stay inert until you approve them once. Changing which tools it defines, or where they send data, asks again.',
-      },
-      keys: {
-        title: 'Keys',
-        body: 'Keys are stored in this browser and never sent to the model. A tool refers to a key by name — it writes {{secret:some_id}} — and the value is substituted only when the request is actually sent. So the agent can tell you which key is missing and where to get one without ever seeing it.\n\nThe part worth knowing: key names are one flat list shared by every tool. A tool that names an existing key receives its value, whatever host that tool points at. That is why each key lists which tools read it, and why approving a folder\'s tools warns you when they name keys you already hold.',
-      },
-      gotchas: {
-        title: 'Things that trip people up',
-        body: 'A green count means a connection answered just now. A grey count is a number from the config, with nothing to connect to — not a problem.\n\nThe browser cannot call an API that refuses cross-origin requests, and there is no server to do it for you. That is what the WebCLI extension is for: it fetches from your real Chrome session, with your cookies and no CORS limit. Tools that need it are marked in the catalog.\n\nA parameter cannot span path segments — {{repo}} given "vuejs/core" is sent as "vuejs%2Fcore", so a tool always talks to the server you approved. Use one parameter per segment.',
-      },
-    },
 
     // KB-carried tools
     kbToolsTitle: 'This knowledge base carries tools',
@@ -399,35 +371,7 @@ export default {
       },
     },
 
-    // Help sub-page
     helpLink: '工具是怎么回事、都存在哪里 →',
-    helpTitle: '工具是怎么回事',
-    help: {
-      what: {
-        title: '两类东西',
-        body: '一个工具就是 agent 能发出的一次 HTTP 请求：URL 模板、参数，以及响应怎么裁剪。它永远存在 —— 没有需要连接的对象，所以它的工具数是配置里的事实。\n\nMCP 服务器（以及说同一套协议的浏览器扩展）是一个独立的程序。你给它一个地址，它回给你一份工具清单，这份清单在不同会话之间可能变化。这就是为什么只有这类行有状态点：只有它们会「挂掉」。',
-      },
-      sources: {
-        title: '每行上的标签',
-        body: '预设 —— 来自推荐目录。定义由应用给出，所以只有必须你自己填的字段可改。\n你的 —— 你在这里写的，或 agent 帮你做的。\nKB —— 跟着当前打开的知识库文件夹来的。这里只展示、不能编辑；要改就跟 agent 说，或直接改文件。\n\nMCP / 扩展 表示这是一个实时连接。没有这个标签的行，就是一组 HTTP 请求。',
-      },
-      storage: {
-        title: '分别存在哪里',
-        body: '存在这个浏览器里（localStorage，键名 `browser-md:settings`）：装了哪些预设、你自己写的工具、所有 MCP 服务器地址和 token、以及你的 API 密钥。它们跟着浏览器走而不是跟着文件夹走 —— 换知识库不受影响，清除站点数据就没了。\n\n存在知识库文件夹里：`.agents/tools.json` 放它的工具，`.agents/mcp.json` 放它的服务器。这些随 git 跟着文件夹走，别人克隆下来也会有。',
-      },
-      kbSwitch: {
-        title: '切换知识库会发生什么',
-        body: '所有带 KB 标签的都会被新打开的文件夹自带的内容替换 —— 换成它的工具和服务器，或者一个都没有。其余的（预设、你自己的工具、你的服务器、你的密钥）原样不动。\n\n文件夹自带的工具在你确认一次之前不会启用。它定义的工具有变化、或者数据发往的地址有变化，都会重新问你。',
-      },
-      keys: {
-        title: '密钥',
-        body: '密钥只存在这个浏览器里，绝不会发给模型。工具只按名字引用密钥 —— 它写的是 {{secret:某个_id}} —— 真正发请求时才把值替换进去。所以 agent 能告诉你缺哪个密钥、去哪里申请，却从来看不到它的值。\n\n值得知道的一点：密钥名是所有工具共用的一份扁平列表。一个工具只要写了某个已存在的密钥名，就能拿到它的值，不管这个工具指向哪台主机。这就是为什么每个密钥下面会列出「被哪些工具读取」，也是为什么确认文件夹自带的工具时，会专门提示它们用到了你已经保存的哪些密钥。',
-      },
-      gotchas: {
-        title: '容易困惑的地方',
-        body: '绿色的数字表示刚刚连上并拿到了回应。灰色的数字来自配置本身，没有需要连接的对象 —— 不是出问题了。\n\n浏览器无法调用拒绝跨域的 API，而这里没有后端可以代劳。WebCLI 扩展就是干这个的：它用你真实的 Chrome 会话发请求，带着你的 cookie，也不受 CORS 限制。需要它的工具在目录里有标注。\n\n参数不能跨越路径分段 —— {{repo}} 传 "vuejs/core" 会被发成 "vuejs%2Fcore"，这样工具永远只会访问你确认过的那台服务器。每个分段用一个参数。',
-      },
-    },
 
     // KB-carried tools
     kbToolsTitle: '这个知识库自带工具',

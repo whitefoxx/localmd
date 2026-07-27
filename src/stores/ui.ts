@@ -44,6 +44,17 @@ export const useUiStore = defineStore('ui', () => {
     settingsOpen.value = true
   }
 
+  /** The Help panel, and which topic it lands on — null shows the contents.
+   *  Settings links into it by topic, so "where is this explained?" is one
+   *  click rather than a hunt through a manual. */
+  const helpOpen = ref(false)
+  const helpTopic = ref<string | null>(null)
+
+  function openHelp(topic?: string): void {
+    helpTopic.value = topic ?? null
+    helpOpen.value = true
+  }
+
   /** Widths (px) of the resizable panels, persisted per browser. */
   const agentWidth = ref(persistedWidth(AGENT_WIDTH_KEY, DEFAULT_AGENT_WIDTH))
   const sidebarWidth = ref(persistedWidth(SIDEBAR_WIDTH_KEY, DEFAULT_SIDEBAR_WIDTH))
@@ -66,6 +77,9 @@ export const useUiStore = defineStore('ui', () => {
     pendingPrompt,
     settingsSection,
     openSettings,
+    helpOpen,
+    helpTopic,
+    openHelp,
     agentWidth,
     sidebarWidth,
   }
