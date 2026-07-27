@@ -1052,10 +1052,14 @@ function removeDetail(): void {
         v-for="r in installedRows"
         :key="r.key"
         class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+        :title="r.title"
         @click="open(r.target)"
       >
         <span v-if="r.dotCls" class="w-1.5 h-1.5 rounded-full shrink-0" :class="r.dotCls" />
-        <span class="text-sm text-fg-1 shrink-0 truncate">{{ r.title }}</span>
+        <!-- The only element allowed to shrink: a long integration name gives up
+             width to its tags and the chevron instead of pushing them out of the
+             row (the list clips overflow). -->
+        <span class="text-sm text-fg-1 min-w-0 truncate">{{ r.title }}</span>
         <span class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0">
           {{ $t(SOURCE_LABEL[r.source]) }}
         </span>
