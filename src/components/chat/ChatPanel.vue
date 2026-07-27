@@ -17,6 +17,7 @@ import { parseCiteSources } from '@/lib/citations'
 import { classifyAnchor, createSourceCollector, type Source } from '@/lib/sources'
 import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
+import { BUILTIN_DIR } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
@@ -412,10 +413,16 @@ function pickSkill(name: string): void {
 
 /* ── Skill chips above the composer ──────────────────────────────────────── */
 
+/** Only the FOLDER's own skills get chips. The app's built-ins are plumbing the
+ *  agent reaches for when the conversation calls for it — a button offering to
+ *  connect a service is noise above an empty composer. They stay in the / menu
+ *  for anyone who wants to force one. */
+const kbSkills = computed(() => skills.all.filter((s) => s.dir !== BUILTIN_DIR))
+
 /** How many skills get a chip of their own. The rest are one ▲ away: a folder
  *  with twenty skills should not bury the composer under rows of buttons. */
 const SKILL_CHIPS = 4
-const chipSkills = computed(() => skills.all.slice(0, SKILL_CHIPS))
+const chipSkills = computed(() => kbSkills.value.slice(0, SKILL_CHIPS))
 const skillMenuOpen = ref(false)
 
 function toggleSkillMenu(): void {
@@ -1225,7 +1232,7 @@ watch(
       class="relative px-3 pb-2 flex items-center gap-2 shrink-0 flex-wrap w-full"
       :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
     >
-      <template v-if="skills.all.length">
+      <template v-if="kbSkills.length">
         <button
           v-for="s in chipSkills"
           :key="s.name"
@@ -1236,7 +1243,7 @@ watch(
           /{{ s.name }}
         </button>
         <button
-          v-if="skills.all.length > chipSkills.length"
+          v-if="kbSkills.length > chipSkills.length"
           class="btn text-xs px-1.5"
           :title="$t('chat.allSkills')"
           @click="toggleSkillMenu"
@@ -1254,7 +1261,7 @@ watch(
             class="absolute bottom-full left-3 right-3 mb-1 z-20 max-h-64 overflow-y-auto rounded-md border border-border bg-bg-1 shadow-lg"
           >
             <button
-              v-for="s in skills.all"
+              v-for="s in kbSkills"
               :key="s.name"
               class="w-full flex items-baseline gap-2 px-2 py-1.5 text-left text-xs text-fg-2 hover:bg-bg-2"
               @click="runSkill(s.name)"
