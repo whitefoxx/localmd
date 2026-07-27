@@ -31,6 +31,9 @@ When the assistant answers from an indexed document, its citations are
 This is the part worth knowing about. If it tells you something surprising about
 a 400-page book, you are one click from the sentence it came from.
 
+Citations survive reorganizing. Move a document to another folder and an old
+citation still finds it — by name, or failing that by the cited passage itself.
+
 The same applies across your knowledge base: references to your own pages become
 links, and references to web pages become normal links, collected into a Sources
 list under the answer.

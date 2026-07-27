@@ -34,6 +34,23 @@ export function parseCiteSources(body: string): Map<string, CiteSource> {
 }
 
 /**
+ * Repair a declared citation path against the KB's real file list. A declared
+ * path is a claim, not a fact: the model may abbreviate to a basename, and the
+ * user may have moved the file since — files are theirs to move, and a chip
+ * that answers "not found" to a rename has broken something we promised not
+ * to. Exact match wins; otherwise a UNIQUE basename match is accepted (two
+ * same-named files would make the repair a guess, so decline and let the
+ * caller fall back to block-id lookup). Null = no defensible target.
+ */
+export function resolveCitePath(declared: string, allFiles: string[]): string | null {
+  if (allFiles.includes(declared)) return declared
+  const base = declared.split('/').pop()
+  if (!base) return null
+  const hits = allFiles.filter((p) => p === base || p.endsWith(`/${base}`))
+  return hits.length === 1 ? hits[0] : null
+}
+
+/**
  * Rewrite citation tokens to anchors (run before generic wikilink rewriting so
  * these specific tokens are consumed first). Source declarations become links
  * that open the document; inline citations become numbered chips carrying the

@@ -9,6 +9,7 @@ import { ref } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useUiStore } from '@/stores/ui'
+import { resolveCitePath } from '@/lib/citations'
 
 /** Direct jump target from the annotations page — no doc-index involved.
  *  EPUB sets `cfi`; PDF sets `page` (1-based) + region `rects` (PDF points,
@@ -36,12 +37,28 @@ let nonce = 0
 export const useCitationsStore = defineStore('citations', () => {
   const pending = ref<PendingJump | null>(null)
 
-  async function openCitation(path: string, blockId: string | null): Promise<void> {
+  /** Set the jump and open the document — `path` is trusted to be real here. */
+  async function jump(path: string, blockId: string | null): Promise<void> {
     const ui = useUiStore()
     const files = useFilesStore()
     ui.graphOpen = false
     pending.value = { path, blockId, nonce: ++nonce }
     await files.openFile(path)
+  }
+
+  /** Open a cited document. The declared path is repaired first (basename
+   *  match) — the model abbreviates and users move files, and a chip that
+   *  opens a "not found" tab has failed at its one job. When no file
+   *  defensibly matches, fall back to locating the block through the
+   *  document indexes rather than opening a dead path. */
+  async function openCitation(path: string, blockId: string | null): Promise<void> {
+    const files = useFilesStore()
+    const resolved = resolveCitePath(path, files.allFiles)
+    if (resolved) return jump(resolved, blockId)
+    if (blockId) return openByBlock(blockId)
+    // No block to search for either — open the declared path and let the
+    // viewer say "not found"; silence would read as a dead button.
+    return jump(path, null)
   }
 
   /** Jump from the annotations page to a highlight's position in the book. */
@@ -68,7 +85,9 @@ export const useCitationsStore = defineStore('citations', () => {
     const path = files.currentPath && sources.includes(files.currentPath)
       ? files.currentPath
       : sources[0]
-    await openCitation(path, blockId)
+    // jump, not openCitation: an index can name a since-deleted file, and
+    // repairing THAT would send openCitation back here forever.
+    await jump(path, blockId)
   }
 
   /** Called by a viewer once it has handled (or cannot handle) the jump. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCiteSources, renderCitationTokens, isCitationToken } from './citations'
+import { parseCiteSources, renderCitationTokens, isCitationToken, resolveCitePath } from './citations'
 
 describe('isCitationToken', () => {
   it('recognises source declarations and inline citations', () => {
@@ -69,5 +69,38 @@ describe('renderCitationTokens with extraSources', () => {
     expect(html).toContain('class="citation"')
     expect(html).toContain('data-block="b14-3"')
     expect(html).not.toContain('data-cite-path')
+  })
+})
+
+describe('resolveCitePath', () => {
+  const kb = ['wiki/index.md', 'wiki/field-notes.docx', 'raw/papers/attention.pdf']
+
+  it('accepts a path that exists as declared', () => {
+    expect(resolveCitePath('raw/papers/attention.pdf', kb)).toBe('raw/papers/attention.pdf')
+  })
+
+  it('repairs a bare basename to the one file that carries it', () => {
+    // The model abbreviated; the chip must still land.
+    expect(resolveCitePath('field-notes.docx', kb)).toBe('wiki/field-notes.docx')
+  })
+
+  it('repairs a stale directory after the user moved the file', () => {
+    // Files are the user's to move — a rename must not kill the citation.
+    expect(resolveCitePath('raw/articles/field-notes.docx', kb)).toBe('wiki/field-notes.docx')
+  })
+
+  it('declines when two files share the basename — a guess is worse than a fallback', () => {
+    const twins = [...kb, 'archive/field-notes.docx']
+    expect(resolveCitePath('field-notes.docx', twins)).toBeNull()
+  })
+
+  it('declines when nothing matches at all', () => {
+    expect(resolveCitePath('gone.pdf', kb)).toBeNull()
+    expect(resolveCitePath('', kb)).toBeNull()
+  })
+
+  it('matches whole basenames, not suffixes', () => {
+    // "notes.docx" must not claim "field-notes.docx".
+    expect(resolveCitePath('notes.docx', kb)).toBeNull()
   })
 })

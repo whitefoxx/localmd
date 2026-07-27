@@ -206,7 +206,10 @@ test('a .docx renders with its structure and is indexed for the agent', async ({
   await expect(page.getByText(/Indexed · \d+ blocks/)).toBeVisible({ timeout: 15_000 })
 
   // A [[docx1:…]] citation chip jumps back into the document and flashes the
-  // cited block — the same contract the PDF and EPUB indexes carry.
+  // cited block — the same contract the PDF and EPUB indexes carry. The
+  // declared path is a bare basename while the file actually sits in a
+  // subdirectory (tree import lands in targetDir), so this also exercises the
+  // path repair: an abbreviated or stale citation path must still land.
   const input = page.getByPlaceholder(/Ask or instruct/)
   await input.fill('echo [[docx1:field-notes.docx]] The pilot ran six weeks [[1:b1-3]].')
   await input.press('Enter')
