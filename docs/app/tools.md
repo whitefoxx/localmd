@@ -1,105 +1,95 @@
 ---
-title: Tools and MCP servers
-summary: What a tool is, the difference from an MCP server, the Preset/Yours/KB sources, where each is stored, and what changes when the user switches knowledge base.
+title: Tools — giving the assistant new abilities
+summary: Nothing is built in; how to add web search, research lookup or a service you use, what the tags on each row mean, and why some counts are green and some grey.
 ---
 
-# Tools and MCP servers
+# Tools — giving the assistant new abilities
 
-Nothing is built in. What the agent can reach is exactly what the user has
-installed under Settings → Tools.
+Out of the box the assistant can work with your folder and nothing else. It
+cannot search the web, look up a paper, or read your reading app — until you
+give it a tool that does.
 
-## Two kinds of thing
+This is deliberate: what it can reach is always something you chose.
 
-**A tool** is one HTTP request: a URL template, its parameters, headers, and a
-rule for shaping the response. It is data — a JSON spec — not code. That is why
-the agent can research a service and build working tools for it inside one
-conversation, and why "add a tool" never means shipping a release.
+Everything lives in **Settings → Tools**.
 
-**An MCP server** is a separate program that speaks the Model Context Protocol.
-The user supplies an address; the server answers with a list of tools, and that
-list can differ between sessions. A browser extension (WebCLI) speaks the same
-protocol over a Chrome runtime port, so it is the same kind of thing with a
-different transport.
+## The easiest way: just ask
 
-The practical difference: a tool always exists, so its count is a fact about the
-config. A server can be down, so its count is a status. In the UI only server
-rows get a status dot and a colour — a green count means a connection answered
-just now, a grey count is a number from the config with nothing to connect to.
-A grey count is not a problem.
+Click **Describe it to the agent** and say what you want it to reach — "search
+Hacker News", "read my Readwise highlights", "look things up in my Notion".
 
-## The three sources
+It will find out how that service works, build the tools, test them, and ask you
+for anything only you can provide (usually an API key). This is a normal
+conversation, not a feature request — tools in this app are just configuration,
+so it can create them on the spot.
 
-Every row in Settings → Tools carries one source tag.
+## Or pick from the recommended list
 
-- **Preset** — from the recommended catalog the app ships. Defined by the app,
-  so only the fields the user must supply (a server URL, a token) are editable.
-- **Yours** — the user wrote it in the editor, or the agent built it for them.
-- **KB** — it came with the knowledge base folder. Visible but not editable in
-  Settings; it is changed by editing the file, or by asking the agent.
+**Browse recommended** has a checklist of things that are known to work: web
+search and page reading, research databases (OpenAlex, Crossref, Europe PMC),
+Wikipedia and Open Library, RSS feeds, arXiv, Zotero, and a couple of
+documentation services.
 
-A second tag, **MCP** or **Extension**, appears only on rows backed by a live
-connection.
+If you want just one thing to start with, take **WebCLI**. It is a browser
+extension that lets the assistant use your own logged-in Chrome — so it reaches
+pages that need a login, and it makes most other tools work better too.
 
-## Where each is stored
+## Reading the Installed list
 
-**In the browser** (`localStorage`, key `browser-md:settings`):
+One row per integration. Open any row to see the individual tools inside it.
 
-- which catalog presets are installed
-- the tools the user wrote or the agent built for them
-- every MCP server address and token
-- API keys
+Each row has a tag saying **where it came from**:
 
-These follow the browser, not the folder. They survive switching knowledge
-bases, and they are lost if the user clears site data. There is no account and
-no server, so they are not synced anywhere.
+- **Preset** — from the recommended list. We defined it, so only the parts you
+  must supply (an address, a token) can be edited.
+- **Yours** — you made it, or the assistant made it for you.
+- **KB** — it came with this knowledge base folder. See below.
 
-**In the knowledge base folder:**
+Some rows have a second tag, **MCP** or **Extension**. That means the row is a
+separate program the app connects to, rather than a set of web requests.
 
-- `.agents/tools.json` — the KB's own tools
-- `.agents/mcp.json` — the KB's own MCP servers
+## Why some counts are green and some grey
 
-These travel with the folder through git, so anyone who clones the repository
-gets them.
+- **Green, with a dot** — this is a live connection, and it answered just now.
+  The number is how many tools it reported.
+- **Grey** — there is nothing to connect to. The number comes from the
+  configuration itself and is simply always true.
 
-## Switching knowledge base
+Grey is not a problem. A red dot is: it means a connection failed, and the row
+says why.
 
-Everything tagged KB is replaced by whatever the newly opened folder carries —
-its tools and servers, or none at all. Everything else (presets, the user's own
-tools, their servers, their keys) is untouched.
+## Tools that come with a folder
 
-A folder's tools stay inert until the user approves them once. Changing which
-tools it defines, or where they send data, asks again. The approval is recorded
-per KB in `localStorage` under `browser-md:kb-tools-trust:v1`, as a fingerprint
-of the tool set rather than a blanket "trusted" flag.
+A knowledge base folder can carry its own tools, so a folder someone shares with
+you arrives with the abilities it needs.
 
-## The browser constraint
+Those tools **stay switched off until you approve them once**. Before you do,
+the app shows you where each one sends data, and warns you if any of them want
+to use an API key you already have. If the folder later changes its tools, it
+asks again.
 
-This app has no backend. A tool's request is made by the browser itself, so an
-API that sends no CORS headers cannot be called directly, however correct the
-spec is.
+Approve only what you understand — it is someone else's configuration running
+with your keys.
 
-That is what the WebCLI extension is for: its `fetch_url` runs in a service
-worker with the user's real cookies and no CORS limit, so it reaches endpoints
-the page cannot. A tool's `transport` chooses the path — `auto` tries direct
-then falls back, `direct` and `webcli` force one. Catalog entries that only work
-through the extension are marked in the recommended list (arXiv is one — it
-sends no `Access-Control-Allow-Origin`).
+## What happens when you switch folders
 
-## Things that trip people up
+- Anything tagged **KB** is replaced by whatever the new folder carries.
+- Everything else — presets, your own tools, your servers, your keys — stays
+  exactly as it is. Those belong to your browser, not the folder.
 
-- **A parameter cannot span path segments.** `{{repo}}` given `vuejs/core` is
-  sent as `vuejs%2Fcore`. This is deliberate — it is what guarantees a tool only
-  ever talks to the host the user approved — but it means one parameter per
-  segment: `/repos/{{owner}}/{{repo}}`.
-- **The host cannot contain a placeholder**, for the same reason.
-- **Response shaping is not optional in practice.** A raw JSON payload can cost
-  thousands of tokens per call. `mode: json` with a `pick` and a `template`
-  turns it into a few lines.
-- **Tool names are global.** A KB tool, a user tool and a preset all share one
-  namespace; on a clash the more specific scope wins (KB, then user, then
-  catalog).
+## When something does not work
+
+**"Failed to fetch" or a red dot.** The service refused the connection. Most
+often it does not allow browser access, which the WebCLI extension gets around —
+try installing it.
+
+**A tool returns an authorization error.** The key is probably missing or wrong.
+Check Settings → Tools → Keys.
+
+**You just want it fixed.** Tell the assistant what happened. It can test tools
+directly and see the real error.
 
 ## Related
 
-Keys and what the model can see: `keys`. Where everything the app stores lives:
+Keys and privacy: `keys`. Everything the app stores and where:
 `storage-and-privacy`.

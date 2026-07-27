@@ -1,67 +1,60 @@
 ---
-title: API keys and what the model can see
-summary: How secrets are referenced by name rather than value, why the agent never sees one, the one flat namespace caveat, and what to do when a key is missing.
+title: API keys and privacy
+summary: Keys stay in your browser and the assistant never sees their values — how that works, why it can still help you set one up, and the one thing worth watching.
 ---
 
-# API keys and what the model can see
+# API keys and privacy
 
-## The rule
+Some services need a key to prove a request is yours. Your keys are stored in
+your browser, and they are never shown to the assistant.
 
-Keys are stored in this browser and are never sent to the model.
+## How that is possible
 
-A tool does not contain its key. It contains a reference — `{{secret:some_id}}`
-— in a header, a URL or a body. The value is substituted at the moment the
-request is actually built and sent. The agent reads and writes the reference; it
-never reads the value.
+A tool does not contain its key. It contains a **name** — a placeholder like
+`{{secret:weread_api_key}}`. The real value is filled in at the last moment,
+when the request is actually sent, and only then.
 
-This is why the agent can be genuinely useful about keys without being trusted
-with them: it can say which key a tool needs, what the id is, where to obtain
-one, and that the field is currently empty — all without the value ever entering
-a conversation.
+So the assistant can read and write the placeholder without ever seeing what it
+stands for. In practice that means it can genuinely help — "this tool needs a
+key called `weread_api_key`, you can get one here, the field is currently
+empty" — while never being in a position to leak it.
 
-## Never ask for a key as chat text
+## Giving it a key
 
-If a key is needed, call `request_setup` with `kind: "key"`, the `secret_id` the
-tools reference, a `help` line saying exactly where to get it, and a `url`. The
-app renders a field; the user types into it directly; the value goes to
-`localStorage` and the tool result says only that a value was saved.
+When the assistant needs one, it does not ask you to paste it into the chat.
+A small form appears instead; you type the key straight into the app. It goes to
+your browser's storage, and the assistant is told only that a value was saved.
 
-A key collected this way is usable immediately, including in a `manage_tools`
-`test` call in the same turn.
+**Never paste a key into the chat message box.** Anything you type there does go
+to the model. If you do it by accident, delete the message and rotate the key.
 
-If the user skips it, do not loop. Build and save the tools anyway, and say they
-will start working once the key is filled in under Settings → Tools → Keys.
+You can also fill keys in yourself at any time: **Settings → Tools → Keys**.
+That section lists only keys your installed tools actually ask for, so it stays
+short.
 
-## The one flat namespace
+## The one thing worth watching
 
-Key ids are a single flat list shared by every installed tool. A tool that names
-an existing id receives that value, whatever host the tool points at.
+Key names are a single shared list. Any tool that asks for a key by a name you
+already have will receive that value — whichever service that tool talks to.
 
-This is worth understanding because tools can arrive from outside: a cloned
-knowledge base carries `.agents/tools.json`, and a tool in it can name a key the
-user already holds. Two things exist because of this:
+This matters when tools arrive from somewhere else, for instance with a shared
+knowledge base folder. Two safeguards exist:
 
-- Settings lists, under each key, which tools read it.
-- Approving a folder's tools warns when they name keys the user already has, and
-  shows the hosts the tools send to.
+- Under each key, the app lists which tools read it.
+- When you approve a folder's tools, it warns you if they want keys you already
+  have, and shows you where they send data.
 
-## Where they live
+## Where keys live
 
-`localStorage`, under `browser-md:settings`, alongside the LLM provider API keys
-and the GitHub token. Same trust model throughout: this browser only, sent
-straight to the provider or the API in question, never through any server of
-ours — there isn't one.
+In your browser's local storage for this site, together with your model provider
+keys and your GitHub token. Specifically:
 
-They are not in the KB folder, so they are never committed and never travel with
-a shared repository. Clearing site data loses them.
-
-## When something is not working
-
-A tool that returns 401/403 usually means the key is empty or wrong, not that
-the spec is broken. Check that the id the tool references and the id in
-Settings → Tools → Keys are the same string — a tool referencing
-`{{secret:weread_key}}` gets nothing from a key saved as `weread_api_key`.
+- They are **not** in your knowledge base folder, so they are never committed to
+  git and never travel with a folder you share.
+- They are **not** on any server of ours, because there isn't one.
+- Clearing your browser's data for this site **deletes them**. Your notes are
+  unaffected — those are files on disk.
 
 ## Related
 
-How tools reference and store things generally: `tools`.
+How tools use keys: `tools`. Everything the app stores: `storage-and-privacy`.

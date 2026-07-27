@@ -1,62 +1,54 @@
 ---
-title: Memory, sessions and saving conversations
-summary: What MEMORY.md is and the rule against writing it unprompted, how sessions and write modes behave, and the difference between saving a transcript and distilling it.
+title: Memory across conversations
+summary: MEMORY.md is what the assistant remembers between sessions; it is only ever written when you ask, and it is a file you can read and edit.
 ---
 
-# Memory, sessions and saving conversations
+# Memory across conversations
 
-## MEMORY.md
+Each conversation starts fresh. What carries over is a single file:
+**`MEMORY.md`** in your folder's root.
 
-`MEMORY.md` in the KB root is that knowledge base's durable memory: stable
-preferences, ongoing project state, decisions worth carrying across sessions.
-When present it is injected into the system prompt **in full** — unlike skills,
-which are only listed — so it is honoured without a round trip. That also means
-it should stay short.
+If it exists, the assistant reads it at the start of every session and honours
+what it says. Typical contents:
 
-The rule: create or update it **only when the user asks** to remember or forget
-something. Read it first, then edit it, keeping entries to one short fact per
-bullet and preserving what is already there.
+- how you like things written or filed
+- what you are currently working on
+- decisions you do not want to re-explain
 
-Never write to it unprompted, and never auto-summarize a conversation into it.
+## It is only written when you ask
 
-## Sessions
+The assistant will not add to your memory on its own, and it will not quietly
+summarize a conversation into it. Say "remember that…" or "forget that…" and it
+edits the file, keeping what is already there.
 
-The agent panel can hold several session tabs at once when multi-tab is enabled;
-otherwise there is one session. A running session is not interrupted by
-switching or closing its tab — only the stop button, deleting the session, or
-closing the page stops it.
+This is a deliberate limit. Memory that grows by itself becomes a file nobody
+trusts and nobody reads.
 
-## Write modes
+## Keep it short
 
-- **Write directly (review afterward)** — the default. Writes land, and the
-  affected files can be reviewed in the "Agent changes" panel.
-- **Ask first** — `write_file` / `edit_file` / `delete_path` pause until the
-  user approves or rejects each one in the Review panel.
+The whole file is included in every request, so it costs something on every
+message. A dozen short lines is a good memory; three pages is a liability.
 
-Deleting a folder or a binary file asks in **both** modes, because nothing can
-bring those back. If a write is declined, do not retry it — ask what the user
-wants instead.
+If it has grown, ask the assistant to tidy it.
 
-Committing is always a separate, explicit act in the Git panel.
+## You can just read it
 
-## Saving versus distilling
+It is a normal markdown file in your folder. Open it, edit it, delete a line,
+put it in git. There is no hidden state anywhere else.
 
-These are different things and the difference matters.
+## Memory versus skills versus notes
 
-**Saving** a conversation writes a plain markdown transcript into the KB with
-`save_transcript`. The result is an ordinary KB file with no special handling.
+Three different things, easy to confuse:
 
-**Distilling** extracts the conclusions, decisions and ideas from a discussion
-into topical wiki pages, merging into an existing page when one fits. The source
-can be the current conversation or any file the user names — including a
-previously saved transcript, which is just a file.
+- **Memory** — a handful of facts about you and your current work, read every
+  time. See above.
+- **Skills** — a workflow, loaded only when it applies. See `skills`.
+- **Notes** — your actual knowledge base. Everything else.
 
-Link back to the source with a `[[wikilink]]` when it is a KB file.
-
-When a discussion reaches a real conclusion, offering **once** at the end of a
-reply to distill it is welcome. Doing it unprompted is not.
+If you find yourself putting instructions into memory, it is probably a skill.
+If you find yourself putting knowledge into memory, it is probably a note.
 
 ## Related
 
-Where sessions and settings are stored: `storage-and-privacy`. Reusable
-workflows, which are a different thing from memory: `skills`.
+Saving and distilling conversations: `working-with-the-agent`. Reusable
+workflows: `skills`.

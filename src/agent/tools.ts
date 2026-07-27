@@ -39,7 +39,10 @@ import {
 } from '@/lib/httpTools'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
-import { listAppDocs, appDoc } from '@/lib/appDocs'
+import { listAppDocsForAgent, appDocForAgent } from '@/lib/appDocs'
+import { WRITABLE, WRITABLE_BY_KEY, describeWritable } from '@/lib/appSettings'
+import { getLocale } from '@/i18n'
+import { CATALOG, catalogEntryById } from '@/lib/toolCatalog'
 import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
@@ -615,17 +618,110 @@ const appHelp = defineTool({
   }),
   describeCall: (a) => (a.topic ? `help: ${a.topic}` : 'help: contents'),
   run: async ({ topic }) => {
-    const doc = topic ? appDoc(topic) : undefined
+    const doc = topic ? appDocForAgent(topic) : undefined
     if (doc) return `# ${doc.title}\n\n${doc.body}`
 
     // A guessed id ("api-keys" for "keys") is the common way to arrive here, so
     // a miss returns the same full index as calling with no topic — enough to
     // pick correctly on the next call rather than guess a second time.
-    const contents = listAppDocs()
+    const contents = listAppDocsForAgent()
       .map((d) => `- ${d.id}: ${d.title} — ${d.summary}`)
       .join('\n')
     const miss = topic ? `No topic "${topic}". ` : ''
     return `${miss}Topics — call app_help again with one of these ids:\n${contents}`
+  },
+})
+
+/**
+ * Change the app's own configuration, so "turn on ask-first mode" or "install
+ * the research tools" is something the user can say rather than something they
+ * have to go and find.
+ *
+ * The readable/writable surface is an allowlist in lib/appSettings — see the
+ * reasoning there. Nothing that could carry a credential is in it, so there is
+ * no path from this tool to an API key, a token, or a secret's value.
+ *
+ * `get` also carries the field reference, which is why the description does not:
+ * the vocabulary is needed by the rare turn that configures something, and
+ * always-on bytes are paid by every step of every turn.
+ */
+const appSettings = defineTool({
+  name: 'app_settings',
+  description:
+    "Read or change this app's own settings, and install/remove recommended tool sets. Use when the user asks to configure localmd itself — \"make writes ask first\", \"install the research tools\", \"turn on multi-tab\", \"set my commit name\". Call action:'get' first: it returns the current setup plus every field you may change and what each accepts. Cannot read or write API keys, tokens or secrets — use request_setup for those.",
+  schema: z.object({
+    action: z
+      .enum(['get', 'set', 'install', 'uninstall'])
+      .describe(
+        "'get' (current setup + the fields you may change), 'set' (change one field), 'install'/'uninstall' (a recommended tool set, by catalog id)",
+      ),
+    key: z.string().optional().describe("set: the field name, e.g. \"write_mode\""),
+    value: z.string().optional().describe('set: the new value, as a string'),
+    id: z.string().optional().describe("install/uninstall: a catalog entry id, e.g. \"research\""),
+  }),
+  describeCall: (a) =>
+    a.action === 'set' ? `settings: ${a.key} = ${a.value}` : `settings: ${a.action}${a.id ? ` ${a.id}` : ''}`,
+  run: async ({ action, key, value, id }) => {
+    const settings = useSettingsStore()
+    const toolsStore = useToolsStore()
+
+    if (action === 'get') {
+      const s = settings.state
+      const slot = (name: 'primary' | 'vision' | 'image'): string => {
+        const p = s.profiles.find((x) => x.id === s.slots[name])
+        return p ? `${p.label} (${p.provider} · ${p.model})` : 'not set'
+      }
+      const installed = CATALOG.filter((e) => toolsStore.isInstalled(e.id)).map((e) => e.id)
+      const available = CATALOG.filter((e) => !toolsStore.isInstalled(e.id)).map((e) => e.id)
+      return [
+        'Current setup:',
+        `- interface language: ${getLocale()}`,
+        `- models: primary = ${slot('primary')}; vision = ${slot('vision')}; image = ${slot('image')}`,
+        ...WRITABLE.map((f) => `- ${f.key}: ${f.read(s)}`),
+        `- recommended tool sets installed: ${installed.join(', ') || '(none)'}`,
+        `- available to install: ${available.join(', ') || '(none)'}`,
+        '',
+        "Fields you can change with action:'set':",
+        describeWritable(),
+        '',
+        'Not readable or writable here: API keys, the GitHub token, and tool secrets. To get a value from the user, call request_setup. To change models, point them at Settings → Models.',
+      ].join('\n')
+    }
+
+    if (action === 'install' || action === 'uninstall') {
+      if (!id) return `Error: ${action} needs an "id". Call action:'get' for the available ids.`
+      const entry = catalogEntryById(id)
+      if (!entry) {
+        return `Error: no recommended tool set called "${id}". Available: ${CATALOG.map((e) => e.id).join(', ')}`
+      }
+      const already = toolsStore.isInstalled(id)
+      if (action === 'install' && already) return `"${id}" is already installed.`
+      if (action === 'uninstall' && !already) return `"${id}" is not installed.`
+      if (action === 'install') {
+        toolsStore.install(id)
+        // A server-backed entry has to connect before it has any tools, and the
+        // missing-key case is the usual reason a fresh install does nothing.
+        const needs = (entry.secrets ?? []).filter((sec) => !toolsStore.hasSecret(sec.id))
+        const note = needs.length
+          ? ` It needs ${needs.map((sec) => sec.id).join(', ')} before it will work — collect with request_setup.`
+          : entry.server
+            ? ' It connects in the background; check back before relying on it.'
+            : ''
+        return `Installed "${id}".${note}`
+      }
+      toolsStore.uninstall(id)
+      return `Removed "${id}".`
+    }
+
+    if (!key) return "Error: set needs a \"key\". Call action:'get' for the field list."
+    const field = WRITABLE_BY_KEY.get(key)
+    if (!field) {
+      return `Error: "${key}" is not a settable field. Settable: ${WRITABLE.map((f) => f.key).join(', ')}`
+    }
+    if (value === undefined) return `Error: set needs a "value" for ${key}.`
+    const err = field.write(settings.state, value)
+    if (err) return `Error: ${err}`
+    return `Set ${key} to ${field.read(settings.state)}.`
   },
 })
 
@@ -1360,6 +1456,7 @@ export const TOOLS: ToolSpec[] = [
   updatePlan,
   useSkill,
   appHelp,
+  appSettings,
   enableTools,
   manageTools,
   requestSetup,

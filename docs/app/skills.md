@@ -1,70 +1,53 @@
 ---
-title: Skills — reusable workflows
-summary: What a skill is, the SKILL.md format and where it lives, how progressive disclosure keeps them free until used, and when to write one.
+title: Skills — saving a way of working
+summary: Teach the assistant a repeatable workflow once, stored as a file in your folder, and run it later with a slash command.
 ---
 
-# Skills — reusable workflows
+# Skills — saving a way of working
 
-A skill is a written workflow the agent can load and follow: "how we ingest a
-paper into this KB", "how to prepare the weekly review". It is a markdown file,
-not code.
+A skill is a workflow you worked out once, written down so the assistant follows
+it the same way every time. "How I ingest a paper." "How I prepare my weekly
+review." "How our team formats meeting notes."
 
-## Format and location
+It is a plain markdown file in your folder, not a program.
 
-Canonical path: `.agents/skills/<name>/SKILL.md`. `.claude/skills/` is also read
-for compatibility; on a name clash the canonical directory wins. Terminal Claude
-Code users typically symlink one to the other.
+## Making one
 
-```markdown
----
-name: ingest-paper
-description: One line — this is what future sessions see when deciding to load it.
----
+The easy way: after the assistant has done something the way you wanted, say
+**"save that as a skill"**. It writes the file.
 
-The full instructions go here, self-contained.
-```
+It ends up at `.agents/skills/<name>/SKILL.md`, with a name and a one-line
+description at the top, and the instructions below. You can edit it like any
+other file.
 
-Both frontmatter fields degrade gracefully: a missing `name` falls back to the
-directory name, a missing `description` to the first body line.
+## Using one
 
-Other files in the skill directory are bundled resources — templates, examples.
-They are listed when the skill loads, and read with `read_file` if the
-instructions reference them.
+Type `/` in the message box and pick it. Or just describe the task — the
+assistant sees a one-line summary of every skill and loads the full instructions
+when one matches.
 
-## Progressive disclosure
+That summary line matters: it is the only thing considered when deciding whether
+a skill applies. "How to ingest a paper into raw/papers with a summary page" is
+a better line than "paper stuff".
 
-Only the name and one-line description go into the system prompt. The full body
-is fetched with `use_skill` when a task actually matches.
+## What makes a good skill
 
-This is why a skill's description should be a precise trigger rather than a
-summary: it is the only thing a future session sees when deciding whether to
-load it, and it is paid for on every turn.
+Write down what you **learned**, not what the tools already say.
 
-## Built-in skills
+A skill that lists tool names adds nothing — the assistant already knows those.
+A skill that records "this API reports duration in seconds, not minutes" or
+"always check the appendix for the funding statement" saves real work every time.
 
-The app ships skills that are about the app rather than about any one knowledge
-base — `connect-a-service` is one. They are available in every KB without
-scaffolding anything into the user's folder, and a KB skill of the same name
-overrides them.
+## Skills travel
 
-## Slash commands
+They live in your folder, so they go with it through git. Share a knowledge base
+and you share the ways of working that go with it.
 
-The user can force a skill directly from the chat input with `/name`.
-
-## When to write one
-
-When a workflow has been worked out once and will be repeated. The useful moment
-is right after finishing something non-obvious: what the steps were, what the
-gotchas were, which field means what.
-
-Write what was actually learned, not a description of tools that already
-describe themselves. A skill that just lists tool names adds nothing; a skill
-that records "this API reports duration in seconds, not minutes" saves the next
-session a round trip.
+The app also ships a few built-in skills for things about the app rather than
+your notes — connecting a new service is one. You never have to install those,
+and a skill of your own with the same name takes priority.
 
 ## Related
 
-Reference material about the app itself is not a skill — it is what app_help
-serves. To connect an external service, load the built-in connect-a-service
-skill with use_skill rather than hand-writing a skill file for it. Where a KB's
-skills sit among everything else it carries: `knowledge-base`.
+Working with the assistant: `working-with-the-agent`. Long-term memory, which is
+a different thing: `memory-and-sessions`. Your folder: `knowledge-base`.

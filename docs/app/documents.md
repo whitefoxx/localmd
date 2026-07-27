@@ -1,69 +1,50 @@
 ---
-title: PDFs, EPUBs and DOCX — indexing and citations
-summary: How documents become readable structured indexes under .trace/, and the block-id citation form that makes an answer jump to the exact passage.
+title: PDFs, EPUBs and Word files
+summary: How a document becomes readable and searchable, and how answers can link straight back to the exact passage they came from.
 ---
 
-# PDFs, EPUBs and DOCX — indexing and citations
+# PDFs, EPUBs and Word files
 
-## Why there is an index step
+You can keep PDFs, EPUBs and `.docx` files in your knowledge base and work with
+them like anything else — but they need one preparation step first.
 
-A PDF is not readable as markdown, and feeding a whole book into a turn is not
-affordable. So a document is converted once into a structured index of markdown
-under `.trace/`, and then read like any other KB content — a table of contents,
-sections, and search across them.
+## Indexing
 
-Call `index_document` on the source path when no index exists. Afterwards:
+Ask the assistant to index a document, or open it and use the index action. It
+reads the file once and writes a structured, searchable version alongside it (in
+a hidden `.trace/` folder).
 
-1. read the index's `_README.md` — it states the conventions for that index
-2. read `toc.md` to find the relevant part
-3. read the relevant `sections/*.md` (`list_files` / `search_files` take a `dir`
-   parameter to scope to the index)
+This takes a moment for a long book. Afterwards:
 
-Indexes live under `.trace/` in the KB folder, so they travel with it, but they
-are excluded from git pushes through the app — they are rebuildable.
+- the assistant can search and quote it like any note
+- you get a table of contents
+- it never has to re-read the whole thing to answer a question, so it stays cheap
 
-## Citations
+The index is rebuildable, so it is skipped when pushing to GitHub — no huge
+repositories.
 
-Every block in an index carries a `[[block-id]]` tag. When answering from an
-indexed source:
+## Citations that jump to the source
 
-- declare the source once at the top: `[[pdf1:path]]` (or `epub`/`docx`/`md`)
-- cite claims inline as `[[1:block-id]]`
+When the assistant answers from an indexed document, its citations are
+**clickable and land on the exact passage** — not the document, the paragraph.
 
-The chat renders these as clickable links that jump to the exact passage. The
-index's `_README.md` carries the full rule.
+This is the part worth knowing about. If it tells you something surprising about
+a 400-page book, you are one click from the sentence it came from.
 
-## Citation forms in general
+The same applies across your knowledge base: references to your own pages become
+links, and references to web pages become normal links, collected into a Sources
+list under the answer.
 
-The app has no footnote system. Only these forms exist, and inventing others
-produces broken links:
+## About made-up sources
 
-- a KB file → a `[[wikilink]]`
-- a web page → a normal `[title](https://…)` link
-- an indexed document → the `[[pdfN:path]]` + `[[N:block-id]]` pair above
+The assistant will not cite a web page it did not actually open in that
+conversation. URLs reconstructed from memory look right and are frequently dead
+or wrong, and passing one off as a source is worse than having no source.
 
-Never emit `[^1]`, a bare `[1]`, or `[text](#source-1)` — there are no such
-anchors, so `#source-N` points nowhere. The chat turns real references into
-numbered superscripts with a Sources list, so link the actual source rather than
-only naming it.
-
-## Never fabricate a source
-
-A cited `https://` URL must be one actually opened or fetched **this session**
-with the browser tools. URLs reconstructed from memory are routinely moved,
-changed or dead even when they look right, and presenting one as a source is a
-fabrication.
-
-If a claim rests on general knowledge rather than a fetched page, say so plainly
-and give no link. If the browser tools are not connected, external URLs cannot
-be cited at all.
-
-## Compatibility note
-
-The index format is byte-compatible with trace-app: the `.trace/*-index/`
-layout, and the index versions, are a hard constraint rather than an internal
-detail.
+If something comes from its general knowledge rather than a page it read, it
+says so and gives no link. If it has no web access at all, it cannot cite
+external pages — see `tools`.
 
 ## Related
 
-Reaching the web at all: `tools`.
+Your folder: `knowledge-base`. Giving it web access: `tools`.

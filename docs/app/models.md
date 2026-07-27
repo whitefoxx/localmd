@@ -1,61 +1,67 @@
 ---
-title: Models — profiles, roles, and why there are three slots
-summary: How provider profiles work, what the primary/vision/image roles do, when a vision slot is needed, and the CORS requirement on any endpoint.
+title: Models — connecting an AI provider
+summary: Add a provider key to make the assistant work, what the three roles are for, and when you need a separate vision model.
 ---
 
-# Models — profiles, roles, and why there are three slots
+# Models — connecting an AI provider
 
-## Profiles
+The app has no AI of its own. You bring a key from a provider, and requests go
+from your browser straight to them. There is no middleman and nothing is billed
+by localmd.
 
-A profile is one provider + key + model name. Once a provider is picked, only
-the API key and the model name are needed — the base URL and the API adapter are
-built in. Several profiles can exist at once.
+Set it up in **Settings → Models**.
 
-Every endpoint must allow browser (CORS) access, because the browser makes the
-call directly. The chat area warns when a connection fails.
+## Adding a model
 
-Keys go to `localStorage` and straight to that provider — see
-`storage-and-privacy`.
+Click **Add model**, pick a provider, paste the API key, and type the model
+name. Everything else is filled in for you.
 
-## Roles
+Anthropic, OpenAI, Google, DeepSeek, Zhipu, Qwen, xAI and any
+OpenAI-compatible endpoint all work. You can add several and switch between
+them.
 
-Three slots, each pointing at a profile:
+If a key or model name is wrong, the chat area will tell you when you first send
+a message.
 
-- **Primary** — runs the conversation and calls the tools.
-- **Vision** — used when an image has to be looked at, through the `view_image`
-  tool.
-- **Image generation** — optional. Once set, the primary can create pictures
-  with `generate_image`; they are saved into the KB and shown as a card.
+## The three roles
 
-## When the vision slot is needed
+Below the list, each role points at one of your models:
 
-- A **Claude** primary is multimodal by nature — no vision slot needed.
-- An OpenAI-compatible primary that is **itself multimodal** (qwen-vl, glm-4v,
-  gpt-4o): point the vision slot at itself, and images go straight into context.
-- A **text-only** primary (deepseek-chat, say): point the vision slot at a
-  dedicated vision model. The primary then calls it through `view_image`.
+- **Primary** — runs the conversation and does the work. This is the only one
+  that must be set.
+- **Vision** — used when an image needs to be looked at.
+- **Image generation** — optional. Set it and the assistant can create pictures,
+  saved into your folder.
 
-Never guess an image's content from its filename — that is what the slot is for.
+## Do you need a vision model?
 
-## Image generation support
+- Using **Claude**? No. It handles images itself.
+- Using a model that already understands images (GPT-4o, qwen-vl, glm-4v)? Point
+  the vision role at that same model.
+- Using a text-only model (deepseek-chat, for example)? Point the vision role at
+  a separate model that does images. The assistant will call it when needed.
 
-OpenAI (DALL·E), Google (Imagen), xAI, and OpenAI-compatible
-`/images/generations` endpoints (Zhipu CogView, Qwen, custom). The matching
-image model name goes in the profile; the endpoint must allow browser CORS.
+Without a vision role on a text-only model, it simply cannot see images — and it
+will say so rather than guess from the filename.
 
-## Token economy
+## Which to choose
 
-Requests are built so the prefix stays byte-identical across turns, because
-every provider bills repeated prefix bytes at a fraction of fresh ones — but
-only on an exact match. This is why the system prompt is split into a stable
-block and a dynamic one, why the deferred-tools catalog is frozen rather than
-reflecting what is currently activated, and why history is appended to rather
-than rewritten.
+Any current model works. Stronger models follow multi-step instructions more
+reliably and are better at the fiddlier jobs like building a new tool; cheaper
+ones are perfectly good for search, summarizing and filing.
 
-The usage tooltip in the chat composer shows cache hits and writes. A near-zero
-cache-hit share across a multi-turn session means something is invalidating the
-prefix.
+You can change the primary at any time, including mid-project.
+
+## Cost
+
+You are billed by your provider, at their rates. The app is built to keep the
+repeated part of each request identical between messages, because every provider
+charges much less for a repeated prefix than for fresh text — which is why a
+long conversation costs far less than its length suggests.
+
+Hovering the token counter under the message box shows what a session has used.
 
 ## Related
 
-Which tools the agent can call: `tools`.
+What the assistant can then do: `working-with-the-agent`. Where the key is
+stored: `storage-and-privacy`.

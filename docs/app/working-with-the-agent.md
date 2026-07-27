@@ -1,0 +1,81 @@
+---
+title: Working with the assistant
+summary: What the assistant can do for you, how to control whether its edits land immediately, and how to save or distill a conversation into your notes.
+---
+
+# Working with the assistant
+
+The assistant on the right is not a chatbot bolted onto a notes app. It has real
+access to your folder: it can read files, search them, write new ones, reorganize
+things you ask it to, read PDFs, and change the app's own settings.
+
+## Asking it to do things
+
+Plain language works. Some examples of the range:
+
+- "What did I write about attention mechanisms?"
+- "File this PDF where it belongs and write me a summary page."
+- "Turn this conversation into a note."
+- "Install the research tools so you can look up papers."
+- "Switch write mode to ask first."
+- "How do API keys work in this app?"
+
+Two things help: **@** references a specific file, and **/** runs a saved
+workflow directly.
+
+## Whether edits land immediately
+
+**Settings → Agent → Write mode** has two options:
+
+- **Write directly (review afterward)** — the default. Edits happen, and a
+  "Agent changes" panel appears so you can see exactly what changed.
+- **Ask first** — every write, edit and delete pauses until you approve it.
+
+Either way, **deleting a folder or a binary file always asks**, because nothing
+can bring those back. And committing to git is always separate and explicit —
+the assistant never commits unless you ask.
+
+If you reject an edit, it will ask what you want instead rather than trying
+again.
+
+## Plans
+
+For anything with several steps, the assistant keeps a visible checklist so you
+can see where it is and what is left. You do not need to ask for this.
+
+## Sessions
+
+Each conversation is a session. If multi-tab is enabled in Settings → Agent, you
+can have several going at once.
+
+A running session keeps running if you switch tabs or close its tab. It stops
+only when you press stop, delete the session, or close the page.
+
+## Saving a conversation
+
+Two different things, and the difference matters:
+
+- **Save** writes the conversation to your folder as a plain markdown file. Ask
+  for "save this conversation". You get a transcript — an ordinary note.
+- **Distill** pulls the *conclusions* out of a discussion and writes them into
+  topic pages, merging into a page that already exists when one fits. Ask to
+  "turn this into notes".
+
+You can distill a conversation you saved weeks ago too — it is just a file, so
+name it and ask.
+
+When a discussion reaches a real conclusion, the assistant may offer once to
+distill it. It will not do it on its own.
+
+## When it cannot reach the web
+
+The assistant has no web access until you give it some, and it will tell you so
+rather than invent an answer. See `tools`.
+
+It also will not cite a link it did not actually open. If something rests on its
+general knowledge rather than a page it read, it says so.
+
+## Related
+
+What it can be given access to: `tools`. Long-term memory across conversations:
+`memory-and-sessions`. Choosing a model: `models`.
