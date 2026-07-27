@@ -67,8 +67,11 @@ export interface ToolCtx {
   /** Emit a UI event mid-tool (e.g. an artifact card). Optional so tools that
    *  don't need it stay simple; runners wire it to their onEvent. */
   emit?: (e: AgentEvent) => void
-  /** The turn's abort signal. An approval pause listens on it so a stopped
-   *  turn releases the waiting tool as 'stopped' instead of dangling. */
+  /** Aborted when the user presses stop. A tool that reaches the network or
+   *  grinds through a lot of files hands it on (or checks it) — otherwise the
+   *  work outlives the turn that asked for it, and the spinner with it. An
+   *  approval pause listens on it too, releasing the waiting tool as 'stopped'
+   *  instead of dangling. */
   signal?: AbortSignal
 }
 
@@ -531,7 +534,7 @@ const searchFiles = defineTool({
   }),
   describeCall: (a) =>
     `${a.names ? 'find' : 'search'} "${a.query}"${a.dir ? ` in ${a.dir}` : ''}`,
-  run: async ({ query, dir, names }) => {
+  run: async ({ query, dir, names }, ctx) => {
     const match = matcher(query)
     if (typeof match === 'string') return match
     const tree = dir ? await fs.readTreeFrom(dir) : await fs.readTree()
@@ -550,6 +553,9 @@ const searchFiles = defineTool({
     const out: string[] = []
     for (const p of all.filter(isTextFile)) {
       if (out.length >= MAX_SEARCH_RESULTS) break
+      // Reading every text file in a large KB is the one built-in that can run
+      // for a while; give up as soon as the user stops the turn.
+      if (ctx.signal?.aborted) return 'Search stopped.'
       const content = await fs.tryReadFile(p)
       if (!content) continue
       const lines = content.split('\n')
@@ -1455,7 +1461,9 @@ export interface ExternalToolSpec {
   description: string
   jsonSchema: Record<string, unknown>
   describeCall: (args: Record<string, unknown>) => string
-  run: (args: Record<string, unknown>) => Promise<string>
+  /** `signal` is the turn's: stop must cancel the request in flight, not just
+   *  the model stream that asked for it. */
+  run: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>
 }
 
 type McpTool = ReturnType<ReturnType<typeof useMcpStore>['activeToolsFor']>[number]
@@ -1466,9 +1474,9 @@ function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): Extern
     description: `[External MCP: ${t.serverName}] ${t.def.description}`.slice(0, 1024),
     jsonSchema: t.def.inputSchema,
     describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
-    run: async (args) => {
+    run: async (args, signal) => {
       try {
-        const out = await mcp.callTool(t.serverId, t.def.name, args)
+        const out = await mcp.callTool(t.serverId, t.def.name, args, signal)
         // A tool that actually ran earns a recall slot, so the next session in
         // this KB starts with it already active (see the store's `recalled`).
         // Only successful calls count — a tool that always throws shouldn't
@@ -1513,7 +1521,7 @@ export function httpToolSpecs(): ExternalToolSpec[] {
     description: spec.description,
     jsonSchema: httpToolJsonSchema(spec),
     describeCall: (args) => describeHttpCall(spec, args),
-    run: (args) => store.run(spec, args),
+    run: (args, signal) => store.run(spec, args, signal),
   }))
 }
 

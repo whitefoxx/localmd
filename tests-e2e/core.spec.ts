@@ -168,6 +168,22 @@ test('clicking a streaming thinking block keeps it open past the stream', async 
   await expect(block).toHaveAttribute('open', '')
 })
 
+test('stop settles the transcript even when the tool ignores it', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('hang 5000')
+  await input.press('Enter')
+
+  const spinner = page.locator('.codicon-modifier-spin')
+  await expect(spinner.first()).toBeVisible({ timeout: 10_000 })
+
+  await page.getByRole('button', { name: 'Stop' }).click()
+  // Immediately — the tool runs on in the background for another 5s, but the
+  // conversation is over as far as the user is concerned.
+  await expect(spinner).toHaveCount(0, { timeout: 1_000 })
+  await expect(page.getByRole('button', { name: /Send/ })).toBeVisible()
+})
+
 test('scrolling up during a stream detaches auto-follow', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)
