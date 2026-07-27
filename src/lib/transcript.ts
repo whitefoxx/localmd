@@ -82,6 +82,11 @@ function renderMessage(m: UiMessage): string {
       if (!p.pending) lines.push(`> 📄 Artifact: ${p.path}${p.title ? ` (${p.title})` : ''}`, '')
     } else if (p.type === 'image') {
       lines.push(`> 🖼 Generated image: ${p.path}`, '')
+    } else if (p.type === 'approval') {
+      const verb = p.deleted ? 'delete' : 'write'
+      const outcome =
+        p.decision === 'approved' ? 'approved' : p.decision === 'rejected' ? 'rejected' : 'stopped before a decision'
+      lines.push(`> ⏸ Asked to ${verb} ${p.path} — ${outcome}`, '')
     }
   }
   if (m.error) lines.push(`> ⚠ ${m.error}`, '')

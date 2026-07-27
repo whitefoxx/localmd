@@ -6,9 +6,10 @@
  *
  * write_file records a before/after snapshot in the review store so the user
  * can approve or discard agent edits afterwards (the browser equivalent of
- * trace-app's git-based review flow). delete_path rides the same store — an
- * undoable snapshot for text files, an always-ask confirmation for the
- * directories and binaries no snapshot can bring back.
+ * trace-app's git-based review flow). In ask mode a write instead pauses on an
+ * approval card in the conversation (stores/approvals) until the user decides
+ * there. delete_path composes both — an undoable snapshot for text files, an
+ * always-ask card for the directories and binaries no snapshot can bring back.
  */
 import { z } from 'zod'
 import * as fs from '@/lib/fs'
@@ -37,7 +38,7 @@ import {
   KB_TOOLS_CONFIG_PATH,
   type HttpToolSpec,
 } from '@/lib/httpTools'
-import { diffLines, collapseContext } from '@/lib/diff'
+import { diffLines, collapseContext, type DiffLine, type HunkLine } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { listAppDocsForAgent, appDocForAgent } from '@/lib/appDocs'
 import { WRITABLE, WRITABLE_BY_KEY, describeWritable } from '@/lib/appSettings'
@@ -47,6 +48,7 @@ import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
 import { useReviewStore } from '@/stores/review'
+import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { useFilesStore } from '@/stores/files'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
@@ -65,18 +67,87 @@ export interface ToolCtx {
   /** Emit a UI event mid-tool (e.g. an artifact card). Optional so tools that
    *  don't need it stay simple; runners wire it to their onEvent. */
   emit?: (e: AgentEvent) => void
+  /** The turn's abort signal. An approval pause listens on it so a stopped
+   *  turn releases the waiting tool as 'stopped' instead of dangling. */
+  signal?: AbortSignal
 }
 
-/** In ask mode, pause until the user approves the proposed content; returns
- *  whether the write may proceed (auto mode always may). */
+/** Longest diff an approval card carries. Cards persist with the session, so
+ *  a huge rewrite stores a capped diff plus a "+N more" count, never the lot. */
+const MAX_APPROVAL_DIFF_LINES = 300
+
+/** What the paused write shows: for a deletion, the doomed content (or a
+ *  directory's file listing) as pure removals; otherwise a collapsed diff. */
+function approvalDiff(
+  before: string | null,
+  after: string,
+  deleted: boolean,
+): { diff: HunkLine[]; added: number; removed: number; truncated: number } {
+  const lines: DiffLine[] = deleted
+    ? (before ?? '').split('\n').map((text) => ({ type: 'del', text }))
+    : diffLines(before ?? '', after)
+  const added = lines.filter((l) => l.type === 'add').length
+  const removed = lines.filter((l) => l.type === 'del').length
+  const collapsed = collapseContext(lines)
+  return {
+    diff: collapsed.slice(0, MAX_APPROVAL_DIFF_LINES),
+    added,
+    removed,
+    truncated: Math.max(0, collapsed.length - MAX_APPROVAL_DIFF_LINES),
+  }
+}
+
+interface AskMeta {
+  deleted?: boolean
+  dir?: boolean
+  restorable?: boolean
+}
+
+/** Pause on a decision card in the conversation until the user settles it.
+ *  The card (an `approval` message part) is the ONLY prompt — nothing pops
+ *  over the user's work; the turn simply waits where the request was made.
+ *  A stopped turn (abort signal) releases the pause as 'stopped'. */
+async function askUser(
+  ctx: ToolCtx,
+  path: string,
+  before: string | null,
+  after: string,
+  meta: AskMeta = {},
+): Promise<ApprovalDecision> {
+  if (ctx.signal?.aborted) return 'stopped'
+  const id = crypto.randomUUID()
+  ctx.emit?.({ type: 'approval', id, path, ...meta, ...approvalDiff(before, after, !!meta.deleted) })
+  const approvals = useApprovalsStore()
+  const onAbort = (): void => approvals.settle(id, 'stopped')
+  ctx.signal?.addEventListener('abort', onAbort, { once: true })
+  try {
+    const decision = await approvals.ask({ id, sessionId: ctx.sessionId, path })
+    ctx.emit?.({ type: 'approval_result', id, decision })
+    return decision
+  } finally {
+    ctx.signal?.removeEventListener('abort', onAbort)
+  }
+}
+
+/** Gate an ordinary write on the write mode: auto proceeds immediately (the
+ *  review store snapshots it afterwards), ask pauses on the user. */
 async function approved(
   ctx: ToolCtx,
   path: string,
   before: string | null,
   after: string,
-): Promise<boolean> {
-  if (useSettingsStore().state.writeMode !== 'ask') return true
-  return await useReviewStore().askApproval(ctx.sessionId, path, before, after)
+): Promise<ApprovalDecision> {
+  if (useSettingsStore().state.writeMode !== 'ask') return 'approved'
+  return askUser(ctx, path, before, after)
+}
+
+/** What the model is told when a write did not go through. A rejection is an
+ *  answer; a stop is the absence of one — conflating them taught the agent to
+ *  argue with a refusal nobody had made. */
+function notApproved(decision: Exclude<ApprovalDecision, 'approved'>, what: string): string {
+  return decision === 'rejected'
+    ? `User declined ${what}. Ask them how to proceed instead of retrying.`
+    : `The turn was stopped before the user decided about ${what} — nothing was changed, and they did NOT say no. If they follow up, just continue; re-propose the change if it is still wanted.`
 }
 
 async function performWrite(
@@ -195,9 +266,8 @@ const writeFile = defineTool({
   describeCall: (a) => `write ${a.path}`,
   run: async ({ path, content }, ctx) => {
     const before = await fs.tryReadFile(path)
-    if (!(await approved(ctx, path, before, content))) {
-      return `User declined the write to ${path}. Ask them how to proceed instead of retrying.`
-    }
+    const decision = await approved(ctx, path, before, content)
+    if (decision !== 'approved') return notApproved(decision, `the write to ${path}`)
     await performWrite(path, before, content)
     return `Wrote ${path} (${content.length} chars)`
   },
@@ -219,9 +289,8 @@ const editFile = defineTool({
     if (before === null) return `Error: file not found: ${path}`
     const result = applyEdit(before, old_string, new_string, replace_all ?? false)
     if (!result.ok) return `Error: ${result.error}`
-    if (!(await approved(ctx, path, before, result.content))) {
-      return `User declined the edit to ${path}. Ask them how to proceed instead of retrying.`
-    }
+    const decision = await approved(ctx, path, before, result.content)
+    if (decision !== 'approved') return notApproved(decision, `the edit to ${path}`)
     await performWrite(path, before, result.content)
     return `Edited ${path} (${result.count} replacement${result.count > 1 ? 's' : ''})`
   },
@@ -291,11 +360,12 @@ const deletePath = defineTool({
     // Ask when the user reviews every write — and always when the deletion is
     // final, since there is no snapshot to undo it with.
     if (useSettingsStore().state.writeMode === 'ask' || !restorable) {
-      const ok = await useReviewStore().askApproval(ctx.sessionId, target, before, '', {
+      const decision = await askUser(ctx, target, before, '', {
         deleted: true,
         dir: isDir,
+        restorable,
       })
-      if (!ok) return `User declined deleting ${target}. Ask them how to proceed instead of retrying.`
+      if (decision !== 'approved') return notApproved(decision, `deleting ${target}`)
     }
     await useFilesStore().deleteEntry(target, isDir)
     useReviewStore().recordDelete(target, before, isDir)
@@ -399,9 +469,8 @@ const createArtifact = defineTool({
   describeCall: (a) => `artifact: ${a.title}`,
   run: async ({ title, html }, ctx) => {
     const path = await uniqueArtifactPath(title)
-    if (!(await approved(ctx, path, null, html))) {
-      return `User declined the artifact ${path}. Ask them how to proceed instead of retrying.`
-    }
+    const decision = await approved(ctx, path, null, html)
+    if (decision !== 'approved') return notApproved(decision, `the artifact ${path}`)
     await performWrite(path, null, html)
     ctx.emit?.({ type: 'artifact', title, path })
     return `Created artifact "${title}" at ${path} (${html.length} chars). It opens in a sandboxed viewer; a clickable card was shown to the user — do not paste the HTML back.`
@@ -1058,7 +1127,9 @@ const manageTools = defineTool({
   },
 })
 
-/** Serialize, ask the user to approve the diff, write, and re-register. */
+/** Serialize, gate on the write mode like any other write (ask mode pauses on
+ *  the diff card; auto writes now and stays reviewable in Agent changes),
+ *  write, and re-register. */
 async function writeKbTools(
   ctx: ToolCtx,
   before: string | null,
@@ -1066,13 +1137,14 @@ async function writeKbTools(
   what: string,
 ): Promise<string> {
   const after = `${JSON.stringify({ tools }, null, 2)}\n`
-  const ok = await useReviewStore().askApproval(ctx.sessionId, KB_TOOLS_CONFIG_PATH, before, after)
-  if (!ok) return `The user declined the change (${what}). Ask what they want instead.`
+  const decision = await approved(ctx, KB_TOOLS_CONFIG_PATH, before, after)
+  if (decision !== 'approved') return notApproved(decision, `the tool change (${what})`)
   await performWrite(KB_TOOLS_CONFIG_PATH, before, after)
   const store = useToolsStore()
   await store.reloadKbTools()
-  // The trust gate guards tools that arrive unseen with a cloned KB. These the
-  // user just approved by diff, so approving twice would only be noise.
+  // The trust gate guards tools that arrive unseen with a cloned KB. These
+  // were authored in the user's own conversation (and in ask mode approved by
+  // diff), so gating them again would only be noise.
   store.trustKbTools()
   return `Done: ${what}. ${KB_TOOLS_CONFIG_PATH} now defines ${tools.length} tool(s); they are callable from your next message.`
 }
@@ -1200,7 +1272,13 @@ const gitRestore = defineTool({
         failed.push(`${path} (already matches HEAD)`)
         continue
       }
-      if (!(await approved(ctx, path, before, head))) {
+      const decision = await approved(ctx, path, before, head)
+      if (decision === 'stopped') {
+        // The turn is dead — asking about the remaining paths would dangle.
+        failed.push(`${path} (turn stopped before a decision — not restored)`)
+        break
+      }
+      if (decision === 'rejected') {
         failed.push(`${path} (declined by the user)`)
         continue
       }

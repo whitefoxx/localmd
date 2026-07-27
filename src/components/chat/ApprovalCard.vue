@@ -1,0 +1,115 @@
+<script setup lang="ts">
+/**
+ * An ask-first write, decided where it was proposed: the card sits in the
+ * transcript right under the tool call that paused, carrying the diff and the
+ * two buttons. The turn hangs until one of them is pressed — there is nothing
+ * to miss and nowhere else to look.
+ *
+ * Once decided (or once the turn dies), the card keeps its place as a
+ * read-only record of what was asked and what was answered.
+ */
+import { computed } from 'vue'
+import { useApprovalsStore } from '@/stores/approvals'
+import type { MessagePart } from '@/stores/chat'
+
+const props = defineProps<{ part: Extract<MessagePart, { type: 'approval' }> }>()
+
+const approvals = useApprovalsStore()
+
+const pending = computed(() => !props.part.decision)
+
+/** One line describing what is being asked. Deletions carry their own warning
+ *  weight; a plain write is introduced by whether the file exists yet. */
+const headline = computed(() => {
+  const p = props.part
+  if (p.deleted) return p.restorable ? 'chat.approvalDelete' : 'chat.approvalDeleteFinal'
+  return p.removed > 0 ? 'chat.approvalWrite' : 'chat.approvalCreate'
+})
+
+const decisionLabel = computed(() =>
+  props.part.decision === 'approved'
+    ? 'chat.approvalApproved'
+    : props.part.decision === 'rejected'
+      ? 'chat.approvalRejected'
+      : 'chat.approvalStopped',
+)
+
+const decisionIcon = computed(() =>
+  props.part.decision === 'approved'
+    ? 'codicon-check text-added'
+    : props.part.decision === 'rejected'
+      ? 'codicon-close text-removed'
+      : 'codicon-stop-circle text-fg-3',
+)
+</script>
+
+<template>
+  <div
+    class="my-2.5 rounded-xl border px-3 py-2.5"
+    :class="pending ? 'border-accent/40 bg-accent/5' : 'border-border bg-bg-1'"
+  >
+    <div class="flex items-center gap-1.5 min-w-0">
+      <span
+        class="codicon codicon-sm shrink-0"
+        :class="
+          part.deleted
+            ? 'codicon-diff-removed text-removed'
+            : part.removed > 0
+              ? 'codicon-diff-modified text-accent'
+              : 'codicon-diff-added text-added'
+        "
+      />
+      <span class="text-sm font-mono text-fg-1 truncate flex-1" :title="part.path">{{ part.path }}</span>
+      <span v-if="!part.deleted" class="shrink-0 text-xs font-mono tabular-nums">
+        <span class="text-added">+{{ part.added }}</span>
+        <span class="text-removed ml-1.5">−{{ part.removed }}</span>
+      </span>
+    </div>
+
+    <p
+      class="mt-0.5 text-xs leading-relaxed"
+      :class="part.deleted && !part.restorable ? 'text-removed' : 'text-fg-3'"
+    >
+      {{ $t(headline) }}
+    </p>
+
+    <div
+      v-if="part.diff.length"
+      class="mt-1.5 max-h-64 overflow-auto rounded bg-bg-2 font-mono text-xs leading-5 selectable"
+    >
+      <template v-for="(line, i) in part.diff" :key="i">
+        <div v-if="line.type === 'skip'" class="px-2 py-0.5 text-center text-fg-3 select-none">
+          {{ $t('review.unchangedLines', { n: line.count }) }}
+        </div>
+        <div
+          v-else
+          class="px-2 whitespace-pre-wrap break-words"
+          :class="{
+            'bg-added/10 text-added': line.type === 'add',
+            'bg-removed/10 text-removed': line.type === 'del',
+            'text-fg-2': line.type === 'same',
+          }"
+        >{{ line.text || ' ' }}</div>
+      </template>
+      <div v-if="part.truncated" class="px-2 py-0.5 text-center text-fg-3 select-none">
+        {{ $t('chat.approvalMoreLines', { n: part.truncated }) }}
+      </div>
+    </div>
+
+    <!-- Pending: the two buttons the turn is waiting on. -->
+    <div v-if="pending" class="mt-2 flex items-center gap-2">
+      <button class="btn-primary text-xs" @click="approvals.settle(part.approvalId, 'approved')">
+        {{ $t('chat.approvalApprove') }}
+      </button>
+      <button class="btn text-xs" @click="approvals.settle(part.approvalId, 'rejected')">
+        {{ $t('chat.approvalReject') }}
+      </button>
+      <span class="text-xs text-fg-3">{{ $t('chat.approvalPending') }}</span>
+    </div>
+    <!-- Decided: a quiet receipt. -->
+    <div v-else class="mt-2 flex items-center gap-1.5 text-xs text-fg-3">
+      <span class="codicon codicon-sm" :class="decisionIcon" />
+      {{ $t(decisionLabel) }}
+    </div>
+  </div>
+</template>

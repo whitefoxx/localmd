@@ -46,7 +46,11 @@ async function runTool(
   let ok = false
   let out = ''
   try {
-    const result = await spec.run(args, { sessionId: opts.sessionId, emit: opts.onEvent })
+    const result = await spec.run(args, {
+      sessionId: opts.sessionId,
+      emit: opts.onEvent,
+      signal: opts.signal,
+    })
     ok = !(typeof result === 'string' && result.startsWith('Error'))
     out = typeof result === 'string' ? result : JSON.stringify(result)
     return result

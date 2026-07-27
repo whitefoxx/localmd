@@ -67,7 +67,7 @@ test('agent delete is undoable from the review panel', async ({ page }) => {
   await expect(tree.getByText('index.md', { exact: true }).first()).toBeVisible()
 })
 
-test('deleting a folder asks first and says it cannot be undone', async ({ page }) => {
+test('deleting a folder asks first, in the conversation, and honors Reject', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const tree = page.locator('aside')
   await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
@@ -76,15 +76,19 @@ test('deleting a folder asks first and says it cannot be undone', async ({ page 
   await input.fill('delete wiki')
   await input.press('Enter')
 
-  // Nothing opens over the user's work: the pause shows up on the activity bar,
-  // and the diff is one click away.
-  const awaiting = page.getByTitle(/waiting for your approval/)
-  await expect(awaiting).toBeVisible({ timeout: 10_000 })
-  await awaiting.click()
-  await expect(page.getByText('everything listed below is gone for good')).toBeVisible()
+  // The decision card appears in the transcript itself — warning, doomed file
+  // listing, and the two buttons; the turn hangs on them.
+  await expect(page.getByText('everything listed below is gone for good')).toBeVisible({
+    timeout: 10_000,
+  })
+  await expect(page.getByText('wiki/index.md')).toBeVisible()
   await page.getByRole('button', { name: 'Reject' }).click()
-  await page.keyboard.press('Escape')
-  await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
+
+  // Rejected: the folder survives, the card becomes a receipt, and the model
+  // is told it was declined.
+  await expect(page.getByText('Rejected', { exact: true })).toBeVisible()
+  await expect(page.getByText(/Done: User declined/)).toBeVisible()
+  await expect(tree.locator('[data-tree-path="wiki"]')).toBeVisible()
 })
 
 test('switching tabs reveals and selects the file in the tree', async ({ page }) => {

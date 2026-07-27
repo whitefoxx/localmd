@@ -1,13 +1,15 @@
 /**
- * manage_tools — the agent authoring its own HTTP tools. What matters here is
- * the gate: nothing persists without the user approving the actual file diff,
- * and a proposed spec can never carry a stored key to a new host.
+ * manage_tools — the agent authoring its own HTTP tools. The save gate follows
+ * the write mode like every other write: auto lands the file (reviewable
+ * afterwards), ask pauses on the user approving the actual diff — and a
+ * proposed spec can never carry a stored key to a new host.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
 import { useReviewStore } from '@/stores/review'
+import { useApprovalsStore } from '@/stores/approvals'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
 import { useSetupStore } from '@/stores/setup'
@@ -32,14 +34,15 @@ const VALID = {
   response: { mode: 'json', pick: 'items[]', template: '- {{title}}' },
 }
 
-/** Spin the queue until the approval prompt is registered, then answer it. */
+/** Ask mode: spin the queue until the approval card is up, then answer it. */
 async function answer(approved: boolean): Promise<void> {
-  const review = useReviewStore()
+  const approvals = useApprovalsStore()
   for (let i = 0; i < 100; i++) {
-    if (review.changes.some((c) => c.awaiting)) break
+    if (approvals.pending.some((r) => r.path === KB_TOOLS_CONFIG_PATH)) break
     await new Promise((r) => setTimeout(r, 0))
   }
-  review.decide(KB_TOOLS_CONFIG_PATH, approved)
+  const req = approvals.pending.find((r) => r.path === KB_TOOLS_CONFIG_PATH)!
+  approvals.settle(req.id, approved ? 'approved' : 'rejected')
 }
 
 beforeEach(() => {
@@ -61,19 +64,34 @@ describe('list', () => {
 })
 
 describe('save', () => {
-  it('writes the KB file once the user approves the diff', async () => {
-    const run = manage({ action: 'save', tool: JSON.stringify(VALID) })
-    await answer(true)
-    expect(await run).toMatch(/Done: add example_search/)
+  it('auto mode writes immediately — reviewable afterwards, like any write', async () => {
+    expect(await manage({ action: 'save', tool: JSON.stringify(VALID) })).toMatch(
+      /Done: add example_search/,
+    )
 
     const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
       tools: Array<{ name: string; request: { url: string } }>
     }
     expect(written.tools).toHaveLength(1)
     expect(written.tools[0].name).toBe('example_search')
+    // The write landed in the post-hoc review list, so it can still be undone.
+    expect(useReviewStore().changes.map((c) => c.path)).toContain(KB_TOOLS_CONFIG_PATH)
   })
 
-  it('writes nothing when the user declines', async () => {
+  it('ask mode writes the KB file once the user approves the diff', async () => {
+    useSettingsStore().state.writeMode = 'ask'
+    const run = manage({ action: 'save', tool: JSON.stringify(VALID) })
+    await answer(true)
+    expect(await run).toMatch(/Done: add example_search/)
+
+    const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
+      tools: Array<{ name: string }>
+    }
+    expect(written.tools).toHaveLength(1)
+  })
+
+  it('ask mode writes nothing when the user declines', async () => {
+    useSettingsStore().state.writeMode = 'ask'
     const run = manage({ action: 'save', tool: JSON.stringify(VALID) })
     await answer(false)
     expect(await run).toMatch(/declined/)
@@ -81,16 +99,13 @@ describe('save', () => {
   })
 
   it('replaces a tool of the same name instead of duplicating it', async () => {
-    const first = manage({ action: 'save', tool: JSON.stringify(VALID) })
-    await answer(true)
-    await first
+    await manage({ action: 'save', tool: JSON.stringify(VALID) })
 
-    const second = manage({
+    const second = await manage({
       action: 'save',
       tool: JSON.stringify({ ...VALID, description: 'Now with a better description.' }),
     })
-    await answer(true)
-    expect(await second).toMatch(/Done: update example_search/)
+    expect(second).toMatch(/Done: update example_search/)
 
     const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
       tools: Array<{ description: string }>
@@ -122,15 +137,13 @@ describe('save', () => {
   })
 
   it('points the agent at request_setup for a key the tool needs', async () => {
-    const run = manage({
+    const out = await manage({
       action: 'save',
       tool: JSON.stringify({
         ...VALID,
         request: { method: 'GET', url: 'https://api.example.com/s?q={{query}}&k={{secret:demo_key}}' },
       }),
     })
-    await answer(true)
-    const out = await run
     expect(out).toMatch(/request_setup/)
     expect(out).toMatch(/demo_key/)
     // Collecting it as chat text is the thing this must never suggest.
@@ -140,13 +153,11 @@ describe('save', () => {
 
 describe('remove', () => {
   it('drops a tool the KB defines', async () => {
-    const add = manage({ action: 'save', tool: JSON.stringify(VALID) })
-    await answer(true)
-    await add
+    await manage({ action: 'save', tool: JSON.stringify(VALID) })
 
-    const run = manage({ action: 'remove', name: 'example_search' })
-    await answer(true)
-    expect(await run).toMatch(/Done: remove example_search/)
+    expect(await manage({ action: 'remove', name: 'example_search' })).toMatch(
+      /Done: remove example_search/,
+    )
     const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as { tools: unknown[] }
     expect(written.tools).toEqual([])
   })
@@ -178,7 +189,8 @@ describe('save_bundle', () => {
     },
   ]
 
-  it('writes a whole integration under ONE approval', async () => {
+  it('ask mode writes a whole integration under ONE approval', async () => {
+    useSettingsStore().state.writeMode = 'ask'
     const run = manage({
       action: 'save_bundle',
       bundle: 'demo',
@@ -195,17 +207,13 @@ describe('save_bundle', () => {
   })
 
   it('replaces the previous members instead of orphaning them', async () => {
-    const first = manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
-    await answer(true)
-    await first
+    await manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
 
-    const second = manage({
+    await manage({
       action: 'save_bundle',
       bundle: 'demo',
       tools: JSON.stringify([BUNDLE[0]]), // the second tool is gone this time
     })
-    await answer(true)
-    await second
 
     const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as {
       tools: Array<{ name: string }>
@@ -224,13 +232,11 @@ describe('save_bundle', () => {
   })
 
   it('removes an entire bundle by name', async () => {
-    const add = manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
-    await answer(true)
-    await add
+    await manage({ action: 'save_bundle', bundle: 'demo', tools: JSON.stringify(BUNDLE) })
 
-    const run = manage({ action: 'remove', name: 'demo' })
-    await answer(true)
-    expect(await run).toMatch(/remove the demo bundle \(2 tools\)/)
+    expect(await manage({ action: 'remove', name: 'demo' })).toMatch(
+      /remove the demo bundle \(2 tools\)/,
+    )
     const written = JSON.parse((await fs.tryReadFile(KB_TOOLS_CONFIG_PATH))!) as { tools: unknown[] }
     expect(written.tools).toEqual([])
   })

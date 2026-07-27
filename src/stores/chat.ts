@@ -4,7 +4,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useSetupStore } from '@/stores/setup'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
-import { useReviewStore } from '@/stores/review'
+import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { usePlanStore } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
 import { buildSystemPrompt } from '@/agent/prompt'
@@ -31,6 +31,7 @@ import { describeQuote } from '@/lib/quoteContext'
 import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
+import type { HunkLine } from '@/lib/diff'
 import type { SelectionRef } from '@/stores/composer'
 import type { ModelMessage } from 'ai'
 
@@ -86,6 +87,23 @@ export type MessagePart =
   | { type: 'artifact'; title: string; path: string; pending?: boolean }
   /** A generated image saved into the KB (generate_image tool), shown inline. */
   | { type: 'image'; path: string }
+  /** An ask-first write paused on the user — the decision card in the
+   *  transcript. Carries a capped display diff (never the full contents, which
+   *  stay in the waiting tool call); `decision` is stamped when the user
+   *  settles it, turning the card into a read-only record. */
+  | {
+      type: 'approval'
+      approvalId: string
+      path: string
+      deleted?: boolean
+      dir?: boolean
+      restorable?: boolean
+      diff: HunkLine[]
+      added: number
+      removed: number
+      truncated?: number
+      decision?: ApprovalDecision
+    }
 
 /** Tool results (file contents, diffs, tab dumps) can be large; keep only a
  *  preview in the transcript so persisted sessions don't balloon. */
@@ -306,7 +324,7 @@ export const useChatStore = defineStore('chat', () => {
       background.delete(id)
       // Release the session's per-subsystem state (paused approvals, plan,
       // deferred-tool activations).
-      useReviewStore().rejectAwaiting(id)
+      useApprovalsStore().clearSession(id)
       usePlanStore().clear(id)
       useMcpStore().clearActivated(id)
     }
@@ -347,9 +365,14 @@ export const useChatStore = defineStore('chat', () => {
     if (!Array.isArray(s.history)) s.history = []
     if (typeof s.favorite !== 'boolean') s.favorite = false // pre-favorite sessions
     // A session persisted mid-stream (reload during a turn) can carry unsettled
-    // parts: stop forever-spinning tool calls and drop never-written artifacts.
+    // parts: stop forever-spinning tool calls, drop never-written artifacts,
+    // and settle approval cards nobody can answer any more (the waiting tool
+    // died with the page — the write never happened).
     for (const m of s.uiMessages) {
-      for (const p of m.parts) if (p.type === 'tool' && p.status === 'running') p.status = 'error'
+      for (const p of m.parts) {
+        if (p.type === 'tool' && p.status === 'running') p.status = 'error'
+        if (p.type === 'approval' && !p.decision) p.decision = 'stopped'
+      }
       m.parts = m.parts.filter((p) => !(p.type === 'artifact' && p.pending))
     }
     if (!addTab(s)) return
@@ -438,8 +461,9 @@ export const useChatStore = defineStore('chat', () => {
     background.delete(id)
     const t = tabs.value.find((x) => x.id === id)
     if (t) t.running = false
-    // Writes paused for approval must not dangle after the turn dies.
-    useReviewStore().rejectAwaiting(id)
+    // Writes paused for approval must not dangle after the turn dies — they
+    // release as 'stopped', which is not a rejection.
+    useApprovalsStore().clearSession(id)
   }
 
   function stopAll(): void {
@@ -448,7 +472,7 @@ export const useChatStore = defineStore('chat', () => {
     steerQueue.clear()
     background.clear()
     for (const t of tabs.value) t.running = false
-    useReviewStore().rejectAwaiting()
+    useApprovalsStore().clearSession()
   }
 
   /** A leading /skill-name invocation forces that skill: the full SKILL.md
@@ -722,6 +746,25 @@ export const useChatStore = defineStore('chat', () => {
         }
       } else if (e.type === 'image') {
         parts.push({ type: 'image', path: e.path })
+      } else if (e.type === 'approval') {
+        parts.push({
+          type: 'approval',
+          approvalId: e.id,
+          path: e.path,
+          deleted: e.deleted,
+          dir: e.dir,
+          restorable: e.restorable,
+          diff: e.diff,
+          added: e.added,
+          removed: e.removed,
+          truncated: e.truncated,
+        })
+      } else if (e.type === 'approval_result') {
+        const p = parts.find(
+          (x): x is Extract<MessagePart, { type: 'approval' }> =>
+            x.type === 'approval' && x.approvalId === e.id,
+        )
+        if (p) p.decision = e.decision
       } else if (e.type === 'limit') {
         assistant.stoppedAtLimit = true
       } else {
@@ -851,9 +894,14 @@ export const useChatStore = defineStore('chat', () => {
       // A setup card only makes sense while its turn is waiting on it; an
       // aborted turn would otherwise leave one on screen with nothing behind it.
       useSetupStore().clearSession(session.id)
+      // Same for a paused approval: the tool behind it is dead, so release it
+      // as 'stopped' and stamp the card (the abort listener usually beat us to
+      // it — both paths are idempotent).
+      useApprovalsStore().clearSession(session.id)
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever.
       for (const p of assistant.parts) {
+        if (p.type === 'approval' && !p.decision) p.decision = 'stopped'
         if (p.type === 'tool' && p.status === 'running') {
           p.status = assistant.error ? 'error' : 'done'
           p.elapsedMs = Date.now() - (p.startedAt ?? Date.now())

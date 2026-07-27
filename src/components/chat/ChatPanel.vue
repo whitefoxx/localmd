@@ -21,6 +21,7 @@ import { BUILTIN_DIR } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
+import ApprovalCard from './ApprovalCard.vue'
 import type { MessagePart } from '@/stores/chat'
 import { t } from '@/i18n'
 
@@ -1103,6 +1104,8 @@ watch(
               />
             </button>
             <KbImageThumb v-else-if="part.type === 'image'" :path="part.path" />
+            <!-- An ask-first write paused on the user: decided right here. -->
+            <ApprovalCard v-else-if="part.type === 'approval'" :part="part" />
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div
               v-else

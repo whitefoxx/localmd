@@ -10,7 +10,9 @@ import * as g from '@/lib/git'
 import { createMemoryRoot } from '@/lib/memfs'
 import { useFilesStore } from '@/stores/files'
 import { useReviewStore } from '@/stores/review'
+import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { useSettingsStore } from '@/stores/settings'
+import type { AgentEvent } from './types'
 import { TOOLS, type ToolCtx } from './tools'
 
 // The settings store persists through a watcher; node has no localStorage.
@@ -19,7 +21,9 @@ globalThis.localStorage ??= {
   setItem: () => {},
 } as unknown as Storage
 
-const ctx: ToolCtx = { sessionId: 's1' }
+/** Events the tools emit (approval cards etc.), reset per test. */
+let events: AgentEvent[] = []
+const ctx: ToolCtx = { sessionId: 's1', emit: (e) => events.push(e) }
 
 function tool(name: string) {
   const spec = TOOLS.find((t) => t.name === name)
@@ -40,9 +44,25 @@ async function until(cond: () => boolean): Promise<void> {
   for (let i = 0; i < 100 && !cond(); i++) await new Promise((r) => setTimeout(r, 0))
 }
 
+/** Wait for the approval pause on `path`, then settle it as the user would
+ *  from the card in the conversation. */
+async function decide(path: string, decision: ApprovalDecision): Promise<void> {
+  const approvals = useApprovalsStore()
+  await until(() => approvals.pending.some((r) => r.path === path))
+  approvals.settle(approvals.pending.find((r) => r.path === path)!.id, decision)
+}
+
+/** The approval card the tool emitted for `path` (its diff is display data). */
+function approvalCard(path: string) {
+  return events.find(
+    (e): e is Extract<AgentEvent, { type: 'approval' }> => e.type === 'approval' && e.path === path,
+  )
+}
+
 beforeEach(async () => {
   setActivePinia(createPinia())
   fs.setRoot(createMemoryRoot())
+  events = []
   await fs.writeFile('wiki/note.md', '# Note\n\nbody\n')
   await fs.writeFile('raw/papers/paper.pdf', 'binary-ish')
   await fs.writeFile('inbox/a.md', 'A')
@@ -65,11 +85,8 @@ describe('delete_path', () => {
   })
 
   it('tolerates "./" and trailing slashes in the path', async () => {
-    const review = useReviewStore()
     const pending = del({ path: './inbox/sub/', recursive: true })
-    await until(() => review.changes.some((c) => c.awaiting))
-    expect(review.changes[0].path).toBe('inbox/sub')
-    review.decide('inbox/sub', true)
+    await decide('inbox/sub', 'approved')
 
     expect(await pending).toContain('Deleted directory inbox/sub')
     expect(await fs.exists('inbox/sub/b.md')).toBe(false)
@@ -94,26 +111,26 @@ describe('delete_path', () => {
   })
 
   it('asks before a directory delete even in auto mode, and honors a rejection', async () => {
-    const review = useReviewStore()
     const pending = del({ path: 'inbox', recursive: true })
-    await until(() => review.changes.some((c) => c.awaiting))
+    await decide('inbox', 'rejected')
 
-    const change = review.changes[0]
-    expect(change).toMatchObject({ path: 'inbox', deleted: true, dir: true, awaiting: true })
-    // The approval diff lists what would disappear.
-    expect(change.before).toContain('inbox/a.md')
-    expect(change.before).toContain('inbox/sub/b.md')
-
-    review.decide('inbox', false)
     expect(await pending).toContain('User declined')
     expect(await fs.exists('inbox/a.md')).toBe(true)
+    // Nothing was written, so nothing lands in the post-hoc review list.
+    expect(useReviewStore().count).toBe(0)
+
+    // The card the user decided on listed what would have disappeared.
+    const card = approvalCard('inbox')!
+    expect(card).toMatchObject({ deleted: true, dir: true, restorable: false })
+    const shown = card.diff.map((l) => (l.type === 'skip' ? '' : l.text)).join('\n')
+    expect(shown).toContain('inbox/a.md')
+    expect(shown).toContain('inbox/sub/b.md')
   })
 
   it('deletes the directory once approved, and never restores its listing as a file', async () => {
     const review = useReviewStore()
     const pending = del({ path: 'inbox', recursive: true })
-    await until(() => review.changes.some((c) => c.awaiting))
-    review.decide('inbox', true)
+    await decide('inbox', 'approved')
 
     expect(await pending).toContain('2 file(s)')
     expect(await fs.exists('inbox/a.md')).toBe(false)
@@ -127,9 +144,7 @@ describe('delete_path', () => {
   it('asks before deleting a binary in auto mode (no snapshot to undo with)', async () => {
     const review = useReviewStore()
     const pending = del({ path: 'raw/papers/paper.pdf' })
-    await until(() => review.changes.some((c) => c.awaiting))
-    expect(review.changes[0].before).toBe(null)
-    review.decide('raw/papers/paper.pdf', true)
+    await decide('raw/papers/paper.pdf', 'approved')
 
     expect(await pending).toContain('cannot be undone')
     expect(await fs.exists('raw/papers/paper.pdf')).toBe(false)
@@ -139,13 +154,35 @@ describe('delete_path', () => {
 
   it('asks before deleting a text file in ask mode', async () => {
     useSettingsStore().state.writeMode = 'ask'
-    const review = useReviewStore()
     const pending = del({ path: 'wiki/note.md' })
-    await until(() => review.changes.some((c) => c.awaiting))
-    review.decide('wiki/note.md', false)
+    await decide('wiki/note.md', 'rejected')
 
     expect(await pending).toContain('User declined')
     expect(await fs.exists('wiki/note.md')).toBe(true)
+  })
+
+  it('tells the model a stopped turn is NOT a rejection', async () => {
+    const pending = del({ path: 'inbox', recursive: true })
+    await decide('inbox', 'stopped')
+
+    const out = await pending
+    expect(out).toContain('stopped before the user decided')
+    expect(out).toContain('did NOT say no')
+    expect(out).not.toContain('declined')
+    expect(await fs.exists('inbox/a.md')).toBe(true)
+  })
+
+  it('an aborted turn releases the pause as stopped by itself', async () => {
+    const controller = new AbortController()
+    const spec = TOOLS.find((t) => t.name === 'delete_path')!
+    const pending = spec.run({ path: 'inbox', recursive: true }, { ...ctx, signal: controller.signal })
+    await until(() => useApprovalsStore().pending.length > 0)
+    controller.abort()
+
+    expect(await pending).toContain('stopped before the user decided')
+    expect(await fs.exists('inbox/a.md')).toBe(true)
+    // The card was stamped so the transcript records what happened.
+    expect(events.some((e) => e.type === 'approval_result' && e.decision === 'stopped')).toBe(true)
   })
 })
 

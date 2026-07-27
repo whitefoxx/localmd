@@ -98,7 +98,7 @@ const viewImageSchema = z.object({
 /** Runs one agent turn; returns the updated conversation history. */
 export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   const model = toLanguageModel(opts.profile)
-  const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent }
+  const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent, signal: opts.signal }
   // Monotonic id per turn correlating a tool's start with its result so the UI
   // can show a spinner + timer (git push / image gen etc. can be slow — the user
   // needs to see it's working). Subagents wrap onEvent and drop ids.
@@ -479,10 +479,12 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
             allowSubagent: false,
             onEvent: (e) => {
               // Surface tool activity (indented) and usage; the subagent's text
-              // comes back as this tool's result.
+              // comes back as this tool's result. Approval pauses pass through
+              // whole — the card must reach the transcript or the subagent
+              // hangs on a decision nobody was shown.
               if (e.type === 'tool') {
                 opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
-              } else if (e.type === 'usage') {
+              } else if (e.type === 'usage' || e.type === 'approval' || e.type === 'approval_result') {
                 opts.onEvent(e)
               }
             },

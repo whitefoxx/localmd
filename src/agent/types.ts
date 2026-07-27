@@ -1,3 +1,6 @@
+import type { HunkLine } from '@/lib/diff'
+import type { ApprovalDecision } from '@/stores/approvals'
+
 /** Events emitted while an agent turn runs, consumed by the chat UI. */
 export type AgentEvent =
   | { type: 'text'; delta: string }
@@ -21,6 +24,29 @@ export type AgentEvent =
   /** A generated image saved into the KB (generate_image tool) — the chat shows
    *  it inline; `path` is its KB location. */
   | { type: 'image'; path: string }
+  /** An ask-first write paused on the user: renders as a decision card in the
+   *  transcript, right where the request was made. `diff` is precomputed and
+   *  capped at emit time so the part stays small enough to persist; `truncated`
+   *  counts diff lines dropped by the cap. The tool stays blocked until the
+   *  matching `approval_result`. */
+  | {
+      type: 'approval'
+      id: string
+      path: string
+      /** The change REMOVES the path; the diff is then the doomed content. */
+      deleted?: boolean
+      /** The removed path is a directory — the diff is its file listing. */
+      dir?: boolean
+      /** A rejected/undone deletion can put the file back (text snapshot). */
+      restorable?: boolean
+      diff: HunkLine[]
+      added: number
+      removed: number
+      truncated?: number
+    }
+  /** The paused write above was decided (or the turn died first) — stamps the
+   *  card so it becomes a read-only record of what happened. */
+  | { type: 'approval_result'; id: string; decision: ApprovalDecision }
   /** The turn stopped because it ran out of steps, not because the work was
    *  done. Without this the two are indistinguishable: the model's last
    *  sentence often promises an action that never came, and any plan it was
