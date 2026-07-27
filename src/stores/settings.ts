@@ -21,7 +21,11 @@ import {
 } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 import { normalizeHttpToolList, type HttpToolSpec } from '@/lib/httpTools'
-import { defaultInstalledIds } from '@/lib/toolCatalog'
+import {
+  defaultInstalledIds,
+  WEBCLI_EXTENSION_ID,
+  LEGACY_WEBCLI_EXTENSION_IDS,
+} from '@/lib/toolCatalog'
 import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
 
@@ -134,6 +138,14 @@ function toolEntriesFrom(obj: Record<string, unknown>): string[] {
   return defaultInstalledIds()
 }
 
+/** A profile from before WebCLI was on the Chrome Web Store points at the old
+ *  unpacked-extension id; rewrite it so the webcli entry stays installed. */
+function migrateWebcliId(list: McpServerConfig[]): McpServerConfig[] {
+  return list.map((s) =>
+    LEGACY_WEBCLI_EXTENSION_IDS.includes(s.url) ? { ...s, url: WEBCLI_EXTENSION_ID } : s,
+  )
+}
+
 function toolSecretsFrom(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object') return {}
   const out: Record<string, string> = {}
@@ -151,7 +163,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
     agentMultiTab: obj.agentMultiTab === true,
     agentMaxTabs: clampMaxTabs(obj.agentMaxTabs),
-    mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
+    mcpServers: migrateWebcliId(normalizeMcpServerList(obj.mcpServers, () => newProfileId())),
     hotkeys: normalizeHotkeyOverrides(obj.hotkeys),
     healthDirs: Array.isArray(obj.healthDirs)
       ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
