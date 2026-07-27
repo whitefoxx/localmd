@@ -652,13 +652,24 @@ function removeDetail(): void {
             <p class="text-xs text-fg-3 mt-0.5 leading-relaxed">
               {{ $t(`settings.catalog.${e.id}.desc`) }}
             </p>
-            <a
-              v-if="e.homepage"
-              :href="e.homepage"
-              target="_blank"
-              rel="noopener"
-              class="inline-block text-xs text-accent hover:underline mt-1.5"
-            >{{ $t('settings.catalogLearnMore') }}</a>
+            <div class="flex items-center gap-3 flex-wrap mt-1.5">
+              <a
+                v-if="e.homepage"
+                :href="e.homepage"
+                target="_blank"
+                rel="noopener"
+                class="text-xs text-accent hover:underline"
+              >{{ $t('settings.catalogLearnMore') }}</a>
+              <a
+                v-if="e.repo"
+                :href="e.repo"
+                target="_blank"
+                rel="noopener"
+                class="flex items-center gap-1 text-xs text-accent hover:underline"
+              >
+                <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -724,13 +735,24 @@ function removeDetail(): void {
     <div v-if="detailEntry?.kind === 'extension' && detailServerConfig" class="space-y-1.5">
       <label class="block text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.extensionId') }}</label>
       <div class="text-xs font-mono text-fg-2 break-all">{{ detailServerConfig.url }}</div>
-      <a
-        v-if="detailEntry.homepage"
-        :href="detailEntry.homepage"
-        target="_blank"
-        rel="noopener"
-        class="inline-block text-xs text-accent hover:underline"
-      >{{ $t('settings.installFromStore') }}</a>
+      <div class="flex items-center gap-3 flex-wrap">
+        <a
+          v-if="detailEntry.homepage"
+          :href="detailEntry.homepage"
+          target="_blank"
+          rel="noopener"
+          class="text-xs text-accent hover:underline"
+        >{{ $t('settings.installFromStore') }}</a>
+        <a
+          v-if="detailEntry.repo"
+          :href="detailEntry.repo"
+          target="_blank"
+          rel="noopener"
+          class="flex items-center gap-1 text-xs text-accent hover:underline"
+        >
+          <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
+        </a>
+      </div>
     </div>
 
     <!-- The only fields a preset leaves to the user. -->

@@ -54,6 +54,9 @@ export interface CatalogEntry {
   defaultInstalled?: boolean
   /** Where to read about / install it. */
   homepage?: string
+  /** Its source / companion repository, when there is one worth reading — the
+   *  homepage is a store listing or a landing page, which is a different thing. */
+  repo?: string
   /** kind 'extension' | 'mcp': the server entry an install adds. For an
    *  extension the url IS the extension id (the Port transport). */
   server?: { name: string; url: string }
@@ -357,6 +360,7 @@ export const CATALOG: CatalogEntry[] = [
     kind: 'extension',
     featured: true,
     homepage: 'https://chromewebstore.google.com/detail/webcli/jnhfdhpafndcbppkphhfpecflhogngge',
+    repo: 'https://github.com/whitefoxx/webcli-skills',
     server: { name: 'webcli', url: WEBCLI_EXTENSION_ID },
   },
   {

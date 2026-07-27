@@ -119,6 +119,7 @@ export default {
     catalogNeedsWebcli: 'needs WebCLI',
     catalogNotConnected: 'not connected',
     catalogLearnMore: 'Learn more →',
+    catalogRepo: 'Docs and source on GitHub',
     catalog: {
       webcli: {
         title: 'WebCLI browser extension',
@@ -337,6 +338,7 @@ export default {
     catalogNeedsWebcli: '需要 WebCLI',
     catalogNotConnected: '未连接',
     catalogLearnMore: '了解更多 →',
+    catalogRepo: 'GitHub 上的文档与源码',
     catalog: {
       webcli: {
         title: 'WebCLI 浏览器扩展',
