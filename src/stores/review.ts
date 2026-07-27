@@ -49,6 +49,9 @@ export const useReviewStore = defineStore('review', () => {
 
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
+  /** At least one write is paused on the user. Nothing pops open on its own, so
+   *  this is what the activity bar turns into a visible "your turn". */
+  const awaiting = computed(() => changes.value.some((c) => c.awaiting))
 
   /** Kind of the recorded change; absent fields mean "an ordinary write". */
   type ChangeMeta = Pick<PendingChange, 'deleted' | 'dir'>
@@ -86,7 +89,11 @@ export const useReviewStore = defineStore('review', () => {
   }
 
   /** Ask-first mode: register the proposed write and pause the tool until the
-   *  user decides. Resolves false when rejected or the turn is stopped. */
+   *  user decides. Resolves false when rejected or the turn is stopped.
+   *
+   *  Deliberately does NOT open the panel: a dialog thrown over the screen
+   *  interrupts whatever the user was reading. The activity bar carries the
+   *  pending count and flags the wait — they open the diff when they are ready. */
   function askApproval(
     sessionId: string,
     path: string,
@@ -95,7 +102,6 @@ export const useReviewStore = defineStore('review', () => {
     meta: ChangeMeta = {},
   ): Promise<boolean> {
     upsert(path, before, after, meta).awaiting = true
-    panelOpen.value = true
     return new Promise((resolve) => {
       resolvers.get(path)?.resolve(false) // a superseded ask counts as rejected
       resolvers.set(path, { sessionId, resolve })
@@ -183,6 +189,7 @@ export const useReviewStore = defineStore('review', () => {
     panelOpen,
     changes,
     count,
+    awaiting,
     recordWrite,
     recordDelete,
     askApproval,

@@ -321,15 +321,18 @@ function closeKb(): void {
         <button :class="actBtn" :title="$t('layout.kbHealth')" @click="ui.healthOpen = true">
           <span class="codicon codicon-pulse" />
         </button>
+        <!-- Agent changes. Nothing opens by itself — this button IS the notice,
+             so a write paused on the user pulses instead of sitting quiet. -->
         <button
           v-if="review.count"
           :class="actBtn"
-          :title="$t('layout.reviewChanges')"
+          :title="review.awaiting ? $t('layout.reviewAwaiting') : $t('layout.reviewChanges')"
           @click="review.panelOpen = true"
         >
           <span class="codicon codicon-diff text-accent" />
           <span
-            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-accent text-white text-[10px] leading-4 text-center font-medium"
+            class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-white text-[10px] leading-4 text-center font-medium"
+            :class="review.awaiting ? 'bg-removed animate-pulse' : 'bg-accent'"
           >{{ review.count }}</span>
         </button>
 

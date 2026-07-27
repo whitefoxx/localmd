@@ -76,10 +76,12 @@ test('deleting a folder asks first and says it cannot be undone', async ({ page 
   await input.fill('delete wiki')
   await input.press('Enter')
 
-  // The panel opens by itself: a folder deletion always needs a decision.
-  await expect(page.getByText('everything listed below is gone for good')).toBeVisible({
-    timeout: 10_000,
-  })
+  // Nothing opens over the user's work: the pause shows up on the activity bar,
+  // and the diff is one click away.
+  const awaiting = page.getByTitle(/waiting for your approval/)
+  await expect(awaiting).toBeVisible({ timeout: 10_000 })
+  await awaiting.click()
+  await expect(page.getByText('everything listed below is gone for good')).toBeVisible()
   await page.getByRole('button', { name: 'Reject' }).click()
   await page.keyboard.press('Escape')
   await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
