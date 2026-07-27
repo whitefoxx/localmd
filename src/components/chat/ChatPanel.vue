@@ -410,6 +410,24 @@ function pickSkill(name: string): void {
   })
 }
 
+/* ── Skill chips above the composer ──────────────────────────────────────── */
+
+/** How many skills get a chip of their own. The rest are one ▲ away: a folder
+ *  with twenty skills should not bury the composer under rows of buttons. */
+const SKILL_CHIPS = 4
+const chipSkills = computed(() => skills.all.slice(0, SKILL_CHIPS))
+const skillMenuOpen = ref(false)
+
+function toggleSkillMenu(): void {
+  skillMenuOpen.value = !skillMenuOpen.value
+  if (skillMenuOpen.value) void skills.refresh() // lazy re-scan, like the / menu
+}
+
+function runSkill(name: string): void {
+  skillMenuOpen.value = false
+  preset(`/${name} `)
+}
+
 /* ── sending ─────────────────────────────────────────────────────────────── */
 
 /** Citation declarations across the WHOLE transcript: messages render part by
@@ -1204,12 +1222,12 @@ watch(
     <!-- Presets: KB skills when present, built-in prompts otherwise -->
     <div
       v-if="!chat.messages.length"
-      class="px-3 pb-2 flex gap-2 shrink-0 flex-wrap w-full"
+      class="relative px-3 pb-2 flex items-center gap-2 shrink-0 flex-wrap w-full"
       :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
     >
       <template v-if="skills.all.length">
         <button
-          v-for="s in skills.all.slice(0, 4)"
+          v-for="s in chipSkills"
           :key="s.name"
           class="btn text-xs"
           :title="s.description"
@@ -1217,6 +1235,35 @@ watch(
         >
           /{{ s.name }}
         </button>
+        <button
+          v-if="skills.all.length > chipSkills.length"
+          class="btn text-xs px-1.5"
+          :title="$t('chat.allSkills')"
+          @click="toggleSkillMenu"
+        >
+          <span
+            class="codicon codicon-sm"
+            :class="skillMenuOpen ? 'codicon-chevron-down' : 'codicon-chevron-up'"
+          />
+        </button>
+        <!-- The full list, opening upward over the transcript. Capped height so
+             a hundred skills scroll instead of covering the conversation. -->
+        <template v-if="skillMenuOpen">
+          <div class="fixed inset-0 z-10" @click="skillMenuOpen = false" />
+          <div
+            class="absolute bottom-full left-3 right-3 mb-1 z-20 max-h-64 overflow-y-auto rounded-md border border-border bg-bg-1 shadow-lg"
+          >
+            <button
+              v-for="s in skills.all"
+              :key="s.name"
+              class="w-full flex items-baseline gap-2 px-2 py-1.5 text-left text-xs text-fg-2 hover:bg-bg-2"
+              @click="runSkill(s.name)"
+            >
+              <span class="font-mono shrink-0">/{{ s.name }}</span>
+              <span class="truncate text-fg-3">{{ s.description }}</span>
+            </button>
+          </div>
+        </template>
       </template>
       <template v-else>
         <button
