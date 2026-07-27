@@ -3,6 +3,7 @@
  * with provider 'mock' routes here. The last user message is a tiny script:
  *
  *   echo <text>              stream <text> back (chunked)
+ *   think <text>             stream <text> as a thinking trail, then reply
  *   write <path> <content>   run the real write_file tool, then confirm
  *   delete <path>            run the real delete_path tool (recursive)
  *   plan                     exercise update_plan (3 steps, all done)
@@ -76,6 +77,13 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
   } else if (writeMatch) {
     const result = await runTool('write_file', { path: writeMatch[1], content: writeMatch[2] }, opts)
     reply = `Done: ${result}`
+    await streamText(reply, opts.onEvent)
+  } else if (script.startsWith('think ')) {
+    for (const chunk of script.slice('think '.length).match(/.{1,8}/gs) ?? []) {
+      opts.onEvent({ type: 'thinking', delta: chunk })
+      await sleep(20)
+    }
+    reply = 'Done thinking'
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('delete ')) {
     const target = script.slice('delete '.length).trim()

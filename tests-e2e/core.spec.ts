@@ -129,6 +129,39 @@ test('plan tool renders the checklist card', async ({ page }) => {
   await expect(page.getByText('2/3', { exact: true })).toBeVisible()
 })
 
+/** The thinking block, whole while it streams, gone once the reply starts. */
+const thinkingBlock = (page: import('@playwright/test').Page) =>
+  page.locator('details:has(summary:has-text("Thinking"))').first()
+
+test('a thinking block streams in full, then folds itself away', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('think ' + '推理中。'.repeat(300))
+  await input.press('Enter')
+
+  const block = thinkingBlock(page)
+  await expect(block).toHaveAttribute('open', '', { timeout: 10_000 })
+  // No clamp any more: what is written is what is on screen.
+  const clipped = await block.locator('div').first().evaluate((el) => el.scrollHeight > el.clientHeight + 2)
+  expect(clipped).toBe(false)
+
+  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 10_000 })
+  await expect(block).not.toHaveAttribute('open', '')
+})
+
+test('clicking a streaming thinking block keeps it open past the stream', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('think ' + '推理中。'.repeat(300))
+  await input.press('Enter')
+
+  const block = thinkingBlock(page)
+  await expect(block).toHaveAttribute('open', '', { timeout: 10_000 })
+  await block.locator('div').first().click() // in the trail, not on the summary
+  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 10_000 })
+  await expect(block).toHaveAttribute('open', '')
+})
+
 test('scrolling up during a stream detaches auto-follow', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)

@@ -20,7 +20,6 @@ import { mentionQueryAt, filterFiles } from '@/lib/mentions'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
-import ThinkingText from './ThinkingText.vue'
 import type { MessagePart } from '@/stores/chat'
 import { t } from '@/i18n'
 
@@ -305,9 +304,12 @@ async function copyBlock(e: MouseEvent, text: string): Promise<void> {
   flashCopy(e.currentTarget as HTMLElement, ok)
 }
 
-/* A thinking block auto-expands while it is actively streaming (the tail of the
- * live assistant message), then STAYS open — the user collapses it by hand, and
- * that choice sticks (tracked in `collapsedThinking`, keyed by message+part). */
+/* A thinking block is shown in full while it streams — the thought is the only
+ * thing happening, so nothing is hidden — and folds itself away once the stream
+ * moves on, leaving the transcript to the reply. Two things override that fold:
+ * an explicit toggle (`thinkingChoice`), and any click inside the block WHILE it
+ * streamed (`thinkingHeld`) — someone reading or selecting the trail should not
+ * have it yanked shut under them. Both are keyed by message+part. */
 function thinkingStreaming(m: UiMessage, i: number): boolean {
   return (
     chat.running &&
@@ -316,23 +318,29 @@ function thinkingStreaming(m: UiMessage, i: number): boolean {
   )
 }
 
-const collapsedThinking = ref<Set<string>>(new Set())
+const thinkingChoice = ref<Map<string, boolean>>(new Map())
+const thinkingHeld = ref<Set<string>>(new Set())
 function thinkKey(m: UiMessage, i: number): string {
   return `${m.id}:${i}`
 }
 function thinkingOpen(m: UiMessage, i: number): boolean {
-  return thinkingStreaming(m, i) || !collapsedThinking.value.has(thinkKey(m, i))
-}
-function onThinkingToggle(m: UiMessage, i: number, e: Event): void {
-  // Ignore programmatic toggles while streaming forces it open; only record the
-  // user's own collapse/expand once the block is settled.
-  if (thinkingStreaming(m, i)) return
-  const open = (e.target as HTMLDetailsElement).open
   const key = thinkKey(m, i)
-  const next = new Set(collapsedThinking.value)
-  if (open) next.delete(key)
-  else next.add(key)
-  collapsedThinking.value = next
+  const choice = thinkingChoice.value.get(key)
+  if (choice !== undefined) return choice
+  return thinkingStreaming(m, i) || thinkingHeld.value.has(key)
+}
+/** The summary's own click, with the native toggle suppressed: `open` is bound
+ *  to our state, so the user's choice has to live there to survive a re-render. */
+function toggleThinking(m: UiMessage, i: number): void {
+  const next = new Map(thinkingChoice.value)
+  next.set(thinkKey(m, i), !thinkingOpen(m, i))
+  thinkingChoice.value = next
+}
+/** Any click inside a still-streaming block retires its auto-collapse. */
+function holdThinking(m: UiMessage, i: number): void {
+  const key = thinkKey(m, i)
+  if (!thinkingStreaming(m, i) || thinkingHeld.value.has(key)) return
+  thinkingHeld.value = new Set(thinkingHeld.value).add(key)
 }
 
 /* ── @-mention autocomplete ──────────────────────────────────────────────── */
@@ -1036,13 +1044,13 @@ watch(
               v-else-if="part.type === 'thinking'"
               class="text-xs text-fg-3"
               :open="thinkingOpen(m, i)"
-              @toggle="onThinkingToggle(m, i, $event)"
+              @click="holdThinking(m, i)"
             >
-              <summary class="cursor-pointer select-none hover:text-fg-2">
+              <summary class="cursor-pointer select-none hover:text-fg-2" @click.prevent="toggleThinking(m, i)">
                 <span class="codicon codicon-sm codicon-lightbulb mr-1" />{{ $t('chat.thinking') }}
                 <span v-if="thinkTime(part)" class="ml-1 tabular-nums text-fg-3">· {{ thinkTime(part) }}</span>
               </summary>
-              <ThinkingText :text="part.text" :streaming="thinkingStreaming(m, i)" />
+              <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">{{ part.text }}</div>
             </details>
             <button
               v-else-if="part.type === 'artifact'"
