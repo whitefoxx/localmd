@@ -21,6 +21,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useTtsStore } from '@/stores/tts'
 import * as fs from '@/lib/fs'
 import { previewScroll } from '@/lib/viewMemory'
+import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import {
   HIGHLIGHT_COLORS,
@@ -68,6 +69,7 @@ let annotations: DocxAnnotation[] = []
 /** Text of the live selection, stashed for the mark we are about to create. */
 let selectedText = ''
 const popup = ref<{ x: number; y: number; id: string; existing: boolean } | null>(null)
+const { el: popupEl, style: popupStyle } = useMarkPopupPosition(popup, scroller)
 const noteEditor = ref<{
   id: string
   excerpt: string
@@ -461,8 +463,9 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="popup"
+        ref="popupEl"
         class="bm-popup fixed z-50 flex items-center gap-1.5 px-2 py-1.5 rounded border border-border bg-bg-1 shadow-lg"
-        :style="{ left: `${popup.x - 76}px`, top: `${popup.y + 8}px` }"
+        :style="popupStyle"
         @mousedown.prevent
       >
         <button

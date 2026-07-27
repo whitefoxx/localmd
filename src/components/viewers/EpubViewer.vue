@@ -8,6 +8,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
 import { useTtsStore } from '@/stores/tts'
 import { highlightSentence } from '@/composables/useTtsHighlight'
+import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
@@ -39,6 +40,7 @@ const tocOpen = ref(false)
 const fontPct = ref(110)
 const selCfi = ref<string | null>(null)
 const popup = ref<{ x: number; y: number; cfi: string; existing: boolean } | null>(null)
+const { el: popupEl, style: popupStyle } = useMarkPopupPosition(popup, host)
 const progressPct = ref(0)
 const chapterLabel = ref('')
 
@@ -1080,8 +1082,9 @@ watch(
     <Teleport to="body">
       <div
         v-if="popup"
+        ref="popupEl"
         class="bm-popup fixed z-50 flex items-center gap-1.5 px-2 py-1.5 rounded border border-border bg-bg-1 shadow-lg"
-        :style="{ left: `${popup.x - 76}px`, top: `${popup.y + 8}px` }"
+        :style="popupStyle"
       >
         <button
           v-for="c in HIGHLIGHT_COLORS"
