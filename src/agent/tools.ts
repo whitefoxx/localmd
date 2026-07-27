@@ -39,6 +39,7 @@ import {
 } from '@/lib/httpTools'
 import { diffLines, collapseContext } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
+import { listAppDocs, appDoc } from '@/lib/appDocs'
 import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
@@ -586,6 +587,45 @@ const useSkill = defineTool({
       ? `\n\nBundled resources (read with read_file when the instructions reference them):\n${skill.resources.map((r) => `- ${r}`).join('\n')}`
       : ''
     return `# Skill: ${skill.name}\n\n${skill.body}${resources}`
+  },
+})
+
+/**
+ * The app's own manual, on demand.
+ *
+ * Neither the topic list nor any body is in the system prompt: the index is one
+ * call away and a body is two, so the always-on cost is this description alone
+ * however far the manual grows. That is the point — it is meant to cover the
+ * whole app eventually, and a listing that grew with it would be paid for on
+ * every step of every turn by the turns that never ask.
+ *
+ * Reference, not workflow — which is why it is not a skill. Skills are listed
+ * in the prompt because the agent must recognise when to run one; nobody
+ * "runs" a fact about where keys are stored.
+ */
+const appHelp = defineTool({
+  name: 'app_help',
+  description:
+    "Look up how localmd itself works — tools, MCP servers, API keys, the knowledge-base layout, skills, document indexing and citations, git sync, models, memory, and where each thing is stored. Call with no topic to list what is covered, then again with one. Use this whenever the user asks about the app rather than about their content ('where are my keys stored?', 'what's the difference between a tool and an MCP server?', 'what happens if I switch KB?') — answer from the doc, not from memory.",
+  schema: z.object({
+    topic: z
+      .string()
+      .optional()
+      .describe('Topic id from the index. Omit to get the index.'),
+  }),
+  describeCall: (a) => (a.topic ? `help: ${a.topic}` : 'help: contents'),
+  run: async ({ topic }) => {
+    const doc = topic ? appDoc(topic) : undefined
+    if (doc) return `# ${doc.title}\n\n${doc.body}`
+
+    // A guessed id ("api-keys" for "keys") is the common way to arrive here, so
+    // a miss returns the same full index as calling with no topic — enough to
+    // pick correctly on the next call rather than guess a second time.
+    const contents = listAppDocs()
+      .map((d) => `- ${d.id}: ${d.title} — ${d.summary}`)
+      .join('\n')
+    const miss = topic ? `No topic "${topic}". ` : ''
+    return `${miss}Topics — call app_help again with one of these ids:\n${contents}`
   },
 })
 
@@ -1319,6 +1359,7 @@ export const TOOLS: ToolSpec[] = [
   saveTranscript,
   updatePlan,
   useSkill,
+  appHelp,
   enableTools,
   manageTools,
   requestSetup,
