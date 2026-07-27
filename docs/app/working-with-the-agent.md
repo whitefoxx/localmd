@@ -23,6 +23,10 @@ Plain language works. Some examples of the range:
 Two things help: **@** references a specific file, and **/** runs a saved
 workflow directly.
 
+It answers — and reasons — in the language you wrote in, and switches when you
+do. The interface language in Settings → General is only what it falls back to
+when a message gives it nothing to go on, like a bare path or a dropped file.
+
 ## Whether edits land immediately
 
 **Settings → Agent → Write mode** has two options:

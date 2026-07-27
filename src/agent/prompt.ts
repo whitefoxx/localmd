@@ -74,11 +74,12 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
     prompt += `\n\nThe knowledge base folder currently open is named "${kbName}" — this is the KB (directory) name; all paths are relative to it.`
   }
 
-  // The system prompt is always English; the *replies* follow the user's chosen
-  // interface language. Injected dynamically so switching the app language takes
-  // effect on the next turn.
+  // The system prompt is always English; the *replies* follow the conversation.
+  // The interface language is only the fallback — someone whose app is in
+  // English writing to the agent in Chinese wants Chinese back. Injected
+  // dynamically so switching the app language takes effect on the next turn.
   const langName = LOCALE_NAMES[getLocale()]
-  prompt += `\n\nResponse language: the user's interface is set to ${langName}. Write your reasoning (thinking) and your replies primarily in ${langName}. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink". If the user writes to you in another language, follow their lead for that exchange.`
+  prompt += `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink".`
 
   const skills = await listSkills()
   if (skills.length) {
