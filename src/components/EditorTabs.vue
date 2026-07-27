@@ -1,9 +1,27 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { baseName } from '@/lib/wiki'
 
 const files = useFilesStore()
+
+/* ── keep the active tab visible ────────────────────────────────────────────
+   The strip scrolls horizontally, so a file opened from the tree, a wikilink
+   or a hotkey can land on a tab that is off to one side. Bring it back in
+   view whenever the active file changes. */
+const strip = ref<HTMLElement | null>(null)
+
+watch(
+  () => files.currentPath,
+  async (path) => {
+    if (!path) return
+    await nextTick()
+    strip.value
+      ?.querySelector<HTMLElement>(`[data-tab="${CSS.escape(path)}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  },
+  { immediate: true },
+)
 
 const ctxItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
@@ -46,11 +64,13 @@ function onAuxClick(e: MouseEvent, path: string): void {
 <template>
   <div
     v-if="files.openTabs.length"
+    ref="strip"
     class="flex items-stretch h-9 border-b border-border bg-bg-1 overflow-x-auto shrink-0 panel-scroll"
   >
     <button
       v-for="path in files.openTabs"
       :key="path"
+      :data-tab="path"
       class="group flex items-center gap-1.5 px-3 text-sm border-r border-border whitespace-nowrap"
       :class="
         path === files.currentPath
