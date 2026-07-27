@@ -3,27 +3,34 @@
  * Settings → Tools.
  *
  * The main page answers one question — what can the agent reach right now — so
- * it lists only what is actually installed. Browsing the catalog, and reading
- * the tools inside a pack or a server, are sub-pages: a page that shows every
- * option at once stops showing the user their own setup.
+ * everything installed sits in ONE list, one integration per row, whoever
+ * provided it. Two small tags carry what used to be three top-level groups:
+ *   - source (Preset / Yours / KB) — who defined it, the only axis that is
+ *     true of every row
+ *   - kind (MCP / Extension) — present only on rows backed by a live
+ *     connection, because that is exactly where "is it up?" is a question
+ * A row with no kind tag is a set of HTTP requests: nothing to connect to, so
+ * its tool count is a fact about the config rather than a status. That is why
+ * only live rows get a status dot and a colour — the previous layout coloured
+ * some counts green and others grey with nothing naming the difference.
  *
- * Three groups that do not overlap, because the previous layout offered two
- * unexplained "add" affordances:
- *   - Recommended — presets, installed by checkbox on the catalog page, and
- *     read-only here: their definition is ours, not the user's.
- *   - Your tools — one HTTP request each, written here or by the agent.
- *   - Tool servers — an external MCP program contributing a whole bundle.
+ * Everything with a body of its own is a sub-page: the catalog, what is inside
+ * a pack or a server, the tools in a group, and both editors. Main stays a
+ * list plus two doors — describe the goal to the agent, or browse recommended.
+ * Writing an HTTP tool by hand and adding an MCP server are the same act at a
+ * lower level, so both sit behind Advanced.
  *
  * Keys live in their own group and are only ever typed by the user. The agent
  * can say WHICH key a tool needs (it writes `{{secret:id}}`) and where to get
  * it, but a value never passes through a conversation.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSettingsStore, newProfileId } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
+import { isExtensionId } from '@/lib/mcp'
 import {
   normalizeHttpTool,
   sanitizeToolName,
@@ -45,8 +52,20 @@ const RESERVED = new Set(TOOLS.map((x) => x.name))
 
 /* ── navigation ────────────────────────────────────────────────────────── */
 
-type View = { name: 'main' } | { name: 'catalog' } | { name: 'entry'; id: string } | { name: 'server'; id: string }
+type View =
+  | { name: 'main' }
+  | { name: 'catalog' }
+  | { name: 'entry'; id: string }
+  | { name: 'server'; id: string }
+  | { name: 'group'; key: string }
+  | { name: 'editor' }
+  | { name: 'serverForm' }
+  | { name: 'help' }
+
 const view = ref<View>({ name: 'main' })
+/** Where an editor returns to — it can be opened from main or from a detail
+ *  page, and landing somewhere else than you came from reads as a bug. */
+const returnTo = ref<View>({ name: 'main' })
 
 function open(v: View): void {
   view.value = v
@@ -54,6 +73,35 @@ function open(v: View): void {
 function back(): void {
   view.value = { name: 'main' }
 }
+
+/**
+ * The settings pane scrolls, and every view of this section renders into that
+ * one container — so without this, opening a sub-page from halfway down the
+ * list starts you halfway down the sub-page, and coming back loses your place
+ * in the list.
+ *
+ * A watcher rather than a call in each navigation helper: there are eight ways
+ * to change `view` (open, back, the editors' open/close, remove…) and one of
+ * them would eventually be missed. Vue's default 'pre' flush runs this before
+ * the re-render, so `scrollTop` is still the outgoing view's position here.
+ */
+const rootEl = ref<HTMLElement | null>(null)
+const mainScroll = ref(0)
+
+function scroller(): HTMLElement | null {
+  return rootEl.value?.closest('.panel-scroll') ?? null
+}
+
+watch(view, (to, from) => {
+  const el = scroller()
+  if (!el) return
+  if (from.name === 'main' && to.name !== 'main') mainScroll.value = el.scrollTop
+  const target = to.name === 'main' ? mainScroll.value : 0
+  void nextTick(() => {
+    const after = scroller()
+    if (after) after.scrollTop = target
+  })
+})
 
 /* ── recommended ───────────────────────────────────────────────────────── */
 
@@ -69,23 +117,138 @@ function entryServer(entry: CatalogEntry) {
   return entry.server ? mcp.servers.find((s) => s.config.url === entry.server!.url) : undefined
 }
 
-function entryToolCount(entry: CatalogEntry): number {
-  return entryServer(entry)?.tools.length ?? entry.tools?.length ?? 0
-}
-
-function entryStatus(entry: CatalogEntry): { label: string; cls: string } | null {
-  const server = entryServer(entry)
-  if (!server) return null
-  if (server.status === 'ok') return { label: t('settings.status.nTools', { n: server.tools.length }), cls: 'text-added' }
-  if (server.status === 'connecting') return { label: t('settings.status.connecting'), cls: 'text-fg-3' }
-  if (server.status === 'off') return { label: t('settings.status.off'), cls: 'text-fg-3' }
-  return { label: t('settings.catalogNotConnected'), cls: 'text-removed' }
-}
-
-/** Servers the user added by hand — the catalog's own are shown above instead,
- *  so no server appears twice and each list means one thing. */
+/** Servers the user added by hand — the catalog's own are shown as their entry
+ *  instead, so no server appears twice and each row means one integration. */
 const catalogServerUrls = computed(() => new Set(CATALOG.filter((e) => e.server).map((e) => e.server!.url)))
 const ownServers = computed(() => mcp.servers.filter((s) => !catalogServerUrls.value.has(s.config.url)))
+
+/* ── the installed list ────────────────────────────────────────────────── */
+
+type Source = 'preset' | 'yours' | 'kb'
+
+interface InstalledRow {
+  key: string
+  title: string
+  source: Source
+  /** 'mcp' | 'extension' when a live connection backs this row, else null. */
+  kind: 'mcp' | 'extension' | null
+  label: string
+  labelCls: string
+  /** Status dot, live rows only. */
+  dotCls: string | null
+  target: View
+}
+
+/** One connection's state as a row reads it. Shared by catalog-installed
+ *  servers and hand-added ones so the same state never renders two ways. */
+function liveStatus(s: (typeof mcp.servers)[number] | undefined): {
+  label: string
+  labelCls: string
+  dotCls: string
+} {
+  if (!s) return { label: t('settings.catalogNotConnected'), labelCls: 'text-removed', dotCls: 'bg-removed' }
+  if (s.status === 'off') return { label: t('settings.status.off'), labelCls: 'text-fg-3', dotCls: 'bg-fg-3' }
+  if (s.status === 'connecting')
+    return { label: t('settings.status.connecting'), labelCls: 'text-fg-3', dotCls: 'bg-fg-3' }
+  if (s.status === 'error')
+    return {
+      label: s.error?.slice(0, 60) ?? t('settings.status.failed'),
+      labelCls: 'text-removed',
+      dotCls: 'bg-removed',
+    }
+  return {
+    label: nTools(s.tools.length),
+    labelCls: 'text-added',
+    dotCls: 'bg-added',
+  }
+}
+
+/** A count that is a fact about the config, not a connection — no dot, no
+ *  colour, so green never has to mean two different things. */
+function staticCount(n: number): { label: string; labelCls: string } {
+  return { label: nTools(n), labelCls: 'text-fg-3' }
+}
+
+/** The user's own tools plus the open KB's approved set, grouped by
+ *  integration — an integration the agent built is one row, not eight. */
+const yourGroups = computed(() => groupByBundle([...store.state.httpTools, ...tools.kbActive]))
+
+/** A group's stable identity: its bundle name, or the lone tool's id. */
+function groupKey(g: { bundle: string | null; tools: HttpToolSpec[] }): string {
+  return g.bundle ?? g.tools[0].id
+}
+
+/** KB-scoped tools are defined by a file the agent and git also write, so they
+ *  are shown but not edited here. */
+function isKbTool(spec: HttpToolSpec): boolean {
+  return tools.kbActive.some((s) => s.id === spec.id)
+}
+
+const installedRows = computed<InstalledRow[]>(() => {
+  const rows: InstalledRow[] = []
+
+  for (const e of installedEntries.value) {
+    const live = e.server ? liveStatus(entryServer(e)) : null
+    const shape = live ?? staticCount(e.tools?.length ?? 0)
+    rows.push({
+      key: `entry:${e.id}`,
+      title: t(`settings.catalog.${e.id}.title`),
+      source: 'preset',
+      kind: e.server ? (e.kind === 'extension' ? 'extension' : 'mcp') : null,
+      label: shape.label,
+      labelCls: shape.labelCls,
+      dotCls: live ? live.dotCls : null,
+      target: { name: 'entry', id: e.id },
+    })
+  }
+
+  for (const g of yourGroups.value) {
+    rows.push({
+      key: `group:${groupKey(g)}`,
+      title: g.bundle ?? g.tools[0].name,
+      source: isKbTool(g.tools[0]) ? 'kb' : 'yours',
+      kind: null,
+      ...staticCount(g.tools.length),
+      dotCls: null,
+      target: { name: 'group', key: groupKey(g) },
+    })
+  }
+
+  for (const s of ownServers.value) {
+    const live = liveStatus(s)
+    rows.push({
+      key: `server:${s.config.id}`,
+      title: s.config.name,
+      source: s.source === 'kb' ? 'kb' : 'yours',
+      kind: isExtensionId(s.config.url) ? 'extension' : 'mcp',
+      label: live.label,
+      labelCls: live.labelCls,
+      dotCls: live.dotCls,
+      target: { name: 'server', id: s.config.id },
+    })
+  }
+
+  return rows
+})
+
+const SOURCE_LABEL: Record<Source, string> = {
+  preset: 'settings.sourcePreset',
+  yours: 'settings.sourceYours',
+  kb: 'settings.sourceKb',
+}
+
+/** The help page's sections, in order. Reference material rather than a
+ *  primary action, so it lives one click away instead of on the main page —
+ *  but it is the only place that states where each thing is written, which is
+ *  the question every tag on the list raises and none of them answers. */
+const HELP_SECTIONS = ['what', 'sources', 'storage', 'kbSwitch', 'keys', 'gotchas'] as const
+
+/** "1 tools" reads as a bug, and single-tool rows are the common case now that
+ *  every integration is one row. The catalog has no plural machinery — two
+ *  keys is the whole of it. */
+function nTools(n: number): string {
+  return n === 1 ? t('settings.status.oneTool') : t('settings.status.nTools', { n })
+}
 
 /* ── keys ──────────────────────────────────────────────────────────────── */
 
@@ -142,7 +305,6 @@ function onSecretInput(id: string, e: Event): void {
 
 type ParamRow = { key: string } & HttpToolParam
 
-const editorOpen = ref(false)
 const editingId = ref<string | null>(null)
 const form = ref({
   name: '',
@@ -161,26 +323,10 @@ const testArgs = ref<Record<string, string>>({})
 const testOutput = ref('')
 const testing = ref(false)
 
-/** Everything under "Your tools": the user's own plus the open KB's approved
- *  set, grouped by integration. */
-const yourGroups = computed(() =>
-  groupByBundle([...store.state.httpTools, ...tools.kbActive]),
-)
-
-/** KB-scoped tools are defined by a file the agent and git also write, so they
- *  are shown but not edited here. */
-function isKbTool(spec: HttpToolSpec): boolean {
-  return tools.kbActive.some((s) => s.id === spec.id)
-}
-
-/** Concrete starting points — an empty "describe what you want" box is a wall;
- *  three examples show what kind of answer works. */
-const connectExamples = computed(() => t('settings.connectExamples').split('|'))
-
 /** Hand the request to the agent instead of the form. It lands in the composer
  *  as an editable draft, so the user still decides what gets asked. */
-function askAgent(prefill?: string): void {
-  ui.pendingPrompt = prefill ? t('settings.connectPrefill', { what: prefill }) : t('settings.agentToolPrompt')
+function askAgent(): void {
+  ui.pendingPrompt = t('settings.agentToolPrompt')
   ui.settingsOpen = false
 }
 
@@ -248,7 +394,6 @@ const draftSpec = computed<HttpToolSpec | null>(() =>
 const draftSecrets = computed(() => (draftSpec.value ? secretRefs(draftSpec.value) : []))
 
 function resetEditor(): void {
-  editorOpen.value = false
   editingId.value = null
   params.value = []
   testArgs.value = {}
@@ -268,13 +413,14 @@ function resetEditor(): void {
 }
 
 function newTool(): void {
+  returnTo.value = view.value
   resetEditor()
-  editorOpen.value = true
+  view.value = { name: 'editor' }
 }
 
 function editTool(spec: HttpToolSpec): void {
+  returnTo.value = view.value
   resetEditor()
-  editorOpen.value = true
   editingId.value = spec.id
   form.value = {
     name: spec.name,
@@ -289,6 +435,17 @@ function editTool(spec: HttpToolSpec): void {
     transport: spec.transport ?? 'auto',
   }
   params.value = Object.entries(spec.params).map(([key, p]) => ({ key, ...p }))
+  view.value = { name: 'editor' }
+}
+
+/** Return where the editor was opened from — unless that page is gone, which
+ *  is exactly what happens when you delete the last tool in a group. */
+function closeEditor(): void {
+  const to = returnTo.value
+  const stillThere =
+    to.name !== 'group' || yourGroups.value.some((g) => groupKey(g) === to.key)
+  resetEditor()
+  view.value = stillThere ? to : { name: 'main' }
 }
 
 function addParam(): void {
@@ -303,12 +460,13 @@ function saveTool(): void {
   if (!spec || nameTaken.value) return
   const list = store.state.httpTools.filter((s) => s.id !== spec.id)
   store.state.httpTools = [...list, spec]
-  resetEditor()
+  closeEditor()
 }
 
 function removeTool(id: string): void {
   store.state.httpTools = store.state.httpTools.filter((s) => s.id !== id)
-  if (editingId.value === id) resetEditor()
+  if (view.value.name === 'editor') closeEditor()
+  else if (view.value.name === 'group' && !detailGroup.value) back()
 }
 
 async function runTest(): Promise<void> {
@@ -327,14 +485,12 @@ async function runTest(): Promise<void> {
 
 /* ── tool servers ──────────────────────────────────────────────────────── */
 
-const serverFormOpen = ref(false)
 const mcpName = ref('')
 const mcpUrl = ref('')
 const mcpToken = ref('')
 const editMcpId = ref<string | null>(null)
 
 function resetMcpForm(): void {
-  serverFormOpen.value = false
   editMcpId.value = null
   mcpName.value = ''
   mcpUrl.value = ''
@@ -342,16 +498,26 @@ function resetMcpForm(): void {
 }
 
 function newServer(): void {
+  returnTo.value = view.value
   resetMcpForm()
-  serverFormOpen.value = true
+  view.value = { name: 'serverForm' }
 }
 
 function startEditMcp(s: { id: string; name: string; url: string; token?: string }): void {
-  serverFormOpen.value = true
+  returnTo.value = view.value
   editMcpId.value = s.id
   mcpName.value = s.name
   mcpUrl.value = s.url
   mcpToken.value = s.token ?? ''
+  view.value = { name: 'serverForm' }
+}
+
+function closeMcpForm(): void {
+  const to = returnTo.value
+  const stillThere =
+    to.name !== 'server' || store.state.mcpServers.some((s) => s.id === to.id)
+  resetMcpForm()
+  view.value = stillThere ? to : { name: 'main' }
 }
 
 function submitMcpServer(): void {
@@ -373,7 +539,7 @@ function submitMcpServer(): void {
       ...(token ? { token } : {}),
     })
   }
-  resetMcpForm()
+  closeMcpForm()
 }
 
 function removeMcpServer(id: string): void {
@@ -381,20 +547,7 @@ function removeMcpServer(id: string): void {
   if (editMcpId.value === id) resetMcpForm()
 }
 
-function toggleMcpServer(id: string): void {
-  const s = store.state.mcpServers.find((x) => x.id === id)
-  if (s) s.enabled = s.enabled === false ? true : false
-}
-
-function mcpStatusLabel(s: (typeof mcp.servers)[number]): { label: string; cls: string } {
-  if (s.status === 'off') return { label: t('settings.status.off'), cls: 'bg-fg-3' }
-  if (s.status === 'connecting') return { label: t('settings.status.connecting'), cls: 'bg-fg-3' }
-  if (s.status === 'error')
-    return { label: s.error?.slice(0, 60) ?? t('settings.status.failed'), cls: 'bg-removed' }
-  return { label: t('settings.status.nTools', { n: s.tools.length }), cls: 'bg-added' }
-}
-
-/* ── detail sub-page ───────────────────────────────────────────────────── */
+/* ── detail sub-pages ──────────────────────────────────────────────────── */
 
 const detailEntry = computed(() => {
   const v = view.value
@@ -405,6 +558,10 @@ const detailServer = computed(() => {
   if (v.name === 'server') return mcp.servers.find((s) => s.config.id === v.id)
   if (detailEntry.value) return entryServer(detailEntry.value)
   return undefined
+})
+const detailGroup = computed(() => {
+  const v = view.value
+  return v.name === 'group' ? yourGroups.value.find((g) => groupKey(g) === v.key) : undefined
 })
 
 /** The tools a detail page lists: an MCP server's live list, or a pack's specs. */
@@ -417,6 +574,7 @@ const detailTools = computed<Array<{ name: string; description: string }>>(() =>
 
 const detailTitle = computed(() => {
   if (detailEntry.value) return t(`settings.catalog.${detailEntry.value.id}.title`)
+  if (detailGroup.value) return detailGroup.value.bundle ?? detailGroup.value.tools[0].name
   return detailServer.value?.config.name ?? ''
 })
 
@@ -445,12 +603,18 @@ function removeDetail(): void {
 </script>
 
 <template>
+  <!-- One root element so `rootEl` can find the scrolling settings pane; the
+       branches below are the actual views. -->
+  <div ref="rootEl">
   <!-- ═══ Recommended catalog (sub-page) ═══ -->
   <div v-if="view.name === 'catalog'" class="space-y-4">
     <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
       <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
     </button>
-    <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
+    <div>
+      <span class="text-sm text-fg-1">{{ $t('settings.recommended') }}</span>
+      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
+    </div>
 
     <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
       <div v-for="e in catalogEntries" :key="e.id" class="px-3 py-3">
@@ -524,6 +688,11 @@ function removeDetail(): void {
            tools, and "turn this off" should not be behind a scroll. -->
       <div v-if="detailEntry || detailServerConfig" class="flex items-center gap-3 shrink-0 pt-0.5">
         <button
+          v-if="view.name === 'server' && detailServerConfig"
+          class="text-xs text-fg-3 hover:text-fg-0"
+          @click="startEditMcp(detailServerConfig)"
+        >{{ $t('common.edit') }}</button>
+        <button
           v-if="detailCanDisable"
           class="text-xs text-fg-3 hover:text-fg-0"
           @click="toggleDetail"
@@ -534,11 +703,23 @@ function removeDetail(): void {
       </div>
     </div>
 
+    <!-- An extension's id is pinned by the app (it IS the store listing's id),
+         so there is nothing to type — the only user step is installing it. -->
+    <div v-if="detailEntry?.kind === 'extension' && detailServerConfig" class="space-y-1.5">
+      <label class="block text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.extensionId') }}</label>
+      <div class="text-xs font-mono text-fg-2 break-all">{{ detailServerConfig.url }}</div>
+      <a
+        v-if="detailEntry.homepage"
+        :href="detailEntry.homepage"
+        target="_blank"
+        rel="noopener"
+        class="inline-block text-xs text-accent hover:underline"
+      >{{ $t('settings.installFromStore') }}</a>
+    </div>
+
     <!-- The only fields a preset leaves to the user. -->
-    <div v-if="detailEntry?.server && detailServerConfig" class="space-y-2">
-      <label class="block text-xs uppercase tracking-wide text-fg-3">
-        {{ detailEntry.kind === 'extension' ? $t('settings.extensionId') : $t('settings.serverUrl') }}
-      </label>
+    <div v-else-if="detailEntry?.server && detailServerConfig" class="space-y-2">
+      <label class="block text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.serverUrl') }}</label>
       <input v-model="detailServerConfig.url" class="input text-xs font-mono" />
       <input
         v-model="detailServerConfig.token"
@@ -550,13 +731,16 @@ function removeDetail(): void {
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.presetLockedHint') }}</p>
     </div>
 
-    <div v-if="detailServer && detailServer.status === 'error'" class="text-xs text-removed">
-      {{ detailServer.error }}
+    <div v-if="detailServer && detailServer.status === 'error'" class="flex items-baseline gap-2 text-xs">
+      <span class="text-removed">{{ detailServer.error }}</span>
+      <button class="text-accent hover:underline shrink-0" @click="mcp.refresh()">
+        {{ $t('settings.reconnect') }}
+      </button>
     </div>
 
     <div>
       <span class="text-xs uppercase tracking-wide text-fg-3">
-        {{ $t('settings.status.nTools', { n: detailTools.length }) }}
+        {{ nTools(detailTools.length) }}
       </span>
       <div v-if="detailTools.length" class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
         <div v-for="d in detailTools" :key="d.name" class="px-3 py-2">
@@ -568,149 +752,81 @@ function removeDetail(): void {
     </div>
   </div>
 
-  <!-- ═══ Main ═══ -->
-  <div v-else class="space-y-5">
-    <!-- ▸ The front door. Most people arrive wanting a service, not a tool
-         format, and the agent can research and build one — so ask for the goal
-         instead of making them shop a catalog for a match. -->
-    <div class="rounded-xl border border-accent/40 bg-accent/5 px-3 py-3">
-      <div class="text-sm text-fg-1">{{ $t('settings.connectTitle') }}</div>
-      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
-      <div class="mt-2 flex items-center gap-2 flex-wrap">
-        <button class="btn text-xs" @click="askAgent()">{{ $t('settings.connectAction') }}</button>
+  <!-- ═══ Detail: an HTTP tool group — yours or the KB's (sub-page) ═══ -->
+  <div v-else-if="view.name === 'group'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
+    <template v-if="detailGroup">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-sm text-fg-1">{{ detailTitle }}</span>
+            <span
+              v-if="isKbTool(detailGroup.tools[0])"
+              class="text-[10px] px-1 rounded bg-accent/15 text-accent"
+            >{{ $t('settings.sourceKb') }}</span>
+          </div>
+          <p class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+            {{
+              isKbTool(detailGroup.tools[0])
+                ? $t('settings.kbToolHint')
+                : nTools(detailGroup.tools.length)
+            }}
+          </p>
+        </div>
         <button
-          v-for="ex in connectExamples"
-          :key="ex"
-          class="text-xs px-2 py-1 rounded-md border border-border text-fg-2 hover:bg-bg-2 transition-colors"
-          @click="askAgent(ex)"
-        >{{ ex }}</button>
+          v-if="!isKbTool(detailGroup.tools[0])"
+          class="text-xs text-accent hover:underline shrink-0 pt-0.5"
+          @click="newTool"
+        >{{ $t('settings.addManually') }}</button>
       </div>
-    </div>
 
-    <!-- ▸ Recommended, installed only -->
-    <div class="flex items-center justify-between">
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.recommended') }}</span>
-      <button class="text-xs text-accent hover:underline" @click="open({ name: 'catalog' })">
-        {{ $t('settings.browseAll') }}
-      </button>
-    </div>
-    <div v-if="installedEntries.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
-      <button
-        v-for="e in installedEntries"
-        :key="e.id"
-        class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
-        @click="open({ name: 'entry', id: e.id })"
-      >
-        <span class="text-sm text-fg-1 shrink-0">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
-        <span
-          v-if="entryStatus(e)"
-          class="text-[10px] shrink-0"
-          :class="entryStatus(e)!.cls"
-        >{{ entryStatus(e)!.label }}</span>
-        <span v-else class="text-[10px] text-fg-3 shrink-0">
-          {{ $t('settings.status.nTools', { n: entryToolCount(e) }) }}
-        </span>
-        <span class="flex-1" />
-        <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
-      </button>
-    </div>
-    <p v-else class="text-sm text-fg-3">{{ $t('settings.noneInstalled') }}</p>
-
-    <!-- ▸ Tools the KB carries, awaiting approval -->
-    <div v-if="tools.kbPending.length" class="rounded-lg border border-accent/40 bg-accent/5 px-3 py-3 space-y-2">
-      <div class="text-sm text-fg-1">{{ $t('settings.kbToolsTitle') }}</div>
-      <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.kbToolsDesc') }}</p>
-      <!-- Grouped by integration: eight rows for one service is not more
-           informative than one row that names the host and the keys. -->
-      <ul class="text-xs font-mono text-fg-2 space-y-1.5">
-        <li v-for="(g, i) in groupByBundle(tools.kbPending)" :key="g.bundle ?? i">
-          <div v-if="g.bundle" class="break-all">
-            {{ g.bundle }} · {{ $t('settings.status.nTools', { n: g.tools.length }) }} →
-            {{ bundleHosts(g.tools) }}
+      <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <div v-for="s in detailGroup.tools" :key="s.id" class="group px-3 py-2.5">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs text-fg-1 shrink-0">{{ s.name }}</span>
+            <span class="text-[10px] text-fg-3 shrink-0">{{ s.request.method }}</span>
+            <span class="flex-1" />
+            <template v-if="!isKbTool(s)">
+              <button
+                class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                :title="$t('common.edit')"
+                @click="editTool(s)"
+              >
+                <span class="codicon codicon-sm codicon-edit" />
+              </button>
+              <button
+                class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                :title="$t('common.delete')"
+                @click="removeTool(s.id)"
+              >
+                <span class="codicon codicon-sm codicon-trash" />
+              </button>
+            </template>
           </div>
-          <div v-else class="break-all">{{ g.tools[0].name }} → {{ g.tools[0].request.url }}</div>
-          <div v-if="g.bundle" class="pl-3 text-fg-3">{{ g.tools.map((t) => t.name).join(', ') }}</div>
-          <!-- A tool arriving with the folder can name a key you already hold;
-               where it sends data is only half of what you are approving. -->
-          <div v-if="bundleSecrets(g.tools).length" class="text-removed">
-            ↳ {{ $t('settings.kbToolsUsesKeys', { ids: bundleSecrets(g.tools).join(', ') }) }}
-          </div>
-        </li>
-      </ul>
-      <button class="btn text-xs" @click="tools.trustKbTools()">{{ $t('settings.kbToolsApprove') }}</button>
-    </div>
+          <p class="text-xs text-fg-3 mt-0.5 font-mono break-all">{{ s.request.url }}</p>
+          <p v-if="s.description" class="text-xs text-fg-3 mt-0.5 leading-relaxed line-clamp-3">
+            {{ s.description }}
+          </p>
+        </div>
+      </div>
+    </template>
+  </div>
 
-    <!-- ▸ Your tools -->
+  <!-- ═══ Tool editor (sub-page) ═══ -->
+  <div v-else-if="view.name === 'editor'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="closeEditor">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
     <div>
-      <div class="flex items-center justify-between">
-        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.customTools') }}</span>
-        <div v-if="!editorOpen" class="flex items-center gap-3">
-          <button class="text-xs text-accent hover:underline" @click="askAgent()">
-            {{ $t('settings.askAgent') }}
-          </button>
-          <button class="text-xs text-fg-3 hover:text-fg-0" @click="newTool">
-            {{ $t('settings.addManually') }}
-          </button>
-        </div>
-      </div>
-      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.customToolsDesc') }}</p>
+      <span class="text-sm text-fg-1">
+        {{ editingId ? $t('settings.editToolTitle') : $t('settings.newToolTitle') }}
+      </span>
+      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.customToolsDesc') }}</p>
     </div>
 
-    <!-- Your tools: global ones you can edit, plus whatever the open KB
-         contributes (approved, hence live). Grouped so an integration the agent
-         built reads as the one thing you asked for. -->
-    <div
-      v-if="yourGroups.length"
-      class="rounded-lg border border-border divide-y divide-border overflow-hidden"
-    >
-      <div v-for="(g, i) in yourGroups" :key="g.bundle ?? g.tools[0].id ?? i" class="px-3 py-2.5">
-        <div v-if="g.bundle" class="flex items-center gap-1.5 mb-1">
-          <span class="text-sm text-fg-1">{{ g.bundle }}</span>
-          <span class="text-[10px] text-fg-3">{{ $t('settings.status.nTools', { n: g.tools.length }) }}</span>
-          <span
-            v-if="isKbTool(g.tools[0])"
-            class="text-[10px] px-1 rounded bg-accent/15 text-accent"
-            :title="$t('settings.kbServerTitle')"
-          >KB</span>
-        </div>
-        <div
-          v-for="s in g.tools"
-          :key="s.id"
-          class="group flex items-center gap-2 text-xs py-0.5"
-          :class="g.bundle ? 'pl-3' : ''"
-        >
-          <span class="font-mono text-fg-1 shrink-0">{{ s.name }}</span>
-          <span
-            v-if="!g.bundle && isKbTool(s)"
-            class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
-          >KB</span>
-          <span class="text-fg-3 truncate flex-1" :title="s.request.url">{{ s.request.url }}</span>
-          <template v-if="!isKbTool(s)">
-            <button
-              class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              :title="$t('common.edit')"
-              @click="editTool(s)"
-            >
-              <span class="codicon codicon-sm codicon-edit" />
-            </button>
-            <button
-              class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-              :title="$t('common.delete')"
-              @click="removeTool(s.id)"
-            >
-              <span class="codicon codicon-sm codicon-trash" />
-            </button>
-          </template>
-        </div>
-        <p v-if="g.bundle && isKbTool(g.tools[0])" class="mt-1 pl-3 text-xs text-fg-3">
-          {{ $t('settings.kbToolHint') }}
-        </p>
-      </div>
-    </div>
-    <p v-else-if="!editorOpen" class="text-sm text-fg-3">{{ $t('settings.noCustomTools') }}</p>
-
-    <!-- ▸ Custom tool editor -->
-    <div v-if="editorOpen" class="rounded-lg border border-border px-3 py-3 space-y-3">
+    <div class="space-y-3">
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-xs text-fg-3 mb-1">{{ $t('settings.toolName') }}</label>
@@ -819,11 +935,16 @@ function removeDetail(): void {
             placeholder="results[]"
           />
         </div>
-        <input
+        <!-- A textarea, not an input: the catalog's own templates span lines
+             (`# {{title}}\nAuthors: …`) and an <input> silently drops every
+             newline pasted into it, so a hand-written tool could never shape
+             output the way a preset does. -->
+        <textarea
           v-if="form.mode !== 'text'"
           v-model="form.template"
+          rows="3"
           class="input text-xs font-mono"
-          placeholder="- {{title}} ({{year}}) {{url}}"
+          placeholder="- {{title}} ({{year}})&#10;  {{url}}"
         />
         <p class="text-xs text-fg-3 mt-1 leading-relaxed">{{ $t('settings.toolResponseHelp') }}</p>
       </div>
@@ -858,81 +979,46 @@ function removeDetail(): void {
         <button class="btn text-xs" :disabled="!draftSpec || nameTaken" @click="saveTool">
           {{ $t('common.save') }}
         </button>
-        <button class="btn text-xs" @click="resetEditor">{{ $t('common.cancel') }}</button>
+        <button class="btn text-xs" @click="closeEditor">{{ $t('common.cancel') }}</button>
+        <button
+          v-if="editingId"
+          class="text-xs text-fg-3 hover:text-removed self-center ml-auto"
+          @click="removeTool(editingId)"
+        >{{ $t('common.delete') }}</button>
         <span v-if="!draftSpec" class="text-xs text-removed self-center">{{ $t('settings.toolInvalid') }}</span>
       </div>
     </div>
+  </div>
 
-    <!-- ▸ Tool servers (user-added) -->
+  <!-- ═══ Help (sub-page) ═══ -->
+  <div v-else-if="view.name === 'help'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
+    <span class="text-sm text-fg-1">{{ $t('settings.helpTitle') }}</span>
+    <div class="space-y-4">
+      <div v-for="s in HELP_SECTIONS" :key="s">
+        <div class="text-xs uppercase tracking-wide text-fg-3">{{ $t(`settings.help.${s}.title`) }}</div>
+        <p class="mt-1 text-xs text-fg-2 leading-relaxed whitespace-pre-line">
+          {{ $t(`settings.help.${s}.body`) }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MCP server form (sub-page) ═══ -->
+  <div v-else-if="view.name === 'serverForm'" class="space-y-4">
+    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="closeMcpForm">
+      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
+    </button>
     <div>
-      <div class="flex items-center justify-between">
-        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectedServers') }}</span>
-        <button v-if="!serverFormOpen" class="text-xs text-accent hover:underline" @click="newServer">
-          {{ $t('settings.addServer') }}
-        </button>
-      </div>
-      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.serversDesc') }}</p>
+      <span class="text-sm text-fg-1">
+        {{ editMcpId ? $t('settings.editServerTitle') : $t('settings.newServerTitle') }}
+      </span>
+      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.serversDesc') }}</p>
     </div>
 
-    <div v-if="ownServers.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
-      <div
-        v-for="s in ownServers"
-        :key="s.config.id"
-        class="group flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-xs transition-colors"
-      >
-        <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="mcpStatusLabel(s).cls" />
-        <button class="text-fg-1 shrink-0 hover:underline" @click="open({ name: 'server', id: s.config.id })">
-          {{ s.config.name }}
-        </button>
-        <span
-          v-if="s.source === 'kb'"
-          class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
-          :title="$t('settings.kbServerTitle')"
-        >KB</span>
-        <span class="text-fg-3 truncate flex-1" :title="s.config.url">{{ mcpStatusLabel(s).label }}</span>
-        <template v-if="s.source === 'global'">
-          <button
-            class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            :title="$t('settings.reconnect')"
-            @click="mcp.refresh()"
-          >
-            <span class="codicon codicon-sm codicon-refresh" />
-          </button>
-          <button
-            class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            :class="editMcpId === s.config.id ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
-            :title="$t('common.edit')"
-            @click="startEditMcp(s.config)"
-          >
-            <span class="codicon codicon-sm codicon-edit" />
-          </button>
-          <button
-            class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            :title="s.config.enabled === false ? $t('settings.enable') : $t('settings.disable')"
-            @click="toggleMcpServer(s.config.id)"
-          >
-            <span
-              class="codicon codicon-sm"
-              :class="s.config.enabled === false ? 'codicon-circle-slash' : 'codicon-pass'"
-            />
-          </button>
-          <button
-            class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-            :title="$t('common.delete')"
-            @click="removeMcpServer(s.config.id)"
-          >
-            <span class="codicon codicon-sm codicon-trash" />
-          </button>
-        </template>
-      </div>
-    </div>
-    <p v-else-if="!serverFormOpen" class="text-sm text-fg-3">{{ $t('settings.noGlobalServers') }}</p>
-
-    <div v-if="serverFormOpen" class="rounded-lg border border-border px-3 py-3 space-y-2">
-      <div v-if="editMcpId" class="flex items-center gap-1.5 text-xs text-accent">
-        <span class="codicon codicon-sm codicon-edit" />
-        {{ $t('settings.editingServer', { name: mcpName || 'server' }) }}
-      </div>
+    <div class="space-y-2">
       <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
       <input v-model="mcpUrl" class="input text-xs font-mono" :placeholder="$t('settings.urlPlaceholder')" />
       <input
@@ -946,9 +1032,104 @@ function removeDetail(): void {
         <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
           {{ editMcpId ? $t('common.save') : $t('common.add') }}
         </button>
-        <button class="btn text-xs" @click="resetMcpForm">{{ $t('common.cancel') }}</button>
+        <button class="btn text-xs" @click="closeMcpForm">{{ $t('common.cancel') }}</button>
       </div>
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.toolsHelp') }}</p>
+    </div>
+  </div>
+
+  <!-- ═══ Main ═══ -->
+  <div v-else class="space-y-5">
+    <!-- ▸ The front door. Most people arrive wanting a service, not a tool
+         format, and the agent can research and build one — so ask for the goal
+         instead of making them shop a catalog for a match. -->
+    <div class="rounded-xl border border-accent/40 bg-accent/5 px-3 py-3">
+      <div class="text-sm text-fg-1">{{ $t('settings.connectTitle') }}</div>
+      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
+      <button class="btn text-xs mt-2" @click="askAgent">{{ $t('settings.connectAction') }}</button>
+    </div>
+
+    <!-- ▸ Installed — everything the agent can reach, one row per integration.
+         Source tag on every row; kind tag and a status dot only where a live
+         connection exists, so a colour never means two things. -->
+    <div>
+      <div class="flex items-center justify-between">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.installed') }}</span>
+        <button class="text-xs text-accent hover:underline" @click="open({ name: 'catalog' })">
+          {{ $t('settings.browseAll') }}
+        </button>
+      </div>
+      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.installedDesc') }}</p>
+    </div>
+    <div v-if="installedRows.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+      <button
+        v-for="r in installedRows"
+        :key="r.key"
+        class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+        @click="open(r.target)"
+      >
+        <span v-if="r.dotCls" class="w-1.5 h-1.5 rounded-full shrink-0" :class="r.dotCls" />
+        <span class="text-sm text-fg-1 shrink-0 truncate">{{ r.title }}</span>
+        <span class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0">
+          {{ $t(SOURCE_LABEL[r.source]) }}
+        </span>
+        <span v-if="r.kind" class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0">
+          {{ r.kind === 'mcp' ? 'MCP' : $t('settings.kindExtension') }}
+        </span>
+        <span class="text-[10px] shrink-0 truncate" :class="r.labelCls">{{ r.label }}</span>
+        <span class="flex-1" />
+        <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
+      </button>
+    </div>
+    <p v-else class="text-sm text-fg-3">{{ $t('settings.noneInstalled') }}</p>
+
+    <!-- ▸ Tools the KB carries, awaiting approval -->
+    <div v-if="tools.kbPending.length" class="rounded-lg border border-accent/40 bg-accent/5 px-3 py-3 space-y-2">
+      <div class="text-sm text-fg-1">{{ $t('settings.kbToolsTitle') }}</div>
+      <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.kbToolsDesc') }}</p>
+      <!-- Grouped by integration: eight rows for one service is not more
+           informative than one row that names the host and the keys. -->
+      <ul class="text-xs font-mono text-fg-2 space-y-1.5">
+        <li v-for="(g, i) in groupByBundle(tools.kbPending)" :key="g.bundle ?? i">
+          <div v-if="g.bundle" class="break-all">
+            {{ g.bundle }} · {{ nTools(g.tools.length) }} →
+            {{ bundleHosts(g.tools) }}
+          </div>
+          <div v-else class="break-all">{{ g.tools[0].name }} → {{ g.tools[0].request.url }}</div>
+          <div v-if="g.bundle" class="pl-3 text-fg-3">{{ g.tools.map((t) => t.name).join(', ') }}</div>
+          <!-- A tool arriving with the folder can name a key you already hold;
+               where it sends data is only half of what you are approving. -->
+          <div v-if="bundleSecrets(g.tools).length" class="text-removed">
+            ↳ {{ $t('settings.kbToolsUsesKeys', { ids: bundleSecrets(g.tools).join(', ') }) }}
+          </div>
+        </li>
+      </ul>
+      <button class="btn text-xs" @click="tools.trustKbTools()">{{ $t('settings.kbToolsApprove') }}</button>
+    </div>
+
+    <!-- ▸ Advanced — the manual versions of the two doors above. Folded, and
+         each opens its own page, so main stays a list. -->
+    <div>
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
+      <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.advancedDesc') }}</p>
+      <div class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <button
+          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+          @click="newTool"
+        >
+          <span class="text-sm text-fg-1">{{ $t('settings.addManually') }}</span>
+          <span class="flex-1" />
+          <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
+        </button>
+        <button
+          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+          @click="newServer"
+        >
+          <span class="text-sm text-fg-1">{{ $t('settings.addServer') }}</span>
+          <span class="flex-1" />
+          <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
+        </button>
+      </div>
     </div>
 
     <!-- ▸ Keys -->
@@ -984,5 +1165,10 @@ function removeDetail(): void {
         </div>
       </div>
     </div>
+
+    <button class="text-xs text-accent hover:underline" @click="open({ name: 'help' })">
+      {{ $t('settings.helpLink') }}
+    </button>
+  </div>
   </div>
 </template>
