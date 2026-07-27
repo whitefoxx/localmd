@@ -158,13 +158,16 @@ test('a thinking block streams in full, then folds itself away', async ({ page }
 test('clicking a streaming thinking block keeps it open past the stream', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)
-  await input.fill('think ' + '推理中。'.repeat(300))
+  // Long trail: the click below must land while the stream is still going, and
+  // on a loaded machine (parallel suites) a short one can finish first — the
+  // block folds and the click misses.
+  await input.fill('think ' + '推理中。'.repeat(900))
   await input.press('Enter')
 
   const block = thinkingBlock(page)
   await expect(block).toHaveAttribute('open', '', { timeout: 10_000 })
   await block.locator('div').first().click() // in the trail, not on the summary
-  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 20_000 })
   await expect(block).toHaveAttribute('open', '')
 })
 
