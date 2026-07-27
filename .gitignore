@@ -5,3 +5,5 @@ dist/
 test-kb/
 test-results/
 playwright-report/
+# Agent scratch: worktrees and session state, not part of the project.
+.claude/
