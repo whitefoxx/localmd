@@ -33,18 +33,22 @@ when a message gives it nothing to go on, like a bare path or a dropped file.
 
 - **Write directly (review afterward)** — the default. Edits happen, and each
   changed file is listed for you to approve or undo afterwards.
-- **Ask first** — every write, edit and delete pauses until you approve it.
+- **Ask first** — every write, edit and delete pauses the conversation on a
+  card right there in the chat: the file, the diff, and Approve / Reject
+  buttons. The assistant waits until you decide — there is no dialog to miss,
+  and each conversation asks for its own changes.
 
 Either way, **deleting a folder or a binary file always asks**, because nothing
 can bring those back. And committing to git is always separate and explicit —
 the assistant never commits unless you ask.
 
-Nothing opens over your work. Changed files collect behind the diff icon in the
-left bar, with a count on it; when the assistant is actually waiting on your
-decision the count turns red. Click it to see the changes side by side.
+Files that have already been changed collect behind the diff icon in the left
+bar, with a count on it. Click it to see the changes side by side and keep or
+undo each one.
 
 If you reject an edit, it will ask what you want instead rather than trying
-again.
+again. Stopping a turn while a card is waiting is not a rejection — nothing is
+written, and the assistant simply picks the question back up if you continue.
 
 ## Plans
 

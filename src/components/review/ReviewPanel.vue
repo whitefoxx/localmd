@@ -83,11 +83,6 @@ async function openInEditor(path: string): Promise<void> {
                 "
               />
               <span class="truncate flex-1">{{ c.path }}</span>
-              <span
-                v-if="c.awaiting"
-                class="text-[10px] px-1 rounded bg-accent/15 text-accent shrink-0"
-                :title="$t('review.awaitingTitle')"
-              >{{ $t('review.awaiting') }}</span>
             </button>
           </div>
 
@@ -99,34 +94,17 @@ async function openInEditor(path: string): Promise<void> {
                 {{ $t('common.open') }}
               </button>
               <button class="btn text-xs" @click="review.discard(selected)">
-                {{
-                  current?.awaiting
-                    ? $t('review.reject')
-                    : restorable
-                      ? $t('review.discard')
-                      : $t('review.dismiss')
-                }}
+                {{ restorable ? $t('review.discard') : $t('review.dismiss') }}
               </button>
               <button class="btn-primary text-xs" @click="review.approve(selected)">
-                {{
-                  !current?.awaiting
-                    ? $t('review.approve')
-                    : current?.deleted
-                      ? $t('review.approveDelete')
-                      : $t('review.approveWrite')
-                }}
+                {{ $t('review.approve') }}
               </button>
             </div>
             <div
               v-if="current?.deleted"
               class="px-3 py-1.5 text-xs border-b border-border bg-removed/10 text-removed shrink-0"
             >
-              <template v-if="current.awaiting">
-                {{ restorable ? $t('review.willDelete') : $t('review.willDeleteFinal') }}
-              </template>
-              <template v-else>
-                {{ restorable ? $t('review.deletedRestorable') : $t('review.deletedFinal') }}
-              </template>
+              {{ restorable ? $t('review.deletedRestorable') : $t('review.deletedFinal') }}
             </div>
             <div class="flex-1 panel-scroll font-mono text-xs leading-5 selectable">
               <template v-for="(line, i) in diff" :key="i">

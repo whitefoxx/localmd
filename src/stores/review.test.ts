@@ -26,14 +26,6 @@ describe('review store — markCommitted (git sync)', () => {
     review.markCommitted(['wiki/never-tracked.md'])
     expect(review.count).toBe(1)
   })
-
-  it('keeps ask-mode writes still awaiting a decision (unwritten, so uncommittable)', () => {
-    const review = useReviewStore()
-    void review.askApproval('s1', 'wiki/pending.md', null, 'P')
-    review.markCommitted(['wiki/pending.md'])
-    expect(review.count).toBe(1)
-    expect(review.changes[0].awaiting).toBe(true)
-  })
 })
 
 describe('review store — deletions', () => {

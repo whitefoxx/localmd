@@ -1,21 +1,15 @@
-/** Agent-changes review panel: pending diffs, approve/reject. Namespace: `review`. */
+/** Agent-changes review panel: already-landed writes, keep or restore.
+ *  (Ask-first pauses render as approval cards in the chat — see `chat`.)
+ *  Namespace: `review`. */
 export default {
   en: {
     title: 'Agent changes',
     discardAll: 'Discard all',
     approveAll: 'Approve all',
     noPending: 'No pending changes',
-    awaiting: 'Awaiting approval',
-    awaitingTitle: 'Agent is waiting for your decision',
-    reject: 'Reject',
     discard: 'Discard',
     dismiss: 'Dismiss',
-    approveWrite: 'Approve & write',
-    approveDelete: 'Approve & delete',
     approve: 'Approve',
-    willDelete: 'The agent wants to delete this file. Discard puts it back.',
-    willDeleteFinal:
-      'The agent wants to delete this permanently — everything listed below is gone for good.',
     deletedRestorable: 'Deleted by the agent. Discard restores the file.',
     deletedFinal: 'Deleted by the agent — this could not be undone.',
     unchangedLines: '⋯ {n} unchanged lines ⋯',
@@ -25,16 +19,9 @@ export default {
     discardAll: '全部丢弃',
     approveAll: '全部批准',
     noPending: '没有待处理的改动',
-    awaiting: '等待批准',
-    awaitingTitle: 'Agent 正在等待你的决定',
-    reject: 'Reject',
     discard: '丢弃',
     dismiss: '知道了',
-    approveWrite: '批准并写入',
-    approveDelete: '批准并删除',
-    approve: 'Approve',
-    willDelete: 'Agent 想删除这个文件。点“丢弃”可以驳回。',
-    willDeleteFinal: 'Agent 想永久删除——下面列出的内容将无法恢复。',
+    approve: '批准',
     deletedRestorable: 'Agent 已删除该文件。点“丢弃”可以恢复。',
     deletedFinal: 'Agent 已删除——此操作无法撤销。',
     unchangedLines: '⋯ 未变动的 {n} 行 ⋯',
