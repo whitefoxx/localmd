@@ -1,6 +1,7 @@
 ---
 title: localmd 是什么
 summary: 一个知识库，本质上就是你电脑上的一个普通文件夹，外加一个能读写它的 AI 助手。不用注册，不上传。
+source-hash: f16465de410c2bec
 ---
 
 # localmd 是什么

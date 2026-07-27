@@ -54,8 +54,18 @@ capability — if a doc describes the old behaviour, it is now telling users
 something false, and telling the agent to repeat it. Treat a stale doc as a bug
 of the same severity as stale code.
 
-- Every topic exists in `<id>.md` (English, canonical) and `<id>.zh.md`. Tests
-  enforce the pairing, that both have a title/summary, and that every
+- **English is the only source of truth.** `<id>.md` is canonical and is the
+  only version the agent ever reads (`appDocForAgent` pins `en`); replies follow
+  the user's language, the facts do not. `<id>.zh.md` is a translation of it and
+  can never be a topic in its own right — a topic without an English file does
+  not exist.
+- **Edit English first, then translate, then `npm run docs:sync`.** Each
+  translation records the fingerprint of the English it was made from, and a
+  test fails when they diverge. Do not stamp a hash to silence that test without
+  actually updating the translation: the failure means the two languages now say
+  different things, and the agent (reading English) will not be the one to
+  notice.
+- Tests also enforce the pairing, that both have a title/summary, and that every
   cross-reference resolves.
 - Write for a non-technical reader: what it does and why they'd care, not how
   it is implemented. Reading order lives in `ORDER` in `src/lib/appDocs.ts`.

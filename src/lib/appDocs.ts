@@ -23,6 +23,7 @@
  * interface language and falls back to English for a topic not yet translated.
  */
 import { getLocale } from '@/i18n'
+import { hashDocSource, SOURCE_HASH_FIELD } from '@/lib/docHash'
 
 export interface AppDocMeta {
   id: string
@@ -34,6 +35,9 @@ export interface AppDocMeta {
 
 export interface AppDoc extends AppDocMeta {
   body: string
+  /** Translations only: the English source's fingerprint at the time this was
+   *  written. Absent on the English file, which is the source. */
+  sourceHash?: string
 }
 
 /** `title:` / `summary:` frontmatter, the same shape as SKILL.md so the two
@@ -41,6 +45,7 @@ export interface AppDoc extends AppDocMeta {
 function parseDoc(md: string, id: string): AppDoc {
   let title = id
   let summary = ''
+  let sourceHash: string | undefined
   let body = md
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(md)
   if (m) {
@@ -49,14 +54,16 @@ function parseDoc(md: string, id: string): AppDoc {
       const kv = /^([A-Za-z_-]+)\s*:\s*(.*)$/.exec(line.trim())
       if (!kv) continue
       const value = kv[2].trim().replace(/^["']|["']$/g, '')
-      if (kv[1].toLowerCase() === 'title' && value) title = value
-      if (kv[1].toLowerCase() === 'summary') summary = value
+      const key = kv[1].toLowerCase()
+      if (key === 'title' && value) title = value
+      if (key === 'summary') summary = value
+      if (key === SOURCE_HASH_FIELD && value) sourceHash = value
     }
   }
   if (!summary) {
     summary = body.split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim().slice(0, 160) ?? ''
   }
-  return { id, title, summary, body: body.trim() }
+  return { id, title, summary, body: body.trim(), ...(sourceHash ? { sourceHash } : {}) }
 }
 
 const MODULES = import.meta.glob('../../docs/app/*.md', {
@@ -93,6 +100,8 @@ function rank(id: string): number {
 /** id → { en, zh? }. A `.zh.md` file registers as a translation of its base id
  *  rather than as a topic of its own. */
 const BY_ID = new Map<string, Partial<Record<string, AppDoc>>>()
+/** The English source's current fingerprint, to compare a translation against. */
+const EXPECTED_HASH = new Map<string, string>()
 
 for (const [path, md] of Object.entries(MODULES)) {
   const file = path.slice(path.lastIndexOf('/') + 1, -3)
@@ -101,6 +110,7 @@ for (const [path, md] of Object.entries(MODULES)) {
   const id = dot === -1 ? file : file.slice(0, dot)
   const bucket = BY_ID.get(id) ?? {}
   bucket[locale] = parseDoc(md, id)
+  if (locale === 'en') EXPECTED_HASH.set(id, hashDocSource(md))
   BY_ID.set(id, bucket)
 }
 
@@ -137,4 +147,38 @@ export function appDocForAgent(id: string): AppDoc | undefined {
 /** Which languages a topic has a file for — used by the parity test. */
 export function appDocLocales(id: string): string[] {
   return Object.keys(BY_ID.get(id) ?? {}).sort()
+}
+
+export interface TranslationState {
+  id: string
+  locale: string
+  /** The fingerprint the translation records, or null if it records none. */
+  recorded: string | null
+  /** The English source's fingerprint now. */
+  expected: string
+  /** False when the English text has changed since this was translated. */
+  fresh: boolean
+}
+
+/**
+ * Every translation, and whether it still matches the English it was made from.
+ *
+ * This is the mechanism that makes "one source of truth" true rather than
+ * merely intended: without it, editing an English doc and forgetting its
+ * translation leaves a page confidently stating something that stopped being
+ * so, with nothing to notice. The agent is unaffected — it only ever reads
+ * English — which is exactly why nobody would catch it by hand.
+ */
+export function translationStatus(): TranslationState[] {
+  const out: TranslationState[] = []
+  for (const id of IDS) {
+    const expected = EXPECTED_HASH.get(id)
+    if (!expected) continue
+    for (const [locale, doc] of Object.entries(BY_ID.get(id) ?? {})) {
+      if (locale === 'en' || !doc) continue
+      const recorded = doc.sourceHash ?? null
+      out.push({ id, locale, recorded, expected, fresh: recorded === expected })
+    }
+  }
+  return out
 }

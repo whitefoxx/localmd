@@ -1,6 +1,7 @@
 ---
 title: PDF、EPUB 和 Word 文件
 summary: 文档怎么变成可读可搜索的，以及回答里的引用怎么直接跳回它出处的那一段。
+source-hash: 10c28bcdf4f6a9b7
 ---
 
 # PDF、EPUB 和 Word 文件

@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { listAppDocs, appDoc, appDocLocales, listAppDocsForAgent, appDocForAgent } from './appDocs'
+import {
+  listAppDocs,
+  appDoc,
+  appDocLocales,
+  listAppDocsForAgent,
+  appDocForAgent,
+  translationStatus,
+} from './appDocs'
+import { hashDocSource } from './docHash'
 
 const LOCALES = ['en', 'zh']
 
@@ -39,6 +47,33 @@ describe('app docs', () => {
       .filter((x) => LOCALES.some((l) => !x.has.includes(l)))
       .map((x) => `${x.id} has only [${x.has.join(', ')}]`)
     expect(missing).toEqual([])
+  })
+
+  /**
+   * The mechanism that makes "one source of truth" true rather than intended.
+   * English is what the agent reads, so editing an English doc and forgetting
+   * its translation leaves the Help panel stating something that stopped being
+   * so, with nobody positioned to notice.
+   */
+  it('keeps every translation in step with its English source', () => {
+    const stale = translationStatus()
+      .filter((t) => !t.fresh)
+      .map((t) =>
+        t.recorded === null
+          ? `${t.id}.${t.locale} records no source-hash`
+          : `${t.id}.${t.locale} was translated from ${t.recorded}, but the English is now ${t.expected}`,
+      )
+    expect(
+      stale,
+      'The English changed since these were translated. Update the translation, then run `npm run docs:sync`.',
+    ).toEqual([])
+  })
+
+  it('hashes content, not formatting', () => {
+    // Line endings and a trailing newline are not a change worth re-translating
+    // for; anything else is.
+    expect(hashDocSource('a\nb\n')).toBe(hashDocSource('a\r\nb'))
+    expect(hashDocSource('a\nb')).not.toBe(hashDocSource('a\nc'))
   })
 
   it('gives each locale its own title and summary', () => {
