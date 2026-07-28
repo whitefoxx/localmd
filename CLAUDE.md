@@ -79,6 +79,31 @@ field there is a deliberate act; anything not listed — every key, token and
 secret — stays invisible to the agent by default. Never widen it to include
 something that could carry a credential.
 
+## Build in public
+
+The manual rule above has a sibling: **a tellable change is not finished until
+its story is captured.** localmd's audience (HN, PKM, local-first, AI
+tinkerers) follows process, not ads — the build itself is the marketing, and
+the first 200 commits produced zero public words. Don't repeat that.
+
+- `docs/buildlog.md` is the story backlog. One entry per tellable moment: a
+  hook line, the substance (what/why/how), a media idea (GIF, screenshot,
+  before/after), target channel, and status (`backlog` → `posted <link>`).
+- **When a task lands something tellable, offer a buildlog entry in the same
+  breath as the commit prompt** — "want me to commit and push? this also looks
+  post-worthy, add a buildlog entry?" Draft the hook; the user decides.
+- Tellable is any of: a demo-able user-visible feature; a war story (bug,
+  constraint, workaround — "git smart-HTTP has no CORS, so sync mirrors
+  objects over the REST API"); a real number (tokens saved, ms cut); an
+  opinionated design call ("tools are data, not code").
+- The unit is the story, not the diff. Don't nag on every commit; batch at
+  feature merges and session ends. A good commit message often *is* the draft
+  (see 917ba00) — harvest it, don't rewrite it.
+- Entry prose is English like the rest of the repo; a draft aimed at a Chinese
+  channel (V2EX, 即刻, 少数派) carries its zh variant inline.
+- Strategy context: `docs/launch-plan.md` (waves, channels), whose ongoing
+  cadence this section feeds.
+
 ## Token economy
 
 The request prefix is a cache key — every LLM provider bills repeated bytes at
