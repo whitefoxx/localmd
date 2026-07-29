@@ -81,22 +81,19 @@ something that could carry a credential.
 
 ## Build in public
 
-The manual rule above has a sibling: **a tellable change is not finished until
-its story is captured.** localmd's audience (HN, PKM, local-first, AI
-tinkerers) follows process, not ads — the build itself is the marketing, and
-the first 200 commits produced zero public words. Don't repeat that.
+**A tellable change is not finished until its story is captured.** localmd's
+audience (HN, PKM, local-first, AI tinkerers) follows process, not ads — the
+build itself is the marketing, and the first 200 commits produced zero public
+words. Don't repeat that.
 
-- `docs/marketing/` is the publishing system (its README has the full flow):
-  `backlog.md` (story material: hook, substance with commit refs, media idea,
-  channel) → `calendar.md` (when/where/what) → `drafts/YYYY-MM-DD-<channel>-
-  <slug>.md` (full post text) → `posted.md` (date/channel/content/link — the
-  public trail). Strategy lives beside them in `launch-plan.md` and
-  `launch-platforms.md`. Keep the state current: landing tellable work adds a
-  backlog entry, scheduling adds a calendar row, publishing moves the row to
-  posted with its link.
-- **When a task lands something tellable, offer a buildlog entry in the same
-  breath as the commit prompt** — "want me to commit and push? this also looks
-  post-worthy, add a buildlog entry?" Draft the hook; the user decides.
+The publishing system no longer lives here. Story material, drafts, schedule,
+channel facts and the launch plan all live in `~/code/social-influence`
+(private), driven by the global skills `/harvest`, `/draft`, `/log` — available
+in any project directory.
+
+- **When a task lands something tellable, offer `/harvest` in the same breath
+  as the commit prompt** — "want me to commit and push? this also looks
+  post-worthy, /harvest it?" Draft the hook; the user decides.
 - Tellable is any of: a demo-able user-visible feature; a war story (bug,
   constraint, workaround — "git smart-HTTP has no CORS, so sync mirrors
   objects over the REST API"); a real number (tokens saved, ms cut); an
@@ -104,15 +101,12 @@ the first 200 commits produced zero public words. Don't repeat that.
 - The unit is the story, not the diff. Don't nag on every commit; batch at
   feature merges and session ends. A good commit message often *is* the draft
   (see 917ba00) — harvest it, don't rewrite it.
-- Entry prose is English like the rest of the repo; a draft aimed at a Chinese
-  channel (V2EX, 即刻, 少数派) is written in Chinese.
-- **This workflow is itself an experiment** whose product is
-  `docs/marketing/playbook.md` — transferable patterns destined to become a
-  shareable skill. When the process teaches something (a post lands or flops,
-  a mechanism helps or chafes, a channel surprises), append a dated entry to
-  the experiment log; promote entries to patterns when they generalize. Keep
-  playbook content project-agnostic — localmd specifics stay in the sibling
-  files.
+- localmd's one-liner, pillars and **anti-claims** live in
+  `~/code/social-influence/products/localmd/README.md`. Read it before writing
+  any public-facing copy about the product; the anti-claims are binding.
+- Methodology (transferable patterns + experiment log) lives in
+  `~/code/social-influence/principles/playbook.md`. When the process teaches
+  something, that's where it goes.
 
 ## Token economy
 
