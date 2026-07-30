@@ -220,29 +220,41 @@ test('WebCLI is presented as a permission to grant, not an id to copy', async ({
   await page.locator('nav button:has(.codicon-settings-gear)').click()
   await page.locator('button:has(.codicon-plug)').click()
 
-  // Install it the way a user does — from the recommended list.
+  // Install it the way a user does — from the recommended list. WebCLI leads the
+  // list (it is the one featured entry) and the row's checkbox is icon-only, so
+  // take the first one. The store link is the call to action, not "learn more".
   await page.getByRole('button', { name: /Browse recommended/ }).click()
-  // WebCLI leads the list (it is the one featured entry); the row's checkbox is
-  // icon-only, so take the first one.
   await expect(page.getByText('WebCLI browser extension')).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Install from the Chrome Web Store/ }),
+  ).toHaveAttribute('href', /chromewebstore\.google\.com/)
   await page.getByRole('checkbox').first().click()
-  await page.locator('button:has(.codicon-arrow-left)').click()
 
-  // No extension is present under Playwright, so the row must read as unfinished
-  // setup rather than as a failed connection.
-  const row = page.getByRole('button', { name: /WebCLI browser extension/ })
-  await expect(row).toContainText('Setup needed')
-  await row.click()
-
-  // The panel asks for the one thing only the user can do, and names the exact
-  // address to add — including the port, which is the usual reason it fails.
+  // Checking the box probed it and, finding nothing, brought us straight here —
+  // no going back and noticing "Setup needed" on the way. What is wrong is stated
+  // BEFORE the steps that fix it.
+  await expect(page.getByText(/cannot see WebCLI on this page/)).toBeVisible()
   await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
+  // The steps name the exact address to add — including the port, which is the
+  // usual reason it fails.
   const allowStep = page.locator('li', { hasText: 'Web app access' })
-  await expect(allowStep).toBeVisible()
   await expect(allowStep).toContainText(`localhost:${new URL(page.url()).port}`)
   await expect(page.getByRole('button', { name: 'Reload this page' })).toBeVisible()
   // And nothing to copy: the id is the extension's to announce, not ours to pin.
   await expect(page.getByText('Chrome extension ID')).toHaveCount(0)
+
+  // With no relay on the page, only a navigation can put one there — so Reload is
+  // offered and "Check again" is NOT: it could only ever report failure while the
+  // real fix sits next to it. (This is the bug the button-feedback pass exposed:
+  // enable the extension on an open page, press Reconnect, nothing changes.)
+  await expect(page.getByRole('button', { name: 'Check again' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Reconnect' })).toHaveCount(0)
+  await expect(page.getByText(/Only reloading can change/)).toBeVisible()
+
+  await page.locator('button:has(.codicon-arrow-left)').click()
+  await expect(page.getByRole('button', { name: /WebCLI browser extension/ })).toContainText(
+    'Setup needed',
+  )
 })
 
 test('a relay on the page is not the same as WebCLI answering', async ({ page }) => {
@@ -273,4 +285,13 @@ test('a relay on the page is not the same as WebCLI answering', async ({ page })
   await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
   await expect(page.getByText(/is not answering it/)).toBeVisible()
   await expect(page.getByText(/Connected — WebCLI is answering/)).toHaveCount(0)
+
+  // Here a re-probe CAN succeed — the origin gate is consulted per connection, so
+  // adding the address needs no reload — and pressing it has to be visible.
+  const check = page.getByRole('button', { name: 'Check again' })
+  await expect(check).toBeVisible()
+  await check.click()
+  // Both the button that started it and the line beside it say so.
+  await expect(page.getByText('Checking…').first()).toBeVisible()
+  await expect(check).toBeDisabled()
 })

@@ -37,16 +37,20 @@ pages that need a login, and it makes most other tools work better too.
 ## Connecting WebCLI
 
 WebCLI is the one entry with a second step, because it answers only the sites you
-have allowed. Its row says **Setup needed** until you have:
+have allowed. Check it on and the app looks for it straight away: when it cannot
+be reached you land on its page, which names the problem before the steps that
+fix it. Its row in the list reads **Setup needed** until you have:
 
 1. **Installed the extension** from the Chrome Web Store.
 2. **Added this site to it.** Click the WebCLI icon in Chrome's toolbar, open
    **Web app access**, and add the address shown on the row's page — exactly as
    shown, including the port. `localhost:5173` and `localhost:3000` are different
    sites as far as the extension is concerned.
-3. **Reloaded this page.** The extension only starts listening on pages opened
-   after you add them, so this is the step that finishes it. There is a **Reload
-   this page** button right there.
+3. **Reloaded this page.** A page gets the extension as it loads and never
+   afterwards — so installing it, switching it on, or adding this site while this
+   page is open changes nothing until you reload. That is the whole reason this
+   page offers **Reload this page** and no "try again" button in that state: a
+   retry could only report the same failure.
 
 The row turns green on its own once that is done. Nothing to copy or type: the
 extension announces itself to the page, so a beta or development build of it
@@ -92,7 +96,8 @@ Mostly it repairs itself:
   arrived — nothing is ever run twice on a guess.)
 
 When you want to force it, open the row and press **Reconnect**. It re-connects
-that one integration and leaves everything else alone.
+that one integration, leaves everything else alone, and tells you how it went —
+including when the answer is the same as before.
 
 WebCLI is the exception to "mostly repairs itself": if you remove this site from
 its **Web app access** list, calls stop being answered rather than refused, so

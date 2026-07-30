@@ -96,8 +96,13 @@ export default {
       'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here.',
     installFromStore: 'Install from the Chrome Web Store →',
     serverUrl: 'Server URL',
+    checkChecking: 'Checking…',
+    checkOk: 'Connected — it answered just now.',
+    checkFailed: 'Still not connected.',
     webcli: {
       connected: 'Connected — WebCLI is answering this site.',
+      notDetected:
+        'We cannot see WebCLI on this page — it is not installed, or this site is not on its list, or it was installed/enabled/allowed after this page was opened. Only reloading can change any of those: the extension attaches to a page as it loads, and never afterwards.',
       extension: 'Extension {id}',
       setupNeeded: 'Setup needed',
       setupTitle: 'Let WebCLI talk to this site',
@@ -334,8 +339,13 @@ export default {
     presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
     installFromStore: '去 Chrome 应用商店安装 →',
     serverUrl: '服务器 URL',
+    checkChecking: '检测中…',
+    checkOk: '已连接 —— 刚刚响应了。',
+    checkFailed: '仍未连上。',
     webcli: {
       connected: '已连接 —— WebCLI 正在响应本站。',
+      notDetected:
+        '本页上看不到 WebCLI —— 可能是没安装、本站不在它的名单里，也可能是安装/启用/授权发生在本页打开之后。这三种都只有刷新才能改变：扩展是在页面加载的那一刻附着上去的，之后就不会了。',
       extension: '扩展 {id}',
       setupNeeded: '需要设置',
       setupTitle: '允许 WebCLI 与本站通信',

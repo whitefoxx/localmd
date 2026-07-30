@@ -92,6 +92,7 @@ function scroller(): HTMLElement | null {
 }
 
 watch(view, (to, from) => {
+  checkState.value = 'idle' // a verdict belongs to the page it was produced on
   const el = scroller()
   if (!el) return
   if (from.name === 'main' && to.name !== 'main') mainScroll.value = el.scrollTop
@@ -106,9 +107,63 @@ watch(view, (to, from) => {
 
 const installedEntries = computed(() => catalogEntries.filter((e) => tools.isInstalled(e.id)))
 
-function toggleEntry(entry: CatalogEntry): void {
-  if (tools.isInstalled(entry.id)) tools.uninstall(entry.id)
-  else tools.install(entry.id)
+/** Which entry we are probing right after it was checked on. */
+const checkingEntry = ref<string | null>(null)
+
+/** How long that probe may hold the checkbox busy before we hand the user the
+ *  page instead. */
+const PROBE_MS = 4_000
+
+/** Minimum time a check stays visibly in progress, so the click is perceivable
+ *  even when the answer arrives in one frame. */
+const MIN_CHECK_MS = 450
+
+function wait(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms))
+}
+
+/** Resolve once this entry's row has a verdict, or PROBE_MS has passed. */
+async function settled(entry: CatalogEntry): Promise<void> {
+  const until = Date.now() + PROBE_MS
+  while (Date.now() < until) {
+    const status = entryServer(entry)?.status
+    if (status && status !== 'connecting') return
+    await wait(100)
+  }
+}
+
+/**
+ * Checking a box installs the entry. For an extension that is only half the job —
+ * it also needs permission inside Chrome — so probe immediately and, when it
+ * cannot answer, go straight to the page that explains why. Leaving the user to
+ * discover "Setup needed" on their way back makes the app look like it worked.
+ */
+async function toggleEntry(entry: CatalogEntry): Promise<void> {
+  if (tools.isInstalled(entry.id)) {
+    tools.uninstall(entry.id)
+    return
+  }
+  tools.install(entry.id)
+  if (entry.kind !== 'extension' || !entry.server) return
+  checkingEntry.value = entry.id
+  try {
+    mcp.recheckRelay()
+    // No marker means it provably cannot answer — don't spend a handshake (or the
+    // user's patience) proving it.
+    //
+    // With a marker: installing already triggers a reconnect, so wait for THIS row
+    // to settle rather than forcing a second refresh — a refresh rebuilds every
+    // client, which would cut off a tool call the agent has in flight on another
+    // server. Bounded, because a refused origin answers with silence and a
+    // checkbox that sits busy for 15s is worse than a page that says what is
+    // wrong and then turns green by itself.
+    if (mcp.relayReady) await settled(entry)
+  } finally {
+    checkingEntry.value = null
+  }
+  // Only steer someone who is still standing where they clicked.
+  if (view.value.name !== 'catalog') return
+  if (entryServer(entry)?.status !== 'ok') open({ name: 'entry', id: entry.id })
 }
 
 /** The live server row an entry installed, when it installs one. */
@@ -621,6 +676,31 @@ const detailIsWebcli = computed(() =>
   isWebcliRelayUrl(detailServerConfig.value?.url ?? detailEntry.value?.server?.url ?? ''),
 )
 
+/* ── connection checks ───────────────────────────────────────────────────── */
+
+/** A click on Reconnect / Check again has to produce something visible. The state
+ *  it leaves behind is often identical to the state it started in — same red row,
+ *  same message — and a button that answers a click with nothing reads as broken. */
+type CheckState = 'idle' | 'checking' | 'ok' | 'failed'
+const checkState = ref<CheckState>('idle')
+
+async function runCheck(serverId: string): Promise<void> {
+  checkState.value = 'checking'
+  mcp.recheckRelay() // the marker may have appeared since this page loaded
+  // The floor is the point: a failing check can finish inside one frame, so
+  // without it the state goes straight back to the verdict it already showed and
+  // the SECOND click looks as dead as the first one did.
+  await Promise.all([mcp.reconnect(serverId), wait(MIN_CHECK_MS)])
+  checkState.value =
+    mcp.servers.find((s) => s.config.id === serverId)?.status === 'ok' ? 'ok' : 'failed'
+}
+
+const CHECK_LABEL: Record<Exclude<CheckState, 'idle'>, { key: string; cls: string }> = {
+  checking: { key: 'settings.checkChecking', cls: 'text-fg-3' },
+  ok: { key: 'settings.checkOk', cls: 'text-added' },
+  failed: { key: 'settings.checkFailed', cls: 'text-removed' },
+}
+
 /** Whether WebCLI is actually answering — the connection, not the marker. The two
  *  come apart: WebCLI injects its relay per HOST but gates the connection on the
  *  exact ORIGIN, so on another port of an allowed host the marker is there and
@@ -643,11 +723,17 @@ const showConnectError = computed(
   () => detailServer.value?.status === 'error' && !detailIsWebcli.value,
 )
 
-async function recheckWebcli(): Promise<void> {
-  mcp.recheckRelay()
-  const server = detailServer.value
-  if (server) await mcp.reconnect(server.config.id)
-}
+/** Whether re-probing can possibly change the answer. For WebCLI with no relay on
+ *  the page it cannot — only a navigation injects one — so every button that
+ *  offers to try again is hidden in that state, Reconnect included. */
+const canProbe = computed(() => !detailIsWebcli.value || mcp.relayReady)
+
+/** What is wrong, in one line, before the steps that fix it. The marker cannot
+ *  tell "not installed" from "this site was never added" — both leave nothing on
+ *  the page — so that diagnosis names both rather than guessing one. */
+const webcliProblem = computed(() =>
+  mcp.relayReady ? 'settings.webcli.presentButSilent' : 'settings.webcli.notDetected',
+)
 
 /** Disable only exists where there is configuration worth keeping — a server's
  *  URL, extension id and token. An HTTP pack has none, so for those "off" and
@@ -712,18 +798,24 @@ function removeDetail(): void {
                 class="text-[10px] px-1 rounded"
                 :class="tools.webcliConnected ? 'bg-bg-3 text-fg-3' : 'bg-removed/15 text-removed'"
               >{{ $t('settings.catalogNeedsWebcli') }}</span>
+              <span v-if="checkingEntry === e.id" class="text-[10px] text-fg-3">
+                {{ $t('settings.checkChecking') }}
+              </span>
             </div>
             <p class="text-xs text-fg-3 mt-0.5 leading-relaxed">
               {{ $t(`settings.catalog.${e.id}.desc`) }}
             </p>
             <div class="flex items-center gap-3 flex-wrap mt-1.5">
+              <!-- For an extension the homepage IS the Web Store listing, and
+                   installing is the step the user has to take: say so, rather than
+                   filing it under "learn more". -->
               <a
                 v-if="e.homepage"
                 :href="e.homepage"
                 target="_blank"
                 rel="noopener"
                 class="text-xs text-accent hover:underline"
-              >{{ $t('settings.catalogLearnMore') }}</a>
+              >{{ $t(e.kind === 'extension' ? 'settings.installFromStore' : 'settings.catalogLearnMore') }}</a>
               <a
                 v-if="e.repo"
                 :href="e.repo"
@@ -764,12 +856,14 @@ function removeDetail(): void {
                exactly the state a stale connection is in, and this row is the
                only place to do something about it. -->
           <button
-            v-if="detailServer && !detailDisabled"
+            v-if="detailServer && !detailDisabled && canProbe"
             class="btn text-xs"
-            :disabled="detailServer.status === 'connecting'"
-            @click="mcp.reconnect(detailServer.config.id)"
+            :disabled="detailServer.status === 'connecting' || checkState === 'checking'"
+            @click="runCheck(detailServer.config.id)"
           >
-            {{ detailServer.status === 'connecting' ? $t('settings.status.connecting') : $t('settings.reconnect') }}
+            {{ detailServer.status === 'connecting' || checkState === 'checking'
+              ? $t('settings.checkChecking')
+              : $t('settings.reconnect') }}
           </button>
           <button
             v-if="view.name === 'server' && detailServerConfig"
@@ -810,14 +904,15 @@ function removeDetail(): void {
       </div>
 
       <div v-else class="space-y-2">
-        <div class="text-xs text-fg-1">{{ $t('settings.webcli.setupTitle') }}</div>
+        <!-- What is wrong comes FIRST. Steps without a diagnosis leave the user
+             re-doing the one they already did; and when the relay is on the page,
+             the problem is specifically the address, nearly always its port. -->
+        <div class="flex items-start gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-removed shrink-0 mt-1.5" />
+          <p class="text-xs text-removed leading-relaxed">{{ $t(webcliProblem) }}</p>
+        </div>
+        <div class="pt-0.5 text-xs text-fg-1">{{ $t('settings.webcli.setupTitle') }}</div>
         <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.webcli.setupIntro') }}</p>
-        <!-- The relay is here and still nobody answers: step ② is the one that is
-             wrong, and it is nearly always the port. Say so instead of letting the
-             user re-do step ① and wonder. -->
-        <p v-if="mcp.relayReady" class="text-xs text-removed leading-relaxed">
-          {{ $t('settings.webcli.presentButSilent') }}
-        </p>
         <ol class="text-xs text-fg-2 leading-relaxed space-y-1 list-decimal pl-4">
           <li>
             {{ $t('settings.webcli.step1') }}
@@ -839,7 +934,22 @@ function removeDetail(): void {
         </ol>
         <div class="flex items-center gap-1.5 flex-wrap">
           <button class="btn text-xs" @click="reloadPage">{{ $t('settings.webcli.reload') }}</button>
-          <button class="btn text-xs" @click="recheckWebcli">{{ $t('settings.webcli.recheck') }}</button>
+          <!-- Offered only where it can actually succeed. With a relay on the page,
+               re-probing works: the origin gate is consulted per connection, so
+               adding the address needs no reload. With NO relay, nothing but a
+               navigation can put one there — a re-probe would be a button that
+               reports failure forever while the real fix sits next to it. -->
+          <button
+            v-if="detailServer && canProbe"
+            class="btn text-xs"
+            :disabled="checkState === 'checking'"
+            @click="runCheck(detailServer.config.id)"
+          >{{ $t('settings.webcli.recheck') }}</button>
+          <span
+            v-if="checkState !== 'idle'"
+            class="text-xs"
+            :class="CHECK_LABEL[checkState].cls"
+          >{{ $t(CHECK_LABEL[checkState].key) }}</span>
         </div>
       </div>
 
@@ -871,12 +981,20 @@ function removeDetail(): void {
     <div v-if="detailServer && showConnectError" class="flex items-baseline gap-2 text-xs">
       <span class="text-removed">{{ detailServer.error }}</span>
       <button
+        v-if="canProbe"
         class="text-accent hover:underline shrink-0"
-        @click="mcp.reconnect(detailServer.config.id)"
+        :disabled="checkState === 'checking'"
+        @click="runCheck(detailServer.config.id)"
       >
         {{ $t('settings.reconnect') }}
       </button>
     </div>
+    <!-- A check that changes nothing still has to say it ran. -->
+    <p
+      v-if="detailServer && !detailIsWebcli && checkState !== 'idle'"
+      class="text-xs"
+      :class="CHECK_LABEL[checkState].cls"
+    >{{ $t(CHECK_LABEL[checkState].key) }}</p>
 
     <div>
       <span class="text-xs uppercase tracking-wide text-fg-3">
