@@ -4,10 +4,9 @@ import { useMcpStore } from './mcp'
 import { MAX_RECALLED_TOOLS } from '@/lib/mcp'
 import type { McpServerState } from './mcp'
 
-/** A connected server exposing `n` tools named tool0..tool(n-1), plus the
- *  never-deferred `web_task` when asked. */
-function server(id: string, n: number, withWebTask = false): McpServerState {
-  const names = [...Array.from({ length: n }, (_, i) => `tool${i}`), ...(withWebTask ? ['web_task'] : [])]
+/** A connected server exposing `n` tools named tool0..tool(n-1). */
+function server(id: string, n: number): McpServerState {
+  const names = Array.from({ length: n }, (_, i) => `tool${i}`)
   return {
     config: { id, name: id, url: `https://${id}/mcp` },
     source: 'global',
@@ -40,9 +39,8 @@ describe('mcp store — recall of deferred tools', () => {
   })
 
   it('ignores tools that are never deferred — they cost nothing to keep', async () => {
-    const mcp = await storeWith(server('small', 3), server('big', 20, true))
+    const mcp = await storeWith(server('small', 3), server('big', 20))
     mcp.rememberUse('mcp__small__tool1') // small server: always in the request
-    mcp.rememberUse('mcp__big__web_task') // web_task never defers
     mcp.rememberUse('mcp__big__nosuchtool') // unknown tool
     expect(mcp.recalled).toEqual([])
   })

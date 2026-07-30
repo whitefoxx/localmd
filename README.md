@@ -123,16 +123,16 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 
 | 层 | 位置 | 适用 |
 |---|---|---|
-| **全局工具** | Settings → 外部工具（localStorage） | 跨知识库通用的，如浏览器桥接扩展；token 放这里 |
+| **全局工具** | Settings → Tools（localStorage） | 跨知识库通用的，如 WebCLI 浏览器扩展；token 放这里 |
 | **KB 级工具** | 知识库里的 `.agents/mcp.json`（随 git 走） | 这个库特有的服务；格式 `{"servers":[{"name","url","token"?,"enabled"?}]}`；与全局重复的目标以 KB 为准 |
 | **用法知识** | `.agents/skills/`（技能） | "什么任务用什么工具、怎么措辞"的流程沉淀 |
 
 每个条目支持 `enabled: false` 停用（保留配置）；Settings 里全局条目有停用/删除按钮，KB 条目显示 KB 徽章（编辑文件修改）。连接成功后工具以 `mcp__<名称>__<工具>` 出现在 agent 的工具列表，两个 provider 通用。
 
-**延迟加载（token 控制）**：工具数超过 8 的服务器，其工具 schema 默认不随请求发送——系统提示词只带一行一个的紧凑目录（约省 80%），agent 需要时调 `enable_tools` 按名激活，**当轮立即可用**（全部外部工具在 `streamText` 里预先注册，靠每步 `prepareStep` 的 `activeTools` 门控只把当前激活的那批发给模型；激活后下一步即纳入）。激活按会话计，新会话重置。`web_task` 类单工具委托入口不参与延迟。为什么必须激活：模型只能调用当次请求携带完整 JSON Schema 的工具，目录行没有参数定义——激活就是把 schema 带进请求的动作（每会话一次 ~200 token，换掉每请求数千 token 的常驻开销）。约束与安全：
+**延迟加载（token 控制）**：工具数超过 8 的服务器，其工具 schema 默认不随请求发送——系统提示词只带一行一个的紧凑目录（约省 80%），agent 需要时调 `enable_tools` 按名激活，**当轮立即可用**（全部外部工具在 `streamText` 里预先注册，靠每步 `prepareStep` 的 `activeTools` 门控只把当前激活的那批发给模型；激活后下一步即纳入）。激活按会话计，新会话重置。为什么必须激活：模型只能调用当次请求携带完整 JSON Schema 的工具，目录行没有参数定义——激活就是把 schema 带进请求的动作（每会话一次 ~200 token，换掉每请求数千 token 的常驻开销）。约束与安全：
 
 - 服务器必须允许浏览器 CORS（与 LLM 端点同一约束）；本地起的 server（localhost）天然可用
-- URL 栏填 **32 位 Chrome 扩展 ID** 时自动改走扩展 Port 传输（`externally_connectable`）——这是 web-agent 桥接的接法：配置 web-agent 的扩展 ID 后，agent 获得 `mcp__webagent__web_task` 工具，可把整个网页浏览任务委托给 web-agent 的 agent 引擎执行。通信原理详见 [docs/web-agent-bridge.md](docs/web-agent-bridge.md)
+- **WebCLI 扩展**走另一条传输：它不再声明 `externally_connectable`，改为在用户授权过的源上注入 relay content script，页面用 `window.postMessage` 收发同样的 JSON-RPC/MCP 报文（`src/lib/webcliRelay.ts`，模块头有完整线格式）。从 Settings → Tools 的推荐列表安装，扩展 ID 由 relay 自己报出（`<html data-webcli-relay>`），线上版和本地 dev 版都自动识别；用户需要在扩展弹窗的「Web app access」里加上本站的地址（含端口）并刷新页面
 - 外部工具的**结果按不可信数据处理**——系统提示词明确要求 agent 不执行结果中内嵌的指令、不主动把 KB 内容发给外部工具
 - `scripts/mcp-test-server.mjs` 提供一个本地测试 server（add/echo 两个工具），`node scripts/mcp-test-server.mjs` 后在 Settings 添加 `http://localhost:8901/mcp` 即可试用
 - 已验证可直连的真实公共 server：DeepWiki（`https://mcp.deepwiki.com/mcp`，问答任意 GitHub 仓库）、Context7（`https://mcp.context7.com/mcp`，查库文档）——加 URL 即用

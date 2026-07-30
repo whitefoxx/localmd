@@ -1,8 +1,10 @@
 /**
- * MCP (Model Context Protocol) client over Streamable HTTP — the browser-
- * reachable transport: one endpoint, JSON-RPC over POST, responses either
- * application/json or a text/event-stream body. Only servers that allow
- * browser CORS work (same constraint as LLM endpoints — document it).
+ * MCP (Model Context Protocol) client over Streamable HTTP — one endpoint,
+ * JSON-RPC over POST, responses either application/json or a text/event-stream
+ * body. Only servers that allow browser CORS work (same constraint as LLM
+ * endpoints — document it). The other transport a server row can select is
+ * WebCLI's postMessage relay, in lib/webcliRelay.ts; both speak the shapes
+ * defined here and satisfy McpClientLike.
  *
  * External tools are namespaced `mcp__<server>__<tool>` (Claude Code's
  * convention) so they can't shadow built-in tools.
@@ -12,7 +14,7 @@ export interface McpServerConfig {
   id: string
   /** Short name used in tool namespacing — sanitized to [a-z0-9-]. */
   name: string
-  /** HTTP endpoint, or a 32-char Chrome extension ID (Port transport). */
+  /** A Streamable-HTTP endpoint, or WEBCLI_RELAY_URL for WebCLI's relay. */
   url: string
   /** Optional bearer token. */
   token?: string
@@ -188,184 +190,29 @@ export class McpHttpClient implements McpClientLike {
   }
 }
 
-/* ── Chrome-extension transport (web-agent bridge) ───────────────────────── */
-
-/** Chrome extension IDs are exactly 32 chars of a-p. When a "server" entry's
- *  url field matches, we speak the same JSON-RPC shapes over a
- *  chrome.runtime Port instead of HTTP (externally_connectable). */
-export function isExtensionId(s: string): boolean {
-  return /^[a-p]{32}$/.test(s.trim())
-}
-
 export interface McpClientLike {
   connect(): Promise<McpToolDef[]>
   callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string>
   /** Release the transport. The client is dead afterwards — a replacement is
    *  built by whoever reconnects, so nothing here has to survive. */
   dispose(): void
-  /** Set by the store: the transport dropped on its own (extension reloaded,
-   *  browser closed the port). Without it a dead connection keeps its green dot. */
+  /** Set by the store: the transport dropped on its own. Without it a dead
+   *  connection keeps its green dot. */
   onLost?: (reason: string) => void
 }
 
 /** Failures where the request provably never reached the server, so reconnecting
- *  and sending it again cannot run the tool twice: the session was gone, the
- *  port was closed, or we never had a connection to begin with. A plain tool
- *  error, a timeout, or a 500 is NOT in here — those may have had effects. */
+ *  and sending it again cannot run the tool twice: the session was gone, or we
+ *  never had a connection to begin with. A plain tool error, a timeout, or a 500
+ *  is NOT in here — those may have had effects. */
 export function isRecoverable(err: unknown): boolean {
   const m = (err as Error)?.message ?? ''
   return (
     /not connected/i.test(m) ||
     /connection closed/i.test(m) ||
-    /chrome\.runtime is unavailable/i.test(m) ||
     /HTTP 404/.test(m) ||
     /session/i.test(m)
   )
-}
-
-interface ChromePort {
-  postMessage(msg: unknown): void
-  disconnect(): void
-  onMessage: { addListener(cb: (msg: unknown) => void): void }
-  onDisconnect: { addListener(cb: () => void): void }
-}
-
-interface ChromeRuntimeGlobal {
-  runtime?: {
-    connect(extensionId: string): ChromePort
-    lastError?: { message?: string }
-  }
-}
-
-const HANDSHAKE_TIMEOUT_MS = 10_000
-/** Web tasks legitimately take minutes (the extension runs a whole agent loop). */
-const CALL_TIMEOUT_MS = 600_000
-
-export class McpExtensionClient implements McpClientLike {
-  private port: ChromePort | null = null
-  private nextId = 1
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
-  /** Whether the port behind us has been through `initialize`. A reloaded
-   *  extension gives us a brand-new port that has never been introduced to. */
-  private handshaken = false
-  onLost?: (reason: string) => void
-
-  constructor(private cfg: McpServerConfig) {}
-
-  dispose(): void {
-    this.handshaken = false
-    const port = this.port
-    this.port = null
-    this.onLost = undefined // a disconnect we asked for is not a loss
-    port?.disconnect()
-  }
-
-  private ensurePort(): ChromePort {
-    if (this.port) return this.port
-    const chrome = (globalThis as unknown as { chrome?: ChromeRuntimeGlobal }).chrome
-    if (!chrome?.runtime?.connect) {
-      throw new Error(
-        'chrome.runtime is unavailable — the matching extension must be installed and its externally_connectable must allow this page origin',
-      )
-    }
-    const port = chrome.runtime.connect(this.cfg.url.trim())
-    port.onMessage.addListener((msg) => this.onMessage(msg))
-    port.onDisconnect.addListener(() => {
-      this.port = null
-      this.handshaken = false
-      const detail = chrome.runtime?.lastError?.message
-      const reason = `Extension connection closed${detail ? `: ${detail}` : ''}`
-      const err = new Error(reason)
-      // An idle port closing is normal — an extension service worker sleeps and
-      // Chrome tears the port down. That is dormant, not broken: the next call
-      // re-opens and re-handshakes. Only a drop that killed work in flight is
-      // worth reporting, because that one the user actually lost something to.
-      const interrupted = this.pending.size > 0
-      for (const p of this.pending.values()) p.reject(err)
-      this.pending.clear()
-      if (interrupted) this.onLost?.(reason)
-    })
-    this.port = port
-    return port
-  }
-
-  private onMessage(msg: unknown): void {
-    const m = msg as { id?: number; result?: unknown; error?: RpcError; method?: string }
-    if (typeof m.method === 'string' && m.method.startsWith('notifications/')) return
-    if (typeof m.id !== 'number') return
-    const p = this.pending.get(m.id)
-    if (!p) return
-    this.pending.delete(m.id)
-    if (m.error) p.reject(new Error(`${m.error.message} (${m.error.code})`))
-    else p.resolve(m.result)
-  }
-
-  private rpc(method: string, params: unknown, timeoutMs: number, signal?: AbortSignal): Promise<unknown> {
-    const port = this.ensurePort()
-    const id = this.nextId++
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id)
-        reject(new Error(`MCP ${method} timed out (${Math.round(timeoutMs / 1000)}s)`))
-      }, timeoutMs)
-      const settle = {
-        resolve: (v: unknown) => {
-          clearTimeout(timer)
-          resolve(v)
-        },
-        reject: (e: Error) => {
-          clearTimeout(timer)
-          reject(e)
-        },
-      }
-      signal?.addEventListener('abort', () => {
-        this.pending.delete(id)
-        settle.reject(new Error('aborted'))
-      })
-      this.pending.set(id, settle)
-      port.postMessage({ jsonrpc: '2.0', id, method, params })
-    })
-  }
-
-  /** initialize + initialized on whatever port we currently hold. */
-  private async handshake(): Promise<void> {
-    await this.rpc(
-      'initialize',
-      {
-        protocolVersion: '2025-03-26',
-        capabilities: {},
-        clientInfo: { name: 'browser-md', version: '0.1.0' },
-      },
-      HANDSHAKE_TIMEOUT_MS,
-    )
-    this.port?.postMessage({ jsonrpc: '2.0', method: 'notifications/initialized' })
-    this.handshaken = true
-  }
-
-  async connect(): Promise<McpToolDef[]> {
-    await this.handshake()
-    const result = (await this.rpc('tools/list', {}, HANDSHAKE_TIMEOUT_MS)) as {
-      tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>
-    }
-    return (result.tools ?? []).map((t) => ({
-      name: t.name,
-      description: t.description ?? '',
-      inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
-    }))
-  }
-
-  async callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
-    // The extension can be reloaded under us; ensurePort() would then hand out a
-    // fresh port that has never seen `initialize`. Re-introduce ourselves before
-    // speaking — this is the one retry that is always safe, since nothing has
-    // been sent yet.
-    if (!this.handshaken) await this.handshake()
-    const result = (await this.rpc('tools/call', { name, arguments: args }, CALL_TIMEOUT_MS, signal)) as {
-      content?: Array<Record<string, unknown>>
-      isError?: boolean
-    }
-    return flattenToolResult(result ?? {})
-  }
 }
 
 /* ── config parsing & merging (global Settings + KB .agents/mcp.json) ────── */
@@ -420,8 +267,7 @@ export function mergeMcpConfigs(
  *  hundreds for a full schema). */
 export const DEFER_THRESHOLD = 8
 
-/** Is this tool deferred right now? web_task never defers (it's the single
- *  high-level delegate and its own schema is tiny). */
+/** Is this tool deferred right now? */
 export function isDeferredTool(
   qualifiedName: string,
   serverToolCount: number,
@@ -429,7 +275,6 @@ export function isDeferredTool(
   threshold = DEFER_THRESHOLD,
 ): boolean {
   if (serverToolCount <= threshold) return false
-  if (qualifiedName.endsWith('__web_task')) return false
   return !activated.has(qualifiedName)
 }
 

@@ -102,21 +102,11 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
 
   // Browser-bridge guidance appears only when the tools are connected.
   const mcpTools = mcpStore.allTools
-  const webTask = mcpTools.find((t) => t.qualifiedName.endsWith('__web_task'))
-  const hasGeneric = mcpTools.some((t) => t.qualifiedName.includes('__generic__'))
-  const hasExtension = !!(webTask || hasGeneric)
+  const hasExtension = mcpTools.some((t) => t.qualifiedName.includes('__generic__'))
   if (hasExtension) {
     prompt += `
 
-Browser access: never guess live web content — use the connected browser tools. Two modes; pick per step:`
-    if (hasGeneric) {
-      prompt += `
-- DIRECT (mcp__*__generic__* tools): you drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Prefer this for precise, short, or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Results come back word-for-word with no model in between. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
-    }
-    if (webTask) {
-      prompt += `
-- DELEGATE (${webTask.qualifiedName}): hands a whole errand to a browser agent with its own model. Each call is a fresh session with NO memory — write complete, self-contained descriptions (URLs, steps, exactly what to return). Prefer this for long multi-step errands (research a topic, operate an unfamiliar site) where step-by-step driving would flood your context. It's slow and costs money: batch related needs into ONE task, and ask for verbatim excerpts + source URLs when capturing into the KB.`
-    }
+Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
   }
 
   // Installed HTTP tools that read arbitrary web pages (the Jina pack, say).
@@ -134,7 +124,7 @@ Browser access: ${webToolNames} — use them for anything about live web content
   } else if (!hasExtension) {
     prompt += `
 
-Browser access: NONE this session — no browser extension is connected and no web tool is installed. You cannot search the web or fetch pages. If the user needs that, point them at Settings → Tools, where the recommended list installs the WebCLI browser extension (their real, logged-in session) or the keyless Jina web tools — and never fabricate web content or URLs in the meantime.`
+Browser access: NONE this session — no browser extension is connected and no web tool is installed. You cannot search the web or fetch pages. If the user needs that, point them at Settings → Tools, where the recommended list carries the WebCLI browser extension (their real, logged-in session; it needs installing AND allowing this site in its popup, which that page walks through) or the keyless Jina web tools — and never fabricate web content or URLs in the meantime.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))

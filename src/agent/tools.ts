@@ -628,7 +628,7 @@ const saveTranscript = defineTool({
 const enableTools = defineTool({
   name: 'enable_tools',
   description:
-    'Activate deferred external tools before calling them. The system prompt lists deferred tools (name + summary) — their full schemas are loaded only on demand to save context. Pass the EXACT qualified names (e.g. ["mcp__webagent__generic__open_url"]); they become callable immediately.',
+    'Activate deferred external tools before calling them. The system prompt lists deferred tools (name + summary) — their full schemas are loaded only on demand to save context. Pass the EXACT qualified names (e.g. ["mcp__webcli__generic__open_url"]); they become callable immediately.',
   schema: z.object({
     names: z.array(z.string()).min(1).describe('Qualified tool names from the deferred catalog'),
   }),
