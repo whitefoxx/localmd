@@ -46,12 +46,27 @@ async function checkExtension(): Promise<void> {
   checkFailed.value = false
   try {
     if (entryId && !tools.isInstalled(entryId)) tools.install(entryId)
+    mcp.recheckRelay()
     await mcp.refresh()
     if (tools.webcliConnected) setup.settle(props.request.id, 'connected')
     else checkFailed.value = true
   } finally {
     checking.value = false
   }
+}
+
+/** WebCLI is not reachable by installing alone: it answers only origins the user
+ *  added in its popup, and it starts listening on the next page load. So the card
+ *  spells out the address to add and offers the reload, rather than sending the
+ *  user back and forth between Chrome and a "check again" that cannot succeed.
+ *  Keyed on the connection, not on the relay marker: the marker is also present on
+ *  a page whose exact address was never allowed, which is the case that most needs
+ *  the address spelled out. */
+const needsRelaySetup = computed(() => props.request.entryId === 'webcli' && !tools.webcliConnected)
+const pageHost = computed(() => window.location.host)
+
+function reloadPage(): void {
+  window.location.reload()
 }
 </script>
 
@@ -89,14 +104,24 @@ async function checkExtension(): Promise<void> {
       </div>
     </div>
 
-    <!-- An extension: install, then re-check. -->
-    <div v-else-if="request.kind === 'extension'" class="mt-2 flex items-center gap-2 flex-wrap">
-      <a v-if="request.url" :href="request.url" target="_blank" rel="noopener" class="btn text-xs">
-        {{ $t('chat.setupInstall') }}
-      </a>
-      <button class="btn text-xs" :disabled="checking" @click="checkExtension">
-        {{ checking ? $t('chat.setupChecking') : $t('chat.setupRecheck') }}
-      </button>
+    <!-- An extension: install, allow this site, reload, then re-check. -->
+    <div v-else-if="request.kind === 'extension'" class="mt-2 space-y-2">
+      <p v-if="needsRelaySetup" class="text-xs text-fg-3 leading-relaxed">
+        {{ $t('settings.webcli.step2') }}
+        <span class="font-mono text-fg-1">{{ pageHost }}</span>
+        {{ $t('settings.webcli.step3') }}
+      </p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a v-if="request.url" :href="request.url" target="_blank" rel="noopener" class="btn text-xs">
+          {{ $t('chat.setupInstall') }}
+        </a>
+        <button v-if="needsRelaySetup" class="btn text-xs" @click="reloadPage">
+          {{ $t('settings.webcli.reload') }}
+        </button>
+        <button class="btn text-xs" :disabled="checking" @click="checkExtension">
+          {{ checking ? $t('chat.setupChecking') : $t('chat.setupRecheck') }}
+        </button>
+      </div>
     </div>
 
     <!-- A choice the agent could not make on the user's behalf. -->
@@ -109,7 +134,9 @@ async function checkExtension(): Promise<void> {
       >{{ o }}</button>
     </div>
 
-    <p v-if="checkFailed" class="mt-1.5 text-xs text-removed">{{ $t('chat.setupNotDetected') }}</p>
+    <p v-if="checkFailed" class="mt-1.5 text-xs text-removed">
+      {{ needsRelaySetup ? $t('chat.setupNotAllowed') : $t('chat.setupNotDetected') }}
+    </p>
 
     <div class="mt-2 flex items-center gap-3">
       <a

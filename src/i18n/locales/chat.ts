@@ -44,6 +44,8 @@ export default {
     setupRecheck: 'I installed it — check again',
     setupChecking: 'Checking…',
     setupNotDetected: 'Still not detected. Make sure the extension is enabled, then check again.',
+    setupNotAllowed:
+      'Still not connected. Check that the address above is in the extension’s “Web app access” list — port included — and reload this page.',
     setupWhere: 'Where do I get this? →',
     setupSkip: 'Skip',
     // ApprovalCard — an ask-first write paused on the user, decided in place
@@ -121,6 +123,8 @@ export default {
     setupRecheck: '装好了，重新检测',
     setupChecking: '检测中…',
     setupNotDetected: '还是没检测到。确认扩展已启用后再试一次。',
+    setupNotAllowed:
+      '还是没连上。确认上面那个地址（含端口）已经加进扩展的「Web app access」名单，然后刷新本页。',
     setupWhere: '去哪里获取？→',
     setupSkip: '跳过',
     // ApprovalCard —— 先询问模式下暂停的写入，就地决定

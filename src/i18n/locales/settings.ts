@@ -94,9 +94,24 @@ export default {
     removeEntry: 'Remove',
     presetLockedHint:
       'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here.',
-    extensionId: 'Chrome extension ID',
     installFromStore: 'Install from the Chrome Web Store →',
     serverUrl: 'Server URL',
+    webcli: {
+      connected: 'Connected — WebCLI is answering this site.',
+      extension: 'Extension {id}',
+      setupNeeded: 'Setup needed',
+      setupTitle: 'Let WebCLI talk to this site',
+      setupIntro:
+        'WebCLI only answers sites you have allowed, so this takes two steps rather than one — install it, then add this site to its list.',
+      presentButSilent:
+        'WebCLI is on this page but is not answering it — so the address below is not the one in its list. Check the port: it counts, and it is the usual culprit.',
+      step1: 'Install the extension, if you have not already.',
+      step2: 'Click its toolbar icon → “Web app access” → add this address, exactly as shown (the port is part of it):',
+      step3:
+        'Reload this page. The extension only starts listening on pages opened after you add them, so this last step is what finishes it.',
+      reload: 'Reload this page',
+      recheck: 'Check again',
+    },
     advanced: 'Advanced',
     advancedDesc: 'Build an integration by hand, if you would rather not have the agent do it.',
     customToolsDesc:
@@ -124,7 +139,7 @@ export default {
     catalog: {
       webcli: {
         title: 'WebCLI browser extension',
-        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly. Official extension, one click from the Chrome Web Store.",
+        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly. Official extension, one click from the Chrome Web Store; after installing, add this site under “Web app access” in its popup, because it only answers sites you allow.",
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -211,10 +226,11 @@ export default {
     disable: 'Disable (keep config)',
     editingServer: 'Editing “{name}”',
     namePlaceholder: 'Name',
-    urlPlaceholder: 'https://…/mcp or Chrome extension ID',
+    urlPlaceholder: 'https://…/mcp',
+    serverUrlInvalid: 'Needs an http(s) address — this field takes an MCP endpoint.',
     tokenPlaceholder: 'token (optional)',
     toolsHelp:
-      'Servers must allow browser CORS; put a 32-char Chrome extension ID in the URL field to use the extension bridge. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
+      'Servers must allow browser CORS. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
 
     // Git & GitHub
     commitAuthor: 'Commit author name',
@@ -316,9 +332,24 @@ export default {
     noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
     removeEntry: '移除',
     presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
-    extensionId: 'Chrome 扩展 ID',
     installFromStore: '去 Chrome 应用商店安装 →',
     serverUrl: '服务器 URL',
+    webcli: {
+      connected: '已连接 —— WebCLI 正在响应本站。',
+      extension: '扩展 {id}',
+      setupNeeded: '需要设置',
+      setupTitle: '允许 WebCLI 与本站通信',
+      setupIntro:
+        'WebCLI 只响应你允许过的站点，所以这里有两步而不是一步 —— 先安装它，再把本站加进它的名单。',
+      presentButSilent:
+        'WebCLI 就在本页上，但不响应本页 —— 说明下面这个地址不是它名单里的那个。检查端口：端口算在内，而且十次有九次是它。',
+      step1: '如果还没装，先安装扩展。',
+      step2: '点它的工具栏图标 →「Web app access」→ 按下面显示的地址原样添加（端口也算在内）：',
+      step3:
+        '刷新本页。扩展只会监听添加之后才打开的页面，所以这最后一步才是真正生效的一步。',
+      reload: '刷新本页',
+      recheck: '重新检测',
+    },
     advanced: '高级',
     advancedDesc: '手动搭一个集成 —— 如果你不想让 agent 代劳的话。',
     customToolsDesc:
@@ -344,7 +375,7 @@ export default {
     catalog: {
       webcli: {
         title: 'WebCLI 浏览器扩展',
-        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。官方扩展，Chrome 应用商店一键安装。',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。官方扩展，Chrome 应用商店一键安装；装好后还要在它的弹窗里「Web app access」添加本站，因为它只响应你允许过的站点。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',
@@ -431,10 +462,11 @@ export default {
     disable: '停用（保留配置）',
     editingServer: '正在编辑「{name}」',
     namePlaceholder: '名称',
-    urlPlaceholder: 'https://…/mcp 或 Chrome 扩展 ID',
+    urlPlaceholder: 'https://…/mcp',
+    serverUrlInvalid: '需要一个 http(s) 地址 —— 这里填的是 MCP 端点。',
     tokenPlaceholder: 'token（可选）',
     toolsHelp:
-      '服务器必须允许浏览器 CORS；URL 栏填 32 位 Chrome 扩展 ID 则走扩展桥接。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
+      '服务器必须允许浏览器 CORS。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
 
     // Git & GitHub
     commitAuthor: 'Commit 作者名',

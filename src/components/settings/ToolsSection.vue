@@ -30,7 +30,7 @@ import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
-import { isExtensionId } from '@/lib/mcp'
+import { isWebcliRelayUrl } from '@/lib/webcliRelay'
 import {
   normalizeHttpTool,
   sanitizeToolName,
@@ -164,8 +164,26 @@ function liveStatus(s: (typeof mcp.servers)[number] | undefined): {
 
 /** A count that is a fact about the config, not a connection — no dot, no
  *  colour, so green never has to mean two different things. */
-function staticCount(n: number): { label: string; labelCls: string } {
-  return { label: nTools(n), labelCls: 'text-fg-3' }
+function staticCount(n: number): { label: string; labelCls: string; dotCls: null } {
+  return { label: nTools(n), labelCls: 'text-fg-3', dotCls: null }
+}
+
+/** How a catalog entry's row reads. WebCLI gets the one override: every way it
+ *  can fail is an unfinished permission (no relay on the page, or a relay whose
+ *  extension won't answer this address), and the fix is on its detail page — so
+ *  the row says that in two words instead of spending 60 characters on a sentence
+ *  the user cannot act on from here. */
+function entryStatus(e: CatalogEntry): { label: string; labelCls: string; dotCls: string | null } {
+  if (!e.server) return staticCount(e.tools?.length ?? 0)
+  const server = entryServer(e)
+  if (isWebcliRelayUrl(e.server.url) && (!server || server.status === 'error')) {
+    return {
+      label: t('settings.webcli.setupNeeded'),
+      labelCls: 'text-removed',
+      dotCls: 'bg-removed',
+    }
+  }
+  return liveStatus(server)
 }
 
 /** The user's own tools plus the open KB's approved set, grouped by
@@ -187,16 +205,12 @@ const installedRows = computed<InstalledRow[]>(() => {
   const rows: InstalledRow[] = []
 
   for (const e of installedEntries.value) {
-    const live = e.server ? liveStatus(entryServer(e)) : null
-    const shape = live ?? staticCount(e.tools?.length ?? 0)
     rows.push({
       key: `entry:${e.id}`,
       title: t(`settings.catalog.${e.id}.title`),
       source: 'preset',
       kind: e.server ? (e.kind === 'extension' ? 'extension' : 'mcp') : null,
-      label: shape.label,
-      labelCls: shape.labelCls,
-      dotCls: live ? live.dotCls : null,
+      ...entryStatus(e),
       target: { name: 'entry', id: e.id },
     })
   }
@@ -208,7 +222,6 @@ const installedRows = computed<InstalledRow[]>(() => {
       source: isKbTool(g.tools[0]) ? 'kb' : 'yours',
       kind: null,
       ...staticCount(g.tools.length),
-      dotCls: null,
       target: { name: 'group', key: groupKey(g) },
     })
   }
@@ -219,7 +232,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       key: `server:${s.config.id}`,
       title: s.config.name,
       source: s.source === 'kb' ? 'kb' : 'yours',
-      kind: isExtensionId(s.config.url) ? 'extension' : 'mcp',
+      kind: 'mcp',
       label: live.label,
       labelCls: live.labelCls,
       dotCls: live.dotCls,
@@ -499,6 +512,18 @@ function resetMcpForm(): void {
   mcpToken.value = ''
 }
 
+/** This field takes one thing: the endpoint of an MCP server that allows browser
+ *  CORS. Checking it here rather than at connect time is the difference between
+ *  "that is not a URL" and a red row reporting a failed fetch of something that
+ *  was never an address. */
+const mcpUrlValid = computed(() => {
+  try {
+    return /^https?:$/.test(new URL(mcpUrl.value.trim()).protocol)
+  } catch {
+    return false
+  }
+})
+
 function newServer(): void {
   returnTo.value = view.value
   resetMcpForm()
@@ -523,7 +548,7 @@ function closeMcpForm(): void {
 }
 
 function submitMcpServer(): void {
-  if (!mcpUrl.value.trim()) return
+  if (!mcpUrlValid.value) return
   const token = mcpToken.value.trim()
   if (editMcpId.value) {
     const s = store.state.mcpServers.find((x) => x.id === editMcpId.value)
@@ -584,6 +609,45 @@ const detailTitle = computed(() => {
 const detailServerConfig = computed(() =>
   detailServer.value ? store.state.mcpServers.find((s) => s.id === detailServer.value!.config.id) : undefined,
 )
+
+/* ── WebCLI: the one integration the user must opt us into ───────────────── */
+
+/** True on the WebCLI row, whose detail page shows connection steps instead of
+ *  fields: there is nothing to type, and everything to allow. Read from the
+ *  config, not the live row — during a refresh there IS no live row, and falling
+ *  through to the generic branch would offer to edit the transport sentinel as if
+ *  it were a server address. */
+const detailIsWebcli = computed(() =>
+  isWebcliRelayUrl(detailServerConfig.value?.url ?? detailEntry.value?.server?.url ?? ''),
+)
+
+/** Whether WebCLI is actually answering — the connection, not the marker. The two
+ *  come apart: WebCLI injects its relay per HOST but gates the connection on the
+ *  exact ORIGIN, so on another port of an allowed host the marker is there and
+ *  every call goes unanswered. Reading the marker here would paint that green. */
+const webcliUp = computed(() => detailServer.value?.status === 'ok')
+
+/** What the user types into WebCLI's popup — host and port, the form its own
+ *  field accepts. The port is part of the identity, per the note above. */
+const pageHost = computed(() => window.location.host)
+
+/** WebCLI starts listening on pages loaded AFTER the origin is added, so a
+ *  reload is the step that finishes setup — not a wait. */
+function reloadPage(): void {
+  window.location.reload()
+}
+
+/** The raw connection error, except on WebCLI — there the setup panel above says
+ *  the same thing in a form the user can act on. */
+const showConnectError = computed(
+  () => detailServer.value?.status === 'error' && !detailIsWebcli.value,
+)
+
+async function recheckWebcli(): Promise<void> {
+  mcp.recheckRelay()
+  const server = detailServer.value
+  if (server) await mcp.reconnect(server.config.id)
+}
 
 /** Disable only exists where there is configuration worth keeping — a server's
  *  URL, extension id and token. An HTTP pack has none, so for those "off" and
@@ -730,29 +794,64 @@ function removeDetail(): void {
       </p>
     </div>
 
-    <!-- An extension's id is pinned by the app (it IS the store listing's id),
-         so there is nothing to type — the only user step is installing it. -->
-    <div v-if="detailEntry?.kind === 'extension' && detailServerConfig" class="space-y-1.5">
-      <label class="block text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.extensionId') }}</label>
-      <div class="text-xs font-mono text-fg-2 break-all">{{ detailServerConfig.url }}</div>
-      <div class="flex items-center gap-3 flex-wrap">
-        <a
-          v-if="detailEntry.homepage"
-          :href="detailEntry.homepage"
-          target="_blank"
-          rel="noopener"
-          class="text-xs text-accent hover:underline"
-        >{{ $t('settings.installFromStore') }}</a>
-        <a
-          v-if="detailEntry.repo"
-          :href="detailEntry.repo"
-          target="_blank"
-          rel="noopener"
-          class="flex items-center gap-1 text-xs text-accent hover:underline"
-        >
-          <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
-        </a>
+    <!-- WebCLI. There is no address and no id to enter — the extension writes its
+         own id into the page when it is willing to talk to us — so this panel is
+         entirely about the permission: has the user added this site, and if not,
+         the three steps that do it. -->
+    <div v-if="detailEntry?.kind === 'extension' && detailIsWebcli" class="space-y-2">
+      <div v-if="webcliUp" class="space-y-1">
+        <div class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-added shrink-0" />
+          <span class="text-xs text-fg-1">{{ $t('settings.webcli.connected') }}</span>
+        </div>
+        <div class="text-xs text-fg-3 font-mono break-all">
+          {{ $t('settings.webcli.extension', { id: mcp.relayExt ?? '' }) }}
+        </div>
       </div>
+
+      <div v-else class="space-y-2">
+        <div class="text-xs text-fg-1">{{ $t('settings.webcli.setupTitle') }}</div>
+        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.webcli.setupIntro') }}</p>
+        <!-- The relay is here and still nobody answers: step ② is the one that is
+             wrong, and it is nearly always the port. Say so instead of letting the
+             user re-do step ① and wonder. -->
+        <p v-if="mcp.relayReady" class="text-xs text-removed leading-relaxed">
+          {{ $t('settings.webcli.presentButSilent') }}
+        </p>
+        <ol class="text-xs text-fg-2 leading-relaxed space-y-1 list-decimal pl-4">
+          <li>
+            {{ $t('settings.webcli.step1') }}
+            <a
+              v-if="detailEntry.homepage"
+              :href="detailEntry.homepage"
+              target="_blank"
+              rel="noopener"
+              class="text-accent hover:underline"
+            >{{ $t('settings.installFromStore') }}</a>
+          </li>
+          <!-- The address is shown rather than described: it is the one string
+               that has to match exactly, and it differs per dev port. -->
+          <li>
+            {{ $t('settings.webcli.step2') }}
+            <span class="font-mono text-fg-1">{{ pageHost }}</span>
+          </li>
+          <li>{{ $t('settings.webcli.step3') }}</li>
+        </ol>
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button class="btn text-xs" @click="reloadPage">{{ $t('settings.webcli.reload') }}</button>
+          <button class="btn text-xs" @click="recheckWebcli">{{ $t('settings.webcli.recheck') }}</button>
+        </div>
+      </div>
+
+      <a
+        v-if="detailEntry.repo"
+        :href="detailEntry.repo"
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center gap-1 text-xs text-accent hover:underline"
+      >
+        <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
+      </a>
     </div>
 
     <!-- The only fields a preset leaves to the user. -->
@@ -769,7 +868,7 @@ function removeDetail(): void {
       <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.presetLockedHint') }}</p>
     </div>
 
-    <div v-if="detailServer && detailServer.status === 'error'" class="flex items-baseline gap-2 text-xs">
+    <div v-if="detailServer && showConnectError" class="flex items-baseline gap-2 text-xs">
       <span class="text-removed">{{ detailServer.error }}</span>
       <button
         class="text-accent hover:underline shrink-0"
@@ -1046,6 +1145,9 @@ function removeDetail(): void {
     <div class="space-y-2">
       <input v-model="mcpName" class="input text-xs" :placeholder="$t('settings.namePlaceholder')" />
       <input v-model="mcpUrl" class="input text-xs font-mono" :placeholder="$t('settings.urlPlaceholder')" />
+      <p v-if="mcpUrl.trim() && !mcpUrlValid" class="text-xs text-removed">
+        {{ $t('settings.serverUrlInvalid') }}
+      </p>
       <input
         v-model="mcpToken"
         type="password"
@@ -1054,7 +1156,7 @@ function removeDetail(): void {
         autocomplete="off"
       />
       <div class="flex gap-2 pt-0.5">
-        <button class="btn text-xs" :disabled="!mcpUrl.trim()" @click="submitMcpServer">
+        <button class="btn text-xs" :disabled="!mcpUrlValid" @click="submitMcpServer">
           {{ editMcpId ? $t('common.save') : $t('common.add') }}
         </button>
         <button class="btn text-xs" @click="closeMcpForm">{{ $t('common.cancel') }}</button>

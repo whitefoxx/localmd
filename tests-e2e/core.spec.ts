@@ -213,3 +213,64 @@ test('e2e mode never persists to real storage', async ({ page }) => {
   const stored = await page.evaluate(() => localStorage.getItem('browser-md:settings'))
   expect(stored).toBeNull()
 })
+
+test('WebCLI is presented as a permission to grant, not an id to copy', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  // The activity bar is icon-only (title, no text), so locate by its icon.
+  await page.locator('nav button:has(.codicon-settings-gear)').click()
+  await page.locator('button:has(.codicon-plug)').click()
+
+  // Install it the way a user does — from the recommended list.
+  await page.getByRole('button', { name: /Browse recommended/ }).click()
+  // WebCLI leads the list (it is the one featured entry); the row's checkbox is
+  // icon-only, so take the first one.
+  await expect(page.getByText('WebCLI browser extension')).toBeVisible()
+  await page.getByRole('checkbox').first().click()
+  await page.locator('button:has(.codicon-arrow-left)').click()
+
+  // No extension is present under Playwright, so the row must read as unfinished
+  // setup rather than as a failed connection.
+  const row = page.getByRole('button', { name: /WebCLI browser extension/ })
+  await expect(row).toContainText('Setup needed')
+  await row.click()
+
+  // The panel asks for the one thing only the user can do, and names the exact
+  // address to add — including the port, which is the usual reason it fails.
+  await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
+  const allowStep = page.locator('li', { hasText: 'Web app access' })
+  await expect(allowStep).toBeVisible()
+  await expect(allowStep).toContainText(`localhost:${new URL(page.url()).port}`)
+  await expect(page.getByRole('button', { name: 'Reload this page' })).toBeVisible()
+  // And nothing to copy: the id is the extension's to announce, not ours to pin.
+  await expect(page.getByText('Chrome extension ID')).toHaveCount(0)
+})
+
+test('a relay on the page is not the same as WebCLI answering', async ({ page }) => {
+  // WebCLI injects its relay per HOST but gates the connection on the exact
+  // ORIGIN, so on another port of an allowed host the marker is present and every
+  // call goes unanswered. Faking just the marker reproduces that exactly.
+  await page.addInitScript(() => {
+    const mark = (): void => {
+      if (document.documentElement) document.documentElement.dataset.webcliRelay = 'a'.repeat(32)
+    }
+    mark()
+    document.addEventListener('DOMContentLoaded', mark)
+  })
+  await page.goto('/?e2e=1')
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.dataset.webcliRelay ?? null))
+    .not.toBeNull()
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  await page.locator('nav button:has(.codicon-settings-gear)').click()
+  await page.locator('button:has(.codicon-plug)').click()
+  await page.getByRole('button', { name: /Browse recommended/ }).click()
+  await page.getByRole('checkbox').first().click()
+  await page.locator('button:has(.codicon-arrow-left)').click()
+  await page.getByRole('button', { name: /WebCLI browser extension/ }).click()
+
+  // Still the setup panel — and it names the reason, which is the address, not
+  // the install.
+  await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
+  await expect(page.getByText(/is not answering it/)).toBeVisible()
+  await expect(page.getByText(/Connected — WebCLI is answering/)).toHaveCount(0)
+})

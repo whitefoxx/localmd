@@ -16,16 +16,7 @@
  * makes every *other* tool (and any the agent writes later) more likely to work.
  */
 import type { HttpToolSpec } from '@/lib/httpTools'
-
-/** WebCLI's extension id — fixed by its Chrome Web Store listing, so the app
- *  pins it and never asks the user to type it. The manifest's
- *  `externally_connectable` already lists localmd.app, so the page connects
- *  over a chrome.runtime Port — the transport McpExtensionClient speaks. */
-export const WEBCLI_EXTENSION_ID = 'jnhfdhpafndcbppkphhfpecflhogngge'
-
-/** Pre-store WebCLI builds had an unpacked-extension id. Settings load rewrites
- *  it to the store id so an existing profile keeps its webcli entry installed. */
-export const LEGACY_WEBCLI_EXTENSION_IDS = ['hjdcccloaonnfpojpiaadabkhjggilha']
+import { WEBCLI_RELAY_URL } from '@/lib/webcliRelay'
 
 /** The WebCLI tool that makes it a general HTTP transport rather than just
  *  another set of browser tools. Used to detect a usable bridge. */
@@ -58,7 +49,8 @@ export interface CatalogEntry {
    *  homepage is a store listing or a landing page, which is a different thing. */
   repo?: string
   /** kind 'extension' | 'mcp': the server entry an install adds. For an
-   *  extension the url IS the extension id (the Port transport). */
+   *  extension the url selects a transport rather than naming an address —
+   *  WEBCLI_RELAY_URL, whose marker supplies whichever build is installed. */
   server?: { name: string; url: string }
   /** kind 'http': the tools an install registers. */
   tools?: HttpToolSpec[]
@@ -361,7 +353,7 @@ export const CATALOG: CatalogEntry[] = [
     featured: true,
     homepage: 'https://chromewebstore.google.com/detail/webcli/jnhfdhpafndcbppkphhfpecflhogngge',
     repo: 'https://github.com/whitefoxx/webcli-skills',
-    server: { name: 'webcli', url: WEBCLI_EXTENSION_ID },
+    server: { name: 'webcli', url: WEBCLI_RELAY_URL },
   },
   {
     id: 'jina',

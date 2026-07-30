@@ -3,16 +3,15 @@
  *   - global: Settings (localStorage, follows the browser)
  *   - KB-level: `.agents/mcp.json` in the opened folder (travels with the KB
  *     via git; duplicate targets override global — the KB is more specific)
- * Transports: Streamable HTTP, or a chrome.runtime Port when the url field is
- * a 32-char extension ID. Connected servers contribute namespaced tools
+ * Two transports, selected by the url field: WebCLI's postMessage relay
+ * (WEBCLI_RELAY_URL — see lib/webcliRelay.ts) or Streamable HTTP. Connected
+ * servers contribute namespaced tools
  * (mcp__<server>__<tool>) that both agent providers append per turn.
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import {
   McpHttpClient,
-  McpExtensionClient,
-  isExtensionId,
   externalToolName,
   sanitizeServerName,
   normalizeMcpServerList,
@@ -25,6 +24,7 @@ import {
   type McpServerConfig,
   type McpToolDef,
 } from '@/lib/mcp'
+import { McpRelayClient, isWebcliRelayUrl, relayExtensionId } from '@/lib/webcliRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
 import * as fs from '@/lib/fs'
@@ -59,6 +59,16 @@ function readRecall(): Record<string, string[]> {
     return {} // best-effort: a lost recall list only costs one enable_tools round trip
   }
 }
+
+/** Which transport a row's url selects: WebCLI's relay, or a Streamable-HTTP
+ *  endpoint. */
+function clientFor(config: McpServerConfig): McpClientLike {
+  return isWebcliRelayUrl(config.url) ? new McpRelayClient() : new McpHttpClient(config)
+}
+
+/** How often we re-read the relay marker while a WebCLI row is waiting on it.
+ *  Reading one dataset property is free; the timer only runs in that state. */
+const RELAY_POLL_MS = 5_000
 
 async function loadKbServers(): Promise<McpServerConfig[]> {
   const raw = await fs.tryReadFile(KB_MCP_CONFIG_PATH)
@@ -211,11 +221,7 @@ export const useMcpStore = defineStore('mcp', () => {
    *  id is disposed first, so ports and HTTP sessions never pile up. */
   async function connectServer(config: McpServerConfig): Promise<void> {
     clients.get(config.id)?.dispose()
-    // A Chrome extension ID in the url field selects the Port transport
-    // (web-agent bridge); anything else is a Streamable-HTTP endpoint.
-    const client: McpClientLike = isExtensionId(config.url)
-      ? new McpExtensionClient(config)
-      : new McpHttpClient(config)
+    const client: McpClientLike = clientFor(config)
     // A transport that drops on its own must show up as red, not stay green
     // until someone happens to run a tool.
     client.onLost = (reason) => {
@@ -256,6 +262,52 @@ export const useMcpStore = defineStore('mcp', () => {
     const state = servers.value.find((s) => s.config.id === serverId)
     if (!state || state.config.enabled === false) return
     await connectServer(state.config)
+  }
+
+  /* ── WebCLI relay presence ────────────────────────────────────────────── */
+
+  /**
+   * WebCLI's extension id when its relay is on this page, else null — the whole
+   * of "is WebCLI connectable?", read straight from the DOM marker.
+   *
+   * It is re-checked rather than read once because the answer is a user action
+   * away: they open WebCLI's popup, add this origin, and come back. Note what
+   * re-checking can and cannot do — the extension registers its relay for FUTURE
+   * navigations, so the marker appears on the next page load, not the moment the
+   * origin is added. That is why the setup panel offers Reload as the action and
+   * this only heals the cases that need no reload (WebCLI enabled again, a dev
+   * build swapped in, a stored id that turns out to be the installed one).
+   */
+  const relayExt = ref<string | null>(relayExtensionId())
+  const relayReady = computed(() => relayExt.value !== null)
+
+  const webcliRows = computed(() => servers.value.filter((s) => isWebcliRelayUrl(s.config.url)))
+
+  function recheckRelay(): void {
+    const next = relayExtensionId()
+    if (next === relayExt.value) return
+    relayExt.value = next
+    // The marker turned up (or names a different build now): the WebCLI rows are
+    // connectable, so heal them instead of making the user find Reconnect.
+    if (next) for (const s of webcliRows.value) void reconnect(s.config.id)
+  }
+
+  if (typeof window !== 'undefined') {
+    // Coming back to the tab is the moment setup is most likely to have finished.
+    window.addEventListener('focus', recheckRelay)
+    document.addEventListener('visibilitychange', recheckRelay)
+    let timer: ReturnType<typeof setInterval> | null = null
+    watch(
+      () => webcliRows.value.length > 0 && !relayReady.value,
+      (waiting) => {
+        if (waiting && timer === null) timer = setInterval(recheckRelay, RELAY_POLL_MS)
+        else if (!waiting && timer !== null) {
+          clearInterval(timer)
+          timer = null
+        }
+      },
+      { immediate: true },
+    )
   }
 
   /** Re-probe only the rows that are currently failing. Cheap enough to run
@@ -316,6 +368,9 @@ export const useMcpStore = defineStore('mcp', () => {
 
   return {
     servers,
+    relayExt,
+    relayReady,
+    recheckRelay,
     allTools,
     activeToolsFor,
     deferredToolsFor,

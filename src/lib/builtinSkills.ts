@@ -62,7 +62,12 @@ called directly. Build one spec and \`manage_tools\` \`test\` it:
   service-worker fetch (no CORS, carries the user's cookies).
 
 If WebCLI isn't connected, don't just report that — call \`request_setup\` with
-\`kind: "extension"\`, \`entry_id: "webcli"\` and let the user install it.
+\`kind: "extension"\`, \`entry_id: "webcli"\` and let the user connect it. Connecting
+it is TWO steps on their side, and the card walks them through both: install the
+extension, then add this site under "Web app access" in its popup and reload the
+page (WebCLI answers only sites the user allowed, and starts listening on the next
+page load). So expect a reload — after one, pick the work back up rather than
+asking again.
 
 ## 4. Design the output against a REAL response
 

@@ -9,6 +9,7 @@ import {
   catalogEntryById,
 } from './toolCatalog'
 import { normalizeHttpTool, secretRefs, staticOrigin, httpToolJsonSchema } from './httpTools'
+import { WEBCLI_RELAY_URL } from './webcliRelay'
 
 const httpEntries = CATALOG.filter((e) => e.kind === 'http')
 const allTools = CATALOG.flatMap((e) => e.tools ?? [])
@@ -34,6 +35,17 @@ describe('catalog shape', () => {
     for (const e of CATALOG) {
       if (e.kind === 'http') expect(e.tools?.length, e.id).toBeGreaterThan(0)
       else expect(e.server, e.id).toBeTruthy()
+    }
+  })
+
+  /** WebCLI's id is supplied by the relay marker at runtime, so pinning one here
+   *  would break the moment a dev build (different id) is what's installed — and
+   *  reintroduce the "which id do I type?" question the relay removed. Every
+   *  other server entry is a URL. */
+  it('pins no extension id: WebCLI is reached through the relay', () => {
+    expect(catalogEntryById('webcli')?.server?.url).toBe(WEBCLI_RELAY_URL)
+    for (const e of CATALOG.filter((x) => x.server && x.id !== 'webcli')) {
+      expect(e.server!.url, e.id).toMatch(/^https:\/\//)
     }
   })
 })

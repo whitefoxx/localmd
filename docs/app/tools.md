@@ -34,6 +34,27 @@ If you want just one thing to start with, take **WebCLI**. It is a browser
 extension that lets the assistant use your own logged-in Chrome — so it reaches
 pages that need a login, and it makes most other tools work better too.
 
+## Connecting WebCLI
+
+WebCLI is the one entry with a second step, because it answers only the sites you
+have allowed. Its row says **Setup needed** until you have:
+
+1. **Installed the extension** from the Chrome Web Store.
+2. **Added this site to it.** Click the WebCLI icon in Chrome's toolbar, open
+   **Web app access**, and add the address shown on the row's page — exactly as
+   shown, including the port. `localhost:5173` and `localhost:3000` are different
+   sites as far as the extension is concerned.
+3. **Reloaded this page.** The extension only starts listening on pages opened
+   after you add them, so this is the step that finishes it. There is a **Reload
+   this page** button right there.
+
+The row turns green on its own once that is done. Nothing to copy or type: the
+extension announces itself to the page, so a beta or development build of it
+works with no extra configuration.
+
+If the row stays red *after* a reload, the address in that list does not match
+this page — it is almost always a missing or different port.
+
 ## Reading the Installed list
 
 One row per integration. Open any row to see the individual tools inside it.
@@ -72,6 +93,10 @@ Mostly it repairs itself:
 
 When you want to force it, open the row and press **Reconnect**. It re-connects
 that one integration and leaves everything else alone.
+
+WebCLI is the exception to "mostly repairs itself": if you remove this site from
+its **Web app access** list, calls stop being answered rather than refused, so
+the app can only report that they timed out. Add the site back and reload.
 
 ## Tools that come with a folder
 
