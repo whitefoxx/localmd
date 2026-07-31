@@ -720,6 +720,23 @@ async function runCheck(serverId: string): Promise<void> {
 /* ── sign in ─────────────────────────────────────────────────────────────── */
 
 const signInBusy = ref(false)
+
+/**
+ * Whether signing in is the answer to what this row is currently saying.
+ *
+ * Not "every server that could conceivably do OAuth": most cannot, and offering
+ * it on a keyless server (DeepWiki says "No key" in its own description) is an
+ * action that can only produce a confusing failure. A server that wants
+ * authorization says so with a 401, so the button appears exactly where the row
+ * has already told the user something is missing — and stays visible once
+ * signed in, because that is the only way back out.
+ */
+const canSignIn = computed(() => {
+  const s = detailServer.value
+  if (!s || detailDisabled.value || detailIsWebcli.value) return false
+  if (mcp.isSignedIn(s.config.id)) return true
+  return s.status === 'error' && /\b401\b|unauthor|invalid_token/i.test(s.error ?? '')
+})
 /** Shown under the row. A failed sign-in has a reason worth reading — the wrong
  *  account, a closed window, a server that only takes confidential clients —
  *  and none of it belongs in the connection error, which is about the endpoint. */
@@ -911,10 +928,8 @@ function removeDetail(): void {
               ? $t('settings.checkChecking')
               : $t('settings.reconnect') }}
           </button>
-          <!-- Sign in appears only where it can work: a row reached over the
-               relay is WebCLI itself, which has no OAuth to do. -->
           <button
-            v-if="detailServer && !detailDisabled && !detailIsWebcli"
+            v-if="canSignIn && detailServer"
             class="btn text-xs"
             :disabled="signInBusy"
             @click="toggleSignIn(detailServer.config.id)"
