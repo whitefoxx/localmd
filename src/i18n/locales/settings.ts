@@ -170,6 +170,10 @@ export default {
         title: 'Zotero library',
         desc: 'Search your own Zotero references, with their notes and tags. Needs your user ID and an API key.',
       },
+      parallel: {
+        title: 'Parallel web search',
+        desc: 'Web search and page extraction built for agents, keyless. Stronger than the Jina pack above — it takes what you are trying to find out, not just keywords — and returns long, quotable excerpts, so expect it to use a fair slice of the conversation.',
+      },
       deepwiki: {
         title: 'DeepWiki',
         desc: 'Ask questions about any public GitHub repository and get answers from generated documentation. No key.',
@@ -414,6 +418,10 @@ export default {
       zotero: {
         title: 'Zotero 文献库',
         desc: '检索你自己的 Zotero 文献（含笔记和标签）。需要填写 User ID 和 API key。',
+      },
+      parallel: {
+        title: 'Parallel 联网搜索',
+        desc: '为 agent 做的联网搜索和网页提取，免 key。比上面的 Jina 更强 —— 它接收的是「你想查清什么」而不只是关键词 —— 返回的摘录长且可直接引用，所以会占掉对话里不小的一块。',
       },
       deepwiki: {
         title: 'DeepWiki',

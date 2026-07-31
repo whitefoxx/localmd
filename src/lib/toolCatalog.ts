@@ -398,6 +398,12 @@ export const CATALOG: CatalogEntry[] = [
     ],
   },
   {
+    id: 'parallel',
+    kind: 'mcp',
+    homepage: 'https://parallel.ai/',
+    server: { name: 'parallel', url: 'https://search.parallel.ai/mcp' },
+  },
+  {
     id: 'deepwiki',
     kind: 'mcp',
     homepage: 'https://deepwiki.com/',

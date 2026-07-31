@@ -10,6 +10,7 @@ import {
 } from './toolCatalog'
 import { normalizeHttpTool, secretRefs, staticOrigin, httpToolJsonSchema } from './httpTools'
 import { WEBCLI_RELAY_URL } from './webcliRelay'
+import settings from '@/i18n/locales/settings'
 
 const httpEntries = CATALOG.filter((e) => e.kind === 'http')
 const allTools = CATALOG.flatMap((e) => e.tools ?? [])
@@ -46,6 +47,26 @@ describe('catalog shape', () => {
     expect(catalogEntryById('webcli')?.server?.url).toBe(WEBCLI_RELAY_URL)
     for (const e of CATALOG.filter((x) => x.server && x.id !== 'webcli')) {
       expect(e.server!.url, e.id).toMatch(/^https:\/\//)
+    }
+  })
+
+  /**
+   * Entry copy is looked up by id at runtime (`settings.catalog.<id>.title`),
+   * so the i18n suite's literal-key scan cannot see it: a new entry with no
+   * copy ships as a blank row in both languages and nothing fails. This is the
+   * only thing standing between "added an entry" and "added an entry someone
+   * can read".
+   */
+  it('gives every entry a title and description in both languages', () => {
+    for (const { id } of CATALOG) {
+      for (const [lang, catalog] of [
+        ['en', settings.en.catalog],
+        ['zh', settings.zh.catalog],
+      ] as const) {
+        const copy = (catalog as Record<string, { title?: string; desc?: string }>)[id]
+        expect(copy?.title, `${id} (${lang}) title`).toBeTruthy()
+        expect(copy?.desc, `${id} (${lang}) desc`).toBeTruthy()
+      }
     }
   })
 })

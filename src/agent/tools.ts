@@ -35,6 +35,9 @@ import {
   groupByBundle,
   secretRefs,
   staticOrigin,
+  // The local `clip` in this file is the file-reading one (offset semantics);
+  // this is the token-budget one shared with HTTP tools.
+  clip as clipToBudget,
   KB_TOOLS_CONFIG_PATH,
   type HttpToolSpec,
 } from '@/lib/httpTools'
@@ -1468,6 +1471,22 @@ export interface ExternalToolSpec {
 
 type McpTool = ReturnType<ReturnType<typeof useMcpStore>['activeToolsFor']>[number]
 
+/**
+ * Ceiling on what one external tool call may put into the turn.
+ *
+ * An HTTP tool's own `maxChars` is applied AFTER its template has already shaped
+ * the response down, so its 20k default is a budget. Nothing shapes an MCP
+ * result — a third-party server returns whatever it returns, straight into the
+ * context — so this is a backstop against unbounded rather than a budget, and it
+ * sits above what servers actually send: measured live, the talkative ones land
+ * around 28k characters (Parallel web_search, scite search_literature), and doc
+ * readers well under that. A cap that clipped those would be tuning a number
+ * against real, wanted output; this one only fires on a server that has lost the
+ * plot. `clip` says how much it dropped, so the model can narrow and retry
+ * instead of silently working from a severed result.
+ */
+const MAX_EXTERNAL_TOOL_CHARS = 40_000
+
 function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): ExternalToolSpec {
   return {
     name: t.qualifiedName,
@@ -1482,7 +1501,11 @@ function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): Extern
         // Only successful calls count — a tool that always throws shouldn't
         // squat on the cap.
         mcp.rememberUse(t.qualifiedName)
-        return out
+        // Capped here rather than in the store: internal callers reach
+        // callTool too — the WebCLI HTTP transport and the MCP-over-WebCLI wire
+        // both read a JSON envelope out of it, and clipping that would corrupt
+        // the plumbing rather than save tokens. This is the model-facing path.
+        return clipToBudget(out, MAX_EXTERNAL_TOOL_CHARS)
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }
