@@ -80,6 +80,7 @@ export default {
     connectDesc:
       "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
     connectAction: 'Describe it to the agent',
+    basics: 'The basics',
     installed: 'Installed',
     installedDesc:
       'Everything the agent can reach right now — one row per integration. Open one to see the tools inside it.',
@@ -89,7 +90,7 @@ export default {
     kindExtension: 'Extension',
     browseAll: 'Browse recommended →',
     backToTools: 'Tools',
-    noneInstalled: 'Nothing installed yet — browse the recommended list to give the agent some reach.',
+    noneInstalled: 'Nothing installed yet — switch one of the basics on above, or ask the assistant for something else.',
     noToolsHere: 'No tools reported. If this is an extension or a server, it may not be connected.',
     removeEntry: 'Remove',
     presetLockedHint:
@@ -308,6 +309,7 @@ export default {
     connectDesc:
       '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
     connectAction: '描述给 agent',
+    basics: '基础能力',
     installed: '已安装',
     installedDesc: '当前 agent 能用到的全部能力，一行一个集成。点开可以看到里面具体有哪些工具。',
     sourcePreset: '预设',

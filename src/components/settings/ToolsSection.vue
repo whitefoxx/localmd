@@ -55,7 +55,6 @@ const RESERVED = new Set(TOOLS.map((x) => x.name))
 
 type View =
   | { name: 'main' }
-  | { name: 'catalog' }
   | { name: 'entry'; id: string }
   | { name: 'server'; id: string }
   | { name: 'group'; key: string }
@@ -162,8 +161,9 @@ async function toggleEntry(entry: CatalogEntry): Promise<void> {
   } finally {
     checkingEntry.value = null
   }
-  // Only steer someone who is still standing where they clicked.
-  if (view.value.name !== 'catalog') return
+  // Only steer someone who is still standing where they clicked — the switches
+  // live on the main page now, so that is where a click came from.
+  if (view.value.name !== 'main') return
   if (entryServer(entry)?.status !== 'ok') open({ name: 'entry', id: entry.id })
 }
 
@@ -821,82 +821,8 @@ function removeDetail(): void {
   <!-- One root element so `rootEl` can find the scrolling settings pane; the
        branches below are the actual views. -->
   <div ref="rootEl">
-  <!-- ═══ Recommended catalog (sub-page) ═══ -->
-  <div v-if="view.name === 'catalog'" class="space-y-4">
-    <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
-      <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
-    </button>
-    <div>
-      <span class="text-sm text-fg-1">{{ $t('settings.recommended') }}</span>
-      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
-    </div>
-
-    <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
-      <div v-for="e in catalogEntries" :key="e.id" class="px-3 py-3">
-        <div class="flex items-start gap-2.5">
-          <button
-            type="button"
-            role="checkbox"
-            :aria-checked="tools.isInstalled(e.id)"
-            class="shrink-0 mt-0.5"
-            @click="toggleEntry(e)"
-          >
-            <span
-              class="codicon codicon-sm"
-              :class="
-                tools.isInstalled(e.id)
-                  ? 'codicon-pass-filled text-accent'
-                  : 'codicon-circle-large-outline text-fg-3'
-              "
-            />
-          </button>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
-              <span v-if="e.featured" class="text-[10px] px-1 rounded bg-accent/15 text-accent">
-                {{ $t('settings.catalogFeatured') }}
-              </span>
-              <span
-                v-if="e.requiresWebcli"
-                class="text-[10px] px-1 rounded"
-                :class="tools.webcliConnected ? 'bg-bg-3 text-fg-3' : 'bg-removed/15 text-removed'"
-              >{{ $t('settings.catalogNeedsWebcli') }}</span>
-              <span v-if="checkingEntry === e.id" class="text-[10px] text-fg-3">
-                {{ $t('settings.checkChecking') }}
-              </span>
-            </div>
-            <p class="text-xs text-fg-3 mt-0.5 leading-relaxed">
-              {{ $t(`settings.catalog.${e.id}.desc`) }}
-            </p>
-            <div class="flex items-center gap-3 flex-wrap mt-1.5">
-              <!-- For an extension the homepage IS the Web Store listing, and
-                   installing is the step the user has to take: say so, rather than
-                   filing it under "learn more". -->
-              <a
-                v-if="e.homepage"
-                :href="e.homepage"
-                target="_blank"
-                rel="noopener"
-                class="text-xs text-accent hover:underline"
-              >{{ $t(e.kind === 'extension' ? 'settings.installFromStore' : 'settings.catalogLearnMore') }}</a>
-              <a
-                v-if="e.repo"
-                :href="e.repo"
-                target="_blank"
-                rel="noopener"
-                class="flex items-center gap-1 text-xs text-accent hover:underline"
-              >
-                <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══ Detail: what's inside a pack or a server (sub-page) ═══ -->
-  <div v-else-if="view.name === 'entry' || view.name === 'server'" class="space-y-4">
+  <div v-if="view.name === 'entry' || view.name === 'server'" class="space-y-4">
     <button class="flex items-center gap-1 text-xs text-fg-3 hover:text-fg-0" @click="back">
       <span class="codicon codicon-sm codicon-arrow-left" />{{ $t('settings.backToTools') }}
     </button>
@@ -1380,16 +1306,47 @@ function removeDetail(): void {
       <button class="btn text-xs mt-2" @click="askAgent">{{ $t('settings.connectAction') }}</button>
     </div>
 
+    <!-- ▸ The basics, as switches rather than a catalogue to shop.
+         There are three of them; a browse-a-list-and-check-boxes page was the
+         right shape for twelve and is ceremony for this. Each one says what it
+         gives you, so the choice can be made here rather than by opening it. -->
+    <div>
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.basics') }}</span>
+      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
+      <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <label
+          v-for="e in catalogEntries"
+          :key="e.id"
+          class="flex items-start gap-2.5 px-3 py-2.5 hover:bg-bg-2 cursor-pointer transition-colors"
+        >
+          <input
+            type="checkbox"
+            class="mt-0.5 shrink-0"
+            :checked="tools.isInstalled(e.id)"
+            :disabled="checkingEntry === e.id"
+            @change="toggleEntry(e)"
+          />
+          <span class="min-w-0">
+            <span class="flex items-center gap-1.5 flex-wrap">
+              <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
+              <span
+                v-if="e.id === 'webcli' && tools.isInstalled(e.id) && !tools.webcliConnected"
+                class="text-2xs rounded px-1 py-0.5 bg-removed/15 text-removed"
+              >{{ $t('settings.webcli.setupNeeded') }}</span>
+            </span>
+            <span class="block mt-0.5 text-xs text-fg-3 leading-relaxed">
+              {{ $t(`settings.catalog.${e.id}.desc`) }}
+            </span>
+          </span>
+        </label>
+      </div>
+    </div>
+
     <!-- ▸ Installed — everything the agent can reach, one row per integration.
          Source tag on every row; kind tag and a status dot only where a live
          connection exists, so a colour never means two things. -->
     <div>
-      <div class="flex items-center justify-between">
-        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.installed') }}</span>
-        <button class="text-xs text-accent hover:underline" @click="open({ name: 'catalog' })">
-          {{ $t('settings.browseAll') }}
-        </button>
-      </div>
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.installed') }}</span>
       <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.installedDesc') }}</p>
     </div>
     <div v-if="installedRows.length" class="rounded-lg border border-border divide-y divide-border overflow-hidden">
