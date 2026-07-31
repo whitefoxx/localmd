@@ -37,29 +37,12 @@ web-agent(Chrome 扩展)有 host 权限与完整的浏览 agent 引擎。桥接�
 
 ## Backlog(已确认暂缓)
 
-- **MCP OAuth 2.1 (deferred 2026-07-26).** Today an MCP server is reachable only
-  with a static bearer token, which is the single thing keeping the big hosted
-  servers out. Measured with an `Origin: https://localmd.app` preflight + a real
-  `initialize`: browser CORS is *not* the blocker — Linear, Notion (both reflect
-  the Origin), GitHub, Exa, Context7, DeepWiki and Cloudflare Docs all answer.
-  DeepWiki and Context7 need no auth and work now (both are in the catalog);
-  Linear and Notion return `401` + `WWW-Authenticate: Bearer …
-  resource_metadata="…/.well-known/oauth-protected-resource"`, i.e. the standard
-  MCP authorization handshake.
-
-  To unlock those: RFC 9728 protected-resource discovery, RFC 7591 dynamic
-  client registration, and an authorization-code + PKCE (S256) flow with the app
-  origin as redirect URI. A browser is the natural client for this — public
-  client, real redirects, no client secret to hide. Estimated 2–3 days.
-
-  Verify before building: neither Linear nor Notion advertises
-  `Access-Control-Expose-Headers: Mcp-Session-Id` on the preflight, so confirm
-  they run stateless — otherwise the browser cannot read the session id back and
-  multi-call sessions break. (Context7 does expose it.)
-
-  Weigh against: these servers mostly *sync content in* from elsewhere, which
-  overlaps what the declarative HTTP tools already do (Zotero ships in the
-  catalog; Readwise and Raindrop both allow browser CORS and are a form away).
+- ~~MCP OAuth 2.1 (deferred 2026-07-26)~~ **已实现**,见下方「MCP OAuth」一节。
+  当时的判断有一处后来被推翻:那条笔记担心 Linear/Notion 不暴露
+  `Access-Control-Expose-Headers: Mcp-Session-Id`、浏览器读不回 session id。
+  实际情况是 `WWW-Authenticate` 才是浏览器读不到的那个(103 个服务器里只有 15 个
+  暴露),所以发现链改走 well-known 路径兜底;而 2026-07-28 规范干脆把 session
+  整个删掉了。
 
 - **GitHub 同步 live 验证**:push/pull 代码与错误路径已测,但真实推送需用户 PAT
   (Settings → Git & GitHub;README 有 token 指南)
@@ -76,17 +59,21 @@ web-agent(Chrome 扩展)有 host 权限与完整的浏览 agent 引擎。桥接�
 (`src/lib/mcpOAuth.ts` 纯逻辑 + `src/lib/oauthPopup.ts` 弹窗 +
 `public/oauth/callback.html` 静态回调 + store 编排)。对 Notion 实测到授权页。
 
-- **部署 `oauth-client.json` 到 localmd.app**(现在 404)。CIMD 只在
-  `window.location.origin` 等于文档里 `client_id` 的 origin 时启用 —— 因为授权
-  服务器要自己抓这个 URL,只有应用就跑在该域名上时「可达」和「这份文档描述的是
-  我们」才同时成立。发布前所有环境走 DCR,功能正常。发布后 CIMD 自动生效,无需
-  改代码。副作用是 dev 永远走 DCR,兼容路径因此不会腐烂。
+- ~~部署 `oauth-client.json`~~ **已生效**(2026-07-31)。文件在 `public/` 里,所以
+  发版就带上去了 —— 从来不存在一个单独的「部署」动作。线上已验证:文档可取、
+  `client_id` 等于它自己的 URL(自洽)、含生产回调;`/definitely-not-a-real-path`
+  返回 404 而非 index.html,说明 Vercel 没把静态文件重写掉,回调页因此能活。
+  CIMD 只在 `window.location.origin` 等于文档 `client_id` 的 origin 时启用 ——
+  那不是开关,而是「对方抓得到」且「这份文档描述的是我们」同时成立的唯一条件。
+  副作用:dev 永远走 DCR,兼容路径因此不会腐烂。
 
-- **令牌中途过期的自动刷新**。当前只在 `connectServer` 刷新(覆盖「标签页关了一阵
-  再回来」这个常见情形)。调用中途 401 会让那一行变红,用户点重连恢复。做成自动
-  重试要动 `stores/mcp.ts` 的 `callTool` 恢复路径 —— 那里的 `isRecoverable` 语义
-  是「请求确定没送达,所以重发不会执行两次」,而 401 不满足这个前提,需要单独一条
-  「刷新后重发一次」的分支并想清楚幂等性。按「先出最简单的手动版本」延后。
+- ~~令牌中途过期的自动刷新~~ **已完成**(2026-07-31)。401 单独成一条重试路径
+  (`isAuthFailure`),因为补救方式和掉线不同:掉线重连即可,令牌过期必须**先换
+  令牌再重连** —— 否则只会换来第二个 401。续期成功是重试的**闸门**,换不到就报错
+  停下,不会变成循环。安全性上 401 满足既有的「请求确定没送达」不变式,甚至比掉线
+  更确定:服务器在鉴权阶段就拒了,没派发到工具。
+  实测:注入坏 access token(refresh 有效)→ 一次调用内自动续期并成功;两个都坏
+  → 报错停下,997ms 结束。
 
 - **已知拦不住的**:只接受机密客户端的服务器(实测 Craft、Miro 明确只列
   `client_secret_*`)。浏览器应用没有能保管的密钥,`supportsPublicPkce` 会在用户

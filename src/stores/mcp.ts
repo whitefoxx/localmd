@@ -18,6 +18,7 @@ import {
   mergeMcpConfigs,
   isDeferredTool,
   isRecoverable,
+  isAuthFailure,
   recallTouch,
   directWire,
   resolveServerSecrets,
@@ -294,16 +295,23 @@ export const useMcpStore = defineStore('mcp', () => {
   /** The Authorization header a signed-in row should connect with, refreshing
    *  first when the stored token has expired. Empty for rows that never signed
    *  in, which is most of them. */
-  async function bearerFor(config: McpServerConfig): Promise<{ token?: string }> {
+  /**
+   * Spend the refresh token and store what comes back. True when a new access
+   * token was obtained.
+   *
+   * A failure leaves the old token in place rather than signing the user out:
+   * the server may simply have been unreachable, and discarding a credential
+   * over a network blip is the wrong trade — a red row is recoverable, a
+   * discarded refresh token is not.
+   */
+  async function refreshAuth(config: McpServerConfig): Promise<boolean> {
     const settings = useSettingsStore()
     const auth = settings.state.mcpAuth[config.id]
-    if (!auth) return {}
-    if (!isExpired(auth) || !auth.refreshToken) return { token: auth.accessToken }
-
+    if (!auth?.refreshToken) return false
     const wire = wireFor(config)
-    if (!wire) return { token: auth.accessToken } // let the 401 speak for itself
+    if (!wire) return false
     const found = await discover(wire, config.url)
-    if ('error' in found) return { token: auth.accessToken }
+    if ('error' in found) return false
     const next = await requestToken(
       wire,
       found.meta,
@@ -315,15 +323,27 @@ export const useMcpStore = defineStore('mcp', () => {
         resource: config.url,
       }),
     )
-    // A refresh that fails leaves the old token in place rather than signing the
-    // user out: the server may simply have been unreachable, and discarding a
-    // credential over a network blip is the wrong trade.
-    if ('error' in next) return { token: auth.accessToken }
+    if ('error' in next) return false
     settings.state.mcpAuth = {
       ...settings.state.mcpAuth,
       [config.id]: { ...auth, ...next, issuer: found.issuer },
     }
-    return { token: next.accessToken }
+    return true
+  }
+
+  /** The Authorization header a signed-in row connects with, renewed first when
+   *  the stored one has expired by the clock. Empty for rows that never signed
+   *  in, which is most of them. */
+  async function bearerFor(config: McpServerConfig): Promise<{ token?: string }> {
+    const settings = useSettingsStore()
+    const auth = settings.state.mcpAuth[config.id]
+    if (!auth) return {}
+    if (isExpired(auth)) await refreshAuth(config)
+    // Whatever is stored now: the renewed token, or the old one when renewing
+    // could not happen. Sending a stale token and letting the server say 401 is
+    // better than refusing to connect on our own authority — the clock is ours,
+    // and it can be wrong.
+    return { token: settings.state.mcpAuth[config.id]?.accessToken ?? auth.accessToken }
   }
 
   /**
@@ -586,12 +606,24 @@ export const useMcpStore = defineStore('mcp', () => {
       // The user stopping their turn says nothing about the server: leave the
       // row alone and don't retry — they asked for it to stop, not to happen.
       if (signal?.aborted) throw err
-      if (!isRecoverable(err)) {
+
+      // Two ways a call can be worth sending again, and they need different
+      // remedies. A dropped port or a dead session is fixed by reconnecting. An
+      // expired token is not: reconnecting with the same rejected credential
+      // earns a second 401, so the token has to be renewed FIRST and the
+      // reconnect then picks it up. Renewing is also the gate — a 401 we cannot
+      // do anything about stays an error rather than becoming a retry loop.
+      const state = servers.value.find((s) => s.config.id === serverId)
+      const retryable =
+        isRecoverable(err) || (isAuthFailure(err) && !!state && (await refreshAuth(state.config)))
+      if (!retryable) {
         patch(serverId, { status: 'error', error: (err as Error).message })
         throw err
       }
-      // The request never landed (dead port, expired session), so sending it
-      // again cannot run the tool twice. One attempt, then the error stands.
+      // Whichever path got here, the request provably never ran: the transport
+      // was gone, or the server turned it away before dispatching anything. So
+      // sending it once more cannot run the tool twice. One attempt, then the
+      // error stands.
       await reconnect(serverId)
       const client = clients.get(serverId)
       if (!client) throw err

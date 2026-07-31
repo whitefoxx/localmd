@@ -360,6 +360,22 @@ export interface McpClientLike {
  *  and sending it again cannot run the tool twice: the session was gone, or we
  *  never had a connection to begin with. A plain tool error, a timeout, or a 500
  *  is NOT in here — those may have had effects. */
+/**
+ * The server rejected us at authentication.
+ *
+ * Also safe to resend — arguably more provably so than the cases above, since a
+ * 401 means the request was turned away before anything was dispatched. It is
+ * kept separate because the REMEDY differs: these need a fresh token first, and
+ * reconnecting with the same dead one just earns a second 401.
+ *
+ * 401 only. A 403 is "authenticated, and still not allowed", which no amount of
+ * refreshing changes.
+ */
+export function isAuthFailure(err: unknown): boolean {
+  const m = (err as Error)?.message ?? ''
+  return /HTTP 401\b/.test(m) || /invalid_token/i.test(m)
+}
+
 export function isRecoverable(err: unknown): boolean {
   const m = (err as Error)?.message ?? ''
   return (

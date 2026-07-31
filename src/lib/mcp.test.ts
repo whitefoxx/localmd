@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isRecoverable,
+  isAuthFailure,
   sanitizeServerName,
   externalToolName,
   parseExternalToolName,
@@ -319,5 +320,33 @@ describe('isRecoverable', () => {
     expect(isRecoverable(new Error('MCP tools/call HTTP 500: boom'))).toBe(false)
     expect(isRecoverable(new Error('MCP tools/call timed out (600s)'))).toBe(false)
     expect(isRecoverable(new Error('Error: the page had no such element'))).toBe(false)
+  })
+})
+
+describe('when a failed call may be sent again', () => {
+  /**
+   * The invariant both predicates serve: a retry is only allowed when the
+   * request provably never ran, so it cannot execute a tool twice.
+   */
+  it('accepts a 401 — the server turned it away before dispatching anything', () => {
+    expect(isAuthFailure('MCP tools/call HTTP 401: {"error":"invalid_token"}')).toBe(false)
+    expect(isAuthFailure(new Error('MCP tools/call HTTP 401: {"error":"invalid_token"}'))).toBe(true)
+    expect(isAuthFailure(new Error('{"error":"invalid_token"}'))).toBe(true)
+  })
+
+  it('refuses a 403 — refreshing changes nothing about being forbidden', () => {
+    expect(isAuthFailure(new Error('MCP tools/call HTTP 403: forbidden'))).toBe(false)
+  })
+
+  it('does not mistake an unrelated 401 in the body for an auth failure', () => {
+    // The status is what counts; 4011 is a different number.
+    expect(isAuthFailure(new Error('MCP tools/call HTTP 500: upstream said 4011'))).toBe(false)
+  })
+
+  it('keeps the two remedies apart', () => {
+    // An auth failure is not "reconnect and hope" — reconnecting with the same
+    // rejected token earns a second 401, so it must not qualify here.
+    expect(isRecoverable(new Error('MCP tools/call HTTP 401: invalid_token'))).toBe(false)
+    expect(isAuthFailure(new Error('connection closed'))).toBe(false)
   })
 })
