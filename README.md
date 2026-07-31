@@ -1,6 +1,6 @@
 # browser-md
 
-**一个在你自己文件夹里干活的 AI agent，什么都不用装。** 打开网页 → 选择本地文件夹 → 配置 LLM API key，即可使用。无需安装、无需后端——文件通过 File System Access API 直接读写在你的设备上，API key 只存在你的浏览器里、只发给你配置的模型服务商。
+**一个 AI 知识库，跑在你的浏览器和本地文件夹里。** 打开网页 → 选择本地文件夹 → 配置 LLM API key，即可使用。无需安装、无需后端——文件通过 File System Access API 直接读写在你的设备上，API key 只存在你的浏览器里、只发给你配置的模型服务商。
 
 browser-md 是 [trace-app](../trace-app)（Electron 桌面版 AI 知识库）的纯浏览器重写，借鉴了 [files.md](https://files.md) 的 local-first 网页模式。两者共享同一套知识库数据格式，可以对同一个文件夹混用。
 

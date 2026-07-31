@@ -1,7 +1,7 @@
 ---
 title: localmd 是什么
-summary: 一个在你电脑上某个普通文件夹里干活的 AI 助手。什么都不用装，不用注册，文件就待在你放它的地方。
-source-hash: 573715482feb8732
+summary: 一个跑在你的浏览器和本地文件夹里的 AI 知识库。什么都不用装，不用注册，文件就待在你放它的地方。
+source-hash: cda52932625058ac
 ---
 
 # localmd 是什么

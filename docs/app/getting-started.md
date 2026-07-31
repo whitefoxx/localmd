@@ -1,6 +1,6 @@
 ---
 title: What localmd is
-summary: An AI assistant that works inside an ordinary folder on your computer. Nothing to install, no account, and the files stay where you put them.
+summary: An AI knowledge base that runs in your browser and your local folder. Nothing to install, no account, and the files stay where you put them.
 ---
 
 # What localmd is

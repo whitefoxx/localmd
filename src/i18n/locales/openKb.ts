@@ -2,7 +2,7 @@
 export default {
   en: {
     tagline:
-      'An AI agent that works in a folder on your own computer — nothing to install. Pick a folder below: it reads your PDFs and writes your Markdown. No account, no upload.',
+      'An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install.',
     openFolder: 'Open local folder',
     newKb: 'Start a new knowledge base',
     recent: 'Recent',
@@ -23,7 +23,7 @@ export default {
   },
   zh: {
     tagline:
-      '一个在你自己文件夹里干活的 AI agent，什么都不用装。在下面选一个文件夹：它读你的 PDF、写你的 Markdown。无需账号，不上传。',
+      '一个 AI 知识库，跑在你的浏览器和本地文件夹里。打开网址，选个文件夹，开始思考——什么都不用装。',
     openFolder: '打开本地文件夹',
     newKb: '新建一个知识库',
     recent: '最近',

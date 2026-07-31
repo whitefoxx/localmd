@@ -44,9 +44,12 @@ export default {
 
     doesLabel: 'What localmd does',
     does1: 'Interlinked Markdown notes with [[wikilinks]] and a graph view',
-    does2: 'Read PDFs and EPUBs in-app, with block-level citations back into your notes',
-    does3: 'An AI agent with tools: search, read, write, edit, plan, run skills, call MCP servers',
-    does4: 'Bring-your-own-key for many providers, a vision model for images, optional image generation',
+    does2:
+      'Read PDFs and EPUBs in-app, with block-level citations back into your notes',
+    does3:
+      'An AI agent with tools: search, read, write, edit, plan, run skills, call MCP servers',
+    does4:
+      'Bring-your-own-key for many providers, a vision model for images, optional image generation',
     does5: 'Save conversations as Markdown and distill them into notes',
     does6: 'Version your knowledge base with built-in git and sync to GitHub',
     does7: 'Installable and offline — everything cached on your device',
@@ -54,14 +57,16 @@ export default {
     dontLabel: "What we don't do",
     dont1: "No account. You don't sign up to think.",
     dont2: "No server storing your files. There's nowhere for us to put them.",
-    dont3: 'No uploading your notes. They stay in your folder unless you send text to your own model.',
+    dont3:
+      'No uploading your notes. They stay in your folder unless you send text to your own model.',
     dont4: 'No ads, no notifications, no "reading goals."',
     dont5: "No lock-in. It's Markdown in a folder — leave whenever you like.",
-    dont6: "We don't hold your API key. It lives in your browser, and you can clear it anytime.",
+    dont6:
+      "We don't hold your API key. It lives in your browser, and you can clear it anytime.",
     dont7: 'No app to install, no terminal, no local server to keep running.',
 
     closingTitle: 'Open a folder and start thinking.',
-    footer: 'localmd · an AI agent for a folder on your own computer',
+    footer: 'localmd · AI knowledge base in your browser and your local folder',
   },
   zh: {
     whyLabel: '为什么有 localmd',
@@ -108,7 +113,8 @@ export default {
     doesLabel: 'localmd 能做什么',
     does1: '用 [[wikilinks]] 互链的 Markdown 笔记，配图谱视图',
     does2: '应用内阅读 PDF 和 EPUB，带块级引用回链到你的笔记',
-    does3: '带工具的 AI agent：搜索、读、写、改、计划、运行 skills、调用 MCP 服务器',
+    does3:
+      '带工具的 AI agent：搜索、读、写、改、计划、运行 skills、调用 MCP 服务器',
     does4: '多家自带 Key、用于图像的视觉模型、可选的图像生成',
     does5: '把对话存成 Markdown，再蒸馏进笔记',
     does6: '用内置 git 为知识库做版本管理，并同步到 GitHub',
@@ -117,13 +123,14 @@ export default {
     dontLabel: '我们不做的事',
     dont1: '不要账号。思考不需要先注册。',
     dont2: '不在服务器上存你的文件。我们根本没有地方放。',
-    dont3: '不上传你的笔记。除非你把文本发给你自己的模型，否则它们只待在你的文件夹里。',
+    dont3:
+      '不上传你的笔记。除非你把文本发给你自己的模型，否则它们只待在你的文件夹里。',
     dont4: '没有广告、没有推送、没有「阅读目标」。',
     dont5: '不锁定。就是文件夹里的 Markdown——想走随时走。',
     dont6: '不替你保管 API Key。它就在你的浏览器里，你随时能清除。',
     dont7: '不用装 app、不用开终端、不用常驻一个本地服务。',
 
     closingTitle: '打开一个文件夹，开始思考。',
-    footer: 'localmd · 在你自己文件夹里干活的 AI agent',
+    footer: 'localmd · 跑在你的浏览器和本地文件夹里的 AI 知识库',
   },
-}
+};
