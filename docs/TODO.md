@@ -69,3 +69,25 @@ web-agent(Chrome 扩展)有 host 权限与完整的浏览 agent 引擎。桥接�
   getDisplayMedia(preferCurrentTab)抓帧 + 自绘选框裁剪(每次多一步浏览器确认,
   画质受屏幕分辨率限制)。当前结论:用系统截图(⌘⇧4)+ 聊天粘贴即可
 - **tracked 二进制的内容修改检测**:需哈希全文件,status 阶段不可行;维持终端处理
+
+## MCP OAuth(已实现,两处延后)
+
+2026-07-31。发现链 → PKCE → CIMD/DCR → token 交换 → 令牌存储 → UI 全部落地
+(`src/lib/mcpOAuth.ts` 纯逻辑 + `src/lib/oauthPopup.ts` 弹窗 +
+`public/oauth/callback.html` 静态回调 + store 编排)。对 Notion 实测到授权页。
+
+- **部署 `oauth-client.json` 到 localmd.app**(现在 404)。CIMD 只在
+  `window.location.origin` 等于文档里 `client_id` 的 origin 时启用 —— 因为授权
+  服务器要自己抓这个 URL,只有应用就跑在该域名上时「可达」和「这份文档描述的是
+  我们」才同时成立。发布前所有环境走 DCR,功能正常。发布后 CIMD 自动生效,无需
+  改代码。副作用是 dev 永远走 DCR,兼容路径因此不会腐烂。
+
+- **令牌中途过期的自动刷新**。当前只在 `connectServer` 刷新(覆盖「标签页关了一阵
+  再回来」这个常见情形)。调用中途 401 会让那一行变红,用户点重连恢复。做成自动
+  重试要动 `stores/mcp.ts` 的 `callTool` 恢复路径 —— 那里的 `isRecoverable` 语义
+  是「请求确定没送达,所以重发不会执行两次」,而 401 不满足这个前提,需要单独一条
+  「刷新后重发一次」的分支并想清楚幂等性。按「先出最简单的手动版本」延后。
+
+- **已知拦不住的**:只接受机密客户端的服务器(实测 Craft、Miro 明确只列
+  `client_secret_*`)。浏览器应用没有能保管的密钥,`supportsPublicPkce` 会在用户
+  点「登录」之前就说明白,这是正确行为而不是待办。
