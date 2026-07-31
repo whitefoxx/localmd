@@ -35,7 +35,12 @@
  * later task, so a page that only listens can miss it. The marker cannot be
  * missed.
  */
-import { flattenToolResult, type McpClientLike, type McpToolDef } from '@/lib/mcp'
+import {
+  flattenToolResult,
+  type McpClientLike,
+  type McpToolDef,
+  type McpWire,
+} from '@/lib/mcp'
 
 /** What a WebCLI server row carries in its `url` field. Deliberately not an
  *  address: the relay's marker names the build that is actually installed, so
@@ -79,6 +84,108 @@ const HANDSHAKE_TIMEOUT_MS = 15_000
  * here would report a failure for work that is still running.
  */
 const CALL_TIMEOUT_MS = 250_000
+
+/* ── fetch_url as a generic HTTP transport ───────────────────────────────── */
+
+/**
+ * What `generic__fetch_url` answers with. The extension returns more fields than
+ * this (url, statusText, format, bytes, truncated, with_cookies…); these are the
+ * ones anything here reads.
+ *
+ * `headers` is what makes this usable as an MCP transport at all: Streamable
+ * HTTP keeps its session in the `Mcp-Session-Id` RESPONSE header, and OAuth
+ * discovery begins at `WWW-Authenticate` — and that second one is not merely
+ * convenient here, it is only available here. A page cannot read
+ * `WWW-Authenticate` off a cross-origin 401 unless the server sends
+ * `Access-Control-Expose-Headers`, which almost none do; through the extension
+ * every header is readable.
+ */
+export interface WebcliFetchResult {
+  status?: number
+  ok?: boolean
+  headers?: Record<string, string>
+  content_type?: string
+  body?: string
+  note?: string
+  /** Set when `stream_stop` ended the read early: `body` is a PREFIX of what the
+   *  server was still willing to send. */
+  stream_open?: boolean
+}
+
+/** Parse a fetch_url result. The bridge reports its own failures as plain text
+ *  rather than a result object, so a parse failure IS the error message. */
+export function parseWebcliFetch(out: string): WebcliFetchResult {
+  try {
+    return JSON.parse(out) as WebcliFetchResult
+  } catch {
+    throw new Error(out.slice(0, 300))
+  }
+}
+
+/** Header lookup that does not care how the far side cased its keys. */
+function lowerKeys(h: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(h ?? {})) out[k.toLowerCase()] = v
+  return out
+}
+
+/**
+ * How long a proxied read may sit quiet before we take what we have.
+ *
+ * MCP Streamable HTTP lets a server answer a POST with an SSE stream and then
+ * KEEP IT OPEN. A buffered proxy waiting for the body to end can only time out
+ * there, so we ask fetch_url to stop on an idle stream instead.
+ *
+ * `idle` rather than `first_event`: a server may put a progress notification on
+ * the stream ahead of the response, and stopping at the first event would return
+ * that instead. Idle costs nothing when the server closes the stream normally —
+ * the read ends at the close, not at the timer — so the wait is only ever paid
+ * by servers that hold the stream open, which are the ones this exists for.
+ */
+const STREAM_IDLE_MS = 2_000
+
+/** Cap on a proxied response, matching what the extension will return. */
+const PROXY_MAX_BYTES = 2_000_000
+
+/** The extension's own call budget is 240s; this bounds one HTTP exchange well
+ *  inside it so a slow endpoint reports as itself rather than as a dead relay. */
+const PROXY_TIMEOUT_MS = 60_000
+
+/**
+ * WebCLI's `fetch_url` as an MCP wire — the transport for endpoints that refuse
+ * browsers outright. `call` runs one fetch_url tool call and returns its raw
+ * text result; stores/mcp.ts binds it to whichever server row is WebCLI, which
+ * is also why this takes a function rather than importing the tool name (that
+ * lives in toolCatalog, which imports from here).
+ */
+export function webcliWire(
+  call: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>,
+): McpWire {
+  return async (req, signal) => {
+    const out = await call(
+      {
+        url: req.url,
+        method: req.method,
+        headers: JSON.stringify(req.headers),
+        ...(req.body !== undefined ? { body: req.body } : {}),
+        format: 'text',
+        stream_stop: 'idle',
+        idle_timeout_ms: STREAM_IDLE_MS,
+        timeout_ms: PROXY_TIMEOUT_MS,
+        max_bytes: PROXY_MAX_BYTES,
+      },
+      signal,
+    )
+    const r = parseWebcliFetch(out)
+    return {
+      status: r.status ?? 0,
+      ok: r.ok === true,
+      headers: lowerKeys(r.headers),
+      body: r.body ?? '',
+      contentType: r.content_type ?? '',
+    }
+  }
+}
 
 interface RpcError {
   code: number

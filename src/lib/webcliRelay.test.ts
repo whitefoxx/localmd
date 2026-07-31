@@ -5,6 +5,7 @@ import {
   isWebcliRelayUrl,
   WEBCLI_RELAY_URL,
   RELAY_ABSENT_MESSAGE,
+  webcliWire,
 } from '@/lib/webcliRelay'
 
 const EXT = 'jnhfdhpafndcbppkphhfpecflhogngge'
@@ -238,5 +239,71 @@ describe('McpRelayClient', () => {
     const running = new McpRelayClient().callTool('slow', {}, ctrl.signal)
     ctrl.abort()
     await expect(running).rejects.toThrow('aborted')
+  })
+})
+
+describe('webcliWire', () => {
+  /** The shape fetch_url actually answers with, trimmed to what we read. */
+  const result = (over: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      url: 'https://e/mcp',
+      status: 200,
+      ok: true,
+      statusText: 'OK',
+      headers: { 'Mcp-Session-Id': 'sess-9', 'Content-Type': 'text/event-stream' },
+      content_type: 'text/event-stream',
+      bytes: 3,
+      body: 'abc',
+      ...over,
+    })
+
+  it('passes the request through and asks fetch_url not to wait out an open stream', async () => {
+    let seen: Record<string, unknown> = {}
+    const wire = webcliWire(async (args) => {
+      seen = args
+      return result()
+    })
+    await wire({
+      url: 'https://e/mcp',
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Mcp-Session-Id': 'sess-9' },
+      body: '{"jsonrpc":"2.0"}',
+    })
+    expect(seen.url).toBe('https://e/mcp')
+    expect(seen.method).toBe('POST')
+    expect(seen.body).toBe('{"jsonrpc":"2.0"}')
+    // headers cross as a JSON string, which is what the tool takes.
+    expect(JSON.parse(String(seen.headers))['Mcp-Session-Id']).toBe('sess-9')
+    // Without this an endpoint that holds its SSE stream open can only time out.
+    expect(seen.stream_stop).toBe('idle')
+  })
+
+  it('lowercases response headers so protocol state is findable', async () => {
+    const wire = webcliWire(async () => result())
+    const reply = await wire({ url: 'https://e/mcp', method: 'POST', headers: {} })
+    // The extension echoes whatever casing the server used; MCP looks these up
+    // by a fixed lowercase name.
+    expect(reply.headers['mcp-session-id']).toBe('sess-9')
+    expect(reply.contentType).toBe('text/event-stream')
+    expect(reply.body).toBe('abc')
+    expect(reply.ok).toBe(true)
+  })
+
+  it('reports a non-ok exchange rather than throwing, so 401 can be read', async () => {
+    const wire = webcliWire(async () =>
+      result({ status: 401, ok: false, headers: { 'WWW-Authenticate': 'Bearer realm="OAuth"' } }),
+    )
+    const reply = await wire({ url: 'https://e/mcp', method: 'POST', headers: {} })
+    expect(reply.status).toBe(401)
+    expect(reply.ok).toBe(false)
+    // OAuth discovery starts at this header, and it is only readable here.
+    expect(reply.headers['www-authenticate']).toContain('OAuth')
+  })
+
+  it('treats a plain-text answer as the bridge reporting a failure', async () => {
+    const wire = webcliWire(async () => 'fetch_url failed: signal timed out')
+    await expect(wire({ url: 'https://e/mcp', method: 'POST', headers: {} })).rejects.toThrow(
+      /signal timed out/,
+    )
   })
 })

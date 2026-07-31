@@ -12,6 +12,10 @@ import {
   catalogEntry,
   recallTouch,
   MAX_RECALLED_TOOLS,
+  McpHttpClient,
+  type McpWire,
+  type McpWireReply,
+  type McpWireRequest,
 } from './mcp'
 
 describe('tool namespacing', () => {
@@ -43,6 +47,89 @@ describe('parseSseResponse', () => {
   })
   it('returns null for empty bodies', () => {
     expect(parseSseResponse('')).toBeNull()
+  })
+  it('prefers the message carrying the id being waited on', () => {
+    // A progress notification and a later unrelated frame both sit on the same
+    // stream; "last one wins" would hand back the wrong one.
+    const body = [
+      'data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"n":1}}',
+      'data: {"jsonrpc":"2.0","id":7,"result":{"ok":true}}',
+      'data: {"jsonrpc":"2.0","method":"notifications/message","params":{}}',
+      '',
+    ].join('\n')
+    expect(parseSseResponse(body, 7)).toEqual({ jsonrpc: '2.0', id: 7, result: { ok: true } })
+  })
+  it('falls back to the last event when no id matches', () => {
+    const body = 'data: {"a":1}\ndata: {"b":2}\n'
+    expect(parseSseResponse(body, 99)).toEqual({ b: 2 })
+  })
+})
+
+describe('McpHttpClient over an injected wire', () => {
+  /** A wire that answers from a script, recording what it was asked to send. */
+  function fakeWire(replies: McpWireReply[]) {
+    const sent: McpWireRequest[] = []
+    const wire: McpWire = async (req) => {
+      sent.push(req)
+      return replies.shift() ?? { status: 500, ok: false, headers: {}, body: '', contentType: '' }
+    }
+    return { wire, sent }
+  }
+  const json = (body: unknown, headers: Record<string, string> = {}): McpWireReply => ({
+    status: 200,
+    ok: true,
+    headers,
+    body: JSON.stringify(body),
+    contentType: 'application/json',
+  })
+
+  it('handshakes, adopts the session header and namespaces nothing', async () => {
+    const { wire, sent } = fakeWire([
+      json({ jsonrpc: '2.0', id: 1, result: {} }, { 'mcp-session-id': 'sess-1' }),
+      json({ jsonrpc: '2.0', result: {} }), // notifications/initialized
+      json({ jsonrpc: '2.0', id: 2, result: { tools: [{ name: 'search' }] } }),
+    ])
+    const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp' }, wire)
+    const tools = await client.connect()
+    expect(tools).toEqual([{ name: 'search', description: '', inputSchema: { type: 'object', properties: {} } }])
+    // The session arrived on the FIRST response and must ride every later request.
+    expect(sent[0].headers['Mcp-Session-Id']).toBeUndefined()
+    expect(sent[2].headers['Mcp-Session-Id']).toBe('sess-1')
+  })
+
+  it('reads a JSON-RPC response out of an SSE body', async () => {
+    const { wire } = fakeWire([
+      {
+        status: 200,
+        ok: true,
+        headers: {},
+        body: 'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26"}}\n\n',
+        contentType: 'text/event-stream',
+      },
+      json({ jsonrpc: '2.0', result: {} }),
+      json({ jsonrpc: '2.0', id: 2, result: { tools: [] } }),
+    ])
+    const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp' }, wire)
+    await expect(client.connect()).resolves.toEqual([])
+  })
+
+  it('surfaces an HTTP failure with the body, not a bare status', async () => {
+    const { wire } = fakeWire([
+      { status: 401, ok: false, headers: {}, body: '{"error":"invalid_token"}', contentType: 'application/json' },
+    ])
+    const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp' }, wire)
+    await expect(client.connect()).rejects.toThrow(/HTTP 401.*invalid_token/)
+  })
+
+  it('sends the bearer token when one is configured', async () => {
+    const { wire, sent } = fakeWire([
+      json({ jsonrpc: '2.0', id: 1, result: {} }),
+      json({ jsonrpc: '2.0', result: {} }),
+      json({ jsonrpc: '2.0', id: 2, result: { tools: [] } }),
+    ])
+    const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp', token: 'tok' }, wire)
+    await client.connect()
+    expect(sent[0].headers.Authorization).toBe('Bearer tok')
   })
 })
 
@@ -88,6 +175,21 @@ describe('normalizeMcpServerList', () => {
   it('returns empty for non-arrays', () => {
     expect(normalizeMcpServerList({ servers: [] }, makeId)).toEqual([])
     expect(normalizeMcpServerList(undefined, makeId)).toEqual([])
+  })
+  it('carries transport:webcli through, and only that spelling', () => {
+    const out = normalizeMcpServerList(
+      [
+        { name: 'a', url: 'https://a/mcp', transport: 'webcli' },
+        { name: 'b', url: 'https://b/mcp', transport: 'direct' },
+        { name: 'c', url: 'https://c/mcp', transport: 'nonsense' },
+      ],
+      makeId,
+    )
+    expect(out[0].transport).toBe('webcli')
+    // 'direct' is the default, so it is absent rather than stored — a KB file
+    // that says it and one that omits it must produce the same config.
+    expect(out[1].transport).toBeUndefined()
+    expect(out[2].transport).toBeUndefined()
   })
 })
 

@@ -1,13 +1,23 @@
 /**
  * MCP (Model Context Protocol) client over Streamable HTTP — one endpoint,
  * JSON-RPC over POST, responses either application/json or a text/event-stream
- * body. Only servers that allow browser CORS work (same constraint as LLM
- * endpoints — document it). The other transport a server row can select is
- * WebCLI's postMessage relay, in lib/webcliRelay.ts; both speak the shapes
- * defined here and satisfy McpClientLike.
+ * body. A server row picks how it is REACHED (McpWire below: the browser's own
+ * fetch, or WebCLI's fetch_url for endpoints that refuse browsers) and, for
+ * WebCLI itself, an entirely different transport — the postMessage relay in
+ * lib/webcliRelay.ts, which satisfies McpClientLike rather than McpWire.
  *
  * External tools are namespaced `mcp__<server>__<tool>` (Claude Code's
  * convention) so they can't shadow built-in tools.
+ *
+ * We speak protocol version 2025-03-26. Note what the 2026-07-28 revision did
+ * to the two most awkward parts of this file: it removed the `Mcp-Session-Id`
+ * header and the initialize/notifications-initialized handshake outright, and
+ * dropped SSE resumability and server-initiated requests with them. So the
+ * session plumbing here is backwards compatibility, not the direction of
+ * travel — when servers in the wild move, it becomes deletable rather than
+ * something to extend. Advertising a newer version is not urgent: a 2026-07-28
+ * server still answers a 2025-03-26 client, and almost nothing implements the
+ * new revision yet.
  */
 
 export interface McpServerConfig {
@@ -18,6 +28,13 @@ export interface McpServerConfig {
   url: string
   /** Optional bearer token. */
   token?: string
+  /** How to reach `url`. 'direct' (default) is a browser fetch, so the endpoint
+   *  must allow CORS. 'webcli' proxies every exchange through the WebCLI
+   *  extension's fetch_url, which runs in a service worker and is not bound by
+   *  page CORS — the only way to reach the majority of hosted MCP servers, which
+   *  send no CORS headers at all. Ignored when `url` is WEBCLI_RELAY_URL: that
+   *  row IS WebCLI. */
+  transport?: 'direct' | 'webcli'
   /** false = keep the config but don't connect (default true). */
   enabled?: boolean
 }
@@ -48,21 +65,86 @@ export function parseExternalToolName(name: string): { server: string; tool: str
   return m ? { server: m[1], tool: m[2] } : null
 }
 
-/** A Streamable-HTTP POST may answer with an SSE body; the JSON-RPC response
- *  is the last `data:` event that parses as JSON. */
-export function parseSseResponse(body: string): unknown {
+/**
+ * A Streamable-HTTP POST may answer with an SSE body; the JSON-RPC response is
+ * the last `data:` event that parses as JSON.
+ *
+ * `id` narrows that: a server is allowed to put other messages on the same
+ * stream — a progress notification, a server-initiated request — and "last one
+ * wins" would hand back whichever happened to arrive last. When the caller says
+ * which id it is waiting for, a message carrying that id wins outright; the
+ * last-parsed value stays the fallback for servers that answer without echoing
+ * one.
+ */
+export function parseSseResponse(body: string, id?: number): unknown {
   let last: unknown = null
   for (const line of body.split('\n')) {
     if (!line.startsWith('data:')) continue
     const payload = line.slice(5).trim()
     if (!payload || payload === '[DONE]') continue
     try {
-      last = JSON.parse(payload)
+      const parsed = JSON.parse(payload)
+      if (id !== undefined && (parsed as { id?: unknown })?.id === id) return parsed
+      last = parsed
     } catch {
       /* keep scanning */
     }
   }
   return last
+}
+
+/* ── the wire ────────────────────────────────────────────────────────────── */
+
+export interface McpWireRequest {
+  url: string
+  method: string
+  headers: Record<string, string>
+  body?: string
+}
+
+export interface McpWireReply {
+  status: number
+  ok: boolean
+  /** Lowercased keys. Two of these carry protocol state rather than metadata:
+   *  `mcp-session-id` is the whole of Streamable HTTP's session, and
+   *  `www-authenticate` is where OAuth discovery starts. A transport that drops
+   *  headers cannot speak MCP. */
+  headers: Record<string, string>
+  body: string
+  contentType: string
+}
+
+/**
+ * One request/response exchange, and the only thing that differs between
+ * reaching a server directly and reaching it through WebCLI. Everything else —
+ * the JSON-RPC framing, the session header, SSE parsing, the teardown — is
+ * written once in McpHttpClient and works over either.
+ */
+export type McpWire = (req: McpWireRequest, signal?: AbortSignal) => Promise<McpWireReply>
+
+const TIMEOUT_MS = 60_000
+
+/** The browser's own fetch. Subject to CORS, which is the entire reason the
+ *  other wire exists. */
+export const directWire: McpWire = async (req, signal) => {
+  const timeout = AbortSignal.timeout(TIMEOUT_MS)
+  const res = await fetch(req.url, {
+    method: req.method,
+    headers: req.headers,
+    ...(req.body !== undefined ? { body: req.body } : {}),
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+  })
+  const headers: Record<string, string> = {}
+  res.headers.forEach((value, key) => {
+    headers[key.toLowerCase()] = value
+  })
+  return {
+    status: res.status,
+    ok: res.ok,
+    headers,
+    body: await res.text(),
+    contentType: res.headers.get('content-type') ?? '',
+  }
 }
 
 /** Flatten an MCP tools/call result into text for the model. */
@@ -84,8 +166,6 @@ export function flattenToolResult(result: {
   return result.isError ? `Error: ${text}` : text
 }
 
-const TIMEOUT_MS = 60_000
-
 interface RpcError {
   code: number
   message: string
@@ -96,7 +176,12 @@ export class McpHttpClient implements McpClientLike {
   private sessionId: string | null = null
   onLost?: (reason: string) => void
 
-  constructor(private cfg: McpServerConfig) {}
+  /** `wire` defaults to the browser's fetch; stores/mcp.ts hands in the WebCLI
+   *  one for rows whose endpoint refuses browsers. */
+  constructor(
+    private cfg: McpServerConfig,
+    private wire: McpWire = directWire,
+  ) {}
 
   /** Tell the server the session is over (spec teardown), best-effort: we are
    *  dropping this client either way, and a server that ignores DELETE is fine. */
@@ -104,7 +189,8 @@ export class McpHttpClient implements McpClientLike {
     const session = this.sessionId
     this.sessionId = null
     if (!session) return
-    void fetch(this.cfg.url, {
+    void this.wire({
+      url: this.cfg.url,
       method: 'DELETE',
       headers: {
         ...(this.cfg.token ? { Authorization: `Bearer ${this.cfg.token}` } : {}),
@@ -124,32 +210,30 @@ export class McpHttpClient implements McpClientLike {
     }
   }
 
-  private async post(payload: unknown, signal?: AbortSignal): Promise<Response> {
-    return fetch(this.cfg.url, {
-      method: 'POST',
-      headers: this.headers(true),
-      body: JSON.stringify(payload),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)])
-        : AbortSignal.timeout(TIMEOUT_MS),
-    })
+  private async post(payload: unknown, signal?: AbortSignal): Promise<McpWireReply> {
+    return this.wire(
+      {
+        url: this.cfg.url,
+        method: 'POST',
+        headers: this.headers(true),
+        body: JSON.stringify(payload),
+      },
+      signal,
+    )
   }
 
   private async rpc(method: string, params: unknown, signal?: AbortSignal): Promise<unknown> {
     const id = this.nextId++
     const resp = await this.post({ jsonrpc: '2.0', id, method, params }, signal)
     if (!resp.ok) {
-      const text = await resp.text().catch(() => '')
-      throw new Error(`MCP ${method} HTTP ${resp.status}: ${text.slice(0, 200)}`)
+      throw new Error(`MCP ${method} HTTP ${resp.status}: ${resp.body.slice(0, 200)}`)
     }
-    const session = resp.headers.get('mcp-session-id')
+    const session = resp.headers['mcp-session-id']
     if (session) this.sessionId = session
-    const contentType = resp.headers.get('content-type') ?? ''
-    const body = await resp.text()
-    const message = contentType.includes('text/event-stream')
-      ? parseSseResponse(body)
-      : body
-        ? JSON.parse(body)
+    const message = resp.contentType.includes('text/event-stream')
+      ? parseSseResponse(resp.body, id)
+      : resp.body
+        ? JSON.parse(resp.body)
         : null
     const m = message as { result?: unknown; error?: RpcError } | null
     if (!m) throw new Error(`MCP ${method}: empty response`)
@@ -240,6 +324,7 @@ export function normalizeMcpServerList(
       name,
       url,
       ...(ss.token ? { token: String(ss.token) } : {}),
+      ...(ss.transport === 'webcli' ? { transport: 'webcli' as const } : {}),
       ...(ss.enabled === false ? { enabled: false } : {}),
     })
   }

@@ -23,8 +23,15 @@ import {
   type McpClientLike,
   type McpServerConfig,
   type McpToolDef,
+  type McpWire,
 } from '@/lib/mcp'
-import { McpRelayClient, isWebcliRelayUrl, relayExtensionId } from '@/lib/webcliRelay'
+import {
+  McpRelayClient,
+  isWebcliRelayUrl,
+  relayExtensionId,
+  webcliWire,
+} from '@/lib/webcliRelay'
+import { WEBCLI_FETCH_TOOL } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
 import * as fs from '@/lib/fs'
@@ -60,10 +67,22 @@ function readRecall(): Record<string, string[]> {
   }
 }
 
-/** Which transport a row's url selects: WebCLI's relay, or a Streamable-HTTP
- *  endpoint. */
-function clientFor(config: McpServerConfig): McpClientLike {
-  return isWebcliRelayUrl(config.url) ? new McpRelayClient() : new McpHttpClient(config)
+/** Shown when a row asks for the WebCLI transport and WebCLI isn't there. Says
+ *  what to do, because "failed to fetch" would not. */
+const WEBCLI_TRANSPORT_MISSING =
+  'This server is set to reach its endpoint through WebCLI, which is not connected — install or enable it in Settings → Tools.'
+
+/**
+ * Which client a row gets. Three cases, and only the first is about the url:
+ *   - WEBCLI_RELAY_URL — the row IS WebCLI, over its postMessage relay
+ *   - transport 'webcli' — a normal endpoint, reached through WebCLI's fetch_url
+ *   - otherwise — a normal endpoint, reached by the browser directly
+ */
+function clientFor(config: McpServerConfig, webcli: McpWire | null): McpClientLike {
+  if (isWebcliRelayUrl(config.url)) return new McpRelayClient()
+  if (config.transport !== 'webcli') return new McpHttpClient(config)
+  if (!webcli) throw new Error(WEBCLI_TRANSPORT_MISSING)
+  return new McpHttpClient(config, webcli)
 }
 
 /** How often we re-read the relay marker while a WebCLI row is waiting on it.
@@ -219,9 +238,33 @@ export const useMcpStore = defineStore('mcp', () => {
 
   /** Build a client for one row and handshake it. Any previous client for that
    *  id is disposed first, so ports and HTTP sessions never pile up. */
+  /**
+   * WebCLI's fetch_url bound as an MCP wire, or null when WebCLI isn't
+   * connected.
+   *
+   * Resolved per connect rather than cached: the WebCLI row can drop and come
+   * back under a proxied row that outlives it, and routing through a stale
+   * serverId would keep failing after the thing it depends on had healed.
+   */
+  function webcliWireOrNull(): McpWire | null {
+    const fetchTool = allTools.value.find((t) => t.def.name === WEBCLI_FETCH_TOOL)
+    if (!fetchTool) return null
+    const { serverId } = fetchTool
+    return webcliWire((args, signal) => callTool(serverId, WEBCLI_FETCH_TOOL, args, signal))
+  }
+
   async function connectServer(config: McpServerConfig): Promise<void> {
     clients.get(config.id)?.dispose()
-    const client: McpClientLike = clientFor(config)
+    let client: McpClientLike
+    try {
+      client = clientFor(config, webcliWireOrNull())
+    } catch (err) {
+      // Only clientFor's "WebCLI isn't connected" case reaches here, and it is a
+      // setup problem rather than a failed handshake — same red row, but the
+      // message tells them what to install.
+      patch(config.id, { status: 'error', error: (err as Error).message, tools: [] })
+      return
+    }
     // A transport that drops on its own must show up as red, not stay green
     // until someone happens to run a tool.
     client.onLost = (reason) => {
@@ -251,9 +294,17 @@ export const useMcpStore = defineStore('mcp', () => {
       status: config.enabled === false ? 'off' : 'connecting',
       tools: [],
     }))
-    await Promise.all(
-      servers.value.filter((s) => s.status !== 'off').map((s) => connectServer(s.config)),
-    )
+    // WebCLI first, and only then everything else: a row with transport 'webcli'
+    // reaches its endpoint THROUGH WebCLI's own tools, so connecting the two
+    // concurrently would race — the proxied row would look up fetch_url before
+    // the row providing it had finished its handshake.
+    const live = servers.value.filter((s) => s.status !== 'off')
+    const [relay, rest] = [
+      live.filter((s) => isWebcliRelayUrl(s.config.url)),
+      live.filter((s) => !isWebcliRelayUrl(s.config.url)),
+    ]
+    await Promise.all(relay.map((s) => connectServer(s.config)))
+    await Promise.all(rest.map((s) => connectServer(s.config)))
   }
 
   /** Reconnect ONE server, leaving every healthy connection alone — the button

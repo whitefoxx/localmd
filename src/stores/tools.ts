@@ -35,6 +35,7 @@ import {
   toolsForEntries,
   WEBCLI_FETCH_TOOL,
 } from '@/lib/toolCatalog'
+import { parseWebcliFetch } from '@/lib/webcliRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
@@ -53,15 +54,6 @@ function readTrust(): Record<string, string> {
   } catch {
     return {}
   }
-}
-
-/** The service worker hands back a FetchResult; `format:'text'` guarantees the
- *  payload is in `body`, so one shaping path serves both transports. */
-interface WebcliFetchResult {
-  status?: number
-  ok?: boolean
-  body?: string
-  note?: string
 }
 
 export const useToolsStore = defineStore('tools', () => {
@@ -210,13 +202,9 @@ export const useToolsStore = defineStore('tools', () => {
       },
       signal,
     )
-    let parsed: WebcliFetchResult
-    try {
-      parsed = JSON.parse(out) as WebcliFetchResult
-    } catch {
-      // Not a FetchResult — the bridge reported a failure as plain text.
-      throw new Error(out.slice(0, 300))
-    }
+    // `format:'text'` guarantees the payload is in `body`, so one shaping path
+    // serves both transports.
+    const parsed = parseWebcliFetch(out)
     return {
       status: parsed.status ?? 0,
       ok: parsed.ok === true,
