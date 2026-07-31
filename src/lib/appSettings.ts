@@ -10,7 +10,9 @@
  * Never listed, and never will be: `profiles[].apiKey`, `githubToken`,
  * `toolSecrets` values, `mcpServers[].token`, `mcpServers[].headers` (a server
  * row carries its key in whatever header the service chose, so the header value
- * is a credential like any other). The agent collects those through
+ * is a credential like any other), and `mcpAuth` (OAuth access and refresh
+ * tokens — the agent asks the user to sign in, and only ever learns that a row
+ * now connects). The agent collects those through
  * request_setup, where the user types the value straight into the app and the
  * conversation only learns that a value now exists.
  *
