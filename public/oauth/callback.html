@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Signing in…</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #444;
+        background: #fff;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { color: #bbb; background: #1e1e1e; }
+      }
+      p { max-width: 26rem; padding: 0 1.5rem; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Finishing sign-in… you can close this window.</p>
+    <!--
+      The OAuth redirect lands here rather than in the app.
+
+      A static page, not a route: the app is a single page with no router, and
+      this only has to read a query string and hand it back. Booting the whole
+      bundle in a window that exists for 200ms would be the expensive way to do
+      the same thing.
+
+      It deliberately knows nothing — no client id, no verifier, no token
+      exchange. The PKCE verifier stays in the window that started the flow,
+      which is what makes an intercepted code useless; this page just carries
+      the code home. If the opener is gone (the user reopened this URL later),
+      it says so instead of failing silently.
+    -->
+    <script>
+      ;(function () {
+        var payload = { source: 'localmd-oauth', href: window.location.href }
+        try {
+          if (window.opener && !window.opener.closed) {
+            // Targeted at our own origin: the code must not be readable by any
+            // other document that happens to be listening.
+            window.opener.postMessage(payload, window.location.origin)
+            window.close()
+            return
+          }
+        } catch (e) {
+          /* fall through to the message below */
+        }
+        document.getElementById('msg').textContent =
+          'This window was opened outside the app, so there is nothing to hand the sign-in back to. Close it and start again from Settings → Tools.'
+      })()
+    </script>
+  </body>
+</html>

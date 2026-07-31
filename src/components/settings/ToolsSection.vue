@@ -717,6 +717,30 @@ async function runCheck(serverId: string): Promise<void> {
     mcp.servers.find((s) => s.config.id === serverId)?.status === 'ok' ? 'ok' : 'failed'
 }
 
+/* ── sign in ─────────────────────────────────────────────────────────────── */
+
+const signInBusy = ref(false)
+/** Shown under the row. A failed sign-in has a reason worth reading — the wrong
+ *  account, a closed window, a server that only takes confidential clients —
+ *  and none of it belongs in the connection error, which is about the endpoint. */
+const signInError = ref('')
+
+async function toggleSignIn(serverId: string): Promise<void> {
+  signInError.value = ''
+  if (mcp.isSignedIn(serverId)) {
+    mcp.signOut(serverId)
+    return
+  }
+  signInBusy.value = true
+  try {
+    // The popup can sit open for minutes; the button says so meanwhile rather
+    // than looking like a click that did nothing.
+    signInError.value = (await mcp.signIn(serverId)) ?? ''
+  } finally {
+    signInBusy.value = false
+  }
+}
+
 const CHECK_LABEL: Record<Exclude<CheckState, 'idle'>, { key: string; cls: string }> = {
   checking: { key: 'settings.checkChecking', cls: 'text-fg-3' },
   ok: { key: 'settings.checkOk', cls: 'text-added' },
@@ -887,6 +911,20 @@ function removeDetail(): void {
               ? $t('settings.checkChecking')
               : $t('settings.reconnect') }}
           </button>
+          <!-- Sign in appears only where it can work: a row reached over the
+               relay is WebCLI itself, which has no OAuth to do. -->
+          <button
+            v-if="detailServer && !detailDisabled && !detailIsWebcli"
+            class="btn text-xs"
+            :disabled="signInBusy"
+            @click="toggleSignIn(detailServer.config.id)"
+          >
+            {{ signInBusy
+              ? $t('settings.signingIn')
+              : mcp.isSignedIn(detailServer.config.id)
+                ? $t('settings.signOut')
+                : $t('settings.signIn') }}
+          </button>
           <button
             v-if="view.name === 'server' && detailServerConfig"
             class="btn text-xs"
@@ -908,6 +946,7 @@ function removeDetail(): void {
       <p v-else-if="detailServer" class="text-xs text-fg-3 font-mono break-all">
         {{ detailServer.config.url }}
       </p>
+      <p v-if="signInError" class="text-xs text-removed leading-relaxed">{{ signInError }}</p>
     </div>
 
     <!-- WebCLI. There is no address and no id to enter — the extension writes its

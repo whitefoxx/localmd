@@ -26,6 +26,18 @@ import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
 import type { ThemePref } from '@/stores/theme'
 
+/** What a signed-in MCP row remembers. `clientId` rides along because a token
+ *  can only be refreshed by the client it was issued to, and a DCR client_id is
+ *  meaningless without the issuer it was registered with. */
+export interface McpAuthState {
+  accessToken: string
+  refreshToken?: string
+  /** Epoch ms; absent when the server did not say when it expires. */
+  expiresAt?: number
+  issuer: string
+  clientId?: string
+}
+
 export interface LlmProfile {
   id: string
   /** User-visible name; autoLabel() default. */
@@ -72,6 +84,16 @@ export interface SettingsState {
   /** Values referenced from a tool as {{secret:<id>}} — API keys and the like.
    *  Same localStorage trust model as the LLM keys; never sent to the model. */
   toolSecrets: Record<string, string>
+  /** OAuth tokens for MCP rows that signed in, keyed by server row id. Held
+   *  apart from toolSecrets because nobody types these: they are minted,
+   *  refreshed and discarded by the flow, and a user editing one by hand would
+   *  only break it. Never sent to the model. */
+  mcpAuth: Record<string, McpAuthState>
+  /** client_ids obtained by dynamic registration, keyed by authorization-server
+   *  issuer. A registration belongs to the server, not to the row that caused
+   *  it, so two rows behind one issuer reuse it and re-signing in does not
+   *  litter the provider with dead clients. */
+  mcpClients: Record<string, string>
   /** Read-aloud (TTS): chosen Web Speech voice name (empty = auto-pick a Google
    *  voice for the content language) and speech rate (0.5–2). */
   ttsVoice: string
@@ -120,6 +142,8 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   toolEntries: defaultInstalledIds(),
   httpTools: [],
   toolSecrets: {},
+  mcpAuth: {},
+  mcpClients: {},
   ttsVoice: '',
   ttsRate: 1,
   theme: 'system',
@@ -148,6 +172,38 @@ function toolSecretsFrom(raw: unknown): Record<string, string> {
   return out
 }
 
+/** Tokens are machine-written, so parsing is about surviving a hand-edited or
+ *  truncated file rather than validating a format: an entry missing the one
+ *  field that makes it useful is dropped, and the row simply asks to sign in
+ *  again. */
+function mcpAuthFrom(raw: unknown): Record<string, McpAuthState> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, McpAuthState> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const e = v as Record<string, unknown> | null
+    if (!e || typeof e !== 'object') continue
+    if (typeof e.accessToken !== 'string' || !e.accessToken) continue
+    if (typeof e.issuer !== 'string' || !e.issuer) continue
+    out[k] = {
+      accessToken: e.accessToken,
+      issuer: e.issuer,
+      ...(typeof e.refreshToken === 'string' ? { refreshToken: e.refreshToken } : {}),
+      ...(typeof e.expiresAt === 'number' ? { expiresAt: e.expiresAt } : {}),
+      ...(typeof e.clientId === 'string' ? { clientId: e.clientId } : {}),
+    }
+  }
+  return out
+}
+
+function stringMapFrom(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (k && typeof v === 'string' && v) out[k] = v
+  }
+  return out
+}
+
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
   return {
     gitName: String(obj.gitName ?? ''),
@@ -164,6 +220,8 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     toolEntries: toolEntriesFrom(obj),
     httpTools: normalizeHttpToolList(obj.httpTools, newProfileId),
     toolSecrets: toolSecretsFrom(obj.toolSecrets),
+    mcpAuth: mcpAuthFrom(obj.mcpAuth),
+    mcpClients: stringMapFrom(obj.mcpClients),
     ttsVoice: String(obj.ttsVoice ?? ''),
     ttsRate: clampRate(obj.ttsRate),
     theme: obj.theme === 'light' || obj.theme === 'dark' ? obj.theme : 'system',

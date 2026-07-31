@@ -90,6 +90,8 @@ describe('normalizeSettings — multi-profile shape', () => {
       toolEntries: ['jina'],
       httpTools: [],
       toolSecrets: {},
+      mcpAuth: {},
+      mcpClients: {},
       ttsVoice: '',
       ttsRate: 1,
       theme: 'system',
@@ -158,5 +160,38 @@ describe('autoLabel', () => {
   })
   it('falls back to the raw provider id', () => {
     expect(autoLabel({ provider: 'myproxy', model: '' })).toBe('myproxy')
+  })
+})
+
+describe('normalizeSettings — MCP OAuth state', () => {
+  it('keeps a usable token and drops an entry missing what makes it usable', () => {
+    // These are machine-written, so parsing is about surviving a truncated or
+    // hand-edited file: a half-entry becomes "not signed in", which the row
+    // recovers from by asking the user to sign in again.
+    const s = normalizeSettings({
+      profiles: [],
+      mcpAuth: {
+        good: { accessToken: 'AT', refreshToken: 'RT', expiresAt: 123, issuer: 'https://as', clientId: 'CID' },
+        noToken: { issuer: 'https://as' },
+        noIssuer: { accessToken: 'AT' },
+        notAnObject: 'nope',
+      },
+    })
+    expect(Object.keys(s.mcpAuth)).toEqual(['good'])
+    expect(s.mcpAuth.good).toEqual({
+      accessToken: 'AT',
+      refreshToken: 'RT',
+      expiresAt: 123,
+      issuer: 'https://as',
+      clientId: 'CID',
+    })
+  })
+
+  it('keeps registrations keyed by issuer, dropping non-string values', () => {
+    const s = normalizeSettings({
+      profiles: [],
+      mcpClients: { 'https://as': 'CID', 'https://bad': 42, '': 'x' },
+    })
+    expect(s.mcpClients).toEqual({ 'https://as': 'CID' })
   })
 })

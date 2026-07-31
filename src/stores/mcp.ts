@@ -19,6 +19,7 @@ import {
   isDeferredTool,
   isRecoverable,
   recallTouch,
+  directWire,
   resolveServerSecrets,
   serverSecretRefs,
   KB_MCP_CONFIG_PATH,
@@ -27,6 +28,20 @@ import {
   type McpToolDef,
   type McpWire,
 } from '@/lib/mcp'
+import {
+  discover,
+  supportsPublicPkce,
+  clientIdentity,
+  buildAuthorizeUrl,
+  parseCallback,
+  callbackFault,
+  tokenRequestBody,
+  requestToken,
+  pkceChallenge,
+  randomToken,
+  isExpired,
+} from '@/lib/mcpOAuth'
+import { authorizeInPopup, redirectUri, cimdUrl } from '@/lib/oauthPopup'
 import {
   McpRelayClient,
   isWebcliRelayUrl,
@@ -262,6 +277,147 @@ export const useMcpStore = defineStore('mcp', () => {
     return webcliWire((args, signal) => callTool(serverId, WEBCLI_FETCH_TOOL, args, signal))
   }
 
+  /* ── OAuth ─────────────────────────────────────────────────────────────── */
+
+  /** The wire a row's own OAuth traffic must take: a server that refuses
+   *  browsers refuses its token endpoint too. */
+  function wireFor(config: McpServerConfig): McpWire | null {
+    if (config.transport !== 'webcli') return directWire
+    return webcliWireOrNull()
+  }
+
+  /** The Authorization header a signed-in row should connect with, refreshing
+   *  first when the stored token has expired. Empty for rows that never signed
+   *  in, which is most of them. */
+  async function bearerFor(config: McpServerConfig): Promise<{ token?: string }> {
+    const settings = useSettingsStore()
+    const auth = settings.state.mcpAuth[config.id]
+    if (!auth) return {}
+    if (!isExpired(auth) || !auth.refreshToken) return { token: auth.accessToken }
+
+    const wire = wireFor(config)
+    if (!wire) return { token: auth.accessToken } // let the 401 speak for itself
+    const found = await discover(wire, config.url)
+    if ('error' in found) return { token: auth.accessToken }
+    const next = await requestToken(
+      wire,
+      found.meta,
+      tokenRequestBody({
+        grant: 'refresh_token',
+        // A token can only be refreshed by the client it was issued to.
+        clientId: auth.clientId ?? cimdUrl() ?? '',
+        refreshToken: auth.refreshToken,
+        resource: config.url,
+      }),
+    )
+    // A refresh that fails leaves the old token in place rather than signing the
+    // user out: the server may simply have been unreachable, and discarding a
+    // credential over a network blip is the wrong trade.
+    if ('error' in next) return { token: auth.accessToken }
+    settings.state.mcpAuth = {
+      ...settings.state.mcpAuth,
+      [config.id]: { ...auth, ...next, issuer: found.issuer },
+    }
+    return { token: next.accessToken }
+  }
+
+  /**
+   * Sign one row in. Returns null on success, else a message to show.
+   *
+   * The order matters and is the spec's: find the authorization server from the
+   * endpoint itself, decide how to identify as a client, then send the user to
+   * a page we do not control and wait for a code we can only redeem with a
+   * verifier that never left this tab.
+   */
+  async function signIn(serverId: string): Promise<string | null> {
+    const settings = useSettingsStore()
+    const state = servers.value.find((s) => s.config.id === serverId)
+    if (!state) return 'That server is no longer configured.'
+    const config = state.config
+
+    const wire = wireFor(config)
+    if (!wire) return WEBCLI_TRANSPORT_MISSING
+
+    const found = await discover(wire, config.url)
+    if ('error' in found) return found.error
+    if (!supportsPublicPkce(found.meta)) {
+      // Worth saying plainly: no amount of retrying fixes a server that will
+      // only talk to a client holding a secret, which a page cannot be.
+      return 'This server only accepts apps that can keep a client secret, which a browser app cannot do.'
+    }
+
+    const identity = await clientIdentity(wire, found.meta, {
+      ...(cimdUrl() ? { cimdUrl: cimdUrl()! } : {}),
+      clientName: 'localmd',
+      redirectUris: [redirectUri()],
+      known: settings.state.mcpClients[found.issuer],
+    })
+    if ('error' in identity) return identity.error
+    if (identity.via === 'dcr' && !settings.state.mcpClients[found.issuer]) {
+      settings.state.mcpClients = {
+        ...settings.state.mcpClients,
+        [found.issuer]: identity.clientId,
+      }
+    }
+
+    const verifier = randomToken()
+    const expected = { state: randomToken(), issuer: found.issuer }
+    const popup = await authorizeInPopup(
+      buildAuthorizeUrl({
+        meta: found.meta,
+        clientId: identity.clientId,
+        redirectUri: redirectUri(),
+        challenge: await pkceChallenge(verifier),
+        state: expected.state,
+        resource: config.url,
+        ...(found.meta.scopes_supported?.length
+          ? { scope: found.meta.scopes_supported.join(' ') }
+          : {}),
+      }),
+    )
+    if (popup.error || !popup.href) return popup.error ?? 'Sign-in did not complete.'
+
+    const cb = parseCallback(popup.href)
+    const fault = callbackFault(cb, expected)
+    if (fault) return fault
+
+    const token = await requestToken(
+      wire,
+      found.meta,
+      tokenRequestBody({
+        grant: 'authorization_code',
+        clientId: identity.clientId,
+        code: cb.code,
+        verifier,
+        redirectUri: redirectUri(),
+        resource: config.url,
+      }),
+    )
+    if ('error' in token) return token.error
+
+    settings.state.mcpAuth = {
+      ...settings.state.mcpAuth,
+      [serverId]: { ...token, issuer: found.issuer, clientId: identity.clientId },
+    }
+    await reconnect(serverId)
+    return null
+  }
+
+  /** Forget this row's tokens. The registration stays: it belongs to the
+   *  authorization server and signing in again should reuse it. */
+  function signOut(serverId: string): void {
+    const settings = useSettingsStore()
+    if (!settings.state.mcpAuth[serverId]) return
+    const next = { ...settings.state.mcpAuth }
+    delete next[serverId]
+    settings.state.mcpAuth = next
+    void reconnect(serverId)
+  }
+
+  function isSignedIn(serverId: string): boolean {
+    return !!useSettingsStore().state.mcpAuth[serverId]
+  }
+
   async function connectServer(raw: McpServerConfig): Promise<void> {
     clients.get(raw.id)?.dispose()
     // Secrets are substituted here, not at install: the row holds references,
@@ -276,7 +432,11 @@ export const useMcpStore = defineStore('mcp', () => {
       })
       return
     }
-    const config = resolved.config
+    // A signed-in row carries its access token here rather than in stored
+    // config: it is minted and refreshed by the flow, so it belongs to the
+    // connection, not to what the user typed. Refreshing on connect covers the
+    // ordinary case of a token that went stale while the tab was closed.
+    const config = { ...resolved.config, ...(await bearerFor(raw)) }
     let client: McpClientLike
     try {
       client = clientFor(config, webcliWireOrNull())
@@ -476,6 +636,9 @@ export const useMcpStore = defineStore('mcp', () => {
     refresh,
     reconnect,
     retryFailed,
+    signIn,
+    signOut,
+    isSignedIn,
     callTool,
   }
 })

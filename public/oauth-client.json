@@ -1,0 +1,14 @@
+{
+  "client_id": "https://localmd.app/oauth-client.json",
+  "client_name": "localmd",
+  "client_uri": "https://localmd.app",
+  "logo_uri": "https://localmd.app/icon.svg",
+  "redirect_uris": [
+    "https://localmd.app/oauth/callback.html",
+    "http://localhost:5173/oauth/callback.html"
+  ],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "application_type": "web"
+}
