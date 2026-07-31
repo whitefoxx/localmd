@@ -7,6 +7,7 @@ import {
   RELAY_ABSENT_MESSAGE,
   webcliWire,
 } from '@/lib/webcliRelay'
+import { McpHttpClient } from '@/lib/mcp'
 
 const EXT = 'jnhfdhpafndcbppkphhfpecflhogngge'
 
@@ -275,7 +276,41 @@ describe('webcliWire', () => {
     // headers cross as a JSON string, which is what the tool takes.
     expect(JSON.parse(String(seen.headers))['Mcp-Session-Id']).toBe('sess-9')
     // Without this an endpoint that holds its SSE stream open can only time out.
+    // 'idle' specifically — the test below is what the faster option costs.
     expect(seen.stream_stop).toBe('idle')
+  })
+
+  /**
+   * Why 'idle' is worth waiting for.
+   *
+   * A server may put progress notifications on the response stream ahead of the
+   * answer. `first_event` returns the first `data:` frame and stops; a
+   * notification carries no `result`, so the call would come back empty with
+   * nothing to say it had been cut short.
+   *
+   * The fake honours `stream_stop` on purpose — one that ignored it would pass
+   * under either setting and guard nothing.
+   */
+  it('reads past a progress notification to the response it is waiting for', async () => {
+    const frames = [
+      'event: message\ndata: {"jsonrpc":"2.0","method":"notifications/progress","params":{"n":1}}\n',
+      'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26"}}\n',
+      'event: message\ndata: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"search"}]}}\n',
+    ]
+    const wire = webcliWire(async (args) =>
+      JSON.stringify({
+        status: 200,
+        ok: true,
+        headers: {},
+        content_type: 'text/event-stream',
+        stream_open: args.stream_stop === 'first_event',
+        body: args.stream_stop === 'first_event' ? frames[0] : frames.join('\n'),
+      }),
+    )
+    const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp' }, wire)
+    await expect(client.connect()).resolves.toEqual([
+      { name: 'search', description: '', inputSchema: { type: 'object', properties: {} } },
+    ])
   })
 
   it('lowercases response headers so protocol state is findable', async () => {

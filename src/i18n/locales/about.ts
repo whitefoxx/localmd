@@ -6,23 +6,26 @@ export default {
     whyBody1:
       "Notes in one app, PDFs in a downloads folder, highlights locked inside a reader you'll cancel next year, half-read papers everywhere. Every tool wants to be the place your knowledge lives — on its servers, in its format, behind its login.",
     whyBody2:
-      'localmd makes the opposite bet: your knowledge is just files in a folder on your own computer. Markdown you can read in any editor, the PDFs and EPUBs you already have, conversations you choose to keep. An AI agent works inside that folder with you — but the folder is yours, and it never leaves your machine.',
+      'localmd makes the opposite bet: your knowledge is just files in a folder on your own computer. Markdown you can read in any editor, the PDFs and EPUBs you already have, conversations you choose to keep. An AI agent works inside that folder with you — and getting to it costs nothing: no download, no install, no sign-up. The folder is yours, and it stays where you put it.',
 
     diffLabel: 'What makes it different',
-    diff1Title: "It's your folder, not our database.",
+    diff1Title: 'Nothing to install.',
     diff1Body:
-      'Everything is plain Markdown and your original files, in a folder you picked. Open it in VS Code, sync it with git, or walk away — there is no "export", because nothing was ever locked in.',
-    diff2Title: 'Local-first, genuinely.',
+      'Every other way to put an agent in your files asks you to install something first — an app, a virtual machine, a terminal, a local server, a plugin and its configuration. localmd is a web page. You open it, grant it one folder, and the agent is already there. Being a static page also means there is no backend to upload anything to, and no account to create.',
+    diff2Title: 'An agent that works in your files.',
     diff2Body:
-      "No account, no sign-up, no server. Files are read and written through the browser's File System Access API. localmd is a static page — there is no backend to upload anything to.",
-    diff3Title: 'Bring your own model.',
+      'Not a chat window bolted onto notes. It reads your PDFs and EPUBs, writes and links Markdown pages, files new material where it belongs, and edits directly — with your approval.',
+    diff3Title: 'Citations that land on the paragraph — in your own notes.',
     diff3Body:
-      'Plug in your own API key — Anthropic, OpenAI, DeepSeek, Gemini and more — each hitting its own endpoint directly. Your key and your text go to the model you chose, and nowhere else.',
-    diff4Title: 'An agent that works in your files.',
+      'Ask about a 300-page PDF and the answer comes back with citations you can click, straight to the paragraph it came from. Those citations are written into your own Markdown, so they still work tomorrow, in your folder, with or without us.',
+    diff4Title: "It's your folder, not our database.",
     diff4Body:
-      'Not a chat window bolted onto notes. It reads your PDFs and EPUBs with citations, writes and links Markdown pages, and edits files directly — with your approval.',
-    diff5Title: 'The structure is a suggestion, not a cage.',
+      'Everything is plain Markdown and your original files, in a folder you picked. Open it in VS Code, sync it with git, or walk away — there is no "export", because nothing was ever locked in.',
+    diff5Title: 'Bring your own model.',
     diff5Body:
+      'Plug in your own API key — Anthropic, OpenAI, DeepSeek, Gemini and more — each hitting its own endpoint directly. Your key and your text go to the model you chose, and nowhere else.',
+    diff6Title: 'The structure is a suggestion, not a cage.',
+    diff6Body:
       'No rigid templates. Open an empty folder and it offers a starting layout; open your existing notes and it adapts to how you already organize them.',
 
     believeLabel: 'What we believe',
@@ -55,9 +58,10 @@ export default {
     dont4: 'No ads, no notifications, no "reading goals."',
     dont5: "No lock-in. It's Markdown in a folder — leave whenever you like.",
     dont6: "We don't hold your API key. It lives in your browser, and you can clear it anytime.",
+    dont7: 'No app to install, no terminal, no local server to keep running.',
 
     closingTitle: 'Open a folder and start thinking.',
-    footer: 'localmd · a local-first AI knowledge base in your browser',
+    footer: 'localmd · an AI agent for a folder on your own computer',
   },
   zh: {
     whyLabel: '为什么有 localmd',
@@ -65,23 +69,26 @@ export default {
     whyBody1:
       '笔记在一个 app 里，PDF 在下载文件夹里，划线锁在你明年就会取消的阅读器里，读了一半的论文散落各处。每个工具都想成为你知识的归宿——在它的服务器上、它的格式里、它的登录后面。',
     whyBody2:
-      'localmd 反着赌：你的知识就是你自己电脑上一个文件夹里的文件。可以用任何编辑器打开的 Markdown、你本来就有的 PDF 和 EPUB、你愿意留下的对话。一个 AI agent 在这个文件夹里陪你干活——但文件夹是你的，它永远不离开你的机器。',
+      'localmd 反着赌：你的知识就是你自己电脑上一个文件夹里的文件。可以用任何编辑器打开的 Markdown、你本来就有的 PDF 和 EPUB、你愿意留下的对话。一个 AI agent 在这个文件夹里陪你干活——而走到这一步不需要任何代价：不用下载、不用安装、不用注册。文件夹是你的，它就待在你放它的地方。',
 
     diffLabel: '与别的产品有什么不同',
-    diff1Title: '是你的文件夹，不是我们的数据库。',
+    diff1Title: '什么都不用装。',
     diff1Body:
-      '全都是纯 Markdown 和你的原始文件，就在你选的那个文件夹里。用 VS Code 打开、用 git 同步，或者随时走人——没有「导出」，因为它从没被锁进去过。',
-    diff2Title: '真正的本地优先。',
+      '别的「让 agent 在你文件里干活」的做法，都要你先装点什么——一个 app、一个虚拟机、一个终端、一个常驻的本地服务，或者一个插件和它的配置。localmd 就是一个网页。你打开它，授权一个文件夹，agent 已经在那儿了。既然是静态页面，也就没有后端可以上传任何东西，没有账号需要注册。',
+    diff2Title: '真正在你文件里干活的 agent。',
     diff2Body:
-      '无账号、无注册、无服务器。文件通过浏览器的 File System Access API 读写。localmd 是一个静态页面——没有后端可以上传任何东西。',
-    diff3Title: '自带你的模型。',
+      '不是硬塞进笔记的聊天框。它读你的 PDF 和 EPUB、撰写和链接 Markdown 页面、把新材料归到该去的地方，并且经你批准直接改文件。',
+    diff3Title: '引用能点回原文的那一段——而且写在你自己的笔记里。',
     diff3Body:
-      '填入你自己的 API Key——Anthropic、OpenAI、DeepSeek、Gemini 等等——各自直连各自的端点。你的 Key 和文本只去你选的那个模型，别无他处。',
-    diff4Title: '真正在你文件里干活的 agent。',
+      '问一句 300 页 PDF 里的事，答案带着可以点的引用，直接落到它出处的那一段。这些引用是写进你自己的 Markdown 的，所以明天它们照样能用，在你的文件夹里，有没有我们都一样。',
+    diff4Title: '是你的文件夹，不是我们的数据库。',
     diff4Body:
-      '不是硬塞进笔记的聊天框。它读你的 PDF 和 EPUB 并附引用、撰写和链接 Markdown 页面、经你批准直接编辑文件。',
-    diff5Title: '结构是建议，不是牢笼。',
+      '全都是纯 Markdown 和你的原始文件，就在你选的那个文件夹里。用 VS Code 打开、用 git 同步，或者随时走人——没有「导出」，因为它从没被锁进去过。',
+    diff5Title: '自带你的模型。',
     diff5Body:
+      '填入你自己的 API Key——Anthropic、OpenAI、DeepSeek、Gemini 等等——各自直连各自的端点。你的 Key 和文本只去你选的那个模型，别无他处。',
+    diff6Title: '结构是建议，不是牢笼。',
+    diff6Body:
       '没有死板的模板。打开一个空文件夹，它给你一套起手布局；打开你已有的笔记，它顺着你本来的组织方式来。',
 
     believeLabel: '我们相信什么',
@@ -114,8 +121,9 @@ export default {
     dont4: '没有广告、没有推送、没有「阅读目标」。',
     dont5: '不锁定。就是文件夹里的 Markdown——想走随时走。',
     dont6: '不替你保管 API Key。它就在你的浏览器里，你随时能清除。',
+    dont7: '不用装 app、不用开终端、不用常驻一个本地服务。',
 
     closingTitle: '打开一个文件夹，开始思考。',
-    footer: 'localmd · 浏览器里的本地优先 AI 知识库',
+    footer: 'localmd · 在你自己文件夹里干活的 AI agent',
   },
 }

@@ -1,26 +1,42 @@
 ---
 title: What localmd is
-summary: A knowledge base that is just a folder of files on your computer, with an AI assistant that can read and write it. No account, no upload.
+summary: An AI assistant that works inside an ordinary folder on your computer. Nothing to install, no account, and the files stay where you put them.
 ---
 
 # What localmd is
 
-localmd is a place to keep what you read, write and think about — with an AI
-assistant that can actually work on it with you.
+localmd is a web page that turns an ordinary folder on your computer into a
+place to keep what you read, write and think about — with an AI assistant that
+can actually work on it with you.
 
-The important part: **your knowledge base is an ordinary folder on your own
-computer.** Markdown files, PDFs, images. Not a database, not a cloud service.
+Two things make it unusual.
+
+**There is nothing to install.** No app, no terminal, no background service, no
+plugin to set up. You open the page, point it at a folder, and the assistant is
+already there. Your browser asks your permission for that one folder, and that
+permission is the whole arrangement.
+
+**Your knowledge base is that folder.** Markdown files, PDFs, images — not a
+database, not a cloud service.
 
 That means:
 
 - **No account.** Nothing to sign up for.
-- **Nothing is uploaded.** The app runs in your browser and reads the folder you
-  choose, directly.
+- **Nothing is uploaded.** The app reads and writes the folder you chose,
+  directly, from your browser. The one thing that does leave is what you send to
+  your AI model — see `storage-and-privacy`.
 - **No lock-in.** Open the same folder in any editor. Edit files outside the app,
   move them, delete them — nothing breaks.
 
 If you stopped using localmd tomorrow, you would still have everything, in a
 format anything can read.
+
+## Which browser
+
+Chrome, Edge, or another Chromium-based browser. Letting a web page read and
+write a folder you choose needs a browser feature (the File System Access API)
+that only those have — Firefox and Safari can't open a local folder this way at
+all. It is the same feature the whole no-install idea rests on.
 
 ## Getting started
 

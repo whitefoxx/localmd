@@ -10,6 +10,7 @@ const diffs = computed(() => [
   { title: t('about.diff3Title'), body: t('about.diff3Body') },
   { title: t('about.diff4Title'), body: t('about.diff4Body') },
   { title: t('about.diff5Title'), body: t('about.diff5Body') },
+  { title: t('about.diff6Title'), body: t('about.diff6Body') },
 ])
 
 const believes = computed(() => [
@@ -36,6 +37,7 @@ const donts = computed(() => [
   t('about.dont4'),
   t('about.dont5'),
   t('about.dont6'),
+  t('about.dont7'),
 ])
 </script>
 
