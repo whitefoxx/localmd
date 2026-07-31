@@ -1,6 +1,6 @@
 ---
 title: Tools — giving the assistant new abilities
-summary: Nothing is built in; how to add web search, research lookup or a service you use, what the tags on each row mean, and why some counts are green and some grey.
+summary: Almost nothing comes switched on; how to add a service by asking, what happens when one needs a key or a login, what the tags on each row mean, and why some counts are green and some grey.
 ---
 
 # Tools — giving the assistant new abilities
@@ -99,6 +99,23 @@ says so rather than failing obscurely.
 
 If a server you know is correct will not connect, that checkbox is the first
 thing to try.
+
+## When a service wants you to log in
+
+Plenty of services do not hand out keys — they want an account. A row like that
+connects, fails, and says so with an authorization error; that is when a
+**Sign in** button appears on it.
+
+Pressing it opens the service's own sign-in page in a small window. You log in
+there and choose what to grant — which pages, which workspace. The window closes
+itself and the row turns green.
+
+The button only appears where it is the answer. A row that is working, or one
+that failed for some other reason, does not offer it — signing in to a service
+that never asked would just produce a different confusing error.
+
+**Sign out**, in the same place, forgets the login. See `keys` for what is
+stored and how to revoke it from the service's end.
 
 ## Reading the Installed list
 

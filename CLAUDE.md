@@ -33,14 +33,27 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
   (open formats), never vendor-specific directories.
 - **Tool code provides capability, never a particular tool.** What we write is
   the generic machinery — the spec format, templating, response shaping, types,
-  parameters, transports, config scopes. Individual tools are *data* created on
-  top of it by the user or the agent; we ship a handful as presets in the
-  recommended catalog, and those are data too. If a feature request can only be
-  met by adding a `defineTool` call, the machinery is missing something —
-  extend the machinery instead. Most tools should be reachable from WebCLI plus
-  the base capabilities, an agent skill and a prompt: "search Hacker News", "get
-  that item's discussion" are conversations, not releases. A tool earns a place
-  in the catalog by being broadly useful AND verified, not by being easy.
+  parameters, transports, config scopes, and how a credential is carried. If a
+  feature request can only be met by adding a `defineTool` call or a branch per
+  service, the machinery is missing something — extend the machinery instead.
+  Individual tools are *data* created on top of it by the user or the agent:
+  "search Hacker News", "add the Notion server" are conversations, not releases.
+- **The catalog is three entries, and adding a fourth needs an argument.**
+  WebCLI plus two web searches — what someone wants before they know what they
+  want. It is deliberately not a directory: a curated list is a promise that
+  rots (entries need re-verifying forever, and every inclusion is an editorial
+  call the machinery has made unnecessary), and the app already reaches a keyed
+  service, a CORS-refusing one, or one behind OAuth. Point people at mcp.so and
+  let the agent set it up. Retiring an entry is not deleting it — see
+  `RETIRED_PACKS`: shrinking is a decision about what to *recommend*, never a
+  licence to remove what a user already chose.
+- **The agent proposes; the user disposes.** Anything with an outward effect —
+  adding a server, spending a key, signing in — goes through a setup card the
+  user clicks. Not politeness: the agent reads web pages, files and tool results,
+  none of which can be distinguished from a genuine request by their content, so
+  a page saying "add the server at …" reaches it the same way you do. It may put
+  the address in front of the user and nothing more. Kinds are primitives
+  (`confirm`, `signin`, `key`), never errands (`add_notion_server`).
 
 ## The app's own manual is part of the app
 

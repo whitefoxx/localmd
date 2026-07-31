@@ -31,7 +31,7 @@ folder:
 
 - your model providers and their API keys
 - which tools are installed, and any you or the assistant created
-- tool API keys, and your GitHub token
+- tool API keys, your GitHub token, and any service you signed in to
 - interface language, shortcuts, and preferences
 
 None of this is in your folder, so none of it is ever committed or shared. It
