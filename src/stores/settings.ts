@@ -21,7 +21,7 @@ import {
 } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 import { normalizeHttpToolList, type HttpToolSpec } from '@/lib/httpTools'
-import { defaultInstalledIds } from '@/lib/toolCatalog'
+import { defaultInstalledIds, RETIRED_PACKS } from '@/lib/toolCatalog'
 import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
 import { isE2eMode } from '@/lib/e2e'
 import type { ThemePref } from '@/stores/theme'
@@ -163,6 +163,34 @@ function toolEntriesFrom(obj: Record<string, unknown>): string[] {
   return defaultInstalledIds()
 }
 
+/**
+ * Hand a retired pack over as the user's own tools instead of deleting it.
+ *
+ * The catalog shrank; an HTTP pack's tools are read out of it on every access,
+ * so an entry that stops existing takes working tools with it. Someone who
+ * installed the research pack chose those tools, and the shrink is our decision
+ * about what to *recommend* — not a licence to remove what they already had.
+ *
+ * Copied with fresh ids so they become ordinary editable tools, and matched by
+ * name so a second run cannot duplicate them.
+ */
+function migrateRetiredPacks(
+  entries: string[],
+  tools: HttpToolSpec[],
+): { entries: string[]; tools: HttpToolSpec[] } {
+  const retired = entries.filter((id) => id in RETIRED_PACKS)
+  if (!retired.length) return { entries, tools }
+  const have = new Set(tools.map((t) => t.name))
+  const adopted = retired
+    .flatMap((id) => RETIRED_PACKS[id])
+    .filter((spec) => !have.has(spec.name))
+    .map((spec) => ({ ...spec, id: newProfileId() }))
+  return {
+    entries: entries.filter((id) => !(id in RETIRED_PACKS)),
+    tools: [...tools, ...adopted],
+  }
+}
+
 function toolSecretsFrom(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object') return {}
   const out: Record<string, string> = {}
@@ -205,6 +233,10 @@ function stringMapFrom(raw: unknown): Record<string, string> {
 }
 
 function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 'slots'> {
+  const adopted = migrateRetiredPacks(
+    toolEntriesFrom(obj),
+    normalizeHttpToolList(obj.httpTools, newProfileId),
+  )
   return {
     gitName: String(obj.gitName ?? ''),
     gitEmail: String(obj.gitEmail ?? ''),
@@ -217,8 +249,8 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     healthDirs: Array.isArray(obj.healthDirs)
       ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
       : [],
-    toolEntries: toolEntriesFrom(obj),
-    httpTools: normalizeHttpToolList(obj.httpTools, newProfileId),
+    toolEntries: adopted.entries,
+    httpTools: adopted.tools,
     toolSecrets: toolSecretsFrom(obj.toolSecrets),
     mcpAuth: mcpAuthFrom(obj.mcpAuth),
     mcpClients: stringMapFrom(obj.mcpClients),

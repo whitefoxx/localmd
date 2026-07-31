@@ -153,8 +153,10 @@ describe('catalog tool specs', () => {
 describe('selection helpers', () => {
   it('collects tools and servers for the installed set only', () => {
     expect(toolsForEntries(['jina']).map((t) => t.name).sort()).toEqual(['web_fetch', 'web_search'])
-    expect(toolsForEntries(['feeds']).map((t) => t.name).sort()).toEqual(['atom_feed', 'rss_feed'])
     expect(toolsForEntries([])).toEqual([])
+    // A retired id resolves to nothing here — settings adopts its tools once,
+    // then drops the id (see migrateRetiredPacks).
+    expect(toolsForEntries(['feeds'])).toEqual([])
     expect(serversForEntries(['webcli'])).toEqual([
       { entryId: 'webcli', name: 'webcli', url: expect.any(String) },
     ])
@@ -162,11 +164,13 @@ describe('selection helpers', () => {
   })
 
   it('reports which keys an installed entry is still missing', () => {
-    expect(missingSecrets(['zotero'], () => false).map((m) => m.secret.id)).toEqual([
-      'zotero_user',
-      'zotero_key',
-    ])
-    expect(missingSecrets(['zotero'], () => true)).toEqual([])
-    expect(missingSecrets(['research'], () => false)).toEqual([])
+    const keyed = CATALOG.filter((e) => e.secrets?.length)
+    for (const entry of keyed) {
+      const ids = entry.secrets!.map((s) => s.id)
+      expect(missingSecrets([entry.id], () => false).map((m) => m.secret.id)).toEqual(ids)
+      expect(missingSecrets([entry.id], () => true)).toEqual([])
+    }
+    // An entry with no keys never asks for one.
+    expect(missingSecrets(['jina'], () => false)).toEqual([])
   })
 })

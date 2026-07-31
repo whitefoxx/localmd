@@ -75,7 +75,7 @@ export default {
     // External tools — recommended catalog
     recommended: 'Recommended tools',
     recommendedDesc:
-      'Nothing is built in: the agent can reach exactly what you check here. Every endpoint listed has been checked to work from a browser. Start with WebCLI — it fetches with your real Chrome session, so it also reaches sites that refuse browser scripts.',
+      'A short list on purpose — these are the ones almost everyone wants, checked to work from a browser. For anything else, tell the assistant what you want to reach and it will set it up with you; there is no list to wait for.',
     connectTitle: 'Connect something',
     connectDesc:
       "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
@@ -151,43 +151,11 @@ export default {
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
-        desc: 'Keyless web search and page reading through Jina AI Reader. No login or cookies, so sign-in walls and heavy bot protection will fail — but it needs no install.',
-      },
-      research: {
-        title: 'Research lookup (OpenAlex, Crossref, Europe PMC)',
-        desc: 'Search papers by topic, turn a DOI into full metadata, and search biomedical literature. Keyless.',
-      },
-      reference: {
-        title: 'Reference lookup (Wikipedia, Open Library)',
-        desc: 'Search and read English Wikipedia articles, and look up books. Keyless.',
-      },
-      feeds: {
-        title: 'Feeds (RSS, Atom)',
-        desc: 'Read any RSS or Atom feed by URL and get recent items as a short list — for following a blog, journal or podcast into the knowledge base.',
-      },
-      arxiv: {
-        title: 'arXiv preprints',
-        desc: 'Search arXiv and get titles, authors, dates and abstracts. arXiv refuses browser requests, so this one needs the WebCLI extension above.',
-      },
-      zotero: {
-        title: 'Zotero library',
-        desc: 'Search your own Zotero references, with their notes and tags. Needs your user ID and an API key.',
+        desc: 'Keyless web search and page reading through Jina AI Reader. Light, quick answers, and the only web access that keeps working when a server connection does not. No login or cookies, so sign-in walls and heavy bot protection will fail.',
       },
       parallel: {
         title: 'Parallel web search',
-        desc: 'Web search and page extraction built for agents, keyless. Stronger than the Jina pack above — it takes what you are trying to find out, not just keywords — and returns long, quotable excerpts, so expect it to use a fair slice of the conversation.',
-      },
-      exa: {
-        title: 'Exa web search',
-        desc: 'Web search and page reading, from the search engine built for AI. Needs your own Exa API key — the free tier without one is throttled too hard to rely on.',
-      },
-      deepwiki: {
-        title: 'DeepWiki',
-        desc: 'Ask questions about any public GitHub repository and get answers from generated documentation. No key.',
-      },
-      context7: {
-        title: 'Context7 library docs',
-        desc: 'Version-correct documentation for thousands of libraries and frameworks, instead of guesses from training data.',
+        desc: 'Web search and page extraction built for agents, keyless. Takes what you are trying to find out rather than just keywords, and returns long quotable excerpts — better answers than the Jina pack, and a fair slice of the conversation to hold them.',
       },
     },
 
@@ -335,7 +303,7 @@ export default {
     // External tools — recommended catalog
     recommended: '推荐工具',
     recommendedDesc:
-      '没有任何内置工具：agent 能用什么，完全取决于你在这里勾选了什么。列出的每个服务都已实测可在浏览器中调用。建议从 WebCLI 开始 —— 它用你真实的 Chrome 会话发请求，因此也能访问那些拒绝浏览器脚本的接口。',
+      '这个列表故意做得很短 —— 只放几乎人人都要、而且实测能从浏览器访问的。别的想接什么，直接告诉助手，它会带着你装好，不用等我们收录。',
     connectTitle: '接入一个服务',
     connectDesc:
       '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
@@ -409,41 +377,9 @@ export default {
         title: 'Jina 网页工具 (web_search、web_fetch)',
         desc: '通过 Jina AI Reader 实现免 key 的网页搜索与正文抓取。不带登录态和 cookie，登录墙和强反爬页面会失败，但无需安装任何东西。',
       },
-      research: {
-        title: '文献检索 (OpenAlex、Crossref、Europe PMC)',
-        desc: '按主题检索论文、把 DOI 换成完整元数据、检索生物医学文献。免 key。',
-      },
-      reference: {
-        title: '资料查询 (Wikipedia、Open Library)',
-        desc: '检索并阅读英文维基百科条目，以及查询图书信息。免 key。',
-      },
-      feeds: {
-        title: '订阅源 (RSS、Atom)',
-        desc: '按 URL 读取任意 RSS/Atom 源，返回精简的最新条目列表 —— 用于把关注的博客、期刊、播客追进知识库。',
-      },
-      arxiv: {
-        title: 'arXiv 预印本',
-        desc: '检索 arXiv，返回标题、作者、日期和摘要。arXiv 拒绝浏览器直连，所以这一项需要上面的 WebCLI 扩展。',
-      },
-      zotero: {
-        title: 'Zotero 文献库',
-        desc: '检索你自己的 Zotero 文献（含笔记和标签）。需要填写 User ID 和 API key。',
-      },
       parallel: {
         title: 'Parallel 联网搜索',
         desc: '为 agent 做的联网搜索和网页提取，免 key。比上面的 Jina 更强 —— 它接收的是「你想查清什么」而不只是关键词 —— 返回的摘录长且可直接引用，所以会占掉对话里不小的一块。',
-      },
-      exa: {
-        title: 'Exa 联网搜索',
-        desc: '来自专为 AI 做的搜索引擎，联网搜索加网页阅读。需要你自己的 Exa API key —— 不带 key 的免费档限流太狠，不足以依赖。',
-      },
-      deepwiki: {
-        title: 'DeepWiki',
-        desc: '针对任意公开 GitHub 仓库提问，从自动生成的文档中得到答案。免 key。',
-      },
-      context7: {
-        title: 'Context7 库文档',
-        desc: '获取数千个库和框架的版本正确的文档，而不是模型凭训练数据猜测。',
       },
     },
 

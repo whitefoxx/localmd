@@ -87,7 +87,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       mcpServers: [],
       hotkeys: {},
       healthDirs: [],
-      toolEntries: ['jina'],
+      toolEntries: ['jina', 'parallel'],
       httpTools: [],
       toolSecrets: {},
       mcpAuth: {},
@@ -109,8 +109,8 @@ describe('normalizeSettings — multi-profile shape', () => {
 
     it('prefers a stored entry list, including an empty one', () => {
       expect(
-        normalizeSettings({ profiles: [], jinaReader: true, toolEntries: ['research'] }).toolEntries,
-      ).toEqual(['research'])
+        normalizeSettings({ profiles: [], jinaReader: true, toolEntries: ['parallel'] }).toolEntries,
+      ).toEqual(['parallel'])
       expect(normalizeSettings({ profiles: [], toolEntries: [] }).toolEntries).toEqual([])
     })
 
@@ -193,5 +193,38 @@ describe('normalizeSettings — MCP OAuth state', () => {
       mcpClients: { 'https://as': 'CID', 'https://bad': 42, '': 'x' },
     })
     expect(s.mcpClients).toEqual({ 'https://as': 'CID' })
+  })
+})
+
+describe('normalizeSettings — retired catalog packs', () => {
+  it('adopts an installed pack as the user\'s own tools instead of deleting it', () => {
+    // Shrinking the catalog is a decision about what to RECOMMEND. Someone who
+    // installed the research pack chose those tools; they must survive as
+    // ordinary editable ones.
+    const s = normalizeSettings({ profiles: [], toolEntries: ['jina', 'research'] })
+    expect(s.toolEntries).toEqual(['jina'])
+    expect(s.httpTools.map((t) => t.name).sort()).toEqual([
+      'crossref_lookup',
+      'europepmc_search',
+      'openalex_search',
+    ])
+    // Adopted with fresh ids, so they edit and delete like any other tool.
+    expect(s.httpTools.every((t) => t.id && !t.id.startsWith('research.'))).toBe(true)
+  })
+
+  it('is idempotent — a second load does not duplicate them', () => {
+    const once = normalizeSettings({ profiles: [], toolEntries: ['research'] })
+    const twice = normalizeSettings({
+      profiles: [],
+      toolEntries: once.toolEntries,
+      httpTools: once.httpTools,
+    })
+    expect(twice.httpTools).toHaveLength(once.httpTools.length)
+  })
+
+  it('leaves a profile that never had one alone', () => {
+    const s = normalizeSettings({ profiles: [], toolEntries: ['jina', 'parallel'] })
+    expect(s.toolEntries).toEqual(['jina', 'parallel'])
+    expect(s.httpTools).toEqual([])
   })
 })

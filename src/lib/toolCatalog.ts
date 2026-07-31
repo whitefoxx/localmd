@@ -350,8 +350,42 @@ const ZOTERO_TOOLS: HttpToolSpec[] = [
   },
 ]
 
+/* ── retired packs ───────────────────────────────────────────────────────── */
+
+/**
+ * Packs that were once offered here, kept only so an install of one survives.
+ *
+ * The catalog shrank to what everyone wants on day one. Everything else is now
+ * a conversation — the agent researches a service, proposes it, and the user
+ * approves — because a curated list is a promise that rots: entries need
+ * verifying, describing in two languages, and re-checking forever, and every
+ * inclusion is an editorial call ("why Parallel and not Tavily?") that the
+ * machinery no longer needs anyone to make.
+ *
+ * An MCP entry that disappears from here is harmless — installing one copies a
+ * row into settings, so it keeps working under its own name. An HTTP pack is
+ * different: its tools are looked up here on every read, so dropping the entry
+ * would delete tools out from under someone. These specs exist so the migration
+ * in stores/settings.ts can hand them over as the user's own instead.
+ */
+export const RETIRED_PACKS: Record<string, HttpToolSpec[]> = {
+  research: RESEARCH_TOOLS,
+  reference: REFERENCE_TOOLS,
+  feeds: FEED_TOOLS,
+  arxiv: ARXIV_TOOLS,
+  zotero: ZOTERO_TOOLS,
+}
+
 /* ── the catalog ─────────────────────────────────────────────────────────── */
 
+/**
+ * What is offered on a first run, and nothing else.
+ *
+ * Three entries, each earning its place by being wanted before the user knows
+ * what they want: WebCLI because it makes everything else more likely to work,
+ * and two web searches that fail differently. Anything past that is the user's
+ * choice to make, with the agent's help — see docs/app/tools.md.
+ */
 export const CATALOG: CatalogEntry[] = [
   {
     id: 'webcli',
@@ -369,74 +403,18 @@ export const CATALOG: CatalogEntry[] = [
     tools: JINA_TOOLS,
   },
   {
-    id: 'research',
-    kind: 'http',
-    homepage: 'https://openalex.org/',
-    tools: RESEARCH_TOOLS,
-  },
-  {
-    id: 'reference',
-    kind: 'http',
-    homepage: 'https://www.wikipedia.org/',
-    tools: REFERENCE_TOOLS,
-  },
-  {
-    id: 'feeds',
-    kind: 'http',
-    homepage: 'https://en.wikipedia.org/wiki/RSS',
-    tools: FEED_TOOLS,
-  },
-  {
-    id: 'arxiv',
-    kind: 'http',
-    homepage: 'https://arxiv.org/',
-    tools: ARXIV_TOOLS,
-    requiresWebcli: true,
-  },
-  {
-    id: 'zotero',
-    kind: 'http',
-    homepage: 'https://www.zotero.org/settings/keys',
-    tools: ZOTERO_TOOLS,
-    secrets: [
-      { id: 'zotero_user', label: 'User ID', url: 'https://www.zotero.org/settings/keys', plain: true },
-      { id: 'zotero_key', label: 'API key', url: 'https://www.zotero.org/settings/keys' },
-    ],
-  },
-  {
+    // Default alongside Jina rather than instead of it. They overlap in what
+    // they do and differ in how they fail: Jina is an HTTP tool that needs no
+    // connection, so it still answers when MCP is unreachable, and its results
+    // are shaped down before they reach the model. Parallel is better at
+    // finding things and returns far more of them. Keeping both costs the
+    // schema bytes of two extra tools and buys a search that survives the other
+    // one being down.
     id: 'parallel',
     kind: 'mcp',
+    defaultInstalled: true,
     homepage: 'https://parallel.ai/',
     server: { name: 'parallel', url: 'https://search.parallel.ai/mcp' },
-  },
-  {
-    // Exa answers without a key, but its free tier rate-limits hard enough that
-    // the row spends much of its time red (measured: over half of searches 429,
-    // and the limit is server-wide — even initialize fails once tripped). So
-    // the key is required here rather than optional: a listed entry should work
-    // when you install it. `x-api-key` rather than a bearer token is Exa's own
-    // choice, and carrying it is the whole point of header templates.
-    id: 'exa',
-    kind: 'mcp',
-    homepage: 'https://exa.ai/',
-    server: {
-      name: 'exa',
-      url: 'https://mcp.exa.ai/mcp',
-      headers: { 'x-api-key': '{{secret:exa_key}}' },
-    },
-    secrets: [{ id: 'exa_key', label: 'API key', url: 'https://dashboard.exa.ai/api-keys' }],
-  },
-  {
-    id: 'deepwiki',
-    kind: 'mcp',
-    homepage: 'https://deepwiki.com/',
-    server: { name: 'deepwiki', url: 'https://mcp.deepwiki.com/mcp' },
-  },
-  {
-    id: 'context7',
-    kind: 'mcp',
-    homepage: 'https://context7.com/',
-    server: { name: 'context7', url: 'https://mcp.context7.com/mcp' },
   },
 ]
 

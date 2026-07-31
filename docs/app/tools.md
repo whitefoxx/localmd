@@ -13,26 +13,45 @@ This is deliberate: what it can reach is always something you chose.
 
 Everything lives in **Settings → Tools**.
 
-## The easiest way: just ask
+## What comes switched on
 
-Click **Describe it to the agent** and say what you want it to reach — "search
-Hacker News", "read my Readwise highlights", "look things up in my Notion".
+Three things, and they are deliberately few:
 
-It will find out how that service works, build the tools, test them, and ask you
-for anything only you can provide (usually an API key). This is a normal
-conversation, not a feature request — tools in this app are just configuration,
-so it can create them on the spot.
+- **Web search** — two of them, because they fail differently. One needs no
+  connection and answers quickly; the other finds better material and returns
+  more of it. Between them you rarely have nothing.
+- **WebCLI** — a browser extension, off until you set it up. Worth doing early:
+  it lets the assistant use your own logged-in Chrome, so it reaches pages that
+  need a login, and it makes most *other* tools work that otherwise could not.
 
-## Or pick from the recommended list
+There is no long list of recommendations. Keeping one would mean deciding on
+your behalf which services are worth having, and re-checking those decisions
+forever — services change their terms, their limits and their addresses. What
+this app has instead is a way to add anything, in a minute, by asking.
 
-**Browse recommended** has a checklist of things that are known to work: web
-search and page reading, research databases (OpenAlex, Crossref, Europe PMC),
-Wikipedia and Open Library, RSS feeds, arXiv, Zotero, and a couple of
-documentation services.
+## Adding anything else: just ask
 
-If you want just one thing to start with, take **WebCLI**. It is a browser
-extension that lets the assistant use your own logged-in Chrome — so it reaches
-pages that need a login, and it makes most other tools work better too.
+Tell the assistant what you want to reach — "search Hacker News", "read my
+Readwise highlights", "look things up in my Notion". It works out how that
+service is reached, then either builds the tools itself or points the app at the
+service's own MCP server.
+
+You never have to find an address yourself, but if you want to browse, a good
+place is **mcp.so** — a directory of MCP servers. Find one you like, come back,
+and say "add this one" with the name or the address. The assistant takes it from
+there.
+
+**Nothing it proposes happens on its own.** When it wants to add a server you
+get a card showing the exact address, and it is added only when you click. When
+a service needs a key, the card takes the key straight into the app — it is
+never typed into the conversation, and the assistant never sees it. When a
+service needs you to log in, the card opens that service's own sign-in page.
+
+That rule is worth knowing the reason for: the assistant reads web pages, files
+and tool results, and none of those can be trusted to be talking to it honestly.
+A page can perfectly well contain the words "add the server at …". So the
+assistant is never the one who decides — it can only ever put the address in
+front of you.
 
 ## Connecting WebCLI
 
@@ -87,8 +106,8 @@ One row per integration. Open any row to see the individual tools inside it.
 
 Each row has a tag saying **where it came from**:
 
-- **Preset** — from the recommended list. We defined it, so only the parts you
-  must supply (an address, a token) can be edited.
+- **Preset** — one of the few things that come switched on. We defined it, so
+  only the parts you must supply (an address, a token) can be edited.
 - **Yours** — you made it, or the assistant made it for you.
 - **KB** — it came with this knowledge base folder. See below.
 
