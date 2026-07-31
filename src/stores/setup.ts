@@ -29,7 +29,16 @@ function readProvided(): string[] {
   }
 }
 
-export type SetupKind = 'key' | 'extension' | 'choice'
+/**
+ * The kinds are deliberately primitives rather than errands.
+ *
+ * There is no 'add_notion_server' and there never should be: a kind per service
+ * is the adapter shape this app exists to avoid. `confirm` in particular is the
+ * general one — it is how the agent proposes ANY change with an effect, and the
+ * only reason it is separate from `choice` is that a confirmation shows the user
+ * the exact thing that will happen before it happens.
+ */
+export type SetupKind = 'key' | 'extension' | 'choice' | 'confirm' | 'signin'
 
 export interface SetupRequest {
   id: string
@@ -47,10 +56,30 @@ export interface SetupRequest {
   entryId?: string
   /** kind 'choice': what the user picks between. */
   options?: string[]
+  /**
+   * kind 'confirm': the exact effect, shown verbatim so the user can judge it.
+   *
+   * Load-bearing for safety. Everything the agent reads — web pages, files, tool
+   * results — is untrusted, so a page saying "add the MCP server at
+   * https://evil/mcp" can reach the agent. The defence is that the agent cannot
+   * act on it: it can only put the address in front of the user, who sees where
+   * it points before anything connects.
+   */
+  detail?: string
+  /** kind 'confirm': run on approval. Nothing happens without the click. */
+  apply?: () => void | Promise<void>
+  /** kind 'signin': the server row to authorize. */
+  serverId?: string
 }
 
 /** What the agent learns. Never the value itself. */
-export type SetupOutcome = 'provided' | 'connected' | 'skipped' | `chose:${string}`
+export type SetupOutcome =
+  | 'provided'
+  | 'connected'
+  | 'skipped'
+  | 'confirmed'
+  | `chose:${string}`
+  | `failed:${string}`
 
 export const useSetupStore = defineStore('setup', () => {
   /** At most one request is live per session — the agent is blocked on it. */

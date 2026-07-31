@@ -68,6 +68,51 @@ const pageHost = computed(() => window.location.host)
 function reloadPage(): void {
   window.location.reload()
 }
+
+const busy = ref(false)
+const failure = ref('')
+
+/**
+ * Nothing the agent proposed happens until this runs.
+ *
+ * The card is the trust boundary: the agent reads untrusted things — web pages,
+ * files, tool output — so a page can talk it into proposing an address. What a
+ * page cannot do is click here, and `detail` shows the user exactly what they
+ * are clicking before they do.
+ */
+async function confirmAction(): Promise<void> {
+  busy.value = true
+  failure.value = ''
+  try {
+    await props.request.apply?.()
+    setup.settle(props.request.id, 'confirmed')
+  } catch (err) {
+    failure.value = (err as Error).message
+    setup.settle(props.request.id, `failed:${(err as Error).message}`)
+  } finally {
+    busy.value = false
+  }
+}
+
+/** Hand off to the row's own OAuth flow — the popup, the verifier and the token
+ *  all stay where they already live. */
+async function signIn(): Promise<void> {
+  const serverId = props.request.serverId
+  if (!serverId) return
+  busy.value = true
+  failure.value = ''
+  try {
+    const err = await mcp.signIn(serverId)
+    if (err) {
+      failure.value = err
+      setup.settle(props.request.id, `failed:${err}`)
+    } else {
+      setup.settle(props.request.id, 'connected')
+    }
+  } finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -75,7 +120,13 @@ function reloadPage(): void {
     <div class="flex items-center gap-1.5">
       <span
         class="codicon codicon-sm text-accent"
-        :class="request.kind === 'key' ? 'codicon-key' : request.kind === 'extension' ? 'codicon-plug' : 'codicon-question'"
+        :class="{
+          'codicon-key': request.kind === 'key',
+          'codicon-plug': request.kind === 'extension',
+          'codicon-shield': request.kind === 'confirm',
+          'codicon-sign-in': request.kind === 'signin',
+          'codicon-question': request.kind === 'choice',
+        }"
       />
       <span class="text-sm text-fg-1">{{ request.label }}</span>
     </div>
@@ -124,6 +175,30 @@ function reloadPage(): void {
       </div>
     </div>
 
+    <!-- A proposed change. The detail is shown verbatim and unwrapped: the
+         address is the thing being judged, so it must not be truncated or
+         prettified into something that reads safer than it is. -->
+    <div v-else-if="request.kind === 'confirm'" class="mt-2 space-y-2">
+      <p
+        v-if="request.detail"
+        class="rounded-lg bg-bg-2 px-2.5 py-2 text-xs font-mono text-fg-1 break-all leading-relaxed"
+      >{{ request.detail }}</p>
+      <button class="btn text-xs" :disabled="busy" @click="confirmAction">
+        {{ busy ? $t('chat.setupWorking') : $t('chat.setupConfirm') }}
+      </button>
+    </div>
+
+    <!-- An authorization only the user can grant, in the service's own window. -->
+    <div v-else-if="request.kind === 'signin'" class="mt-2 space-y-2">
+      <p
+        v-if="request.detail"
+        class="rounded-lg bg-bg-2 px-2.5 py-2 text-xs font-mono text-fg-1 break-all leading-relaxed"
+      >{{ request.detail }}</p>
+      <button class="btn text-xs" :disabled="busy" @click="signIn">
+        {{ busy ? $t('settings.signingIn') : $t('settings.signIn') }}
+      </button>
+    </div>
+
     <!-- A choice the agent could not make on the user's behalf. -->
     <div v-else class="mt-2 flex items-center gap-2 flex-wrap">
       <button
@@ -137,6 +212,7 @@ function reloadPage(): void {
     <p v-if="checkFailed" class="mt-1.5 text-xs text-removed">
       {{ needsRelaySetup ? $t('chat.setupNotAllowed') : $t('chat.setupNotDetected') }}
     </p>
+    <p v-if="failure" class="mt-1.5 text-xs text-removed leading-relaxed">{{ failure }}</p>
 
     <div class="mt-2 flex items-center gap-3">
       <a

@@ -47,6 +47,8 @@ export default {
     setupNotAllowed:
       'Still not connected. Check that the address above is in the extension’s “Web app access” list — port included — and reload this page.',
     setupWhere: 'Where do I get this? →',
+    setupConfirm: 'Confirm',
+    setupWorking: 'Working…',
     setupSkip: 'Skip',
     // ApprovalCard — an ask-first write paused on the user, decided in place
     approvalWrite: 'Wants to write this file',
@@ -126,6 +128,8 @@ export default {
     setupNotAllowed:
       '还是没连上。确认上面那个地址（含端口）已经加进扩展的「Web app access」名单，然后刷新本页。',
     setupWhere: '去哪里获取？→',
+    setupConfirm: '确认',
+    setupWorking: '处理中…',
     setupSkip: '跳过',
     // ApprovalCard —— 先询问模式下暂停的写入，就地决定
     approvalWrite: '想写入这个文件',

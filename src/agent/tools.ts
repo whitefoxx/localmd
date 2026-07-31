@@ -815,11 +815,13 @@ const appSettings = defineTool({
 const requestSetup = defineTool({
   name: 'request_setup',
   description:
-    "Ask the user for something the setup needs, as a form in the chat rather than instructions to go and find a settings page. Use for: an API key a tool references ({{secret:<id>}}) — the user types it straight into the app and you never see the value; a browser extension a tool requires; or a choice only they can make. Blocks until they answer. Never ask for a key or token as chat text — always use this.",
+    "Ask the user for something the setup needs, as a card in the chat rather than instructions to go and find a settings page. Use for: an API key a tool references ({{secret:<id>}}) — the user types it straight into the app and you never see the value; a browser extension a tool requires; adding an MCP server (kind:'confirm' + server_url — you propose, they see the address and click); signing in to a server that answered 401 (kind:'signin'); or a choice only they can make. Blocks until they answer. Never ask for a key or token as chat text, and never claim to have added or connected something a card has not come back confirmed — always use this.",
   schema: z.object({
     kind: z
-      .enum(['key', 'extension', 'choice'])
-      .describe("'key' = an API key/token, 'extension' = a browser extension, 'choice' = pick one option"),
+      .enum(['key', 'extension', 'choice', 'confirm', 'signin'])
+      .describe(
+        "'key' = an API key/token, 'extension' = a browser extension, 'choice' = pick one option, 'confirm' = propose a change that only happens if they click (use with server_url to add an MCP server), 'signin' = let them authorize a server that answered 401 (use with server_id)",
+      ),
     label: z.string().describe('Title of the card — what you are asking for, in the user\'s terms'),
     help: z.string().optional().describe('One line on how to obtain it (where to click, which page)'),
     url: z.string().optional().describe('Where to get the key / install the extension'),
@@ -832,11 +834,50 @@ const requestSetup = defineTool({
       .optional()
       .describe("kind 'extension': the recommended-tools entry to install, currently only \"webcli\""),
     options: z.array(z.string()).optional().describe("kind 'choice': the options to offer"),
+    server_url: z
+      .string()
+      .optional()
+      .describe(
+        "kind 'confirm': the https MCP endpoint to add. Shown to the user in full before anything connects.",
+      ),
+    server_name: z
+      .string()
+      .optional()
+      .describe("kind 'confirm' with server_url: short name for the row, e.g. \"notion\""),
+    server_id: z.string().optional().describe("kind 'signin': the server row id, from list_tools"),
   }),
   describeCall: (a) => `ask user: ${a.label}`,
   run: async (args, ctx) => {
     if (args.kind === 'key' && !args.secret_id) return 'Error: kind "key" needs secret_id.'
     if (args.kind === 'choice' && !args.options?.length) return 'Error: kind "choice" needs options.'
+    if (args.kind === 'signin' && !args.server_id) return 'Error: kind "signin" needs server_id.'
+
+    // A proposal, not a write. The agent reads untrusted things, so a page can
+    // talk it into suggesting an address — the user seeing that address and
+    // clicking is what makes it real.
+    let apply: (() => void) | undefined
+    let detail: string | undefined
+    if (args.kind === 'confirm' && args.server_url) {
+      const url = args.server_url.trim()
+      let host: string
+      try {
+        const u = new URL(url)
+        if (u.protocol !== 'https:') return 'Error: an MCP endpoint must be https.'
+        host = u.host
+      } catch {
+        return `Error: "${url}" is not a URL.`
+      }
+      const name = (args.server_name || host.split('.')[0] || 'server').trim()
+      detail = `${name} → ${url}`
+      apply = () => {
+        const settings = useSettingsStore()
+        if (settings.state.mcpServers.some((s) => s.url === url)) return
+        settings.state.mcpServers = [
+          ...settings.state.mcpServers,
+          { id: crypto.randomUUID(), name, url },
+        ]
+      }
+    }
 
     const outcome = await useSetupStore().ask({
       id: crypto.randomUUID(),
@@ -848,12 +889,27 @@ const requestSetup = defineTool({
       ...(args.secret_id ? { secretId: args.secret_id } : {}),
       ...(args.entry_id ? { entryId: args.entry_id } : {}),
       ...(args.options ? { options: args.options } : {}),
+      ...(detail ? { detail } : {}),
+      ...(apply ? { apply } : {}),
+      ...(args.server_id ? { serverId: args.server_id } : {}),
     })
 
     if (outcome === 'provided') {
       return `The user saved a value for "${args.secret_id}". You cannot read it — just carry on and let the tool use it.`
     }
-    if (outcome === 'connected') return 'The extension is connected. Continue.'
+    if (outcome === 'confirmed') {
+      return args.server_url
+        ? `Added. It connects in the background — check list_tools before relying on it, and if it reports 401 ask for a sign-in with kind:"signin".`
+        : 'The user confirmed. Continue.'
+    }
+    if (outcome === 'connected') {
+      return args.kind === 'signin'
+        ? 'Signed in, and the server reconnected. Check list_tools for what it offers now.'
+        : 'The extension is connected. Continue.'
+    }
+    if (outcome.startsWith('failed:')) {
+      return `That did not work: ${outcome.slice('failed:'.length)}. Tell the user plainly and stop — do not retry the same thing.`
+    }
     if (outcome.startsWith('chose:')) return `The user chose: ${outcome.slice('chose:'.length)}`
     return 'The user skipped this. Do not ask again in a loop — say what stays unavailable without it, and continue with whatever still works.'
   },
