@@ -59,6 +59,28 @@ works with no extra configuration.
 If the row stays red *after* a reload, the address in that list does not match
 this page — it is almost always a missing or different port.
 
+## Adding a server yourself
+
+Settings → Tools → **Add an MCP server** takes an address, an optional name, and
+an optional token. That covers most of what you will be handed when a service
+says "here is our MCP endpoint".
+
+There is one checkbox worth knowing about: **Reach it through WebCLI**.
+
+Leave it off and the app connects to the address itself. That is the simpler
+path, and it works whenever the service allows it. The catch is that most hosted
+MCP services do not: they were built for desktop apps and refuse a web page
+outright, which shows up as a red row saying "Failed to fetch" no matter how
+correct your address is.
+
+Turn the checkbox on and WebCLI fetches on the app's behalf instead. It is not a
+web page, so the refusal does not apply to it. The trade is that the server now
+depends on WebCLI — if WebCLI is not connected, that row cannot start, and it
+says so rather than failing obscurely.
+
+If a server you know is correct will not connect, that checkbox is the first
+thing to try.
+
 ## Reading the Installed list
 
 One row per integration. Open any row to see the individual tools inside it.
@@ -126,7 +148,9 @@ with your keys.
 
 **"Failed to fetch" or a red dot.** The service refused the connection. Most
 often it does not allow browser access, which the WebCLI extension gets around —
-try installing it.
+try installing it. For a server you added yourself, also turn on **Reach it
+through WebCLI** in that server's settings; the address being right is not
+enough if the service will not talk to a web page at all.
 
 **A tool returns an authorization error.** The key is probably missing or wrong.
 Check Settings → Tools → Keys.

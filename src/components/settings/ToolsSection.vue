@@ -558,6 +558,10 @@ async function runTest(): Promise<void> {
 const mcpName = ref('')
 const mcpUrl = ref('')
 const mcpToken = ref('')
+/** true = reach the endpoint through WebCLI instead of fetching it from this
+ *  page. Off by default: a direct connection is fewer moving parts, and most
+ *  people adding a server by hand have one that works. */
+const mcpViaWebcli = ref(false)
 const editMcpId = ref<string | null>(null)
 
 function resetMcpForm(): void {
@@ -565,6 +569,7 @@ function resetMcpForm(): void {
   mcpName.value = ''
   mcpUrl.value = ''
   mcpToken.value = ''
+  mcpViaWebcli.value = false
 }
 
 /** This field takes one thing: the endpoint of an MCP server that allows browser
@@ -585,12 +590,19 @@ function newServer(): void {
   view.value = { name: 'serverForm' }
 }
 
-function startEditMcp(s: { id: string; name: string; url: string; token?: string }): void {
+function startEditMcp(s: {
+  id: string
+  name: string
+  url: string
+  token?: string
+  transport?: 'direct' | 'webcli'
+}): void {
   returnTo.value = view.value
   editMcpId.value = s.id
   mcpName.value = s.name
   mcpUrl.value = s.url
   mcpToken.value = s.token ?? ''
+  mcpViaWebcli.value = s.transport === 'webcli'
   view.value = { name: 'serverForm' }
 }
 
@@ -612,6 +624,8 @@ function submitMcpServer(): void {
       s.url = mcpUrl.value.trim()
       if (token) s.token = token
       else delete s.token
+      if (mcpViaWebcli.value) s.transport = 'webcli'
+      else delete s.transport
     }
   } else {
     store.state.mcpServers.push({
@@ -619,6 +633,7 @@ function submitMcpServer(): void {
       name: mcpName.value.trim() || 'server',
       url: mcpUrl.value.trim(),
       ...(token ? { token } : {}),
+      ...(mcpViaWebcli.value ? { transport: 'webcli' as const } : {}),
     })
   }
   closeMcpForm()
@@ -1273,6 +1288,16 @@ function removeDetail(): void {
         :placeholder="$t('settings.tokenPlaceholder')"
         autocomplete="off"
       />
+      <label class="flex items-start gap-2 pt-1 cursor-pointer">
+        <input v-model="mcpViaWebcli" type="checkbox" class="mt-0.5" />
+        <span class="text-xs text-fg-2 leading-relaxed">
+          {{ $t('settings.serverViaWebcli') }}
+          <span class="block text-fg-3">{{ $t('settings.serverViaWebcliHint') }}</span>
+          <span v-if="mcpViaWebcli && !mcp.relayReady" class="block text-removed">
+            {{ $t('settings.serverViaWebcliMissing') }}
+          </span>
+        </span>
+      </label>
       <div class="flex gap-2 pt-0.5">
         <button class="btn text-xs" :disabled="!mcpUrlValid" @click="submitMcpServer">
           {{ editMcpId ? $t('common.save') : $t('common.add') }}

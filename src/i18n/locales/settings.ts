@@ -234,8 +234,12 @@ export default {
     urlPlaceholder: 'https://…/mcp',
     serverUrlInvalid: 'Needs an http(s) address — this field takes an MCP endpoint.',
     tokenPlaceholder: 'token (optional)',
+    serverViaWebcli: 'Reach it through WebCLI',
+    serverViaWebcliHint:
+      "Turn this on when the server won't talk to a web page. Most hosted MCP servers refuse browsers outright; WebCLI fetches on this page's behalf and is not bound by that.",
+    serverViaWebcliMissing: 'WebCLI is not connected — this server cannot start until it is.',
     toolsHelp:
-      'Servers must allow browser CORS. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
+      'A server reached directly must allow browser CORS; one reached through WebCLI need not. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
 
     // Git & GitHub
     commitAuthor: 'Commit author name',
@@ -475,8 +479,12 @@ export default {
     urlPlaceholder: 'https://…/mcp',
     serverUrlInvalid: '需要一个 http(s) 地址 —— 这里填的是 MCP 端点。',
     tokenPlaceholder: 'token（可选）',
+    serverViaWebcli: '通过 WebCLI 连接',
+    serverViaWebcliHint:
+      '当这个服务器不接受网页直接访问时打开它。大多数托管的 MCP 服务器都直接拒绝浏览器；WebCLI 会代替本页去取，不受这条限制。',
+    serverViaWebcliMissing: 'WebCLI 未连接 —— 在它连上之前这个服务器起不来。',
     toolsHelp:
-      '服务器必须允许浏览器 CORS。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
+      '直连的服务器必须允许浏览器 CORS，走 WebCLI 的则不需要。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
 
     // Git & GitHub
     commitAuthor: 'Commit 作者名',
