@@ -13,6 +13,8 @@ import {
   recallTouch,
   MAX_RECALLED_TOOLS,
   McpHttpClient,
+  serverSecretRefs,
+  resolveServerSecrets,
   type McpWire,
   type McpWireReply,
   type McpWireRequest,
@@ -62,6 +64,55 @@ describe('parseSseResponse', () => {
   it('falls back to the last event when no id matches', () => {
     const body = 'data: {"a":1}\ndata: {"b":2}\n'
     expect(parseSseResponse(body, 99)).toEqual({ b: 2 })
+  })
+})
+
+describe('server secrets', () => {
+  const has = (values: Record<string, string>) => (id: string) => values[id]
+
+  it('finds references in url, token and any header', () => {
+    expect(
+      serverSecretRefs({
+        url: 'https://e/mcp?k={{secret:in_url}}',
+        token: '{{secret:in_token}}',
+        headers: { 'x-api-key': '{{secret:in_header}}', 'x-plain': 'literal' },
+      }).sort(),
+    ).toEqual(['in_header', 'in_token', 'in_url'])
+  })
+
+  it('substitutes everywhere, leaving literals alone', () => {
+    const out = resolveServerSecrets(
+      {
+        id: 'a',
+        name: 'a',
+        url: 'https://e/mcp?k={{secret:k}}',
+        headers: { 'x-api-key': '{{secret:k}}', accept: 'application/json' },
+      },
+      has({ k: 'VALUE' }),
+    )
+    expect(out).toEqual({
+      config: {
+        id: 'a',
+        name: 'a',
+        url: 'https://e/mcp?k=VALUE',
+        headers: { 'x-api-key': 'VALUE', accept: 'application/json' },
+      },
+    })
+  })
+
+  it('reports a missing secret rather than substituting emptiness', () => {
+    // Half a credential reaches the server as a 401 the user has to decode; the
+    // real answer is that they have not entered the key yet.
+    const out = resolveServerSecrets(
+      { id: 'a', name: 'a', url: 'https://e/mcp', headers: { 'x-api-key': '{{secret:nope}}' } },
+      has({}),
+    )
+    expect(out).toEqual({ missing: ['nope'] })
+  })
+
+  it('passes a row with no references straight through', () => {
+    const cfg = { id: 'a', name: 'a', url: 'https://e/mcp' }
+    expect(resolveServerSecrets(cfg, has({}))).toEqual({ config: cfg })
   })
 })
 
@@ -119,6 +170,22 @@ describe('McpHttpClient over an injected wire', () => {
     ])
     const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp' }, wire)
     await expect(client.connect()).rejects.toThrow(/HTTP 401.*invalid_token/)
+  })
+
+  it('sends configured headers, and the protocol keeps the ones it owns', async () => {
+    const { wire, sent } = fakeWire([
+      json({ jsonrpc: '2.0', id: 1, result: {} }, { 'mcp-session-id': 'sess-1' }),
+      json({ jsonrpc: '2.0', result: {} }),
+      json({ jsonrpc: '2.0', id: 2, result: { tools: [] } }),
+    ])
+    const client = new McpHttpClient(
+      { id: 'x', name: 'x', url: 'https://e/mcp', headers: { 'x-api-key': 'KEY', 'Mcp-Session-Id': 'forged' } },
+      wire,
+    )
+    await client.connect()
+    expect(sent[0].headers['x-api-key']).toBe('KEY')
+    // A row cannot dislodge the session header the transport depends on.
+    expect(sent[2].headers['Mcp-Session-Id']).toBe('sess-1')
   })
 
   it('sends the bearer token when one is configured', async () => {

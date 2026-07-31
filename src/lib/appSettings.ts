@@ -8,7 +8,9 @@
  * key, token and credential — is invisible.
  *
  * Never listed, and never will be: `profiles[].apiKey`, `githubToken`,
- * `toolSecrets` values, `mcpServers[].token`. The agent collects those through
+ * `toolSecrets` values, `mcpServers[].token`, `mcpServers[].headers` (a server
+ * row carries its key in whatever header the service chose, so the header value
+ * is a credential like any other). The agent collects those through
  * request_setup, where the user types the value straight into the app and the
  * conversation only learns that a value now exists.
  *

@@ -155,6 +155,12 @@ enough if the service will not talk to a web page at all.
 **A tool returns an authorization error.** The key is probably missing or wrong.
 Check Settings → Tools → Keys.
 
+**A row says it needs a value for something.** That integration wants a key you
+have not entered yet, and the row names which one. Put it in Settings → Tools →
+Keys under that name and the row connects itself — there is no second step. The
+key is stored once and referenced by name, so rotating it later means editing it
+in that one place rather than reinstalling anything.
+
 **You just want it fixed.** Tell the assistant what happened. It can test tools
 directly and see the real error.
 

@@ -24,10 +24,23 @@ export interface McpServerConfig {
   id: string
   /** Short name used in tool namespacing — sanitized to [a-z0-9-]. */
   name: string
-  /** A Streamable-HTTP endpoint, or WEBCLI_RELAY_URL for WebCLI's relay. */
+  /** A Streamable-HTTP endpoint, or WEBCLI_RELAY_URL for WebCLI's relay.
+   *  May carry `{{secret:<id>}}` — see resolveServerSecrets. */
   url: string
-  /** Optional bearer token. */
+  /** Optional bearer token — sugar for `headers: { Authorization: 'Bearer …' }`,
+   *  kept because it is the shape most servers and every existing config use.
+   *  May carry `{{secret:<id>}}`. */
   token?: string
+  /**
+   * Extra request headers, values possibly carrying `{{secret:<id>}}`.
+   *
+   * Bearer is the common case, not the only one: hosted MCP servers ask for a
+   * key in whatever header they chose (`x-api-key` and friends), or in the URL.
+   * Rather than grow a branch per service, the machinery carries arbitrary
+   * headers and a URL template, and a catalog entry is then just data that
+   * names a header and a secret — which is also all the user has to supply.
+   */
+  headers?: Record<string, string>
   /** How to reach `url`. 'direct' (default) is a browser fetch, so the endpoint
    *  must allow CORS. 'webcli' proxies every exchange through the WebCLI
    *  extension's fetch_url, which runs in a service worker and is not bound by
@@ -57,6 +70,57 @@ export function sanitizeServerName(name: string): string {
 
 export function externalToolName(server: string, tool: string): string {
   return `mcp__${sanitizeServerName(server)}__${tool}`
+}
+
+/* ── secrets ─────────────────────────────────────────────────────────────── */
+
+/** Same spelling HTTP tools use, so one thing is learned once. */
+const SECRET_REF = /\{\{secret:([a-zA-Z0-9_-]+)\}\}/g
+
+/** Every secret id a row references — what the UI collects, and all a KB-scoped
+ *  config is ever allowed to name. Never the value. */
+export function serverSecretRefs(cfg: {
+  url?: string
+  token?: string
+  headers?: Record<string, string>
+}): string[] {
+  const seen = new Set<string>()
+  const scan = (s: string | undefined): void => {
+    for (const m of String(s ?? '').matchAll(SECRET_REF)) seen.add(m[1])
+  }
+  scan(cfg.url)
+  scan(cfg.token)
+  for (const v of Object.values(cfg.headers ?? {})) scan(v)
+  return [...seen]
+}
+
+/**
+ * Substitute `{{secret:<id>}}` throughout a row, at CONNECT time rather than at
+ * install time. A row therefore stores the reference, never the value: the user
+ * can add the server before the key, rotate the key without touching the row,
+ * and the secret keeps living in exactly one place.
+ *
+ * A referenced secret with no value is reported rather than substituted with
+ * emptiness — sending a half-built credential produces a 401 the user has to
+ * decode, when the real answer is "you have not entered the key yet".
+ */
+export function resolveServerSecrets(
+  cfg: McpServerConfig,
+  lookup: (id: string) => string | undefined,
+): { config: McpServerConfig } | { missing: string[] } {
+  const missing = serverSecretRefs(cfg).filter((id) => !lookup(id))
+  if (missing.length) return { missing }
+  const sub = (s: string): string => s.replace(SECRET_REF, (_, id: string) => lookup(id) ?? '')
+  return {
+    config: {
+      ...cfg,
+      url: sub(cfg.url),
+      ...(cfg.token ? { token: sub(cfg.token) } : {}),
+      ...(cfg.headers
+        ? { headers: Object.fromEntries(Object.entries(cfg.headers).map(([k, v]) => [k, sub(v)])) }
+        : {}),
+    },
+  }
 }
 
 /** Split a namespaced tool name; null when it isn't an external tool. */
@@ -192,7 +256,10 @@ export class McpHttpClient implements McpClientLike {
     void this.wire({
       url: this.cfg.url,
       method: 'DELETE',
+      // Same auth as every other request: a server that rejects the teardown
+      // for want of a key just leaks a session until it expires.
       headers: {
+        ...(this.cfg.headers ?? {}),
         ...(this.cfg.token ? { Authorization: `Bearer ${this.cfg.token}` } : {}),
         'Mcp-Session-Id': session,
       },
@@ -201,10 +268,14 @@ export class McpHttpClient implements McpClientLike {
     })
   }
 
+  /** Configured headers sit between the defaults and the protocol's own, so a
+   *  row can set Accept or its own auth header, but nothing a user typed can
+   *  dislodge the session header the transport depends on. */
   private headers(json: boolean): Record<string, string> {
     return {
       Accept: 'application/json, text/event-stream',
       ...(json ? { 'Content-Type': 'application/json' } : {}),
+      ...(this.cfg.headers ?? {}),
       ...(this.cfg.token ? { Authorization: `Bearer ${this.cfg.token}` } : {}),
       ...(this.sessionId ? { 'Mcp-Session-Id': this.sessionId } : {}),
     }
@@ -307,6 +378,18 @@ export const KB_MCP_CONFIG_PATH = '.agents/mcp.json'
 /** Parse a raw server list (from Settings storage or the KB file). Invalid
  *  entries are dropped; `enabled` defaults to true. `makeId` supplies stable
  *  ids for entries that lack one (KB entries derive from name+url). */
+/** String-valued entries only. A KB's mcp.json is someone else's file, so a
+ *  header whose value is an object or a number is dropped rather than coerced
+ *  into `[object Object]` and sent. */
+function headersFrom(raw: unknown): { headers: Record<string, string> } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (k && typeof v === 'string') out[k] = v
+  }
+  return Object.keys(out).length ? { headers: out } : null
+}
+
 export function normalizeMcpServerList(
   raw: unknown,
   makeId: (s: { name: string; url: string }) => string,
@@ -324,6 +407,7 @@ export function normalizeMcpServerList(
       name,
       url,
       ...(ss.token ? { token: String(ss.token) } : {}),
+      ...(headersFrom(ss.headers) ?? {}),
       ...(ss.transport === 'webcli' ? { transport: 'webcli' as const } : {}),
       ...(ss.enabled === false ? { enabled: false } : {}),
     })

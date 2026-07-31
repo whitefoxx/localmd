@@ -19,6 +19,8 @@ import {
   isDeferredTool,
   isRecoverable,
   recallTouch,
+  resolveServerSecrets,
+  serverSecretRefs,
   KB_MCP_CONFIG_PATH,
   type McpClientLike,
   type McpServerConfig,
@@ -71,6 +73,13 @@ function readRecall(): Record<string, string[]> {
  *  what to do, because "failed to fetch" would not. */
 const WEBCLI_TRANSPORT_MISSING =
   'This server is set to reach its endpoint through WebCLI, which is not connected — install or enable it in Settings → Tools.'
+
+/** A row that names a key nobody has entered yet. Naming the ids matters: the
+ *  row is the only place that knows WHICH key, and without it the user is left
+ *  reading a 401 from a service they never got to configure. */
+function missingSecretMessage(ids: readonly string[]): string {
+  return `Needs a value for ${ids.join(', ')} — add it under Settings → Tools → Keys.`
+}
 
 /**
  * Which client a row gets. Three cases, and only the first is about the url:
@@ -253,8 +262,21 @@ export const useMcpStore = defineStore('mcp', () => {
     return webcliWire((args, signal) => callTool(serverId, WEBCLI_FETCH_TOOL, args, signal))
   }
 
-  async function connectServer(config: McpServerConfig): Promise<void> {
-    clients.get(config.id)?.dispose()
+  async function connectServer(raw: McpServerConfig): Promise<void> {
+    clients.get(raw.id)?.dispose()
+    // Secrets are substituted here, not at install: the row holds references,
+    // so entering or rotating a key takes effect on the next connect with
+    // nothing to re-add.
+    const resolved = resolveServerSecrets(raw, (id) => useSettingsStore().state.toolSecrets[id])
+    if ('missing' in resolved) {
+      patch(raw.id, {
+        status: 'error',
+        error: missingSecretMessage(resolved.missing),
+        tools: [],
+      })
+      return
+    }
+    const config = resolved.config
     let client: McpClientLike
     try {
       client = clientFor(config, webcliWireOrNull())
@@ -406,6 +428,26 @@ export const useMcpStore = defineStore('mcp', () => {
     () => [JSON.stringify(settings.state.mcpServers), kb.name] as const,
     () => void refresh(),
     { immediate: true },
+  )
+
+  /**
+   * Entering a key a row was waiting on should bring it up, without the user
+   * having to know that "add the key" and "connect" are two steps.
+   *
+   * Watched by PRESENCE, not value: the secrets field writes on every keystroke,
+   * so watching values would dial the server once per character. And only the
+   * failing rows are retried — a healthy connection is never dropped because
+   * some unrelated key changed. Rotating a key in place therefore still needs
+   * Reconnect, which is the rarer act and the one worth being deliberate about.
+   */
+  watch(
+    () =>
+      settings.state.mcpServers
+        .flatMap((s) => serverSecretRefs(s))
+        .map((id) => `${id}:${settings.state.toolSecrets[id] ? 1 : 0}`)
+        .sort()
+        .join(','),
+    () => void retryFailed(),
   )
 
   // Recall belongs to the KB it was learned in — swap it on KB open/close.

@@ -31,6 +31,7 @@ import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import { isWebcliRelayUrl } from '@/lib/webcliRelay'
+import { serverSecretRefs } from '@/lib/mcp'
 import {
   normalizeHttpTool,
   sanitizeToolName,
@@ -339,6 +340,12 @@ const requiredKeys = computed(() => {
   const users = new Map<string, string[]>()
   for (const spec of tools.specs) {
     for (const id of secretRefs(spec)) users.set(id, [...(users.get(id) ?? []), spec.name])
+  }
+  // Server rows reference keys too — a hosted MCP server wants its key in
+  // whatever header it chose. Without this the row can say it needs one and
+  // there is nowhere on the page to put it.
+  for (const s of store.state.mcpServers) {
+    for (const id of serverSecretRefs(s)) users.set(id, [...(users.get(id) ?? []), s.name])
   }
   return [...users].map(([id, names]) => ({
     ...(SECRET_META.get(id) ?? { id, label: id, plain: false, url: undefined }),

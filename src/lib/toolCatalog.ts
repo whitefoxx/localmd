@@ -50,8 +50,14 @@ export interface CatalogEntry {
   repo?: string
   /** kind 'extension' | 'mcp': the server entry an install adds. For an
    *  extension the url selects a transport rather than naming an address —
-   *  WEBCLI_RELAY_URL, whose marker supplies whichever build is installed. */
-  server?: { name: string; url: string }
+   *  WEBCLI_RELAY_URL, whose marker supplies whichever build is installed.
+   *
+   *  `url`, `token` and any header value may carry `{{secret:<id>}}`, resolved
+   *  when the row connects (see resolveServerSecrets). That is what lets an
+   *  entry for a keyed service be data rather than code: it names the header
+   *  the service chose and the secret to put in it, and the user supplies only
+   *  the value. Declare the ids in `secrets` so the UI knows to ask. */
+  server?: { name: string; url: string; token?: string; headers?: Record<string, string> }
   /** kind 'http': the tools an install registers. */
   tools?: HttpToolSpec[]
   /** The endpoint refuses browsers, so these tools only work with the WebCLI
@@ -404,6 +410,23 @@ export const CATALOG: CatalogEntry[] = [
     server: { name: 'parallel', url: 'https://search.parallel.ai/mcp' },
   },
   {
+    // Exa answers without a key, but its free tier rate-limits hard enough that
+    // the row spends much of its time red (measured: over half of searches 429,
+    // and the limit is server-wide — even initialize fails once tripped). So
+    // the key is required here rather than optional: a listed entry should work
+    // when you install it. `x-api-key` rather than a bearer token is Exa's own
+    // choice, and carrying it is the whole point of header templates.
+    id: 'exa',
+    kind: 'mcp',
+    homepage: 'https://exa.ai/',
+    server: {
+      name: 'exa',
+      url: 'https://mcp.exa.ai/mcp',
+      headers: { 'x-api-key': '{{secret:exa_key}}' },
+    },
+    secrets: [{ id: 'exa_key', label: 'API key', url: 'https://dashboard.exa.ai/api-keys' }],
+  },
+  {
     id: 'deepwiki',
     kind: 'mcp',
     homepage: 'https://deepwiki.com/',
@@ -440,12 +463,20 @@ export function toolsForEntries(ids: readonly string[]): HttpToolSpec[] {
 /** Server configs an installed set of entries contributes (extensions + MCP). */
 export function serversForEntries(
   ids: readonly string[],
-): Array<{ entryId: string; name: string; url: string }> {
+): Array<{
+  entryId: string
+  name: string
+  url: string
+  token?: string
+  headers?: Record<string, string>
+}> {
   const wanted = new Set(ids)
   return CATALOG.filter((e) => wanted.has(e.id) && e.server).map((e) => ({
     entryId: e.id,
     name: e.server!.name,
     url: e.server!.url,
+    ...(e.server!.token ? { token: e.server!.token } : {}),
+    ...(e.server!.headers ? { headers: e.server!.headers } : {}),
   }))
 }
 

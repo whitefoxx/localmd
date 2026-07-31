@@ -105,7 +105,15 @@ export const useToolsStore = defineStore('tools', () => {
     if (entry.server) {
       settings.state.mcpServers = [
         ...settings.state.mcpServers,
-        { id: crypto.randomUUID(), name: entry.server.name, url: entry.server.url },
+        {
+          id: crypto.randomUUID(),
+          name: entry.server.name,
+          url: entry.server.url,
+          // Copied as written: any {{secret:…}} stays a reference, so the row
+          // works whether the key is entered before or after installing.
+          ...(entry.server.token ? { token: entry.server.token } : {}),
+          ...(entry.server.headers ? { headers: entry.server.headers } : {}),
+        },
       ]
       return
     }

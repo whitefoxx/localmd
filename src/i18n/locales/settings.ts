@@ -174,6 +174,10 @@ export default {
         title: 'Parallel web search',
         desc: 'Web search and page extraction built for agents, keyless. Stronger than the Jina pack above — it takes what you are trying to find out, not just keywords — and returns long, quotable excerpts, so expect it to use a fair slice of the conversation.',
       },
+      exa: {
+        title: 'Exa web search',
+        desc: 'Web search and page reading, from the search engine built for AI. Needs your own Exa API key — the free tier without one is throttled too hard to rely on.',
+      },
       deepwiki: {
         title: 'DeepWiki',
         desc: 'Ask questions about any public GitHub repository and get answers from generated documentation. No key.',
@@ -422,6 +426,10 @@ export default {
       parallel: {
         title: 'Parallel 联网搜索',
         desc: '为 agent 做的联网搜索和网页提取，免 key。比上面的 Jina 更强 —— 它接收的是「你想查清什么」而不只是关键词 —— 返回的摘录长且可直接引用，所以会占掉对话里不小的一块。',
+      },
+      exa: {
+        title: 'Exa 联网搜索',
+        desc: '来自专为 AI 做的搜索引擎，联网搜索加网页阅读。需要你自己的 Exa API key —— 不带 key 的免费档限流太狠，不足以依赖。',
       },
       deepwiki: {
         title: 'DeepWiki',
