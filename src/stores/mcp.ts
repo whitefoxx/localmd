@@ -89,6 +89,11 @@ function readRecall(): Record<string, string[]> {
 const WEBCLI_TRANSPORT_MISSING =
   'This server is set to reach its endpoint through WebCLI, which is not connected — install or enable it in Settings → Tools.'
 
+/** A KB-carried row that reached for one of the reader's stored keys. Worth
+ *  naming plainly: this is someone else's config asking for your credential. */
+const KB_SECRET_REFUSED =
+  'This server came with the knowledge base folder and asks for one of your saved keys. Folder config cannot spend your keys — add the server yourself under Settings → Tools if you trust it.'
+
 /** A row that names a key nobody has entered yet. Naming the ids matters: the
  *  row is the only place that knows WHICH key, and without it the user is left
  *  reading a 401 from a service they never got to configure. */
@@ -418,8 +423,21 @@ export const useMcpStore = defineStore('mcp', () => {
     return !!useSettingsStore().state.mcpAuth[serverId]
   }
 
-  async function connectServer(raw: McpServerConfig): Promise<void> {
+  async function connectServer(raw: McpServerConfig, source: 'global' | 'kb' = 'global'): Promise<void> {
     clients.get(raw.id)?.dispose()
+    // A row that arrived with the folder may NAME a key but never receives one.
+    //
+    // Keys live in one flat namespace, so a shared knowledge base could ship an
+    // .agents/mcp.json pointing at any host and referencing a key the user
+    // stored for someone else — opening the folder would hand it over. HTTP
+    // tools already refuse the same combination (see httpTools' anyOrigin
+    // check); this is that rule for servers. A KB row wanting authentication
+    // has to carry its own literal, which is the KB author's secret to spend,
+    // not the reader's.
+    if (source === 'kb' && serverSecretRefs(raw).length) {
+      patch(raw.id, { status: 'error', error: KB_SECRET_REFUSED, tools: [] })
+      return
+    }
     // Secrets are substituted here, not at install: the row holds references,
     // so entering or rotating a key takes effect on the next connect with
     // nothing to re-add.
@@ -485,8 +503,8 @@ export const useMcpStore = defineStore('mcp', () => {
       live.filter((s) => isWebcliRelayUrl(s.config.url)),
       live.filter((s) => !isWebcliRelayUrl(s.config.url)),
     ]
-    await Promise.all(relay.map((s) => connectServer(s.config)))
-    await Promise.all(rest.map((s) => connectServer(s.config)))
+    await Promise.all(relay.map((s) => connectServer(s.config, s.source)))
+    await Promise.all(rest.map((s) => connectServer(s.config, s.source)))
   }
 
   /** Reconnect ONE server, leaving every healthy connection alone — the button
@@ -494,7 +512,7 @@ export const useMcpStore = defineStore('mcp', () => {
   async function reconnect(serverId: string): Promise<void> {
     const state = servers.value.find((s) => s.config.id === serverId)
     if (!state || state.config.enabled === false) return
-    await connectServer(state.config)
+    await connectServer(state.config, state.source)
   }
 
   /* ── WebCLI relay presence ────────────────────────────────────────────── */
