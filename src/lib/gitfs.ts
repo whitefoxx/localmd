@@ -7,9 +7,18 @@
  * Stat caveat: File System Access exposes only size + lastModified. ino/uid/
  * gid/ctime are faked as 0, which makes every index entry written by real git
  * look stale ONCE — isomorphic-git then re-hashes the file and (oid unchanged)
- * rewrites the index entry with our stats, so subsequent status calls are
- * cache hits. Interop with CLI git is symmetric: it re-freshes the entries
- * back. This is the documented racy-git behavior, not corruption.
+ * rewrites the index entry with our stats. That per-entry refresh is the
+ * documented racy-git behavior and is harmless BY ITSELF — but isomorphic-git
+ * persists it by rewriting the WHOLE index file from its in-memory copy, with
+ * no .git/index.lock (the file lock in GitIndexManager is commented out
+ * upstream). If CLI git commits between our read and that write-back, the
+ * write-back reverts the index to the pre-commit generation: git status then
+ * shows the last commit's changes inverted, and the next `git commit` silently
+ * undoes it. Hence the write guard below: refuse the write-back whenever
+ * .git/index on disk no longer matches what this adapter last read/wrote, and
+ * tell git.ts to drop its cached in-memory index instead. The guard compares
+ * size + mtimeMs; a same-millisecond same-size external write still slips
+ * through, but that window is stat-vs-write, not the whole workdir scan.
  */
 import * as fs from '@/lib/fs'
 
@@ -50,6 +59,25 @@ function segments(path: string): string[] {
 let dirCache = new Map<string, FileSystemDirectoryHandle>()
 let cachedRoot: FileSystemDirectoryHandle | null = null
 
+/* ── .git/index write-back guard (see header) ────────────────────────────── */
+
+/** On-disk state of .git/index as of this adapter's last read/write of it.
+ *  null = never seen (fresh repo or KB just opened). */
+let indexDiskState: { size: number; mtimeMs: number } | null = null
+let indexConflictHandler: (() => void) | null = null
+
+/** Single-consumer hook (git.ts): called when an index write-back is refused
+ *  because .git/index changed on disk since this adapter last read it — the
+ *  in-memory index is a stale generation and must be dropped, not persisted. */
+export function onIndexWriteConflict(handler: () => void): void {
+  indexConflictHandler = handler
+}
+
+function isIndexPath(path: string): boolean {
+  const segs = segments(path)
+  return segs.length === 2 && segs[0] === '.git' && segs[1] === 'index'
+}
+
 /** Drop cached directory handles. Must be called after directories are moved
  *  or deleted OUTSIDE gitFs (app-side fs.renameDir/removeDir) — a cached
  *  handle to a removed directory throws on use and corrupts status results. */
@@ -62,6 +90,7 @@ function root(): FileSystemDirectoryHandle {
   if (r !== cachedRoot) {
     cachedRoot = r
     dirCache = new Map()
+    indexDiskState = null // different repo, forget the old index generation
   }
   return r
 }
@@ -111,6 +140,7 @@ async function readFile(
   try {
     const [parent, name] = await getParentAndName(path)
     const file = await (await parent.getFileHandle(name)).getFile()
+    if (isIndexPath(path)) indexDiskState = { size: file.size, mtimeMs: file.lastModified }
     if (encoding === 'utf8') return await file.text()
     return new Uint8Array(await file.arrayBuffer())
   } catch (e) {
@@ -123,6 +153,21 @@ async function writeFile(
   data: Uint8Array | string,
   _options?: unknown,
 ): Promise<void> {
+  if (isIndexPath(path) && indexDiskState) {
+    // Write-back guard: isomorphic-git rewrites the WHOLE index from memory.
+    // If the file moved on disk since we read it (CLI git committed), that
+    // memory copy is a stale generation — persisting it would revert the
+    // external commit's index. Refuse, and have git.ts drop the cached index.
+    const cur = await stat(path).catch(() => null)
+    if (cur && (cur.size !== indexDiskState.size || cur.mtimeMs !== indexDiskState.mtimeMs)) {
+      console.warn(
+        'gitfs: .git/index changed on disk since it was read (external git?) — ' +
+          'skipping the write-back and dropping the in-memory index',
+      )
+      indexConflictHandler?.()
+      return
+    }
+  }
   try {
     const [parent, name] = await getParentAndName(path, true)
     const handle = await parent.getFileHandle(name, { create: true })
@@ -133,12 +178,17 @@ async function writeFile(
   } catch (e) {
     throw mapDomError(e, path)
   }
+  if (isIndexPath(path)) {
+    const now = await stat(path).catch(() => null)
+    indexDiskState = now ? { size: now.size, mtimeMs: now.mtimeMs } : null
+  }
 }
 
 async function unlink(path: string): Promise<void> {
   try {
     const [parent, name] = await getParentAndName(path)
     await parent.removeEntry(name)
+    if (isIndexPath(path)) indexDiskState = null
   } catch (e) {
     throw mapDomError(e, path)
   }

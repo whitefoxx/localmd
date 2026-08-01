@@ -10,7 +10,7 @@
  */
 import { Buffer } from 'buffer'
 import git from 'isomorphic-git'
-import { gitFs } from '@/lib/gitfs'
+import { gitFs, onIndexWriteConflict } from '@/lib/gitfs'
 import * as kb from '@/lib/fs'
 
 // isomorphic-git expects Node's Buffer as a global; Vite doesn't polyfill it.
@@ -26,6 +26,19 @@ let cache: object = {}
 export function resetGitCache(): void {
   cache = {}
 }
+
+/** Drop the parsed .git/index that isomorphic-git keeps inside `cache`
+ *  (keyed by its private IndexCache symbol), so the next index operation
+ *  re-reads the file from disk. Objects/packfiles stay cached. */
+function dropIndexCache(): void {
+  for (const sym of Object.getOwnPropertySymbols(cache)) {
+    if (sym.description === 'IndexCache') delete (cache as Record<symbol, unknown>)[sym]
+  }
+}
+
+// When gitfs refuses a stale index write-back (CLI git moved the file under
+// us), the cached in-memory index is a dead generation — drop it.
+onIndexWriteConflict(dropIndexCache)
 
 const base = () => ({ fs: gitFs, dir, cache })
 
@@ -91,6 +104,12 @@ export type FileChange = {
  *  deleted binaries appear, but content modifications to tracked binaries
  *  can't be detected without hashing and are NOT listed. */
 export async function changedFiles(): Promise<FileChange[]> {
+  // Always status against the on-disk index. The cached parse's staleness
+  // check compares mtime at SECONDS granularity with our faked ino/ctime, so
+  // an external commit can go unnoticed and the scan (the longest-running git
+  // op) would run — and write back — a stale index generation. Re-reading the
+  // index file each refresh costs KBs; reverting a CLI commit costs work.
+  dropIndexCache()
   const matrix = await git.statusMatrix({ ...base(), filter: statusEligible })
   const out: FileChange[] = []
   for (const [path, head, workdir] of matrix) {
