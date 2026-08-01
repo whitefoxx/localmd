@@ -100,13 +100,15 @@ build itself is the marketing, and the first 200 commits produced zero public
 words. Don't repeat that.
 
 The publishing system no longer lives here. Story material, drafts, schedule,
-channel facts and the launch plan all live in `~/code/social-influence`
-(private), driven by the global skills `/harvest`, `/draft`, `/log` — available
-in any project directory.
+channel facts and the launch plan all live in `~/code/trace/influence` — the
+`influence/` wing of the private trace knowledge base — driven by the global
+skills `/story`, `/draft`, `/log`, available in any project directory. (Note
+`/story`, not `/harvest`: in a KB, `harvest` means distilling a conversation
+into wiki notes.)
 
-- **When a task lands something tellable, offer `/harvest` in the same breath
+- **When a task lands something tellable, offer `/story` in the same breath
   as the commit prompt** — "want me to commit and push? this also looks
-  post-worthy, /harvest it?" Draft the hook; the user decides.
+  post-worthy, /story it?" Draft the hook; the user decides.
 - Tellable is any of: a demo-able user-visible feature; a war story (bug,
   constraint, workaround — "git smart-HTTP has no CORS, so sync mirrors
   objects over the REST API"); a real number (tokens saved, ms cut); an
@@ -115,10 +117,10 @@ in any project directory.
   feature merges and session ends. A good commit message often *is* the draft
   (see 917ba00) — harvest it, don't rewrite it.
 - localmd's one-liner, pillars and **anti-claims** live in
-  `~/code/social-influence/products/localmd/README.md`. Read it before writing
+  `~/code/trace/influence/products/localmd/README.md`. Read it before writing
   any public-facing copy about the product; the anti-claims are binding.
 - Methodology (transferable patterns + experiment log) lives in
-  `~/code/social-influence/principles/playbook.md`. When the process teaches
+  `~/code/trace/influence/principles/playbook.md`. When the process teaches
   something, that's where it goes.
 
 ## Token economy
