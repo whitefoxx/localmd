@@ -667,6 +667,9 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
               <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceCovers') }}</p>
               <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceOffline') }}</p>
+              <button class="btn text-xs" @click="ui.pricingOpen = true">
+                {{ $t('pricing.cta') }}
+              </button>
             </div>
           </div>
         </div>

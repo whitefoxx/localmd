@@ -13,6 +13,7 @@ import { useMcpStore } from '@/stores/mcp'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import TtsBar from '@/components/TtsBar.vue'
+import PricingDialog from '@/components/PricingDialog.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
 
 const kb = useKbStore()
@@ -80,6 +81,7 @@ function closeTopLayer(): void {
   const review = useReviewStore()
   const chat = useChatStore()
   if (ui.searchOpen) ui.searchOpen = false
+  else if (ui.pricingOpen) ui.pricingOpen = false
   else if (ui.settingsOpen) ui.settingsOpen = false
   else if (git.panelOpen) git.panelOpen = false
   else if (review.panelOpen) review.panelOpen = false
@@ -114,5 +116,8 @@ onBeforeUnmount(() => {
     <AppLayout v-if="kb.isOpen" />
     <OpenKbScreen v-else />
     <TtsBar />
+    <!-- Mounted at the root, not inside the start screen: the Licence pane
+         opens it too, and by then the start screen is gone. -->
+    <PricingDialog />
   </div>
 </template>

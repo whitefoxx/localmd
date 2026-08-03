@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { t } from '@/i18n'
+import { useUiStore } from '@/stores/ui'
+import { PRICE_USD } from '@/lib/pricing'
 
 defineEmits<{ open: [] }>()
+
+const ui = useUiStore()
 
 const diffs = computed(() => [
   { title: t('about.diff1Title'), body: t('about.diff1Body') },
@@ -94,6 +98,32 @@ const donts = computed(() => [
             <span class="leading-relaxed">{{ f }}</span>
           </li>
         </ul>
+      </section>
+
+      <!-- Pricing. Sits after "what we don't do" and before the closing call to
+           action: someone who has read this far is deciding, and "what will
+           this cost me" is the last question before they do. -->
+      <section>
+        <div class="text-xs uppercase tracking-wide text-fg-3 mb-3">{{ $t('pricing.label') }}</div>
+        <h2 class="text-2xl font-bold text-fg-0 leading-snug mb-5">{{ $t('pricing.title') }}</h2>
+        <p class="text-fg-2 leading-relaxed mb-6">{{ $t('pricing.line') }}</p>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div class="rounded border border-border p-4">
+            <div class="text-fg-0 font-semibold mb-1">{{ $t('pricing.freeTitle') }}</div>
+            <p class="text-sm text-fg-2 leading-relaxed">{{ $t('pricing.freeBody') }}</p>
+          </div>
+          <div class="rounded border border-border p-4">
+            <div class="flex items-baseline gap-2 mb-1">
+              <span class="text-fg-0 font-semibold">{{ $t('pricing.paidTitle') }}</span>
+              <span class="text-sm text-fg-3">{{ $t('pricing.price', { n: PRICE_USD }) }}</span>
+            </div>
+            <p class="text-sm text-fg-2 leading-relaxed">{{ $t('pricing.paidBody') }}</p>
+          </div>
+        </div>
+        <p class="text-sm text-fg-3 leading-relaxed mt-5">{{ $t('pricing.notLive') }}</p>
+        <button class="btn mt-3 px-4 py-1.5 text-sm" @click="ui.pricingOpen = true">
+          {{ $t('pricing.cta') }}
+        </button>
       </section>
 
       <!-- Closing -->
