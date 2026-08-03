@@ -87,10 +87,15 @@ and them. See `keys`.
 **The app is free**, with no limit on how many files, documents or conversations
 you keep. That part does not change.
 
-One part will eventually be paid: connecting outside services — the tools you or
-the assistant build (`tools`) and syncing with GitHub (`git-and-github`). It is
-planned as a one-time purchase, with no account and no subscription, and it will
-not touch anything described above. Nothing is charged today.
+One part will eventually be paid, and the line is this: everything you can do
+with your own folder and your own model stays free — including web search,
+reading documents, skills, and git on your own machine. What will be paid is
+reaching past those: the browser extension, servers and services you connect,
+tools built against them (`tools`), and syncing with GitHub
+(`git-and-github`). It is planned as a one-time purchase, with no account and no
+subscription. Nothing is charged today, and nothing is held back:
+**Settings → Licence** is where such a key will go when there is one, and until
+then everything in the app works without it.
 
 ## Related
 

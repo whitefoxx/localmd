@@ -4,6 +4,8 @@ import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/st
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { useThemeStore } from '@/stores/theme'
+import { useLicenceStore } from '@/stores/licence'
+import { ENFORCE_LICENCE } from '@/lib/licence'
 import ToolsSection from '@/components/settings/ToolsSection.vue'
 import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
 import {
@@ -41,6 +43,37 @@ onUnmounted(() => {
 const store = useSettingsStore()
 const files = useFilesStore()
 const theme = useThemeStore()
+const licence = useLicenceStore()
+
+/** One line saying where the reader stands. Every branch of the verdict gets
+ *  its own sentence — an expired key and an invalid one are not the same news,
+ *  and "we couldn't check" must never read as "yours is fake". */
+const licenceStatus = computed<{ text: string; tone: 'ok' | 'warn' | 'muted' }>(() => {
+  const v = licence.verdict
+  // "Locked" would be a lie while enforcement is off — nothing refuses yet.
+  if (!v) {
+    return {
+      text: t(ENFORCE_LICENCE ? 'settings.licenceNone' : 'settings.licenceNoneYet'),
+      tone: 'muted',
+    }
+  }
+  switch (v.status) {
+    case 'valid': {
+      const days = licence.remainingDays
+      if (days === null) return { text: t('settings.licenceValid'), tone: 'ok' }
+      if (days === 0) return { text: t('settings.licenceLastDay'), tone: 'warn' }
+      return { text: t('settings.licenceValidUntil', { days }), tone: 'ok' }
+    }
+    case 'expired':
+      return { text: t('settings.licenceExpired', { date: v.licence.expires ?? '' }), tone: 'warn' }
+    case 'bad-signature':
+      return { text: t('settings.licenceBad'), tone: 'warn' }
+    case 'malformed':
+      return { text: t('settings.licenceBad'), tone: 'warn' }
+    case 'unverifiable':
+      return { text: t('settings.licenceUnverifiable', { reason: v.reason }), tone: 'warn' }
+  }
+})
 
 /* KB health scope — pick which top-level dirs the health check covers. */
 const kbDirs = computed(() => {
@@ -112,7 +145,7 @@ function onRecordKey(e: KeyboardEvent): void {
 }
 
 /** Left-nav sections (ChatGPT-style). */
-type SectionId = 'general' | 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
+type SectionId = 'general' | 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git' | 'licence'
 const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
   { id: 'general', labelKey: 'settings.nav.general', icon: 'codicon-globe' },
   { id: 'models', labelKey: 'settings.nav.models', icon: 'codicon-sparkle' },
@@ -121,6 +154,7 @@ const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
   { id: 'health', labelKey: 'settings.nav.health', icon: 'codicon-pulse' },
   { id: 'tools', labelKey: 'settings.nav.tools', icon: 'codicon-plug' },
   { id: 'git', labelKey: 'settings.nav.git', icon: 'codicon-github' },
+  { id: 'licence', labelKey: 'settings.nav.licence', icon: 'codicon-key' },
 ]
 const section = ref<SectionId>('models')
 
@@ -604,6 +638,35 @@ function slotBadges(p: LlmProfile): string[] {
                   class="text-accent hover:underline"
                 >{{ $t('settings.githubTokenLink') }}</a>{{ $t('settings.githubHelp') }}
               </p>
+            </div>
+
+            <div v-else-if="section === 'licence'" class="space-y-4 max-w-md">
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.licenceKeyLabel') }}</label>
+                <textarea
+                  v-model="licence.key"
+                  rows="3"
+                  class="input font-mono text-xs leading-relaxed"
+                  :placeholder="$t('settings.licencePlaceholder')"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-xs"
+                  :class="{
+                    'text-green-500': licenceStatus.tone === 'ok',
+                    'text-amber-500': licenceStatus.tone === 'warn',
+                    'text-fg-3': licenceStatus.tone === 'muted',
+                  }"
+                >{{ licenceStatus.text }}</span>
+                <button v-if="licence.key" class="btn text-xs ml-auto" @click="licence.clear()">
+                  {{ $t('settings.licenceRemove') }}
+                </button>
+              </div>
+              <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceCovers') }}</p>
+              <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceOffline') }}</p>
             </div>
           </div>
         </div>

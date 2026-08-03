@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useGitStore } from '@/stores/git'
 import { useFilesStore } from '@/stores/files'
+import { useLicenceStore } from '@/stores/licence'
 import { readHeadText } from '@/lib/git'
 import { GIT_DECOR } from '@/lib/gitStatus'
 import { diffLines, collapseContext, type HunkLine } from '@/lib/diff'
@@ -10,6 +11,11 @@ import { t } from '@/i18n'
 
 const git = useGitStore()
 const files = useFilesStore()
+// Local git — commit, diff, history — is free and stays free. Only the two
+// buttons that reach GitHub are gated, and they stay visible while locked:
+// a control that explains why it is unavailable is honest, where one that
+// vanishes just looks like the feature does not exist.
+const licence = useLicenceStore()
 
 const message = ref('')
 const checked = ref<Set<string>>(new Set())
@@ -94,10 +100,20 @@ function fmtTime(ms: number): string {
           </span>
           <template v-if="git.remote">
             <span class="text-xs text-fg-3 truncate">{{ git.remote.owner }}/{{ git.remote.repo }}</span>
-            <button class="btn text-xs" :disabled="!!git.busy" @click="git.sync('pull')">
+            <button
+              class="btn text-xs"
+              :disabled="!!git.busy || licence.restricted"
+              :title="licence.restricted ? $t('git.needsLicence') : undefined"
+              @click="git.sync('pull')"
+            >
               <span class="codicon codicon-sm codicon-arrow-down mr-1" />{{ $t('git.pull') }}
             </button>
-            <button class="btn text-xs" :disabled="!!git.busy" @click="git.sync('push')">
+            <button
+              class="btn text-xs"
+              :disabled="!!git.busy || licence.restricted"
+              :title="licence.restricted ? $t('git.needsLicence') : undefined"
+              @click="git.sync('push')"
+            >
               <span class="codicon codicon-sm codicon-arrow-up mr-1" />{{ $t('git.push') }}
             </button>
           </template>
