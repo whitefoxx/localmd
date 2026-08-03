@@ -81,6 +81,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       gitName: '',
       gitEmail: '',
       githubToken: '',
+      licenceKey: '',
       writeMode: 'auto',
       agentMultiTab: false,
       agentMaxTabs: 3,

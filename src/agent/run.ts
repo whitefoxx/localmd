@@ -38,6 +38,8 @@ import { toLanguageModel } from './model'
 import { mapLimit, untilAborted } from '@/lib/async'
 import { sdkKindFor } from '@/lib/providers'
 import { withMovingBreakpoint } from '@/lib/promptCache'
+import { needsLicence, lockedToolResult } from '@/lib/licence'
+import { useLicenceStore } from '@/stores/licence'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
 import { generateKbImage } from './imagegen'
 import type { SystemPromptParts } from './prompt'
@@ -47,6 +49,26 @@ import type { AgentEventHandler } from './types'
 const MAX_ITERATIONS = 25
 const MAX_IMAGES_PER_CALL = 5
 const DEFAULT_MAX_TOKENS = 8192
+
+/**
+ * Whether this call must be refused for want of a licence.
+ *
+ * Asked at call time, not at registration time: the tool list is part of the
+ * provider's cache prefix, so a key pasted or expiring mid-session must not
+ * change which tools were serialized. Only the answer changes.
+ *
+ * Tolerates the store being unavailable (tests, and any non-app caller) by
+ * treating that as unlocked — a missing Pinia instance is our problem, and the
+ * failure mode that matters is charging someone twice, not gating too little.
+ */
+function licenceLocked(name: string): boolean {
+  if (!needsLicence(name)) return false
+  try {
+    return useLicenceStore().restricted
+  } catch {
+    return false
+  }
+}
 
 /* Subagent framing rides in the task's user message, NOT the system prompt:
  * a subagent request whose tools + system are byte-identical to the main
@@ -128,6 +150,13 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         let ok = false
         let out = ''
         try {
+          // Refused here rather than by withholding the tool: the registered
+          // list is part of the cache prefix, and the attempt belongs in the
+          // transcript so the user sees what the agent wanted to do.
+          if (licenceLocked(t.name)) {
+            out = lockedToolResult(t.name)
+            return out
+          }
           const signal = abortSignal ?? opts.signal
           const result = await untilAborted(t.run(input, { ...ctx, signal }), signal)
           ok = !(typeof result === 'string' && result.startsWith('Error'))
@@ -184,7 +213,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   // loop's byte for byte.
   tools['run_subagent'] = opts.allowSubagent
     ? buildSubagentTool(opts, nextToolId)
-    : buildSubagentStub()
+    : buildSubagentStub(SUBAGENT_IN_SUBAGENT)
   const staticNames = Object.keys(tools)
 
   // Register EVERY external tool (active + deferred) so a deferred one can be
@@ -461,14 +490,18 @@ const subagentSchema = z.object({
     .describe('1-5 self-contained subtask descriptions; independent tasks run concurrently'),
 })
 
-/** What a subagent gets under the run_subagent name: same wire bytes, no
- *  recursion — depth stays 1 and the refusal costs one cheap step at most. */
-function buildSubagentStub(): ToolSet[string] {
+const SUBAGENT_IN_SUBAGENT =
+  'Error: run_subagent is unavailable — you ARE a subagent. Do the work directly with your other tools.'
+
+/** The name registered with its real description and schema but an execute that
+ *  only explains itself. Two callers want this — a subagent (depth stays 1) and
+ *  an unlicensed browser — and both need the wire bytes to match the working
+ *  tool, so the cache prefix does not move when the reason does. */
+function buildSubagentStub(message: string): ToolSet[string] {
   return tool({
     description: SUBAGENT_DESCRIPTION,
     inputSchema: subagentSchema,
-    execute: async () =>
-      'Error: run_subagent is unavailable — you ARE a subagent. Do the work directly with your other tools.',
+    execute: async () => message,
   })
 }
 

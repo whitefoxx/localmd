@@ -39,6 +39,8 @@ import { parseWebcliFetch } from '@/lib/webcliRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
+import { useLicenceStore } from '@/stores/licence'
+import { isBuiltinToolSource } from '@/lib/licence'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
@@ -77,15 +79,29 @@ export const useToolsStore = defineStore('tools', () => {
   const kbActive = computed(() => (kbTrusted.value ? kbTools.value : []))
 
   const catalogTools = computed(() => toolsForEntries(settings.state.toolEntries))
-
-  /** Everything the agent may call this session. */
-  const specs = computed<HttpToolSpec[]>(() =>
-    dedupeByName([
-      ...(kbTrusted.value ? kbTools.value : []),
-      ...settings.state.httpTools,
-      ...catalogTools.value,
-    ]),
+  /** The built-in pair — web search and page fetch. Free forever, and never
+   *  filtered: a knowledge base that cannot look anything up is not a product. */
+  const builtinTools = computed(() =>
+    toolsForEntries(settings.state.toolEntries.filter(isBuiltinToolSource)),
   )
+
+  /** Everything the agent may call this session.
+   *
+   *  Everything except the built-in pair reaches past the user's own folder and
+   *  model — a service the KB folder named, a tool authored against someone's
+   *  API — so it waits on a licence. Built-ins are appended last so the shadowing
+   *  order among the paid ones is unchanged from when they were the whole list. */
+  const specs = computed<HttpToolSpec[]>(() => {
+    const licence = useLicenceStore()
+    const licensed = licence.restricted
+      ? []
+      : [
+          ...(kbTrusted.value ? kbTools.value : []),
+          ...settings.state.httpTools,
+          ...catalogTools.value,
+        ]
+    return dedupeByName([...licensed, ...builtinTools.value])
+  })
 
   /* ── catalog install / uninstall ───────────────────────────────────────── */
 

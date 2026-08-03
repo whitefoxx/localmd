@@ -5,6 +5,9 @@ import {
   hasExpired,
   daysLeft,
   unlocks,
+  needsLicence,
+  isBuiltinToolSource,
+  lockedToolResult,
   type Licence,
 } from './licence'
 
@@ -154,6 +157,57 @@ describe('expiry arithmetic', () => {
     // 30.04 days here and round to the wrong number.
     const l: Licence = { ...EARLY, expires: '2026-11-30' }
     expect(daysLeft(l, new Date('2026-10-31T12:00:00'))).toBe(30)
+  })
+})
+
+describe('what the licence covers', () => {
+  it('gates the tools that reach a machine that is not yours', () => {
+    for (const name of ['git_push', 'git_pull', 'github_create_repo', 'manage_tools']) {
+      expect(needsLicence(name)).toBe(true)
+    }
+  })
+
+  it('leaves free what only spends the user’s own key in their own folder', () => {
+    // Both were once on the paid side and were moved off it deliberately:
+    // a subagent is a context-management technique, and a skill is a file in
+    // the user's folder. Charging for either would be charging someone to
+    // spend their own money.
+    expect(needsLicence('run_subagent')).toBe(false)
+    expect(needsLicence('use_skill')).toBe(false)
+  })
+
+  it('keeps the built-in search pair free, and nothing else by default', () => {
+    expect(isBuiltinToolSource('jina')).toBe(true)
+    expect(isBuiltinToolSource('parallel')).toBe(true)
+    expect(isBuiltinToolSource('webcli')).toBe(false)
+    expect(isBuiltinToolSource('anything-a-user-adds')).toBe(false)
+  })
+
+  it('leaves local git free — the no-lock-in pillar depends on it', () => {
+    for (const name of [
+      'git_init',
+      'git_commit',
+      'git_diff',
+      'git_log',
+      'git_restore',
+      'git_status',
+      'git_remote_add',
+    ]) {
+      expect(needsLicence(name)).toBe(false)
+    }
+  })
+
+  it('leaves the free core alone', () => {
+    for (const name of ['read_file', 'write_file', 'edit_file', 'search_files', 'index_document']) {
+      expect(needsLicence(name)).toBe(false)
+    }
+  })
+
+  it('tells the model not to retry, so a lock cannot become a loop', () => {
+    const msg = lockedToolResult('git_push')
+    expect(msg.startsWith('Error')).toBe(true)
+    expect(msg).toContain('git_push')
+    expect(msg).toMatch(/do not retry/i)
   })
 })
 

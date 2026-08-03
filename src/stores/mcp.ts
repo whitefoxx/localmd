@@ -49,9 +49,10 @@ import {
   relayExtensionId,
   webcliWire,
 } from '@/lib/webcliRelay'
-import { WEBCLI_FETCH_TOOL } from '@/lib/toolCatalog'
+import { WEBCLI_FETCH_TOOL, CATALOG } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
+import { useLicenceStore } from '@/stores/licence'
 import * as fs from '@/lib/fs'
 
 export interface McpServerState {
@@ -94,6 +95,16 @@ const WEBCLI_TRANSPORT_MISSING =
  *  naming plainly: this is someone else's config asking for your credential. */
 const KB_SECRET_REFUSED =
   'This server came with the knowledge base folder and asks for one of your saved keys. Folder config cannot spend your keys — add the server yourself under Settings → Tools if you trust it.'
+
+/** A row that reaches a service the user connected, without a licence for it. */
+const LICENCE_REQUIRED =
+  'Connecting a server is part of the paid tier — Settings → Licence. Web search stays built in and free.'
+
+/** Matched on URL, not name: a row calling itself "parallel" must not inherit
+ *  the built-in entry's free status. */
+function isBuiltinServer(raw: McpServerConfig): boolean {
+  return CATALOG.some((e) => e.builtin && e.server?.url === raw.url)
+}
 
 /** A row that names a key nobody has entered yet. Naming the ids matters: the
  *  row is the only place that knows WHICH key, and without it the user is left
@@ -445,6 +456,12 @@ export const useMcpStore = defineStore('mcp', () => {
 
   async function connectServer(raw: McpServerConfig, source: 'global' | 'kb' = 'global'): Promise<void> {
     clients.get(raw.id)?.dispose()
+    // Refused before any network call, so a locked row never tells a third
+    // party that this browser exists.
+    if (!isBuiltinServer(raw) && useLicenceStore().restricted) {
+      patch(raw.id, { status: 'error', error: LICENCE_REQUIRED, tools: [] })
+      return
+    }
     // A row that arrived with the folder may NAME a key but never receives one.
     //
     // Keys live in one flat namespace, so a shared knowledge base could ship an

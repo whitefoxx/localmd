@@ -63,6 +63,12 @@ export interface SettingsState {
   /** GitHub PAT for pushing via the REST API (pull of public repos works
    *  without it). Same localStorage trust model as the LLM keys. */
   githubToken: string
+  /** The paid tier's key, verified offline against a public key in the bundle
+   *  (see lib/licence.ts). Kept with the other credentials rather than in its
+   *  own storage slot so it follows the same trust model and the same "settings
+   *  belong to this browser, not to your folder" rule — and so it inherits the
+   *  agent-invisibility that comes from appSettings.ts being an allowlist. */
+  licenceKey: string
   /** auto: agent writes land immediately (reviewable after the fact).
    *  ask: every write/edit pauses until approved in the review panel. */
   writeMode: 'auto' | 'ask'
@@ -133,6 +139,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   gitName: '',
   gitEmail: '',
   githubToken: '',
+  licenceKey: '',
   writeMode: 'auto',
   agentMultiTab: false,
   agentMaxTabs: 3,
@@ -241,6 +248,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     gitName: String(obj.gitName ?? ''),
     gitEmail: String(obj.gitEmail ?? ''),
     githubToken: String(obj.githubToken ?? ''),
+    licenceKey: String(obj.licenceKey ?? ''),
     writeMode: obj.writeMode === 'ask' ? 'ask' : 'auto',
     agentMultiTab: obj.agentMultiTab === true,
     agentMaxTabs: clampMaxTabs(obj.agentMaxTabs),

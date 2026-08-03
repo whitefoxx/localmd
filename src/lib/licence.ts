@@ -205,3 +205,91 @@ export async function verifyLicenceKey(
 export function unlocks(verdict: LicenceVerdict | null): boolean {
   return verdict?.status === 'valid'
 }
+
+/* ── what the licence covers ─────────────────────────────────────────────── */
+
+/**
+ * Whether a licensed feature actually refuses when there is no licence.
+ *
+ * OFF until the paid tier launches, and that is not caution — it is the whole
+ * promise. Everyone using the app today has GitHub sync and subagents working;
+ * switching enforcement on before anyone can buy a key would take a working
+ * feature away from existing users with no way to get it back. That is exactly
+ * the rug-pull the pricing copy exists to rule out, and doing it accidentally
+ * would cost more than the tier could earn.
+ *
+ * Everything else is live meanwhile: a key can be pasted, verified and shown in
+ * Settings, so the machinery is exercised long before it decides anything. Flip
+ * this the day the pricing page can take money.
+ */
+export const ENFORCE_LICENCE = false
+
+/**
+ * The line: free is everything you can do with your own folder and your own
+ * model. Paid is reaching past them — the WebCLI extension, MCP servers, tools
+ * you author against outside services, and syncing with GitHub.
+ *
+ * Two things are pointedly NOT paid, and both for the same reason.
+ *
+ * `run_subagent` is a context-management technique, not a capability: it spends
+ * the user's own key to keep their own context clean. Skills are plain files in
+ * the user's own folder, written with `write_file` like anything else. Charging
+ * for either would be charging someone to spend their own money, which is the
+ * thing "no usage caps" exists to rule out.
+ *
+ * Local git is absent for a third reason: "No lock-in — plain Markdown in a
+ * folder you picked, with built-in git" is a pillar we sell on, and a version
+ * history you cannot make without paying is not that. `git_init`, `git_commit`,
+ * `git_diff`, `git_log`, `git_restore` and `git_remote_add` all stay free. What
+ * is paid is reaching a machine that is not yours.
+ */
+export const LICENSED_TOOLS: readonly string[] = [
+  'git_push',
+  'git_pull',
+  'github_create_repo',
+  // Authoring a tool against an outside service. Reading the installed list is
+  // not gated — the agent has to be able to say what is there.
+  'manage_tools',
+]
+
+export function needsLicence(toolName: string): boolean {
+  return LICENSED_TOOLS.includes(toolName)
+}
+
+/**
+ * Whether an external tool — an MCP tool or an installed HTTP tool — is part of
+ * the paid tier.
+ *
+ * Built-in tools are free forever and are named as such, rather than being
+ * "the entries currently in the catalog". That distinction is the whole point:
+ * a catalog is an editorial list that will be added to and pruned, and pinning
+ * the free tier to it would mean the free tier changed every time someone had
+ * an opinion about a recommendation. Built-in is structural — web search sits
+ * beside read_file, and stays there.
+ */
+export const BUILTIN_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
+
+export function isBuiltinToolSource(id: string): boolean {
+  return BUILTIN_TOOL_SOURCES.includes(id)
+}
+
+/**
+ * What a locked tool hands back to the model.
+ *
+ * A tool result rather than a missing tool, for two reasons. The registered
+ * tool list is part of the provider's cache prefix — dropping a tool when a key
+ * expires would invalidate the whole session's cached prompt — and a model that
+ * can see the tool can explain the situation, where one that cannot just fails
+ * at the task for no reason the user can see.
+ *
+ * It ends by forbidding a retry: without that, a model reads a bare error as
+ * transient and spends a step finding out it is not.
+ */
+export function lockedToolResult(toolName: string): string {
+  return (
+    `Error: ${toolName} is part of the paid tier (outside services and syncing ` +
+    `with GitHub), and this browser has no valid licence. Tell the user plainly, ` +
+    `point them at Settings → Licence, and continue with your other tools. ` +
+    `Do not retry.`
+  )
+}
