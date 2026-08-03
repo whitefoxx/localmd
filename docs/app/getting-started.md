@@ -77,9 +77,20 @@ If you are ever unsure how something works, just ask it. It has this manual.
 
 ## A note on cost
 
-The app is free and has no server. What costs money is the AI model, billed by
-whichever provider's key you enter, at their prices. Nothing is charged by
-localmd, because there is nobody to charge it.
+Two separate things, and only one of them could ever be a bill from us.
+
+**The AI model is the ongoing cost, and that money is not ours.** You enter a
+key from a provider, and they bill you directly at their prices. Nothing is
+added on top, and nothing here caps how much you use it — that is between you
+and them. See `keys`.
+
+**The app is free**, with no limit on how many files, documents or conversations
+you keep. That part does not change.
+
+One part will eventually be paid: connecting outside services — the tools you or
+the assistant build (`tools`) and syncing with GitHub (`git-and-github`). It is
+planned as a one-time purchase, with no account and no subscription, and it will
+not touch anything described above. Nothing is charged today.
 
 ## Related
 
