@@ -5,9 +5,9 @@
  * so the agent's reach is generally something they chose rather than something
  * the app assumed.
  *
- * The exception is the two entries marked `builtin` — Jina and Parallel, the
+ * The exception is the entries marked `bundled` — today Jina and Parallel, the
  * web-search pair. Those are free forever and sit beside read_file rather than
- * being integrations to connect, because a knowledge base that cannot look
+ * being connections to pay for, because a knowledge base that cannot look
  * anything up is not a working product to hand someone. Everything else here
  * reaches past the user's own folder and model, which is what the paid tier
  * covers (see lib/licence.ts).
@@ -49,12 +49,13 @@ export interface CatalogEntry {
   /** Present on a fresh profile unless the user removes it. */
   defaultInstalled?: boolean
   /** Ships with the app and is free forever — web search sits beside read_file
-   *  rather than being an integration the user connects. Deliberately a flag on
-   *  the entry rather than "whatever is in the catalog today": the catalog is an
-   *  editorial list that will change, and the free tier must not change with it.
-   *  See `BUILTIN_TOOL_SOURCES` in lib/licence.ts, which names the same set for
-   *  the gate. */
-  builtin?: boolean
+   *  rather than being a connection the user pays to add. "Bundled", not
+   *  "built-in": that word is reserved for tools native to the agent code.
+   *  Deliberately a flag on the entry rather than "whatever is in the catalog
+   *  today" — the catalog is an editorial list that will change, and the free
+   *  tier must not change with it. See `BUNDLED_TOOL_SOURCES` in lib/licence.ts,
+   *  which names the same set for the gate; a test keeps the two in lockstep. */
+  bundled?: boolean
   /** Where to read about / install it. */
   homepage?: string
   /** Its source / companion repository, when there is one worth reading — the
@@ -411,7 +412,7 @@ export const CATALOG: CatalogEntry[] = [
     id: 'jina',
     kind: 'http',
     defaultInstalled: true,
-    builtin: true,
+    bundled: true,
     homepage: 'https://jina.ai/reader/',
     tools: JINA_TOOLS,
   },
@@ -426,7 +427,7 @@ export const CATALOG: CatalogEntry[] = [
     id: 'parallel',
     kind: 'mcp',
     defaultInstalled: true,
-    builtin: true,
+    bundled: true,
     homepage: 'https://parallel.ai/',
     server: { name: 'parallel', url: 'https://search.parallel.ai/mcp' },
   },

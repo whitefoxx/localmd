@@ -14,6 +14,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import { isE2eMode } from '@/lib/e2e'
 import { useSettingsStore } from '@/stores/settings'
 import {
   verifyLicenceKey,
@@ -38,6 +39,20 @@ export const useLicenceStore = defineStore('licence', () => {
   })
 
   async function check(): Promise<void> {
+    // E2E runs in a mock world with no private key to mint real signatures, so
+    // the crypto path would leave every run unlicensed and re-test the gate in
+    // every flow. Instead the licence is part of the mock, like the LLM: valid
+    // by default so the mechanics stay testable, `e2e-unlicensed` to pin the
+    // locked state when a test is ABOUT the gate.
+    if (isE2eMode()) {
+      verdict.value = new URLSearchParams(location.search).has('e2e-unlicensed')
+        ? null
+        : {
+            status: 'valid',
+            licence: { id: 'e2e', kind: 'pro', issued: '2026-01-01', expires: null },
+          }
+      return
+    }
     const k = settings.state.licenceKey
     if (!k) {
       verdict.value = null

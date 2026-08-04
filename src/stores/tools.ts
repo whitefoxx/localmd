@@ -40,7 +40,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
 import { useLicenceStore } from '@/stores/licence'
-import { isBuiltinToolSource } from '@/lib/licence'
+import { isBundledToolSource, lockedToolResult } from '@/lib/licence'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
@@ -79,18 +79,19 @@ export const useToolsStore = defineStore('tools', () => {
   const kbActive = computed(() => (kbTrusted.value ? kbTools.value : []))
 
   const catalogTools = computed(() => toolsForEntries(settings.state.toolEntries))
-  /** The built-in pair — web search and page fetch. Free forever, and never
+  /** The bundled tools — today the web-search pair. Free forever, and never
    *  filtered: a knowledge base that cannot look anything up is not a product. */
-  const builtinTools = computed(() =>
-    toolsForEntries(settings.state.toolEntries.filter(isBuiltinToolSource)),
+  const bundledTools = computed(() =>
+    toolsForEntries(settings.state.toolEntries.filter(isBundledToolSource)),
   )
 
   /** Everything the agent may call this session.
    *
-   *  Everything except the built-in pair reaches past the user's own folder and
+   *  Everything except the bundled tools reaches past the user's own folder and
    *  model — a service the KB folder named, a tool authored against someone's
-   *  API — so it waits on a licence. Built-ins are appended last so the shadowing
-   *  order among the paid ones is unchanged from when they were the whole list. */
+   *  API — so it waits on a licence. Bundled ones are appended last so the
+   *  shadowing order among the paid ones is unchanged from when they were the
+   *  whole list. */
   const specs = computed<HttpToolSpec[]>(() => {
     const licence = useLicenceStore()
     const licensed = licence.restricted
@@ -100,7 +101,7 @@ export const useToolsStore = defineStore('tools', () => {
           ...settings.state.httpTools,
           ...catalogTools.value,
         ]
-    return dedupeByName([...licensed, ...builtinTools.value])
+    return dedupeByName([...licensed, ...bundledTools.value])
   })
 
   /* ── catalog install / uninstall ───────────────────────────────────────── */
@@ -237,11 +238,22 @@ export const useToolsStore = defineStore('tools', () => {
   }
 
   /** Run one installed tool. Returns the model-facing string (errors included). */
+  /** Exactly the bundled specs, by id — membership, not a name prefix, so a
+   *  hand-written spec calling itself `jina.something` gains nothing. */
+  const bundledToolIds = computed(() => new Set(bundledTools.value.map((s) => s.id)))
+
   async function run(
     spec: HttpToolSpec,
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<string> {
+    // `specs` already withholds licensed tools from the agent, but this is the
+    // execution point and takes an arbitrary spec: the editor's Test button and
+    // the agent's dry run both arrive here with a spec that was never in that
+    // list. Gating the list alone would leave a way to run one anyway.
+    if (!bundledToolIds.value.has(spec.id) && useLicenceStore().restricted) {
+      return lockedToolResult(spec.name)
+    }
     return runHttpTool(spec, args, {
       resolveSecret: (id) => settings.state.toolSecrets[id],
       direct,

@@ -87,15 +87,17 @@ and them. See `keys`.
 **The app is free**, with no limit on how many files, documents or conversations
 you keep. That part does not change.
 
-One part will eventually be paid, and the line is this: everything you can do
-with your own folder and your own model stays free — including web search,
-reading documents, skills, and git on your own machine. What will be paid is
-reaching past those: the browser extension, servers and services you connect,
-tools built against them (`tools`), and syncing with GitHub
-(`git-and-github`). It is planned as a one-time purchase, with no account and no
-subscription. Nothing is charged today, and nothing is held back:
-**Settings → Licence** is where such a key will go when there is one, and until
-then everything in the app works without it.
+One part is paid, and the line is this: everything you can do with your own
+folder and your own model is free — including web search, reading documents,
+skills, and git on your own machine. Paid is what reaches past those: the
+browser extension, servers and services you connect, tools built against them
+(`tools`), and syncing with GitHub (`git-and-github`). It is a one-time
+purchase, yours for good, with no account and no subscription — a key you paste
+into **Settings → Licence**, checked in your browser against nothing and nobody.
+
+It is not on sale yet, so today the way to unlock those parts is a free early
+slot — the start screen has the details. Until you have a key, they stay
+locked; everything else in this manual works without one.
 
 ## Related
 

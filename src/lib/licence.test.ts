@@ -6,10 +6,12 @@ import {
   daysLeft,
   unlocks,
   needsLicence,
-  isBuiltinToolSource,
+  isBundledToolSource,
+  BUNDLED_TOOL_SOURCES,
   lockedToolResult,
   type Licence,
 } from './licence'
+import { CATALOG } from './toolCatalog'
 
 /* A throwaway keypair per run, so these tests never need — and can never be
  * broken by — the real signing key. */
@@ -95,6 +97,24 @@ describe('verifyLicenceKey', () => {
     expect(v.status).toBe('valid')
   })
 
+  it('carries who a key was issued to, and tolerates its absence', async () => {
+    // The `to` field is the sharing deterrent: no revocation and no device
+    // binding means the one honest defence is the buyer's own name riding
+    // inside the signed bytes. Older keys without it must stay valid.
+    const named: Licence = { ...PRO, to: 'ada@example.com' }
+    expect(await verifyLicenceKey(await mint(named), { publicKey })).toEqual({
+      status: 'valid',
+      licence: named,
+    })
+  })
+
+  it('rejects an empty issued-to rather than showing "Licensed to nobody"', async () => {
+    const payload = b64url(new TextEncoder().encode(JSON.stringify({ ...PRO, to: '' })))
+    expect(parseLicenceKey(`LMD1.${payload}.${b64url(new Uint8Array(64))}`)).toEqual({
+      error: 'payload is not a licence',
+    })
+  })
+
   it('says unverifiable — not bad-signature — when the build has no key', async () => {
     const v = await verifyLicenceKey(await mint(PRO), { publicKey: '' })
     expect(v.status).toBe('unverifiable')
@@ -176,11 +196,28 @@ describe('what the licence covers', () => {
     expect(needsLicence('use_skill')).toBe(false)
   })
 
-  it('keeps the built-in search pair free, and nothing else by default', () => {
-    expect(isBuiltinToolSource('jina')).toBe(true)
-    expect(isBuiltinToolSource('parallel')).toBe(true)
-    expect(isBuiltinToolSource('webcli')).toBe(false)
-    expect(isBuiltinToolSource('anything-a-user-adds')).toBe(false)
+  it('keeps the bundled search pair free, and nothing else by default', () => {
+    expect(isBundledToolSource('jina')).toBe(true)
+    expect(isBundledToolSource('parallel')).toBe(true)
+    expect(isBundledToolSource('webcli')).toBe(false)
+    expect(isBundledToolSource('anything-a-user-adds')).toBe(false)
+  })
+
+  it('agrees with the catalog about which entries are bundled', () => {
+    // Two lists name the same set — `BUNDLED_TOOL_SOURCES` for the gate and the
+    // `bundled` flag for the Tools page. Drift between them would mean the free
+    // tier and the free-looking UI disagreed, silently and in either direction.
+    expect(CATALOG.filter((e) => e.bundled).map((e) => e.id).sort()).toEqual(
+      [...BUNDLED_TOOL_SOURCES].sort(),
+    )
+  })
+
+  it('frees exactly one MCP endpoint, matched by URL', () => {
+    // A server row is judged on its url, so this is the whole free-server list.
+    // WebCLI is pointedly not on it — it is the paid tier's anchor.
+    const free = CATALOG.filter((e) => e.bundled && e.server).map((e) => e.server!.url)
+    expect(free).toEqual(['https://search.parallel.ai/mcp'])
+    expect(free).not.toContain(CATALOG.find((e) => e.id === 'webcli')!.server!.url)
   })
 
   it('leaves local git free — the no-lock-in pillar depends on it', () => {

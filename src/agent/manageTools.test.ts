@@ -16,6 +16,14 @@ import { useSetupStore } from '@/stores/setup'
 import { KB_TOOLS_CONFIG_PATH } from '@/lib/httpTools'
 import { TOOLS, type ToolCtx } from './tools'
 
+// manage_tools is a paid tool, and its dry run goes through the licensed path.
+// That is asserted where it belongs (licence.test.ts); here it would only mean
+// every case below returns the same "needs a licence" string and tests nothing.
+vi.mock('@/lib/licence', async (orig) => ({
+  ...(await orig<typeof import('@/lib/licence')>()),
+  ENFORCE_LICENCE: false,
+}))
+
 globalThis.localStorage ??= {
   getItem: () => null,
   setItem: () => {},

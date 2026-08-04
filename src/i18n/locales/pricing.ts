@@ -13,13 +13,13 @@ export default {
     paidBody:
       'What reaches past your folder and your model: the browser extension, MCP servers you connect, tools built against outside services, and syncing with GitHub.',
     price: '${n} once',
-    priceNote: 'Includes a year of updates. No account, no subscription, checked in your browser.',
-    notLive: 'Not live yet — nothing is charged today, and nothing is held back.',
+    priceNote: 'One payment, yours for good — updates included, no renewal. No account, no subscription, checked in your browser.',
+    notLive: 'Not on sale yet. The paid parts are locked in the meantime, and the way in right now is a free early slot.',
     cta: 'How the paid part works',
 
     dialogTitle: 'The paid part',
     dialogNotLive:
-      'It is not on sale yet. Everything described as paid is currently working for everyone, and will keep working until there is a way to buy it.',
+      'It is not on sale yet — there is no way to pay for it today. The paid parts above are locked in the meantime.',
     slotsTitle: 'Early access',
     slotsBody:
       '{left} of {total} slots left. Take one and you get a key for {days} days, in exchange for telling me where it breaks.',
@@ -40,13 +40,13 @@ export default {
     paidBody:
       '伸到你的文件夹和你的模型之外的部分：浏览器扩展、你接进来的 MCP server、针对外部服务造的工具，以及跟 GitHub 同步。',
     price: '一次性 ${n}',
-    priceNote: '含一年更新。不需要账号，不是订阅，在你的浏览器里校验。',
-    notLive: '还没上线 —— 今天不收任何费用，也没有任何东西被锁起来。',
+    priceNote: '一次买断，永久有效 —— 更新都在内，不用续费。不需要账号，不是订阅，在你的浏览器里校验。',
+    notLive: '还没开卖。在那之前收费的部分是锁着的，现在进去的方式是一个免费的早期名额。',
     cta: '收费的部分是怎么回事',
 
     dialogTitle: '收费的部分',
     dialogNotLive:
-      '还没开卖。上面写着收费的那些，目前对所有人都是可用的，并且会一直可用到真的能买为止。',
+      '还没开卖 —— 今天没有付款的途径。在那之前，上面这些收费的部分是锁着的。',
     slotsTitle: '早期名额',
     slotsBody:
       '还剩 {left} / {total} 个名额。领一个，你会拿到一把 {days} 天的 key，条件是回头告诉我哪里不好用。',

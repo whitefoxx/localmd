@@ -45,6 +45,13 @@ export interface Licence {
   /** ISO `YYYY-MM-DD`, valid through the end of that day in the reader's own
    *  timezone, or `null` for a licence that does not expire. */
   expires: string | null
+  /** Who the key was issued to — a name or email the buyer gave.
+   *
+   *  A social deterrent, not an entitlement: with no device binding or
+   *  revocation (deliberate — both need a server), the one honest defence
+   *  against a key being posted publicly is that sharing it means sharing your
+   *  own name inside it. Optional, and older builds simply ignore it. */
+  to?: string
 }
 
 export type LicenceVerdict =
@@ -63,14 +70,17 @@ export type LicenceVerdict =
 const PREFIX = 'LMD1'
 
 /**
- * The signing key's public half, base64url of the raw 32 bytes.
+ * The signing key's public half, base64url of the raw 32 bytes. Public by
+ * definition — the private half lives in ~/.localmd and never leaves it.
  *
- * Empty until `node scripts/sign-key.mjs --init` generates a keypair and prints
- * what to paste here. Empty is a handled state, not a broken one: verification
- * answers `unverifiable`, so a build without a key locks the paid features and
- * says why, rather than unlocking them for everyone.
+ * Re-derive it any time with `npm run sign-key -- --pubkey`; `--init` prints it
+ * once and losing that line should not matter.
+ *
+ * Empty is a handled state rather than a broken one: verification then answers
+ * `unverifiable`, so a build without a key locks the paid features and says why,
+ * instead of either unlocking them for everyone or calling a good key fake.
  */
-const PUBLIC_KEY = ''
+const PUBLIC_KEY = 'Js5J1N9CivdUlC8u2iGY29Viu3y3thVMlvTtkq2qhdE'
 
 /** The `<ArrayBuffer>` parameter is not decoration: WebCrypto's `BufferSource`
  *  excludes SharedArrayBuffer-backed views, and a bare `Uint8Array` is the
@@ -94,12 +104,13 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 function readLicence(json: unknown): Licence | null {
   if (typeof json !== 'object' || json === null) return null
   const o = json as Record<string, unknown>
-  const { id, kind, issued, expires } = o
+  const { id, kind, issued, expires, to } = o
   if (typeof id !== 'string' || !id) return null
   if (kind !== 'pro' && kind !== 'early') return null
   if (typeof issued !== 'string' || !ISO_DATE.test(issued)) return null
   if (expires !== null && (typeof expires !== 'string' || !ISO_DATE.test(expires))) return null
-  return { id, kind, issued, expires }
+  if (to !== undefined && (typeof to !== 'string' || !to)) return null
+  return { id, kind, issued, expires, ...(to !== undefined ? { to } : {}) }
 }
 
 interface ParsedKey {
@@ -211,18 +222,18 @@ export function unlocks(verdict: LicenceVerdict | null): boolean {
 /**
  * Whether a licensed feature actually refuses when there is no licence.
  *
- * OFF until the paid tier launches, and that is not caution — it is the whole
- * promise. Everyone using the app today has GitHub sync and subagents working;
- * switching enforcement on before anyone can buy a key would take a working
- * feature away from existing users with no way to get it back. That is exactly
- * the rug-pull the pricing copy exists to rule out, and doing it accidentally
- * would cost more than the tier could earn.
+ * ON since 2026-08-04. The condition for switching it on was never "payment
+ * works" — it was "nobody loses a feature without a way to get it back", and
+ * that is satisfied by something other than a card reader: the pricing page is
+ * live, it states the price, and it offers 100 free early slots with a contact
+ * that reaches a person. Taking the paid features behind a gate while that
+ * offer is on the page is a different act from taking them away.
  *
- * Everything else is live meanwhile: a key can be pasted, verified and shown in
- * Settings, so the machinery is exercised long before it decides anything. Flip
- * this the day the pricing page can take money.
+ * Enforcement is asked at the point of EXECUTION, never only at setup. A server
+ * that connected while licensed must stop being callable when the licence
+ * lapses, or "gated" would mean "gated until you found a way in once".
  */
-export const ENFORCE_LICENCE = false
+export const ENFORCE_LICENCE = true
 
 /**
  * The line: free is everything you can do with your own folder and your own
@@ -257,20 +268,20 @@ export function needsLicence(toolName: string): boolean {
 }
 
 /**
- * Whether an external tool — an MCP tool or an installed HTTP tool — is part of
- * the paid tier.
+ * Catalog entries whose tools ship with the app, free forever ("bundled" — NOT
+ * "built-in", which CONTEXT.md reserves for tools native to the agent code).
  *
- * Built-in tools are free forever and are named as such, rather than being
- * "the entries currently in the catalog". That distinction is the whole point:
- * a catalog is an editorial list that will be added to and pruned, and pinning
+ * A named set rather than "the entries currently in the catalog", because the
+ * catalog is an editorial list that will be added to and pruned, and pinning
  * the free tier to it would mean the free tier changed every time someone had
- * an opinion about a recommendation. Built-in is structural — web search sits
- * beside read_file, and stays there.
+ * an opinion about a recommendation. Membership here is a decision about what
+ * is free; a test keeps it in lockstep with the catalog's `bundled` flags.
+ * Expected to grow — moving a paid tool here is one entry plus one flag.
  */
-export const BUILTIN_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
+export const BUNDLED_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
 
-export function isBuiltinToolSource(id: string): boolean {
-  return BUILTIN_TOOL_SOURCES.includes(id)
+export function isBundledToolSource(id: string): boolean {
+  return BUNDLED_TOOL_SOURCES.includes(id)
 }
 
 /**

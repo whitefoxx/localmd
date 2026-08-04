@@ -15,7 +15,9 @@
  * (did a slot holder USE a paid feature), and it needs the slots to exist first.
  */
 
-/** One-time, includes a year of updates. */
+/** One time, for good. Not a subscription and not a year of updates — the app
+ *  is a static page a buyer already holds, so metering upgrades would cost more
+ *  to build than it could collect. */
 export const PRICE_USD = 39
 
 /** Early-slot cohort size. Small enough to stay scarce and to sign by hand,
@@ -41,7 +43,7 @@ export const EARLY_SLOT_DAYS = 90
  * rather than rendering a button that goes nowhere. The price and the "not live
  * yet" line still show, so the page is never broken — only smaller.
  */
-export const EARLY_ACCESS_CONTACT = ''
+export const EARLY_ACCESS_CONTACT = 'yunbiaoch@gmail.com'
 
 export function slotsLeft(): number {
   return Math.max(0, EARLY_SLOTS_TOTAL - EARLY_SLOTS_TAKEN)

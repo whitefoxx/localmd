@@ -18,6 +18,29 @@ describe('agent-writable settings', () => {
     expect(leaks.map((f) => f.key)).toEqual([])
   })
 
+  /**
+   * The name regex above is a spelling check; these two are the behaviour. The
+   * shortest path past the paid gate is an agent that can read or write its own
+   * licence, and a field called something innocent would sail through a name
+   * test. So: no field returns the value, and no field can be made to set it.
+   */
+  it('never reveals the licence key, whatever a field is called', () => {
+    const s = fresh()
+    s.licenceKey = 'LMD1.sentinel.value'
+    for (const f of WRITABLE) {
+      expect(String(f.read(s)), `${f.key} leaks the licence`).not.toContain('sentinel')
+    }
+    expect(describeWritable()).not.toContain('sentinel')
+  })
+
+  it('cannot be talked into setting a licence key', () => {
+    for (const f of WRITABLE) {
+      const s = fresh()
+      f.write(s, 'LMD1.forged.key')
+      expect(s.licenceKey, `${f.key} wrote the licence`).toBe('')
+    }
+  })
+
   it('reads a value for every field it advertises', () => {
     const s = fresh()
     for (const f of WRITABLE) {
