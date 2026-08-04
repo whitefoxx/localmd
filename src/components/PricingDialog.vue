@@ -21,9 +21,15 @@ const left = computed(() => slotsLeft())
 
 <template>
   <Teleport to="body">
+    <!-- z-[60], one layer above the settings modal (z-50) on purpose: this
+         dialog is opened FROM the Licence pane, and the two teleports' body
+         order follows MOUNT order — the settings modal mounts with AppLayout
+         when a folder opens, which is after this dialog's boot-time anchor, so
+         at equal z it would paint on top and swallow this dialog whole. The
+         Esc chain in App.vue already closes pricing before settings. -->
     <div
       v-if="ui.pricingOpen"
-      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-6"
+      class="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center px-6"
       @click.self="ui.pricingOpen = false"
     >
       <div class="w-[560px] max-w-full max-h-[86vh] overflow-y-auto rounded-lg border border-border bg-bg-1">
