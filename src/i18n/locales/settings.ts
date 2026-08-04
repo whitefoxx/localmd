@@ -75,13 +75,18 @@ export default {
 
     // External tools — recommended catalog
     recommended: 'Recommended tools',
-    recommendedDesc:
-      'A short list on purpose — these are the ones almost everyone wants, checked to work from a browser. For anything else, tell the assistant what you want to reach and it will set it up with you; there is no list to wait for.',
+    bundledGroup: 'Bundled tools — free',
+    bundledDesc:
+      'These ship with the app and cost nothing, ever. Today that is web search and page reading; the set can grow.',
+    connectionsGroup: 'Connections — paid',
+    connectionsDesc:
+      'Everything that reaches an outside service: the browser extension, MCP servers, and tools built against an API. One licence covers all of it.',
+    connectionsLocked: 'Adding and using connections needs a licence —',
+    rowNeedsLicence: 'Needs a licence',
     connectTitle: 'Connect something',
     connectDesc:
       "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
     connectAction: 'Describe it to the agent',
-    basics: 'The basics',
     installed: 'Installed',
     installedDesc:
       'Everything the agent can reach right now — one row per integration. Open one to see the tools inside it.',
@@ -89,9 +94,8 @@ export default {
     sourceYours: 'Yours',
     sourceKb: 'KB',
     kindExtension: 'Extension',
-    browseAll: 'Browse recommended →',
     backToTools: 'Tools',
-    noneInstalled: 'Nothing installed yet — switch one of the basics on above, or ask the assistant for something else.',
+    noneInstalled: 'Nothing installed yet — switch something on above, or ask the assistant for what you want to reach.',
     noToolsHere: 'No tools reported. If this is an extension or a server, it may not be connected.',
     removeEntry: 'Remove',
     presetLockedHint:
@@ -149,7 +153,7 @@ export default {
     catalog: {
       webcli: {
         title: 'WebCLI browser extension',
-        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly. Official extension, one click from the Chrome Web Store; after installing, add this site under “Web app access” in its popup, because it only answers sites you allow.",
+        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly. The extension itself is free to install from the Chrome Web Store; using it here is part of the paid tier. After installing, add this site under “Web app access” in its popup, because it only answers sites you allow.",
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -247,6 +251,7 @@ export default {
     licenceBad: "This key isn't valid. Check for a truncated paste — a key is one long line.",
     licenceUnverifiable: 'Could not check this key ({reason}). This is our problem, not yours — nothing is wrong with your key.',
     licenceRemove: 'Remove',
+    licenceHolder: 'Licensed to {to} — the name is part of the key itself.',
   },
   zh: {
     nav: {
@@ -322,22 +327,25 @@ export default {
 
     // External tools — recommended catalog
     recommended: '推荐工具',
-    recommendedDesc:
-      '这个列表故意做得很短 —— 只放几乎人人都要、而且实测能从浏览器访问的。别的想接什么，直接告诉助手，它会带着你装好，不用等我们收录。',
+    bundledGroup: '自带工具 —— 免费',
+    bundledDesc: '随应用附带，永远不收费。目前是网页搜索和读网页；这个集合以后会变多。',
+    connectionsGroup: '外部接入 —— 付费',
+    connectionsDesc:
+      '所有伸到外部服务的能力：浏览器扩展、MCP server、针对某个 API 造的工具。一个许可覆盖全部。',
+    connectionsLocked: '添加和使用外部接入需要许可 ——',
+    rowNeedsLicence: '需要许可',
     connectTitle: '接入一个服务',
     connectDesc:
       '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
     connectAction: '描述给 agent',
-    basics: '基础能力',
     installed: '已安装',
     installedDesc: '当前 agent 能用到的全部能力，一行一个集成。点开可以看到里面具体有哪些工具。',
     sourcePreset: '预设',
     sourceYours: '你的',
     sourceKb: 'KB',
     kindExtension: '扩展',
-    browseAll: '浏览推荐 →',
     backToTools: '工具',
-    noneInstalled: '还没装任何工具 —— 去推荐列表里挑几个，agent 才有能力可用。',
+    noneInstalled: '还没装任何工具 —— 把上面的开关打开，或者直接告诉助手你想接什么。',
     noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
     removeEntry: '移除',
     presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
@@ -392,7 +400,7 @@ export default {
     catalog: {
       webcli: {
         title: 'WebCLI 浏览器扩展',
-        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。官方扩展，Chrome 应用商店一键安装；装好后还要在它的弹窗里「Web app access」添加本站，因为它只响应你允许过的站点。',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。官方扩展，Chrome 应用商店一键安装；装好后还要在它的弹窗里「Web app access」添加本站，因为它只响应你允许过的站点。扩展本身从 Chrome 商店免费安装；在这里使用它属于付费部分。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',
@@ -489,5 +497,6 @@ export default {
     licenceBad: '这串 key 无效。先看看是不是粘贴时被截断了 —— 一个 key 是完整的一行。',
     licenceUnverifiable: '没能校验这串 key（{reason}）。这是我们这边的问题，不是你的 key 有问题。',
     licenceRemove: '移除',
+    licenceHolder: '授权给 {to} —— 这个名字是 key 本身的一部分。',
   },
 }

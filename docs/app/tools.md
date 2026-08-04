@@ -13,16 +13,27 @@ This is deliberate: what it can reach is always something you chose.
 
 Everything lives in **Settings → Tools**.
 
-## What comes switched on
+## Two groups, and only one costs anything
 
-Three things, and they are deliberately few:
+The Tools page is split the same way the pricing is, so where a row sits tells
+you what it costs:
 
-- **Web search** — two of them, because they fail differently. One needs no
-  connection and answers quickly; the other finds better material and returns
-  more of it. Between them you rarely have nothing.
-- **WebCLI** — a browser extension, off until you set it up. Worth doing early:
-  it lets the assistant use your own logged-in Chrome, so it reaches pages that
-  need a login, and it makes most *other* tools work that otherwise could not.
+- **Bundled tools — free.** These ship with the app and never cost anything.
+  Today that is web search and page reading — two of them, because they fail
+  differently: one needs no connection and answers quickly; the other finds
+  better material and returns more of it. Between them you rarely have nothing.
+  This set can grow over time.
+- **Connections — paid.** Everything that reaches an outside service: the
+  WebCLI browser extension, MCP servers, and tools built against an API. One
+  licence covers all of it (**Settings → Licence**; the start screen explains
+  the price and the free early slots). Until you have a key, this group is
+  visible but locked.
+
+**WebCLI** deserves a sentence of its own: the extension is free to install
+from the Chrome Web Store — using it *here* is what the licence covers. Worth
+setting up early once you have a key: it lets the assistant use your own
+logged-in Chrome, so it reaches pages that need a login, and it makes most
+*other* connections work that otherwise could not.
 
 There is no long list of recommendations. Keeping one would mean deciding on
 your behalf which services are worth having, and re-checking those decisions
@@ -30,6 +41,8 @@ forever — services change their terms, their limits and their addresses. What
 this app has instead is a way to add anything, in a minute, by asking.
 
 ## Adding anything else: just ask
+
+This — like everything in the Connections group — needs a licence.
 
 Tell the assistant what you want to reach — "search Hacker News", "read my
 Readwise highlights", "look things up in my Notion". It works out how that

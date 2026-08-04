@@ -75,6 +75,14 @@ const licenceStatus = computed<{ text: string; tone: 'ok' | 'warn' | 'muted' }>(
   }
 })
 
+/** The name inside the key. Shown for expired keys too — "licensed to you,
+ *  ran out" is a friendlier fact than either half alone. */
+const licenceHolder = computed<string | null>(() => {
+  const v = licence.verdict
+  if (!v || (v.status !== 'valid' && v.status !== 'expired')) return null
+  return v.licence.to ?? null
+})
+
 /* KB health scope — pick which top-level dirs the health check covers. */
 const kbDirs = computed(() => {
   const set = new Set<string>()
@@ -665,6 +673,9 @@ function slotBadges(p: LlmProfile): string[] {
                   {{ $t('settings.licenceRemove') }}
                 </button>
               </div>
+              <p v-if="licenceHolder" class="text-xs text-fg-3">
+                {{ $t('settings.licenceHolder', { to: licenceHolder }) }}
+              </p>
               <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceCovers') }}</p>
               <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.licenceOffline') }}</p>
               <button class="btn text-xs" @click="ui.pricingOpen = true">

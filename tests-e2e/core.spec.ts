@@ -214,26 +214,49 @@ test('e2e mode never persists to real storage', async ({ page }) => {
   expect(stored).toBeNull()
 })
 
+test('without a licence the Connections group is visible, locked, and says why', async ({ page }) => {
+  // The one flow that runs unlicensed on purpose. Everything else in this file
+  // runs with the e2e default licence, the same way it runs with the mock LLM.
+  await page.goto('/?e2e=1&e2e-unlicensed=1')
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  await page.locator('nav button:has(.codicon-settings-gear)').click()
+  await page.locator('button:has(.codicon-plug)').click()
+
+  // Bundled tools stay free and usable…
+  await expect(page.getByText('Bundled tools — free')).toBeVisible()
+  await expect(
+    page.locator('label', { hasText: 'Jina web tools' }).getByRole('checkbox'),
+  ).toBeEnabled()
+
+  // …the paid group is present — a hidden feature just looks missing — but
+  // locked: the hint says why, and the doors are disabled rather than absent.
+  await expect(page.getByText('Connections — paid')).toBeVisible()
+  await expect(page.getByText(/needs a licence/)).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Describe it to the agent' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Add an MCP server/ })).toBeDisabled()
+})
+
 test('WebCLI is presented as a permission to grant, not an id to copy', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   // The activity bar is icon-only (title, no text), so locate by its icon.
   await page.locator('nav button:has(.codicon-settings-gear)').click()
   await page.locator('button:has(.codicon-plug)').click()
 
-  // Install it the way a user does — from the recommended list. WebCLI leads the
-  // list (it is the one featured entry) and the row's checkbox is icon-only, so
-  // take the first one. The store link is the call to action, not "learn more".
-  await page.getByRole('button', { name: /Browse recommended/ }).click()
+  // Install it the way a user does — its switch on the Tools page, in the
+  // Connections group (e2e runs licensed by default, so the group is open).
   await expect(page.getByText('WebCLI browser extension')).toBeVisible()
-  await expect(
-    page.getByRole('link', { name: /Install from the Chrome Web Store/ }),
-  ).toHaveAttribute('href', /chromewebstore\.google\.com/)
-  await page.getByRole('checkbox').first().click()
+  await page
+    .locator('label', { hasText: 'WebCLI browser extension' })
+    .getByRole('checkbox')
+    .click()
 
   // Checking the box probed it and, finding nothing, brought us straight here —
   // no going back and noticing "Setup needed" on the way. What is wrong is stated
-  // BEFORE the steps that fix it.
+  // BEFORE the steps that fix it — and the store link is on this page too.
   await expect(page.getByText(/cannot see WebCLI on this page/)).toBeVisible()
+  await expect(
+    page.getByRole('link', { name: /Install from the Chrome Web Store/ }),
+  ).toHaveAttribute('href', /chromewebstore\.google\.com/)
   await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
   // The steps name the exact address to add — including the port, which is the
   // usual reason it fails.
@@ -275,8 +298,10 @@ test('a relay on the page is not the same as WebCLI answering', async ({ page })
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   await page.locator('nav button:has(.codicon-settings-gear)').click()
   await page.locator('button:has(.codicon-plug)').click()
-  await page.getByRole('button', { name: /Browse recommended/ }).click()
-  await page.getByRole('checkbox').first().click()
+  await page
+    .locator('label', { hasText: 'WebCLI browser extension' })
+    .getByRole('checkbox')
+    .click()
   await page.locator('button:has(.codicon-arrow-left)').click()
   await page.getByRole('button', { name: /WebCLI browser extension/ }).click()
 

@@ -29,6 +29,7 @@ import { useSettingsStore, newProfileId } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
+import { useLicenceStore } from '@/stores/licence'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import { isWebcliRelayUrl } from '@/lib/webcliRelay'
 import { serverSecretRefs } from '@/lib/mcp'
@@ -47,8 +48,14 @@ const store = useSettingsStore()
 const mcp = useMcpStore()
 const tools = useToolsStore()
 const ui = useUiStore()
+const licence = useLicenceStore()
 
 const catalogEntries = sortedCatalog()
+/* The page's two groups mirror the pricing line, so what a row costs is legible
+ * from where it sits: bundled tools ship free; everything below them reaches an
+ * outside service and belongs to the paid tier. */
+const bundledEntries = catalogEntries.filter((e) => e.bundled)
+const connectionEntries = catalogEntries.filter((e) => !e.bundled)
 const RESERVED = new Set(TOOLS.map((x) => x.name))
 
 /* ── navigation ────────────────────────────────────────────────────────── */
@@ -257,6 +264,14 @@ function isKbTool(spec: HttpToolSpec): boolean {
   return tools.kbActive.some((s) => s.id === spec.id)
 }
 
+/** What a paid row's status reads while there is no licence. Server rows say it
+ *  through their connect error already; this is for the rows with no connection
+ *  to fail — a grey tool count next to a tool that will refuse every call would
+ *  be the list quietly lying. */
+function lockedStatus(): { label: string; labelCls: string; dotCls: null } {
+  return { label: t('settings.rowNeedsLicence'), labelCls: 'text-amber-500', dotCls: null }
+}
+
 const installedRows = computed<InstalledRow[]>(() => {
   const rows: InstalledRow[] = []
 
@@ -266,7 +281,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: t(`settings.catalog.${e.id}.title`),
       source: 'preset',
       kind: e.server ? (e.kind === 'extension' ? 'extension' : 'mcp') : null,
-      ...entryStatus(e),
+      ...(licence.restricted && !e.bundled && !e.server ? lockedStatus() : entryStatus(e)),
       target: { name: 'entry', id: e.id },
     })
   }
@@ -277,7 +292,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: g.bundle ?? g.tools[0].name,
       source: isKbTool(g.tools[0]) ? 'kb' : 'yours',
       kind: null,
-      ...staticCount(g.tools.length),
+      ...(licence.restricted ? lockedStatus() : staticCount(g.tools.length)),
       target: { name: 'group', key: groupKey(g) },
     })
   }
@@ -1297,25 +1312,51 @@ function removeDetail(): void {
 
   <!-- ═══ Main ═══ -->
   <div v-else class="space-y-5">
-    <!-- ▸ The front door. Most people arrive wanting a service, not a tool
-         format, and the agent can research and build one — so ask for the goal
-         instead of making them shop a catalog for a match. -->
-    <div class="rounded-xl border border-accent/40 bg-accent/5 px-3 py-3">
-      <div class="text-sm text-fg-1">{{ $t('settings.connectTitle') }}</div>
-      <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
-      <button class="btn text-xs mt-2" @click="askAgent">{{ $t('settings.connectAction') }}</button>
-    </div>
-
-    <!-- ▸ The basics, as switches rather than a catalogue to shop.
-         There are three of them; a browse-a-list-and-check-boxes page was the
-         right shape for twelve and is ceremony for this. Each one says what it
-         gives you, so the choice can be made here rather than by opening it. -->
+    <!-- ▸ Bundled tools — ship with the app, free forever. Their own group so
+         the pricing line is legible from the page itself: what sits here costs
+         nothing, everything below reaches an outside service and is paid. -->
     <div>
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.basics') }}</span>
-      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.recommendedDesc') }}</p>
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.bundledGroup') }}</span>
+      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.bundledDesc') }}</p>
       <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
         <label
-          v-for="e in catalogEntries"
+          v-for="e in bundledEntries"
+          :key="e.id"
+          class="flex items-start gap-2.5 px-3 py-2.5 hover:bg-bg-2 cursor-pointer transition-colors"
+        >
+          <input
+            type="checkbox"
+            class="mt-0.5 shrink-0"
+            :checked="tools.isInstalled(e.id)"
+            :disabled="checkingEntry === e.id"
+            @change="toggleEntry(e)"
+          />
+          <span class="min-w-0">
+            <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
+            <span class="block mt-0.5 text-xs text-fg-3 leading-relaxed">
+              {{ $t(`settings.catalog.${e.id}.desc`) }}
+            </span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ▸ Connections — everything that reaches an outside service; the paid
+         tier as one visible surface. When locked the group stays fully visible
+         with one hint, because a paid feature that hides just looks missing. -->
+    <div>
+      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectionsGroup') }}</span>
+      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectionsDesc') }}</p>
+      <p v-if="licence.restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
+        {{ $t('settings.connectionsLocked') }}
+        <button class="underline hover:text-fg-0" @click="ui.settingsSection = 'licence'">
+          {{ $t('settings.nav.licence') }}
+        </button>
+      </p>
+
+      <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+        <label
+          v-for="e in connectionEntries"
           :key="e.id"
           class="flex items-start gap-2.5 px-3 py-2.5 hover:bg-bg-2 cursor-pointer transition-colors"
         >
@@ -1339,6 +1380,20 @@ function removeDetail(): void {
             </span>
           </span>
         </label>
+      </div>
+
+      <!-- The front door. Most people arrive wanting a service, not a tool
+           format, and the agent can research and build one — so ask for the
+           goal instead of making them shop a catalog for a match. -->
+      <div class="mt-2 rounded-xl border border-accent/40 bg-accent/5 px-3 py-3">
+        <div class="text-sm text-fg-1">{{ $t('settings.connectTitle') }}</div>
+        <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
+        <button
+          class="btn text-xs mt-2"
+          :disabled="licence.restricted"
+          :title="licence.restricted ? $t('settings.connectionsLocked') : undefined"
+          @click="askAgent"
+        >{{ $t('settings.connectAction') }}</button>
       </div>
     </div>
 
@@ -1407,9 +1462,14 @@ function removeDetail(): void {
     <div>
       <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
       <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.advancedDesc') }}</p>
+      <!-- Locked at the door, not at save: letting someone fill in a whole
+           form before telling them it needs a licence would be worse than
+           either hiding or refusing. -->
       <div class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
         <button
-          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="licence.restricted"
+          :title="licence.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newTool"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addManually') }}</span>
@@ -1417,7 +1477,9 @@ function removeDetail(): void {
           <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0" />
         </button>
         <button
-          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors"
+          class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="licence.restricted"
+          :title="licence.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newServer"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addServer') }}</span>

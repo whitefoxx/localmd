@@ -103,12 +103,35 @@ page, unrelated to any index above.
 
 **Built-in tool**:
 A tool defined natively in the agent code (`ToolSpec`) — read_file, write_file, etc.
-_Avoid_: capability, function, native tool.
+Always free; the word says where the code lives, nothing about pricing.
+_Avoid_: capability, function, native tool. Never use it for catalog entries —
+that is **bundled**.
+
+**Bundled tool**:
+A catalog entry that ships with the app and is free forever (`bundled` flag +
+`BUNDLED_TOOL_SOURCES` — a test keeps the two in lockstep). Today the web-search
+pair (jina, parallel); the set is expected to grow. Bundled is a pricing/shipping
+fact about an *external* tool — it does not make the tool built-in.
+_Avoid_: built-in (reserved for native code), default, preset.
+
+**Connection**:
+The user-facing word for everything that reaches an outside service — the WebCLI
+extension, MCP servers, user- or agent-authored HTTP tools, GitHub sync, sign-ins.
+The paid tier is exactly the connections. WebCLI itself is free to *install*; using
+it from the app is a connection.
+_Avoid_: integration, external services (as a category name), paid tools.
 
 **External tool**:
 A tool provided by an MCP server, namespaced `mcp__<server>__<tool>`. "MCP tool" is an
-acceptable synonym.
+acceptable synonym. Orthogonal to bundled/connection: parallel is external *and*
+bundled.
 _Avoid_: plugin, integration tool.
+
+**Licence**:
+The paid tier's key (`LMD1.…`), verified offline against a public key in the bundle.
+`unlocks`/`active` say whether a valid key is present; **restricted** is the question
+gates ask (`ENFORCE_LICENCE && !active`) — keep the two apart.
+_Avoid_: license (spelling; code and UI use -ce), subscription, account.
 
 **Deferred tool**:
 An external tool from a large server that is registered but withheld from the model
