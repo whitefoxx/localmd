@@ -78,6 +78,40 @@ function isIndexPath(path: string): boolean {
   return segs.length === 2 && segs[0] === '.git' && segs[1] === 'index'
 }
 
+/* ── read-only index policy ──────────────────────────────────────────────── */
+
+/**
+ * While > 0, writes to .git/index are silently dropped.
+ *
+ * The generation guard below refuses ONE stale write-back, but a status
+ * refresh performs several: the refusal drops the parsed-index cache while the
+ * in-flight operation keeps its own reference, an innocent re-read then
+ * refreshes the guard's generation token, and the late stale write passes the
+ * check and lands. Caught live (2026-08-04): the bytes that finally stuck were
+ * identical to a parse taken 73 minutes earlier.
+ *
+ * The class of bug dies only one way: a status is a READ, and reading a
+ * repository must not be able to destroy it. isomorphic-git writes the index
+ * during status only to persist refreshed stat caches — a performance
+ * optimisation. Dropping it costs re-hashing files whose stats drifted on the
+ * next scan; keeping it cost an external commit.
+ *
+ * A counter rather than a boolean so nested read-only scopes compose.
+ */
+let readOnlyIndexDepth = 0
+
+/** Run `fn` with .git/index writes suppressed. For read-only git operations
+ *  (status, listFiles) — anything that mutates on purpose (add, commit,
+ *  checkout) must run outside it. */
+export async function withReadOnlyIndex<T>(fn: () => Promise<T>): Promise<T> {
+  readOnlyIndexDepth++
+  try {
+    return await fn()
+  } finally {
+    readOnlyIndexDepth--
+  }
+}
+
 /** Drop cached directory handles. Must be called after directories are moved
  *  or deleted OUTSIDE gitFs (app-side fs.renameDir/removeDir) — a cached
  *  handle to a removed directory throws on use and corrupts status results. */
@@ -153,6 +187,12 @@ async function writeFile(
   data: Uint8Array | string,
   _options?: unknown,
 ): Promise<void> {
+  if (isIndexPath(path) && readOnlyIndexDepth > 0) {
+    // A read-only operation's stat-cache write-back: dropped whole. Losing it
+    // costs a few re-hashes next scan; letting it through is how a stale parse
+    // reverts an external commit (see the policy comment above).
+    return
+  }
   if (isIndexPath(path) && indexDiskState) {
     // Write-back guard: isomorphic-git rewrites the WHOLE index from memory.
     // If the file moved on disk since we read it (CLI git committed), that

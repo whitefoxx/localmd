@@ -10,7 +10,7 @@
  */
 import { Buffer } from 'buffer'
 import git from 'isomorphic-git'
-import { gitFs, onIndexWriteConflict } from '@/lib/gitfs'
+import { gitFs, onIndexWriteConflict, withReadOnlyIndex } from '@/lib/gitfs'
 import * as kb from '@/lib/fs'
 
 // isomorphic-git expects Node's Buffer as a global; Vite doesn't polyfill it.
@@ -104,11 +104,21 @@ export type FileChange = {
  *  deleted binaries appear, but content modifications to tracked binaries
  *  can't be detected without hashing and are NOT listed. */
 export async function changedFiles(): Promise<FileChange[]> {
+  return withReadOnlyIndex(changedFilesInner)
+}
+
+/** Body of changedFiles. Runs under withReadOnlyIndex because a status is a
+ *  READ: every .git/index write it would make is a stat-cache optimisation,
+ *  and one of those write-backs is how a stale in-memory parse reverted a CLI
+ *  commit in the wild TWICE (d5f27e1, and again 2026-08-04 past its guard —
+ *  the guard's generation token gets refreshed by any innocent re-read, so a
+ *  refused stale writer can pass on its next attempt). Suppressing the writes
+ *  entirely is the only shape of fix that removes the class. */
+async function changedFilesInner(): Promise<FileChange[]> {
   // Always status against the on-disk index. The cached parse's staleness
   // check compares mtime at SECONDS granularity with our faked ino/ctime, so
   // an external commit can go unnoticed and the scan (the longest-running git
-  // op) would run — and write back — a stale index generation. Re-reading the
-  // index file each refresh costs KBs; reverting a CLI commit costs work.
+  // op) would run against a stale index generation.
   dropIndexCache()
   const matrix = await git.statusMatrix({ ...base(), filter: statusEligible })
   const out: FileChange[] = []

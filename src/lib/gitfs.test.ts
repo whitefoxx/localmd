@@ -12,7 +12,7 @@ import git from 'isomorphic-git'
 const state = vi.hoisted(() => ({ root: null as unknown }))
 vi.mock('@/lib/fs', () => ({ getRoot: () => state.root }))
 
-import { gitFs, onIndexWriteConflict } from './gitfs'
+import { gitFs, onIndexWriteConflict, withReadOnlyIndex } from './gitfs'
 
 /* ── minimal in-memory File System Access mock ───────────────────────────── */
 
@@ -190,6 +190,51 @@ describe('.git/index write-back guard', () => {
 
     expect(conflicts).not.toHaveBeenCalled()
     expect(rawFile(root, '.git/index').data).toEqual(fresh)
+  })
+
+  it('a read-only status NEVER writes the index, even with drifted stats', async () => {
+    // The d5f27e1 guard refuses ONE stale write-back, but a refresh performs
+    // several: the refusal drops the cache map while the in-flight operation
+    // keeps its parsed-index object, an innocent re-read then updates the
+    // guard's generation token, and the late stale write sails through — caught
+    // live against the trace KB (2026-08-04: the landed bytes were identical to
+    // a parse from 73 minutes earlier). The class dies only one way: a status
+    // is a READ, and a read must not write.
+    const cache = {}
+    await git.init({ fs: gitFs, dir, defaultBranch: 'main' })
+    await commitFile(cache, 'a.txt', 'original\n', 'commit A')
+    await git.statusMatrix({ fs: gitFs, dir, cache })
+
+    // Drift a.txt's stats without changing content — exactly what makes
+    // isomorphic-git mark the index dirty and schedule a write-back.
+    const a = rawFile(root, 'a.txt')
+    a.lastModified = tick()
+
+    const before = rawFile(root, '.git/index').data.slice()
+    await withReadOnlyIndex(() => git.statusMatrix({ fs: gitFs, dir, cache: {} }))
+    expect(rawFile(root, '.git/index').data).toEqual(before) // byte-identical
+  })
+
+  it('an external commit survives a status refresh that raced it', async () => {
+    // The full crime scene: stale long-lived parse + external commit + refresh.
+    const cache = {}
+    await git.init({ fs: gitFs, dir, defaultBranch: 'main' })
+    await commitFile(cache, 'a.txt', 'original\n', 'commit A')
+    await git.statusMatrix({ fs: gitFs, dir, cache }) // long-lived parse born
+
+    // CLI git commits b.txt (side cache = another process's memory).
+    const side = {}
+    await gitFs.promises.writeFile('/b.txt', 'added by CLI\n')
+    await git.add({ fs: gitFs, dir, cache: side, filepath: 'b.txt' })
+    await git.commit({ fs: gitFs, dir, cache: side, message: 'commit B', author })
+    const genM = rawFile(root, '.git/index').data.slice()
+
+    // Focus refresh with the STALE cache, statuses under the read-only policy.
+    await withReadOnlyIndex(() => git.statusMatrix({ fs: gitFs, dir, cache }))
+
+    expect(rawFile(root, '.git/index').data).toEqual(genM) // b.txt still staged
+    const files = await git.listFiles({ fs: gitFs, dir, cache: {} })
+    expect(files).toEqual(['a.txt', 'b.txt'])
   })
 
   it('statusMatrix after an external index rewrite re-reads instead of reverting', async () => {
