@@ -60,11 +60,19 @@ if (has('init')) {
   process.exit(0)
 }
 
-/* ── verifying ───────────────────────────────────────────────────────────── */
+/* ── reading the key back ────────────────────────────────────────────────── */
 
 function readPrivate() {
   if (!existsSync(KEY_PATH)) die(`no signing key at ${KEY_PATH} — run with --init first`)
   return createPrivateKey(readFileSync(KEY_PATH))
+}
+
+/** The public half, re-derived. `--init` prints it once and then it is gone from
+ *  the scrollback; the value itself is public, so there is no reason to make
+ *  losing that one line mean anything. */
+if (has('pubkey')) {
+  console.log(createPublicKey(readPrivate()).export({ format: 'jwk' }).x)
+  process.exit(0)
 }
 
 if (has('verify')) {
@@ -104,13 +112,22 @@ const expires =
 // support thread, and it carries no information about the buyer.
 const id = flag('id') || `${issued.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 8)}`
 
-const payload = b64url(Buffer.from(JSON.stringify({ id, kind, issued, expires })))
+// Baked into the signed payload, so "Licensed to …" shows in the app and a key
+// posted publicly carries its owner's name. Defaults to the email; `--to` for a
+// buyer who would rather show a name.
+const to = flag('to') || email
+
+const payload = b64url(Buffer.from(JSON.stringify({ id, kind, issued, expires, to })))
 const signature = b64url(sign(null, Buffer.from(`${PREFIX}.${payload}`), readPrivate()))
 const licenceKey = `${PREFIX}.${payload}.${signature}`
 
 // The key travels in the URL fragment, which browsers never send to a server —
 // so it stays out of access logs, referrers and any CDN in between.
-const claimUrl = `https://localmd.app/claim#${licenceKey}`
+//
+// An explicit .html path rather than a pretty /claim: this is the shape already
+// verified to resolve in production (see public/oauth/callback.html), and a link
+// that 404s is a slot the buyer cannot claim.
+const claimUrl = `https://localmd.app/claim.html#${licenceKey}`
 
 mkdirSync(HOME, { recursive: true, mode: 0o700 })
 if (!existsSync(LEDGER)) appendFileSync(LEDGER, 'id,kind,email,issued,expires,key\n')
