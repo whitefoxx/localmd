@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   contactKind,
   contactHref,
   earlyAccessOpen,
   slotsLeft,
+  liveSlotsTaken,
   EARLY_SLOTS_TOTAL,
   EARLY_SLOTS_TAKEN,
 } from './pricing'
@@ -33,6 +34,36 @@ describe('early-access contact', () => {
 
   it('opens only when a contact exists AND slots remain', () => {
     expect(earlyAccessOpen('hi@localmd.app')).toBe(slotsLeft() > 0)
+  })
+})
+
+describe('liveSlotsTaken', () => {
+  const stub = (impl: () => Promise<unknown>) => {
+    vi.stubGlobal('fetch', vi.fn(impl))
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  const ok = (body: string) =>
+    Promise.resolve({ ok: true, text: () => Promise.resolve(body) })
+
+  it('reads the counter and clamps it into [constant, total]', async () => {
+    stub(() => ok('7'))
+    expect(await liveSlotsTaken()).toBe(Math.max(7, EARLY_SLOTS_TAKEN))
+    // Below the shipped constant can only be a misconfigured counter — the
+    // ledger never shrinks — so the constant wins.
+    stub(() => ok('0'))
+    expect(await liveSlotsTaken()).toBe(EARLY_SLOTS_TAKEN)
+    stub(() => ok('9999'))
+    expect(await liveSlotsTaken()).toBe(EARLY_SLOTS_TOTAL)
+  })
+
+  it('answers null — use the fallback — for garbage, errors and no endpoint', async () => {
+    stub(() => ok('not a number'))
+    expect(await liveSlotsTaken()).toBeNull()
+    stub(() => Promise.resolve({ ok: false, text: () => Promise.resolve('') }))
+    expect(await liveSlotsTaken()).toBeNull()
+    stub(() => Promise.reject(new Error('offline')))
+    expect(await liveSlotsTaken()).toBeNull()
   })
 })
 

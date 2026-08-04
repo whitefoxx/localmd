@@ -30,7 +30,7 @@ export const EARLY_SLOTS_TOTAL = 100
  * this number changes a few times over a few weeks. Being a day stale costs
  * nothing; being a static page is the product.
  */
-export const EARLY_SLOTS_TAKEN = 0
+export const EARLY_SLOTS_TAKEN = 1
 
 /** Days an early slot runs for. */
 export const EARLY_SLOT_DAYS = 90
@@ -45,8 +45,34 @@ export const EARLY_SLOT_DAYS = 90
  */
 export const EARLY_ACCESS_CONTACT = 'yunbiaoch@gmail.com'
 
-export function slotsLeft(): number {
-  return Math.max(0, EARLY_SLOTS_TOTAL - EARLY_SLOTS_TAKEN)
+export function slotsLeft(taken = EARLY_SLOTS_TAKEN): number {
+  return Math.max(0, EARLY_SLOTS_TOTAL - taken)
+}
+
+/**
+ * The live taken-count from `/api/slots` (a same-origin proxy over the gist
+ * the signing script maintains), or null when it cannot be had.
+ *
+ * Null is a first-class answer, not an error: dev servers have no /api, the
+ * sidecar may be down, a visitor may be offline. The compiled constant is the
+ * deliberately-maintained fallback, so a failed fetch shows a slightly stale
+ * number rather than a broken dialog — and the caller treats null exactly as
+ * "use the constant".
+ *
+ * Clamped to [constant, total]: the ledger only ever grows, so a live value
+ * BELOW the shipped constant can only be a misconfigured counter — showing
+ * more slots than the last deploy knew of would oversell scarcity in reverse.
+ */
+export async function liveSlotsTaken(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/slots', { signal: AbortSignal.timeout(1500) })
+    if (!res.ok) return null
+    const n = Number.parseInt((await res.text()).trim(), 10)
+    if (!Number.isInteger(n)) return null
+    return Math.min(EARLY_SLOTS_TOTAL, Math.max(EARLY_SLOTS_TAKEN, n))
+  } catch {
+    return null
+  }
 }
 
 export type ContactKind = 'form' | 'email'

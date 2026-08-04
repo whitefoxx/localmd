@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import {
   PRICE_USD,
   EARLY_SLOTS_TOTAL,
   EARLY_SLOT_DAYS,
   slotsLeft,
+  liveSlotsTaken,
   contactHref,
   earlyAccessOpen,
 } from '@/lib/pricing'
@@ -16,7 +17,19 @@ const ui = useUiStore()
  *  dead button: an offer you cannot accept is worse than no offer. */
 const slotsOpen = computed(() => earlyAccessOpen())
 const href = computed(() => contactHref())
-const left = computed(() => slotsLeft())
+
+/** Live count, fetched when the dialog opens — not at app load, because the
+ *  number is only worth a request while someone is looking at it. Until (or
+ *  unless) it answers, the compiled constant shows; the swap is at most a
+ *  small correction, never a spinner. */
+const liveTaken = ref<number | null>(null)
+watch(
+  () => ui.pricingOpen,
+  (open) => {
+    if (open) void liveSlotsTaken().then((n) => (liveTaken.value = n))
+  },
+)
+const left = computed(() => slotsLeft(liveTaken.value ?? undefined))
 </script>
 
 <template>

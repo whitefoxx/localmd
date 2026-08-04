@@ -18,8 +18,10 @@
  */
 import { generateKeyPairSync, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto'
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { homedir } from 'node:os'
+import { execFileSync } from 'node:child_process'
 
 const HOME = process.env.LOCALMD_LICENCE_DIR || join(homedir(), '.localmd')
 const KEY_PATH = join(HOME, 'signing-key.pem')
@@ -137,3 +139,35 @@ console.log(`\n  ${kind}${expires ? ` · expires ${expires}` : ' · no expiry'} 
 console.log(`  ledger → ${LEDGER}\n`)
 console.log(`  Send this link:\n`)
 console.log(`    ${claimUrl}\n`)
+
+/* ── publish the taken-count ─────────────────────────────────────────────── */
+
+// The ledger is the authority on how many slots are gone; the public counter
+// is a projection of it, pushed here so it can never drift by someone
+// forgetting. Storage is the gist that api/slots.js proxies — its id is read
+// from that file, so there is exactly one place to configure.
+const taken = readFileSync(LEDGER, 'utf8').trim().split('\n').length - 1
+const apiFile = join(dirname(fileURLToPath(import.meta.url)), '..', 'api', 'slots.js')
+const gistId = /gist\.githubusercontent\.com\/[^/']+\/([a-f0-9]+)\/raw/.exec(
+  existsSync(apiFile) ? readFileSync(apiFile, 'utf8') : '',
+)?.[1]
+
+if (!gistId) {
+  console.log(`  Slots taken: ${taken} — no counter gist configured in api/slots.js,`)
+  console.log(`  so the site keeps showing its compiled fallback.\n`)
+} else {
+  try {
+    execFileSync(
+      'gh',
+      ['api', `gists/${gistId}`, '-X', 'PATCH', '-f', `files[slots][content]=${taken}`],
+      { stdio: ['ignore', 'ignore', 'pipe'] },
+    )
+    console.log(`  Public counter updated: ${taken} taken.\n`)
+  } catch (e) {
+    // The key is issued either way — the counter is presentation. Say exactly
+    // what to run by hand, so a gh hiccup costs one paste, not a debugging session.
+    console.log(`  Could not update the counter gist (${e.message?.split('\n')[0]}).`)
+    console.log(`  Run it yourself:`)
+    console.log(`    gh api gists/${gistId} -X PATCH -f 'files[slots][content]=${taken}'\n`)
+  }
+}
