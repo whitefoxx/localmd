@@ -22,6 +22,15 @@ import {
   compactedPrefix,
 } from '@/lib/history'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
+import {
+  branchPath,
+  branchableIds,
+  childrenOf,
+  deepestLeaf,
+  linearize,
+  rebuildWire,
+  versionsOf as versionsOfNode,
+} from '@/lib/branch'
 import { loadSkill } from '@/lib/skills'
 import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib/transcript'
 import { pdfPage } from '@/lib/viewMemory'
@@ -129,6 +138,19 @@ export interface TokenUsage {
 
 export interface UiMessage {
   id: number
+  /** The message this one was said after — null for a conversation's first.
+   *  A session holds every message it ever had, including abandoned branches;
+   *  this is what makes the array a tree (see lib/branch). Absent on sessions
+   *  persisted before branching existed, until they are opened and linked. */
+  parentId?: number | null
+  /** The slice of wire history this message contributed, kept raw so a branch
+   *  can be rebuilt from full fidelity. Undefined means it was never recorded
+   *  (a pre-branching session, or a turn that died before committing anything). */
+  wire?: unknown[]
+  /** `wire` holds the whole history up to here rather than this message's own
+   *  contribution — set when a pre-branching session is linked up. See
+   *  lib/branch. */
+  wireIsCheckpoint?: boolean
   role: 'user' | 'assistant'
   parts: MessagePart[]
   attachments?: Attachment[]
@@ -151,11 +173,21 @@ interface ChatSession {
   profileId: string
   /** 'mock' for the E2E provider, 'sdk' for every real provider. */
   provider: string
+  /** EVERY message the session has held, abandoned branches included — a tree
+   *  linked by `parentId`, not a transcript. The transcript is the path from a
+   *  root down to `leafId`. */
   uiMessages: UiMessage[]
+  /** Where the conversation currently is. Null before the first message, and
+   *  after branching back past it. */
+  leafId?: number | null
   /** Unified AI SDK wire history (all providers share one shape). Opaque to the
    *  store — passed to runTurn/runMockTurn and stored verbatim. Typed loosely so
    *  Vue's reactive unwrap doesn't recurse the deep ModelMessage union (TS2589);
-   *  cast to ModelMessage[] at the boundaries. */
+   *  cast to ModelMessage[] at the boundaries.
+   *
+   *  This is the WORKING copy for the active branch: trimming and compaction
+   *  rewrite it in place, which is why each message also keeps its own raw
+   *  `wire` slice — switching branches rebuilds this from those. */
   history: unknown[]
   createdAt: number
   updatedAt: number
@@ -164,10 +196,14 @@ interface ChatSession {
   favorite: boolean
 }
 
-/** An open chat tab: a session plus its runtime `running` flag. Multiple tabs
- *  run concurrently; `running` is not persisted. */
+/** An open chat tab: a session plus its runtime flags. Multiple tabs run
+ *  concurrently; neither flag is persisted. */
 interface OpenSession extends ChatSession {
   running: boolean
+  /** The user message being re-asked: its text is sitting in the composer, and
+   *  sending will branch from just before it rather than continue the leaf.
+   *  Transient on purpose — an abandoned edit must not survive a reload. */
+  editingFrom?: number
 }
 
 export interface SessionSummary {
@@ -220,8 +256,33 @@ export const useChatStore = defineStore('chat', () => {
   const steerPending = (id: string): boolean => (steerQueue.get(id)?.length ?? 0) > 0
 
   const active = computed(() => tabs.value.find((t) => t.id === activeId.value) ?? null)
-  const messages = computed<UiMessage[]>(() => active.value?.uiMessages ?? [])
+  /** The conversation as it currently reads: the path from a root down to the
+   *  active session's leaf. Everything downstream — rendering, the saved
+   *  transcript, quote provenance, token totals — works off this, never off the
+   *  raw message array, which also holds the branches that were walked away
+   *  from. */
+  const messages = computed<UiMessage[]>(() =>
+    active.value ? branchPath(active.value.uiMessages, active.value.leafId) : [],
+  )
   const running = computed(() => active.value?.running ?? false)
+
+  /** Append a message at the leaf and move the leaf onto it. Every message
+   *  enters the session through here, so the tree can never grow a stray node. */
+  function appendNode(session: OpenSession, node: UiMessage): void {
+    node.parentId = session.leafId ?? null
+    session.uiMessages.push(node)
+    session.leafId = node.id
+  }
+
+  /** Move the conversation to `leafId` and rebuild the model-facing history
+   *  from the messages on that path. Trimming and compaction are deliberately
+   *  NOT re-applied here — the next send re-earns them against the size
+   *  thresholds, exactly as it would for a conversation of that length. */
+  function branchTo(session: OpenSession, leafId: number | null): void {
+    session.leafId = leafId
+    session.history = rebuildWire(branchPath(session.uiMessages, leafId))
+    void persist(session)
+  }
 
   // Sessions are per-KB: on KB switch, reload the list and auto-open the most
   // recent session (if any) so the user resumes where they left off.
@@ -267,6 +328,7 @@ export const useChatStore = defineStore('chat', () => {
       profileId: '',
       provider: '',
       uiMessages: [],
+      leafId: null,
       history: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -364,6 +426,13 @@ export const useChatStore = defineStore('chat', () => {
     // context for that old conversation is lost, and rebuilds on the next send.
     if (!Array.isArray(s.history)) s.history = []
     if (typeof s.favorite !== 'boolean') s.favorite = false // pre-favorite sessions
+    // Sessions persisted before branching are flat lists — link them into a
+    // chain so they read and continue exactly as they did. Their one flat
+    // history becomes a checkpoint on the last message: nothing recorded which
+    // message contributed what, so the messages before it can only be replayed
+    // as a whole and are not offered for re-asking, while everything said from
+    // here on branches like any other conversation.
+    if (s.leafId === undefined) s.leafId = linearize(s.uiMessages, s.history)
     // A session persisted mid-stream (reload during a turn) can carry unsettled
     // parts: stop forever-spinning tool calls, drop never-written artifacts,
     // and settle approval cards nobody can answer any more (the waiting tool
@@ -418,8 +487,12 @@ export const useChatStore = defineStore('chat', () => {
     if (!session.uiMessages.length) return
     session.updatedAt = Date.now()
     // JSON round-trip strips Vue reactivity proxies before structured clone.
-    const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & { running?: boolean }
+    const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & {
+      running?: boolean
+      editingFrom?: number
+    }
     delete snapshot.running
+    delete snapshot.editingFrom
     await idb.saveSession(snapshot)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
@@ -447,8 +520,15 @@ export const useChatStore = defineStore('chat', () => {
     id: string | null = activeId.value,
   ): { name: string; content: string } | null {
     const s = tabs.value.find((t) => t.id === id)
-    if (!s || !s.uiMessages.length) return null
-    return { name: sessionFileName(s.title, s.createdAt), content: renderTranscriptFile(s) }
+    if (!s) return null
+    // What gets saved is what the user is reading — the active branch, not the
+    // ones they walked away from.
+    const uiMessages = branchPath(s.uiMessages, s.leafId)
+    if (!uiMessages.length) return null
+    return {
+      name: sessionFileName(s.title, s.createdAt),
+      content: renderTranscriptFile({ ...s, uiMessages }),
+    }
   }
 
   /** Close off whatever a turn left mid-flight in one message: a tool still
@@ -483,7 +563,7 @@ export const useChatStore = defineStore('chat', () => {
       // turn may take a moment to unwind (a tool that cannot be cancelled runs
       // on in the background), but as far as this conversation is concerned it
       // is over now.
-      const last = t.uiMessages[t.uiMessages.length - 1]
+      const last = t.uiMessages.find((m) => m.id === t.leafId)
       if (last?.role === 'assistant') settleOpenParts(last, true)
     }
     // Writes paused for approval must not dangle after the turn dies — they
@@ -587,7 +667,13 @@ export const useChatStore = defineStore('chat', () => {
     // with where it came from — which file and section, or which of your replies
     // — because "look into this" means different work depending on the answer.
     if (selections.length) {
-      const scope = { sessionId: session.id, messages: session.uiMessages, viewing }
+      // "how far back" is counted along the branch the user is reading, not
+      // across the abandoned ones sitting in the same array.
+      const scope = {
+        sessionId: session.id,
+        messages: branchPath(session.uiMessages, session.leafId),
+        viewing,
+      }
       const blocks = selections.map(
         (s) => `${describeQuote(s, scope)}:\n\`\`\`\n${s.text}\n\`\`\``,
       )
@@ -685,9 +771,11 @@ export const useChatStore = defineStore('chat', () => {
         selections,
         session,
       )
-      session.uiMessages.push(ui)
+      const steerMessage = { role: 'user', content: steerContent } as ModelMessage
+      ui.wire = [steerMessage]
+      appendNode(session, ui)
       const q = steerQueue.get(session.id) ?? []
-      q.push({ role: 'user', content: steerContent } as ModelMessage)
+      q.push(steerMessage)
       steerQueue.set(session.id, q)
       void persist(session)
       return
@@ -695,6 +783,15 @@ export const useChatStore = defineStore('chat', () => {
 
     if (!session.uiMessages.length) {
       session.title = (trimmed || selections[0]?.text || attachments[0]?.path || 'chat').slice(0, 40)
+    }
+
+    // RE-ASK: the user edited an earlier message of theirs. Move back to just
+    // before it — the reply it got, and everything that followed, stays in the
+    // session as a sibling branch the version switcher can walk back to.
+    if (session.editingFrom != null) {
+      const edited = session.uiMessages.find((m) => m.id === session.editingFrom)
+      session.editingFrom = undefined
+      if (edited) branchTo(session, edited.parentId ?? null)
     }
 
     // Switching the primary profile mid-conversation would replay an
@@ -707,14 +804,15 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const { content, ui } = await prepareUserMessage(trimmed, attachments, selections, session)
-    session.uiMessages.push(ui)
+    ui.wire = [{ role: 'user', content } as ModelMessage]
+    appendNode(session, ui)
     // reactive() is load-bearing: onEvent mutates this object from outside the
     // store's proxy — a raw object would render nothing until the turn ends (no
     // streaming). Mutating through the proxy triggers per-delta updates. `let`
     // (not const): each steer segment opens a fresh assistant bubble below the
     // interjection, which onEvent then streams into.
     let assistant: UiMessage = reactive({ id: nextId++, role: 'assistant', parts: [] })
-    session.uiMessages.push(assistant)
+    appendNode(session, assistant)
     void persist(session)
     // Throttle streaming persistence so a reload mid-turn keeps the partial
     // reply (the turn-end persist never runs if the tab is closed first).
@@ -820,13 +918,15 @@ export const useChatStore = defineStore('chat', () => {
           { role: 'user', content: content as string },
         ]
         session.history = hist
-        session.history = await runMockTurn({
+        const result = await runMockTurn({
           system: `${system.stable}\n\n${system.dynamic}`,
           messages: [...hist],
           sessionId: session.id,
           onEvent,
           signal: controller.signal,
         })
+        assistant.wire = (result as ModelMessage[]).slice(hist.length)
+        session.history = result
       } else {
         // History hygiene runs as BATCH events, not per-send sweeps: rewriting
         // old bytes invalidates every provider's prefix cache from the rewrite
@@ -871,6 +971,10 @@ export const useChatStore = defineStore('chat', () => {
         // clean on abort (no dangling tool calls).
         let messages: ModelMessage[] = [...hist]
         for (;;) {
+          // What this segment adds is everything past what it was handed —
+          // runTurn returns its input plus the new messages — and that slice is
+          // what the assistant message keeps so a branch can replay it later.
+          const base = messages.length
           const next = await runTurn({
             profile: primary,
             system,
@@ -888,6 +992,7 @@ export const useChatStore = defineStore('chat', () => {
             steerPending: () => steerPending(session.id),
           })
           session.history = next
+          assistant.wire = (next as ModelMessage[]).slice(base)
           const steers = steerQueue.get(session.id)
           if (!steers?.length) break
           steerQueue.delete(session.id)
@@ -895,7 +1000,7 @@ export const useChatStore = defineStore('chat', () => {
           session.history = messages
           void persist(session)
           assistant = reactive({ id: nextId++, role: 'assistant', parts: [] })
-          session.uiMessages.push(assistant)
+          appendNode(session, assistant)
         }
       }
     } catch (err) {
@@ -937,6 +1042,10 @@ export const useChatStore = defineStore('chat', () => {
       // A still-pending artifact means the turn died before the file was
       // written — drop the loading card so it doesn't spin forever.
       assistant.parts = assistant.parts.filter((p) => !(p.type === 'artifact' && p.pending))
+      // A turn that died before committing anything contributed no wire history
+      // — say so explicitly rather than leaving the message unrecorded, which
+      // would read as "from before branching existed" and block re-asking.
+      assistant.wire ??= []
       void persist(session)
       void autoTitle(session, trimmed, assistant)
     }
@@ -949,7 +1058,9 @@ export const useChatStore = defineStore('chat', () => {
     userText: string,
     assistant: UiMessage,
   ): Promise<void> {
-    if (session.uiMessages.length > 2) return // only the first turn
+    // Only the first turn — counted along the branch being read, so re-asking
+    // the opening question can still retitle the session.
+    if (branchPath(session.uiMessages, session.leafId).length > 2) return
     const settings = useSettingsStore()
     if (!settings.primary) return
     const reply = assistant.parts
@@ -964,7 +1075,72 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** Session-wide token totals (sum of every assistant message's usage). */
+  /* ── branching: re-asking a question without losing the answer ──────────── */
+
+  /** User messages on the active branch that can be re-asked. A message is only
+   *  offered when everything before it can be replayed to the model — see
+   *  lib/branch. */
+  const branchable = computed<Set<number>>(() => branchableIds(messages.value))
+
+  /** Which version of a re-asked message is showing, for the `‹ 2/3 ›` switcher.
+   *  `total` of 1 means it was never re-asked and the switcher stays hidden. */
+  function versionsOf(id: number): { index: number; total: number } {
+    const s = active.value
+    return s ? versionsOfNode(s.uiMessages, id) : { index: 1, total: 1 }
+  }
+
+  /** Show the previous/next version of a re-asked message, landing where that
+   *  branch left off. Nothing is discarded either way. */
+  function switchVersion(id: number, delta: number): void {
+    const s = active.value
+    if (!s || s.running) return
+    const node = s.uiMessages.find((m) => m.id === id)
+    if (!node) return
+    const sibs = childrenOf(s.uiMessages, node.parentId ?? null)
+    const target = sibs[sibs.findIndex((m) => m.id === id) + delta]
+    if (!target) return
+    s.editingFrom = undefined
+    branchTo(s, deepestLeaf(s.uiMessages, target.id))
+  }
+
+  /** Start re-asking a message: returns what the composer should recover — the
+   *  text, and whatever rode along with it — and remembers where to branch from.
+   *  Nothing moves yet: the conversation keeps reading as it did until the
+   *  edited message is actually sent, so backing out costs nothing.
+   *
+   *  Null means the composer must not be touched: either the message cannot be
+   *  re-asked, or it is ALREADY the one being re-asked — clicking the pencil a
+   *  second time must not paste the text again on top of the edit in progress. */
+  function startEdit(id: number): { text: string; attachments: Attachment[] } | null {
+    const s = active.value
+    if (!s || s.running || !branchable.value.has(id)) return null
+    if (s.editingFrom === id) return null
+    const node = s.uiMessages.find((m) => m.id === id)
+    if (!node) return null
+    s.editingFrom = id
+    return {
+      text: node.parts.map((p) => (p.type === 'text' ? p.text : '')).join(''),
+      // Copies: the composer's list is edited freely and must never write back
+      // into the message it came from.
+      attachments: (node.attachments ?? []).map((a) => ({ ...a })),
+    }
+  }
+
+  function cancelEdit(): void {
+    const s = active.value
+    if (s) s.editingFrom = undefined
+  }
+
+  /** The message being re-asked in the active tab, if any. */
+  const editing = computed<UiMessage | null>(() => {
+    const s = active.value
+    if (!s || s.editingFrom == null) return null
+    return s.uiMessages.find((m) => m.id === s.editingFrom) ?? null
+  })
+
+  /** Session-wide token totals — summed over the branch being read, so the
+   *  figure matches the conversation on screen rather than every path ever
+   *  explored. */
   const sessionUsage = computed<TokenUsage>(() => {
     const total = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
     for (const m of messages.value) {
@@ -996,5 +1172,11 @@ export const useChatStore = defineStore('chat', () => {
     activateTab,
     closeTab,
     renderSession,
+    branchable,
+    editing,
+    versionsOf,
+    switchVersion,
+    startEdit,
+    cancelEdit,
   }
 })
