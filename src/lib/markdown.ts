@@ -107,6 +107,11 @@ interface WikilinkToken {
 const INLINE_BLOCK_RULE = /^\$\$([^$]+?)\$\$/
 // Pandoc-style $…$ (see above).
 const INLINE_RULE = /^\$(?!\s)((?:\\.|[^\\\n$])+?)\$(?!\d)/
+
+/** The same delimiters, for the editor's live rendering. Shared rather than
+ *  re-derived: two sets of math rules would disagree about `$5,那件 $10`, and
+ *  the editor and the preview would render the same note differently. */
+export const MATH_RULES = { inlineBlock: INLINE_BLOCK_RULE, inline: INLINE_RULE }
 // A paragraph-level $$ … $$ block, possibly spanning multiple lines.
 const BLOCK_RULE = /^\$\$([\s\S]+?)\$\$\s*(?:\n+|$)/
 

@@ -292,6 +292,88 @@
   outline: none !important;
 }
 
+/* Live markdown rendering (richMarkdown.ts). Sizes are relative so the whole
+   editor still scales with the base font size, and every rule has to survive
+   the cursor landing on the line — which restores the raw syntax underneath,
+   so nothing here may change the *height* of a line by much. */
+.cm-md-h1,
+.cm-md-h2,
+.cm-md-h3,
+.cm-md-h4,
+.cm-md-h5,
+.cm-md-h6 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+/* CodeMirror's default highlight style underlines headings, which reads as a
+   mistake once they also have their own size. Its class names are generated
+   and unstable, so out-specify it rather than targeting them. */
+.cm-editor .cm-line[class*='cm-md-h'] > span {
+  text-decoration: none;
+}
+.cm-editor .cm-line[class*='cm-md-h'] .cm-md-link {
+  text-decoration: underline;
+}
+.cm-md-h1 {
+  font-size: 1.6em;
+}
+.cm-md-h2 {
+  font-size: 1.35em;
+}
+.cm-md-h3 {
+  font-size: 1.18em;
+}
+.cm-md-h4 {
+  font-size: 1.06em;
+}
+.cm-md-h5,
+.cm-md-h6 {
+  font-size: 1em;
+  color: rgb(var(--c-fg-2));
+}
+.cm-md-quote {
+  border-left: 2px solid rgb(var(--c-border));
+  padding-left: 0.75em;
+  color: rgb(var(--c-fg-2));
+}
+.cm-md-bullet {
+  color: rgb(var(--c-accent));
+}
+.cm-md-code {
+  background-color: rgb(var(--c-fg-3) / 0.12);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+}
+.cm-md-link {
+  color: rgb(var(--c-accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.cm-md-task {
+  vertical-align: -0.1em;
+  margin-right: 0.15em;
+  cursor: pointer;
+  accent-color: rgb(var(--c-accent));
+}
+.cm-md-image img {
+  max-width: 100%;
+  max-height: 20rem;
+  border-radius: 4px;
+  vertical-align: top;
+}
+.cm-md-image-missing {
+  color: rgb(var(--c-fg-3));
+  border: 1px dashed rgb(var(--c-border));
+  border-radius: 4px;
+  padding: 0 0.4em;
+  font-style: italic;
+}
+.cm-md-math-display {
+  display: block;
+  text-align: center;
+}
+
 /* pdf.js viewer */
 .pdf-page {
   position: relative;
