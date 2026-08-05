@@ -81,6 +81,7 @@ const MODULES = import.meta.glob('../../docs/app/*.md', {
 const ORDER = [
   'getting-started',
   'knowledge-base',
+  'writing-notes',
   'working-with-the-agent',
   'models',
   'tools',
