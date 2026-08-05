@@ -272,6 +272,12 @@
 .md-preview img {
   @apply max-w-full rounded;
 }
+/* A knowledge-base image whose file could not be read. Without a src an <img>
+   collapses to nothing, so show the alt text in a frame rather than silently
+   dropping the picture from the page. */
+.md-preview img.kb-image-missing {
+  @apply block w-full max-w-sm rounded border border-dashed border-border px-3 py-6 text-center text-xs text-fg-3;
+}
 
 /* CodeMirror */
 .cm-editor {

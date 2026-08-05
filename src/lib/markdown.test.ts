@@ -5,6 +5,33 @@ const resolver = {
   resolve: (t: string) => (t === 'existing' ? 'wiki/existing.md' : null),
 }
 
+describe('renderMarkdown — images', () => {
+  it('defers knowledge-base paths to the viewer', () => {
+    const html = renderMarkdown('![a shot](shot.png)', resolver)
+    expect(html).toContain('data-kb-src="shot.png"')
+    expect(html).toContain('alt="a shot"')
+    expect(html).not.toMatch(/\ssrc=/) // no plain src the browser would try to fetch
+  })
+
+  it('leaves paths the browser can fetch alone', () => {
+    for (const src of ['https://x.dev/a.png', 'data:image/png;base64,AA', '//cdn/x.png']) {
+      expect(renderMarkdown(`![](${src})`, resolver)).toContain(`src="${src}"`)
+    }
+  })
+
+  it('handles relative paths and percent-encoded spaces', () => {
+    expect(renderMarkdown('![](../media/a.png)', resolver)).toContain(
+      'data-kb-src="../media/a.png"',
+    )
+    // How the paste handler writes a name with a space; the store decodes it back.
+    expect(renderMarkdown('![](a%20b.png)', resolver)).toContain('data-kb-src="a%20b.png"')
+  })
+
+  it('escapes a path that would break out of the attribute', () => {
+    expect(renderMarkdown('![](a"b.png)', resolver)).not.toContain('data-kb-src="a"b')
+  })
+})
+
 describe('renderMarkdown', () => {
   it('renders resolved wikilinks as clickable anchors', () => {
     const html = renderMarkdown('See [[existing]].', resolver)

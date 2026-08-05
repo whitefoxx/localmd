@@ -157,6 +157,9 @@ const mathExtensions = [
   },
 ]
 
+/** Image sources the browser can fetch on its own. Everything else is a KB path. */
+const EXTERNAL_SRC = /^(https?:|data:|blob:|\/\/)/i
+
 export interface RenderOptions {
   /** Citation source declarations from surrounding context (e.g. the whole
    *  chat session) for resolving [[N:block]] chips in a partial text. */
@@ -182,6 +185,17 @@ export function renderMarkdown(
     renderer: {
       code(code: string, infostring: string | undefined) {
         return highlightCode(code, infostring?.trim().split(/\s+/)[0]?.toLowerCase())
+      },
+      image(href: string, title: string | null, text: string) {
+        const alt = ` alt="${escapeHtml(text ?? '')}"`
+        const t = title ? ` title="${escapeHtml(title)}"` : ''
+        // A picture stored in the knowledge base cannot be fetched by URL —
+        // the app is not served from the user's folder, so `src="shot.png"`
+        // resolves against the app's origin and shows a broken image. Hand it
+        // to the viewer as data-kb-src instead; resolveKbImages swaps in a
+        // blob URL once the file has been read through the file-system handle.
+        if (EXTERNAL_SRC.test(href)) return `<img src="${escapeHtml(href)}"${alt}${t}>`
+        return `<img data-kb-src="${escapeHtml(href)}"${alt}${t} class="kb-image">`
       },
     },
     extensions: [

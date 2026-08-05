@@ -8,6 +8,7 @@ import { splitFrontmatter } from '@/lib/wiki'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
 import { useTtsHighlight } from '@/composables/useTtsHighlight'
+import { useKbImages } from '@/composables/useKbImages'
 import { t } from '@/i18n'
 
 const files = useFilesStore()
@@ -44,6 +45,15 @@ onBeforeUnmount(saveScroll)
 
 const html = computed(() =>
   renderMarkdown(files.content, { resolve: (t) => files.resolveWikilink(t) }),
+)
+
+// Pictures stored in the KB — the markdown renderer leaves them as
+// data-kb-src because it cannot read files synchronously. Declared after
+// `html` because the watcher reads it immediately.
+useKbImages(
+  root,
+  () => html.value,
+  (href) => files.resolveMarkdownLink(files.currentPath ?? '', href),
 )
 
 async function onClick(e: MouseEvent): Promise<void> {
