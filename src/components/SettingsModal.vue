@@ -205,6 +205,9 @@ const editing = ref<LlmProfile | null>(null)
 const isExistingProfile = computed(
   () => !!editing.value && store.state.profiles.some((p) => p.id === editing.value!.id),
 )
+/** What Save itself requires — one source, so the button's disabled state and
+ *  the back arrow below can never drift apart. */
+const profileValid = computed(() => !!editing.value?.apiKey && !!editing.value.model)
 
 function addProfile(): void {
   editing.value = {
@@ -239,6 +242,15 @@ function saveProfile(): void {
   if (e.reasoning === undefined) delete e.reasoning
   store.upsertProfile({ ...e })
   editing.value = null
+}
+
+/** The header's ← reads as "I'm done here", and on a form this long Save can
+ *  sit below the fold — so back commits the edit instead of dropping it. Cancel
+ *  stays as the one deliberate way to throw an edit away. A profile Save itself
+ *  would refuse (no key, no model) can only be discarded. */
+function closeEditor(): void {
+  if (profileValid.value) saveProfile()
+  else editing.value = null
 }
 
 function slotBadges(p: LlmProfile): string[] {
@@ -301,7 +313,7 @@ function slotBadges(p: LlmProfile): string[] {
               v-if="editing"
               class="codicon codicon-arrow-left text-fg-3 hover:text-fg-0 cursor-pointer mr-2"
               :title="$t('settings.back')"
-              @click="editing = null"
+              @click="closeEditor"
             />
             <h2 class="text-base font-semibold text-fg-0">
               {{ editing ? (isExistingProfile ? $t('settings.editProfile') : $t('settings.addProfile')) : sectionTitle }}
@@ -371,7 +383,7 @@ function slotBadges(p: LlmProfile): string[] {
               </p>
 
               <div class="flex gap-2 pt-1">
-                <button class="btn-primary text-xs" :disabled="!editing.apiKey || !editing.model" @click="saveProfile">
+                <button class="btn-primary text-xs" :disabled="!profileValid" @click="saveProfile">
                   {{ $t('common.save') }}
                 </button>
                 <button class="btn text-xs" @click="editing = null">{{ $t('common.cancel') }}</button>
