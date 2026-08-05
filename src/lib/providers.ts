@@ -129,8 +129,8 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
     label: 'DeepSeek',
     sdk: 'deepseek',
     baseUrl: '',
-    defaultModel: 'deepseek-chat',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
+    defaultModel: 'deepseek-v4-flash',
+    models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
   },
   {
     id: 'google',

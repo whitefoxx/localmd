@@ -38,8 +38,9 @@ Below the list, each role points at one of your models:
 - Using **Claude**? No. It handles images itself.
 - Using a model that already understands images (GPT-4o, qwen-vl, glm-4v)? Point
   the vision role at that same model.
-- Using a text-only model (deepseek-chat, for example)? Point the vision role at
-  a separate model that does images. The assistant will call it when needed.
+- Using a text-only model (deepseek-v4-flash, for example)? Point the vision
+  role at a separate model that does images. The assistant will call it when
+  needed.
 
 Without a vision role on a text-only model, it simply cannot see images — and it
 will say so rather than guess from the filename.
