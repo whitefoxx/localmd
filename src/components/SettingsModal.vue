@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useSettingsStore, newProfileId, autoLabel, type LlmProfile } from '@/stores/settings'
+import {
+  useSettingsStore,
+  newProfileId,
+  autoLabel,
+  REASONING_EFFORTS,
+  type LlmProfile,
+} from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { useThemeStore } from '@/stores/theme'
@@ -208,6 +214,7 @@ function addProfile(): void {
     baseUrl: '',
     apiKey: '',
     model: 'claude-opus-4-8',
+    reasoning: undefined,
   }
 }
 
@@ -229,6 +236,7 @@ function saveProfile(): void {
   if (!e) return
   if (!e.label.trim()) e.label = autoLabel(e)
   if (e.maxTokens !== undefined && !(e.maxTokens > 0)) delete e.maxTokens
+  if (e.reasoning === undefined) delete e.reasoning
   store.upsertProfile({ ...e })
   editing.value = null
 }
@@ -346,6 +354,16 @@ function slotBadges(p: LlmProfile): string[] {
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.maxTokensOptional') }}</label>
                 <input v-model.number="editing.maxTokens" type="number" class="input" :placeholder="$t('settings.defaultPlaceholder')" />
+              </div>
+              <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.reasoningOptional') }}</label>
+                <select v-model="editing.reasoning" class="input">
+                  <option :value="undefined">{{ $t('settings.defaultPlaceholder') }}</option>
+                  <option v-for="r in REASONING_EFFORTS" :key="r" :value="r">
+                    {{ $t(`settings.reasoning.${r}`) }}
+                  </option>
+                </select>
+                <p class="text-xs text-fg-3 leading-relaxed mt-1">{{ $t('settings.reasoningHelp') }}</p>
               </div>
 
               <p class="text-xs text-fg-3 leading-relaxed">

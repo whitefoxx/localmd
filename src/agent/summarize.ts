@@ -18,6 +18,7 @@ export async function summarize(
   const { text } = await generateText({
     model: toLanguageModel(profile),
     maxOutputTokens: 3000, // headroom for reasoning-model thinking
+    reasoning: profile.reasoning,
     messages: [{ role: 'user', content: `${PROMPT}\n\n<conversation-history>\n${transcript}\n</conversation-history>` }],
     abortSignal: signal,
   })
@@ -38,6 +39,7 @@ export async function generateTitle(
     const { text } = await generateText({
       model: toLanguageModel(profile),
       maxOutputTokens: 500, // reasoning models spend tokens thinking before answering
+      reasoning: profile.reasoning,
       messages: [{ role: 'user', content: prompt }],
       abortSignal: AbortSignal.timeout(15_000),
     })

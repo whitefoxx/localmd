@@ -23,6 +23,25 @@ them.
 If a key or model name is wrong, the chat area will tell you when you first send
 a message.
 
+## Thinking effort
+
+Some models pause to reason before they answer. That reasoning is often the
+best part of the result — and often far longer than the question deserved.
+
+Each model has a **Thinking effort** setting, from Off up to Very high, next to
+its API key. Turn it down when replies feel padded with deliberation you did not
+need; turn it up for jobs that take several steps, like reworking a folder or
+building a tool. Left on **Default**, the provider picks for you, which is what
+happens today if you never touch it.
+
+It is one setting, not one per provider: the app translates it into whatever
+each provider calls the same idea. A model with no reasoning to speak of simply
+ignores it, and a few endpoints refuse the request outright — the chat area
+tells you if that happens.
+
+Effort is not free in either direction. More thinking means slower answers and a
+larger bill; none at all can mean a worse one.
+
 ## The three roles
 
 Below the list, each role points at one of your models:

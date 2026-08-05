@@ -106,6 +106,7 @@ export async function visionDescribe(
   const { text } = await generateText({
     model: toLanguageModel(profile),
     maxOutputTokens: 1500,
+    reasoning: profile.reasoning,
     messages: [
       {
         role: 'user',

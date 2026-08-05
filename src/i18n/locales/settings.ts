@@ -27,6 +27,17 @@ export default {
     // Profile editor
     labelOptional: 'Label (optional)',
     maxTokensOptional: 'Max tokens (optional)',
+    reasoningOptional: 'Thinking effort (optional)',
+    reasoning: {
+      none: 'Off',
+      minimal: 'Minimal',
+      low: 'Low',
+      medium: 'Medium',
+      high: 'High',
+      xhigh: 'Very high',
+    },
+    reasoningHelp:
+      'How long the model deliberates before it answers. Lower means shorter thinking, less waiting and a smaller bill; higher is worth it for multi-step work. Left at Default, the provider decides. Models that cannot think ignore it, and a few endpoints reject it outright — the chat area will say so.',
     defaultPlaceholder: 'Default',
     profileHelp:
       'Once you pick a provider you only need the API key and model name — the base URL and API adapter are built into the SDK. The endpoint must allow browser (CORS) access; the chat area will warn you if the connection fails.',
@@ -279,6 +290,17 @@ export default {
     // Profile editor
     labelOptional: 'Label（可选）',
     maxTokensOptional: 'Max tokens（可选）',
+    reasoningOptional: '思考强度（可选）',
+    reasoning: {
+      none: '关闭',
+      minimal: '极低',
+      low: '低',
+      medium: '中',
+      high: '高',
+      xhigh: '很高',
+    },
+    reasoningHelp:
+      '模型回答前思考多久。调低意味着思考更短、等待更少、账单更小；多步骤的活儿才值得调高。留在「默认」就交给 provider 自己决定。不会思考的模型会忽略它，少数端点则直接拒绝——聊天区会提示。',
     defaultPlaceholder: '默认',
     profileHelp:
       '选好 provider 后只需填 API key 和模型名——base URL 与接口适配由 SDK 内置。端点须允许浏览器（CORS）访问；连接失败时聊天区会给出提示。',

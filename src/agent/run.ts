@@ -261,6 +261,10 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     // results present) and the caller can append the steer and run another turn.
     stopWhen: [stepCountIs(MAX_ITERATIONS), () => opts.steerPending?.() ?? false],
     maxOutputTokens: opts.profile.maxTokens ?? DEFAULT_MAX_TOKENS,
+    // One generic knob; each provider package turns it into its own parameter.
+    // Undefined sends nothing at all, so a profile that never set it keeps
+    // exactly the request shape it had before.
+    reasoning: opts.profile.reasoning,
     abortSignal: opts.signal,
     onError: ({ error }) => {
       streamError ??= error

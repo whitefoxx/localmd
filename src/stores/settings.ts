@@ -13,6 +13,7 @@
  */
 import { defineStore } from 'pinia'
 import { reactive, computed, watch } from 'vue'
+import type { CallSettings } from 'ai'
 import {
   presetFor,
   providerIdForBaseUrl,
@@ -38,6 +39,24 @@ export interface McpAuthState {
   clientId?: string
 }
 
+/** How hard the model should think before answering. One generic setting: the
+ *  AI SDK translates it into whatever knob the provider actually exposes —
+ *  DeepSeek's `reasoning_effort`, Anthropic's `thinking` + `effort`, Gemini's
+ *  `thinkingLevel`/`thinkingBudget`, `reasoning_effort` on the OpenAI-shaped
+ *  endpoints — so nothing here is per-provider. Absent on a profile means send
+ *  nothing and let the provider decide; 'none' asks for no thinking at all,
+ *  which not every model can honour. */
+export const REASONING_EFFORTS = [
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+] as const satisfies readonly NonNullable<CallSettings['reasoning']>[]
+
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number]
+
 export interface LlmProfile {
   id: string
   /** User-visible name; autoLabel() default. */
@@ -50,6 +69,8 @@ export interface LlmProfile {
   model: string
   /** Per-request output cap; absent = provider default. */
   maxTokens?: number
+  /** Thinking depth; absent = provider default. */
+  reasoning?: ReasoningEffort
 }
 
 export type Slot = 'primary' | 'vision' | 'image'
@@ -287,6 +308,9 @@ export function normalizeSettings(raw: unknown): SettingsState {
       }
       const maxTokens = Number(pp.maxTokens)
       if (Number.isFinite(maxTokens) && maxTokens > 0) prof.maxTokens = maxTokens
+      if (REASONING_EFFORTS.includes(pp.reasoning as ReasoningEffort)) {
+        prof.reasoning = pp.reasoning as ReasoningEffort
+      }
       prof.label =
         typeof pp.label === 'string' && pp.label.trim() ? pp.label.trim() : autoLabel(prof)
       profiles.push(prof)
