@@ -123,6 +123,14 @@ export const WRITABLE: WritableField[] = [
       s.agentMaxTabs = v
     },
   ),
+  bool(
+    'rich_editor',
+    'live rendering in the markdown editor: syntax hides on lines the cursor is not on, and images, formulas and task boxes draw in place',
+    (s) => s.richEditor,
+    (s, v) => {
+      s.richEditor = v
+    },
+  ),
   choice(
     'theme',
     'colour scheme of the app; system follows the operating system',

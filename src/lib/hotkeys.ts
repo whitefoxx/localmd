@@ -47,9 +47,12 @@ export const HOTKEYS: HotkeyDef[] = [
   },
   {
     id: 'sidebar',
+    // ⌘B is bold inside a text editor — every editor in the world agrees, so
+    // the sidebar yields there and ⌘` covers the case. Same trade as ⌘[ / ⌘]
+    // below.
     label: 'Sidebar',
-    hint: 'Show / hide the file tree',
-    defaultBinding: { mod: true, code: 'KeyB' },
+    hint: 'Show / hide the file tree. ⌘B is bold while editing a file — use ⌘` there.',
+    defaultBinding: { mod: true, code: 'KeyB', notInEditable: true },
     aliases: [{ mod: true, code: 'Backquote' }],
   },
   {

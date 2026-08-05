@@ -414,6 +414,29 @@ function slotBadges(p: LlmProfile): string[] {
                 </select>
                 <p class="text-xs text-fg-3 leading-relaxed mt-2">{{ $t('settings.appearanceDesc') }}</p>
               </div>
+              <div class="rounded-lg border border-border overflow-hidden">
+                <div class="px-3 py-3 flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="text-sm text-fg-1">{{ $t('settings.richEditor') }}</div>
+                    <div class="text-xs text-fg-3 mt-0.5 leading-relaxed">
+                      {{ $t('settings.richEditorDesc') }}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    :aria-checked="store.state.richEditor"
+                    class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+                    :class="store.state.richEditor ? 'bg-accent' : 'bg-bg-3'"
+                    @click="store.state.richEditor = !store.state.richEditor"
+                  >
+                    <span
+                      class="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                      :class="store.state.richEditor ? 'translate-x-4' : 'translate-x-0.5'"
+                    />
+                  </button>
+                </div>
+              </div>
             </div>
 
             <!-- ▸ Models -->

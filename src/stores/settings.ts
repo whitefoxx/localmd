@@ -128,6 +128,10 @@ export interface SettingsState {
   /** Colour scheme; 'system' follows the OS. Lives here rather than in the theme
    *  store so it persists with everything else and the agent can set it. */
   theme: ThemePref
+  /** Live rendering in the markdown editor: hide the syntax on lines the cursor
+   *  is not on, and draw images, formulas and task boxes in place. Off means
+   *  the editor shows the file exactly as it is on disk. */
+  richEditor: boolean
 }
 
 const STORAGE_KEY = 'browser-md:settings'
@@ -175,6 +179,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   ttsVoice: '',
   ttsRate: 1,
   theme: 'system',
+  richEditor: true,
 }
 
 /**
@@ -286,6 +291,7 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     ttsVoice: String(obj.ttsVoice ?? ''),
     ttsRate: clampRate(obj.ttsRate),
     theme: obj.theme === 'light' || obj.theme === 'dark' ? obj.theme : 'system',
+    richEditor: obj.richEditor !== false, // absent (upgrading) means on
   }
 }
 

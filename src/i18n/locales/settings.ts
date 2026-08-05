@@ -23,6 +23,9 @@ export default {
     appearance: 'Appearance',
     appearanceDesc:
       'Colour scheme. “System” follows your operating system. The theme icon at the bottom of the icon bar switches the same setting.',
+    richEditor: 'Live rendering while editing',
+    richEditorDesc:
+      'Show headings at their size, hide the markdown symbols, and draw images, formulas and task boxes in place. The line your cursor is on always shows the plain text, so you edit exactly what is in the file. Turn this off to see the raw markdown everywhere.',
 
     // Profile editor
     labelOptional: 'Label (optional)',
@@ -286,6 +289,9 @@ export default {
       '界面语言。助手用你跟它说话的语言回答——这个设置只是在你的消息无从判断时的兜底。',
     appearance: '外观',
     appearanceDesc: '配色方案。「跟随系统」跟着操作系统走。图标栏底部的主题图标切换的是同一个设置。',
+    richEditor: '编辑时实时渲染',
+    richEditorDesc:
+      '标题按级别显示字号，markdown 符号隐藏起来，图片、公式和任务框就地画出来。光标所在的那一行永远显示纯文本，所以你改的就是文件里的东西。关掉它则处处显示原始 markdown。',
 
     // Profile editor
     labelOptional: 'Label（可选）',

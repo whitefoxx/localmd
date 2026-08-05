@@ -96,6 +96,7 @@ describe('normalizeSettings — multi-profile shape', () => {
       ttsVoice: '',
       ttsRate: 1,
       theme: 'system',
+      richEditor: true,
     }
     expect(normalizeSettings(null)).toEqual(empty)
     expect(normalizeSettings('x')).toEqual(empty)

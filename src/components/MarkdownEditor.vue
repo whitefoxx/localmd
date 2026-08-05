@@ -14,15 +14,50 @@ import {
 import { oneDark } from '@codemirror/theme-one-dark'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
+import { useSettingsStore } from '@/stores/settings'
 import { editorScroll } from '@/lib/viewMemory'
+import { markdownEditing } from '@/lib/editor/keymap'
+import { mediaPaste } from '@/lib/editor/paste'
+import { richMarkdown } from '@/lib/editor/richMarkdown'
+import * as fs from '@/lib/fs'
+import { mimeFor } from '@/lib/filetypes'
 
 const files = useFilesStore()
 const theme = useThemeStore()
+const settings = useSettingsStore()
 
 const host = ref<HTMLElement | null>(null)
 let view: EditorView | null = null
 const themeCompartment = new Compartment()
 const languageCompartment = new Compartment()
+
+/** Object URLs for images drawn inside the editor, revoked when it goes away. */
+const imageUrls = new Map<string, string>()
+
+async function readImage(path: string): Promise<string> {
+  const cached = imageUrls.get(path)
+  if (cached) return cached
+  const buf = await fs.readBinary(path)
+  const url = URL.createObjectURL(new Blob([buf], { type: mimeFor(path) }))
+  imageUrls.set(path, url)
+  return url
+}
+
+function richExt(): Extension {
+  if (!settings.state.richEditor) return []
+  return richMarkdown({
+    resolvePath: (href) => files.resolveMarkdownLink(files.currentPath ?? '', href),
+    readImage,
+    openLink: (href) => {
+      if (/^https?:\/\//i.test(href)) {
+        window.open(href, '_blank', 'noopener')
+        return
+      }
+      const rel = files.resolveMarkdownLink(files.currentPath ?? '', href)
+      if (rel) void files.openFile(rel)
+    },
+  })
+}
 
 function themeExt() {
   return theme.isDark ? oneDark : syntaxHighlighting(defaultHighlightStyle)
@@ -51,7 +86,16 @@ const gutterTheme = EditorView.theme({
  *  highlighter from italicising/underlining JSON, YAML and other text files. */
 async function langExtFor(path: string | null): Promise<Extension> {
   if (!path) return []
-  if (/\.md$/i.test(path)) return markdown({ base: markdownLanguage, codeLanguages: languages })
+  if (/\.md$/i.test(path)) {
+    // The editing keys and media paste ride along with the language, so they
+    // are only live in markdown — `![](shot.png)` in a .json file is nonsense.
+    return [
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      markdownEditing,
+      mediaPaste(() => files.currentPath),
+      richExt(),
+    ]
+  }
   const name = path.slice(path.lastIndexOf('/') + 1)
   const desc = LanguageDescription.matchFilename(languages, name)
   if (!desc) return []
@@ -164,6 +208,8 @@ onBeforeUnmount(() => {
   if (shownPath && view) editorScroll.set(shownPath, view.scrollDOM.scrollTop)
   view?.destroy()
   view = null
+  for (const url of imageUrls.values()) URL.revokeObjectURL(url)
+  imageUrls.clear()
 })
 
 let shownPath: string | null = null
@@ -191,6 +237,13 @@ watch(
 watch(
   () => theme.isDark,
   () => view?.dispatch({ effects: themeCompartment.reconfigure(themeExt()) }),
+)
+
+// Turning live rendering on or off applies to the open file straight away —
+// it lives in the language compartment, so reconfigure that.
+watch(
+  () => settings.state.richEditor,
+  () => void applyLanguage(files.currentPath),
 )
 </script>
 
