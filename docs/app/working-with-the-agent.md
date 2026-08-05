@@ -68,6 +68,29 @@ The conversation closes off immediately. A few things cannot be called back
 once they are under way — a push already sent, a document part-way through
 indexing — and those finish in the background; nothing waits for them.
 
+## Asking something a different way
+
+If a reply went somewhere you did not want, you do not have to start over or
+argue your way out of it. Hover over one of your own messages and click the
+pencil: the text comes back to the composer, you change it, and sending it picks
+the conversation up from there.
+
+The reply you are leaving behind is not thrown away. Your message now has
+versions — a small **1/2** appears beside it, and the arrows move between them.
+Each version keeps whatever followed it, so you can try two approaches and go
+back to either.
+
+Two things worth knowing:
+
+- The assistant answers again from that point, so it costs a reply.
+- **Your files are not rewound.** Anything already written, moved or deleted
+  stays exactly as it is. Going back changes the conversation, not your folder —
+  undo file changes from the diff panel, or with git.
+
+In a conversation that started before this existed, the older messages have no
+pencil — they were never recorded in a way that can be replayed one at a time.
+Everything you say in it from now on can be re-asked normally.
+
 ## Saving a conversation
 
 Two different things, and the difference matters:
