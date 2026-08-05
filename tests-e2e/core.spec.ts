@@ -135,6 +135,40 @@ test('plan tool renders the checklist card', async ({ page }) => {
   await expect(page.getByText('2/3', { exact: true })).toBeVisible()
 })
 
+test('re-asking a message forks the conversation instead of overwriting it', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('echo alpha')
+  await input.press('Enter')
+  await expect(page.getByText('alpha', { exact: true })).toBeVisible({ timeout: 10_000 })
+
+  // Re-ask: the message comes back to the composer and the pending fork is
+  // announced, but nothing has moved yet.
+  await page.getByTitle(/Ask this again/).click()
+  await expect(input).toHaveValue('echo alpha')
+  await expect(page.getByText('Asking again')).toBeVisible()
+  await expect(page.getByText('alpha', { exact: true })).toBeVisible()
+
+  // Clicking the same message again must not paste it a second time on top of
+  // the edit under way.
+  await input.fill('echo alpha, but better')
+  await page.getByTitle(/Ask this again/).click()
+  await expect(input).toHaveValue('echo alpha, but better')
+
+  await input.fill('echo beta')
+  await input.press('Enter')
+  await expect(page.getByText('beta', { exact: true })).toBeVisible({ timeout: 10_000 })
+  // The first answer is off the branch being read — but not deleted.
+  await expect(page.getByText('alpha', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('2/2', { exact: true })).toBeVisible()
+
+  // ‹ walks back to the original, whole.
+  await page.getByTitle('Previous version of this message').click()
+  await expect(page.getByText('alpha', { exact: true })).toBeVisible()
+  await expect(page.getByText('beta', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('1/2', { exact: true })).toBeVisible()
+})
+
 /** The thinking block, whole while it streams, gone once the reply starts. */
 const thinkingBlock = (page: import('@playwright/test').Page) =>
   page.locator('details:has(summary:has-text("Thinking"))').first()

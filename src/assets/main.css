@@ -300,6 +300,30 @@
   border-radius: 2px;
   pointer-events: none;
 }
+/* The message currently being re-asked in the composer (see ChatPanel). It is a
+   PENDING state — sending will fork the conversation there — so the marker
+   breathes rather than sitting still: a static tint reads as "selected", and
+   this needs to read as "something is about to happen here". The ring lives in
+   box-shadow so the bubble's own border and contents are untouched. */
+.reask-target {
+  animation: reask-breathe 1.8s ease-in-out infinite;
+}
+@keyframes reask-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(var(--c-accent) / 0.16);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reask-target {
+    animation: none;
+    box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.3);
+  }
+}
+
 /* Transient highlight of a cited markdown block. */
 .md-preview .cite-target {
   background-color: rgb(var(--c-accent) / 0.16);

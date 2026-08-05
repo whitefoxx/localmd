@@ -18,6 +18,10 @@ export default {
     emptyState:
       'Ask questions about your knowledge base, or let the agent maintain it. It can list, read, search, index and write files in the opened folder — writes appear in the review panel. Paste screenshots or drop files here to add them; type @ to reference a file.',
     agentReply: 'Agent reply',
+    reAsk: 'Ask this again — the reply it got is kept on its own branch',
+    reAsking: 'Asking again',
+    versionPrev: 'Previous version of this message',
+    versionNext: 'Next version of this message',
     thinking: 'Thinking',
     thinkingEllipsis: 'Thinking…',
     allSkills: 'All skills',
@@ -99,6 +103,10 @@ export default {
     emptyState:
       '就你的知识库提问，或让 agent 来维护它。它可以在已打开的文件夹里列出、读取、搜索、索引和写入文件——写入会显示在审阅面板中。粘贴截图或拖入文件即可添加；输入 @ 可引用文件。',
     agentReply: 'Agent 回复',
+    reAsk: '重新问这一句——原来的回复会保留在它自己的分支上',
+    reAsking: '重新提问',
+    versionPrev: '这条消息的上一个版本',
+    versionNext: '这条消息的下一个版本',
     thinking: '思考',
     thinkingEllipsis: '思考中…',
     allSkills: '全部技能',

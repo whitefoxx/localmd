@@ -62,6 +62,18 @@ const setupRequest = computed(() =>
 
 const input = ref('')
 
+/** Put a draft in the composer and leave the caret at the end. Never clobbers
+ *  what the user already typed — an unsent draft is theirs, so anything handed
+ *  over lands on a new line below it. */
+function fillComposer(text: string): void {
+  input.value = input.value ? `${input.value.trimEnd()}\n${text}` : text
+  void nextTick(() => {
+    textarea.value?.focus()
+    const end = input.value.length
+    textarea.value?.setSelectionRange(end, end)
+  })
+}
+
 /** A request handed over from elsewhere (Settings → Tools). It lands in the
  *  composer as an editable draft rather than being sent: the user should see —
  *  and be able to change — what the agent is about to be asked. */
@@ -70,12 +82,7 @@ watch(
   (prompt) => {
     if (!prompt) return
     ui.pendingPrompt = ''
-    input.value = input.value ? `${input.value.trimEnd()}\n${prompt}` : prompt
-    void nextTick(() => {
-      textarea.value?.focus()
-      const end = input.value.length
-      textarea.value?.setSelectionRange(end, end)
-    })
+    fillComposer(prompt)
   },
 )
 
@@ -555,6 +562,62 @@ function userText(m: { parts: MessagePart[] }): string {
   return p?.type === 'text' ? p.text : ''
 }
 
+/* ── re-asking an earlier message ────────────────────────────────────────── */
+
+/** Version counts for the user messages on screen, computed once per render
+ *  rather than per button. */
+const versions = computed(() => {
+  const out = new Map<number, { index: number; total: number }>()
+  for (const m of chat.messages) if (m.role === 'user') out.set(m.id, chat.versionsOf(m.id))
+  return out
+})
+
+function ver(m: UiMessage): { index: number; total: number } {
+  return versions.value.get(m.id) ?? { index: 1, total: 1 }
+}
+
+/** This message has been asked more than one way — which pins its action row
+ *  open, so the fork is visible without hovering for it. */
+function forked(m: UiMessage): boolean {
+  return ver(m).total > 1
+}
+
+/** Re-ask one of your earlier messages: its text and attachments come back to
+ *  the composer, and sending it forks the conversation there. Nothing moves
+ *  until you send — the reply this message already got stays on its own branch
+ *  either way.
+ *
+ *  Clicking the same message again is a no-op on the composer (the store says
+ *  so), so a second click never duplicates the text or overwrites the edit
+ *  under way; pointing at a DIFFERENT message appends it below what is already
+ *  typed, same as anything else handed to the composer. */
+function reAsk(m: UiMessage): void {
+  const recovered = chat.startEdit(m.id)
+  if (recovered) {
+    fillComposer(recovered.text)
+    for (const a of recovered.attachments) {
+      if (!attachments.value.some((x) => x.path === a.path)) attachments.value.push(a)
+    }
+  }
+  void nextTick(() => textarea.value?.focus())
+}
+
+/** Jump the transcript to the message being re-asked — clicking the chip should
+ *  answer "which message was that?" without scrolling around for it. */
+function scrollToEditing(): void {
+  const id = chat.editing?.id
+  if (id == null) return
+  scroller.value
+    ?.querySelector(`[data-msg="${id}"]`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+/** Whether the copy button belongs on a message: it has text to copy, and it
+ *  is not the reply still being streamed. */
+function canCopy(m: UiMessage): boolean {
+  return !!messageText(m) && !(chat.running && m === chat.messages[chat.messages.length - 1])
+}
+
 /** The copyable text of a message: the reply's markdown (or the user's prompt),
  *  joining all text parts and skipping tool/thinking/artifact chrome. */
 function messageText(m: UiMessage): string {
@@ -960,10 +1023,12 @@ watch(
         {{ $t('chat.emptyState') }}
       </div>
 
-      <div v-for="m in chat.messages" :key="m.id" class="group/msg">
+      <!-- data-msg: the anchor the composer's re-ask chip scrolls back to. -->
+      <div v-for="m in chat.messages" :key="m.id" class="group/msg" :data-msg="m.id">
         <div
           v-if="m.role === 'user'"
-          class="rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 selectable text-fg-0"
+          class="rounded-lg bg-accent/10 border px-3 py-2 selectable text-fg-0 transition-colors"
+          :class="chat.editing?.id === m.id ? 'border-accent reask-target' : 'border-accent/20'"
         >
           <!-- Quoted passages the user attached — shown above the message. Each
                chip carries a snippet of the selected text; hovering reveals the
@@ -1173,26 +1238,62 @@ watch(
             {{ $t('chat.thinkingEllipsis') }}
           </div>
         </div>
-        <!-- Per-message copy: reveals on hover/focus, copies the message's text
-             (the reply markdown or the user's prompt), skipping tool/thinking
-             chrome. Hidden while the final reply is still streaming. -->
+        <!-- Per-message actions. Copy and re-ask reveal on hover/focus; the
+             version switcher does not, because it is information rather than an
+             action — a message that has been asked more than one way must look
+             different from one that never was, without hunting for it. -->
         <div
-          v-if="messageText(m) && !(chat.running && m === chat.messages[chat.messages.length - 1])"
-          class="mt-1 flex items-center justify-end gap-1.5 transition-opacity"
-          :class="
-            copiedMsg === m.id
-              ? 'opacity-100'
-              : 'opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100'
-          "
+          v-if="canCopy(m) || ver(m).total > 1 || chat.branchable.has(m.id)"
+          class="mt-1 flex items-center justify-end gap-1.5"
         >
           <span v-if="copiedMsg === m.id" class="text-xs text-added">{{ $t('common.copied') }}</span>
+          <!-- Copies the message's text (reply markdown or the user's prompt),
+               skipping tool/thinking chrome. -->
           <button
-            class="text-fg-3 hover:text-fg-0 [&.code-copied]:text-added"
+            v-if="canCopy(m)"
+            class="text-fg-3 hover:text-fg-0 transition-opacity [&.code-copied]:text-added"
+            :class="
+              copiedMsg === m.id
+                ? 'opacity-100'
+                : 'opacity-0 group-hover/msg:opacity-100 focus:opacity-100'
+            "
             :title="$t('common.copy')"
             @click="copyMessage($event, m)"
           >
             <span class="codicon codicon-sm codicon-copy" />
           </button>
+          <!-- Ask this again: the text returns to the composer and sending it
+               forks here, leaving the reply it already got on its own branch. -->
+          <button
+            v-if="chat.branchable.has(m.id)"
+            class="text-fg-3 hover:text-fg-0 transition-opacity opacity-0 group-hover/msg:opacity-100 focus:opacity-100 disabled:opacity-30"
+            :title="$t('chat.reAsk')"
+            :disabled="chat.running"
+            @click="reAsk(m)"
+          >
+            <span class="codicon codicon-sm codicon-edit" />
+          </button>
+          <!-- Which version of a re-asked message is showing. Both branches are
+               kept — ‹ › walks between them, landing where each left off. -->
+          <div v-if="forked(m)" class="flex items-center gap-0.5 text-[11px] text-fg-3">
+            <button
+              class="p-0.5 rounded hover:bg-bg-2 hover:text-fg-1 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-fg-3"
+              :title="$t('chat.versionPrev')"
+              :disabled="chat.running || ver(m).index <= 1"
+              @click="chat.switchVersion(m.id, -1)"
+            >
+              <span class="codicon codicon-sm codicon-chevron-left" />
+            </button>
+            <span class="tabular-nums select-none">{{ ver(m).index }}/{{ ver(m).total }}</span>
+            <button
+              class="p-0.5 rounded hover:bg-bg-2 hover:text-fg-1 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-fg-3"
+              :title="$t('chat.versionNext')"
+              :disabled="chat.running || ver(m).index >= ver(m).total"
+              @click="chat.switchVersion(m.id, 1)"
+            >
+              <span class="codicon codicon-sm codicon-chevron-right" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1365,6 +1466,36 @@ watch(
         class="rounded-xl border bg-bg-0 focus-within:border-accent transition-colors"
         :class="dragOver ? 'border-accent' : 'border-border'"
       >
+        <!-- A re-ask waiting to be sent. Sending forks the conversation at that
+             message instead of continuing from the end, which is too large a
+             difference to leave implicit — the chip says so and ✕ calls it off. -->
+        <div v-if="chat.editing" class="px-3 pt-2.5">
+          <div
+            class="flex items-center gap-1 text-xs pl-1.5 pr-1 py-1 rounded-md border border-accent/40 bg-accent/5"
+          >
+            <span class="codicon codicon-sm codicon-edit text-accent shrink-0" />
+            <!-- The label is the way back to the message: clicking it scrolls
+                 the transcript to the one being re-asked, which is also the one
+                 outlined up there. Takes the whole width so ✕ sits hard right. -->
+            <button
+              class="flex items-center gap-1 min-w-0 flex-1 text-left"
+              :title="userText(chat.editing)"
+              @click="scrollToEditing()"
+            >
+              <span class="shrink-0 font-medium text-fg-1">{{ $t('chat.reAsking') }}</span>
+              <span class="text-fg-3 shrink-0">·</span>
+              <span class="truncate text-fg-3 italic">{{ snippet(userText(chat.editing)) }}</span>
+            </button>
+            <button
+              class="text-fg-3 hover:text-removed shrink-0"
+              :title="$t('common.cancel')"
+              @click="chat.cancelEdit()"
+            >
+              <span class="codicon codicon-sm codicon-close" />
+            </button>
+          </div>
+        </div>
+
         <!-- Selected-text context chips (from the open file or an agent reply).
              The quote icon is a quiet toggle: gray = transient (clears when the
              selection is dropped), blue = pinned (stays until ✕). mousedown.prevent
