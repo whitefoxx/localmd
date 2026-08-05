@@ -382,7 +382,34 @@ export const useSettingsStore = defineStore('settings', () => {
   // E2E mode must NOT persist — the mock profile once leaked into the user's
   // real localStorage through this watcher and wiped their API keys.
   if (!isE2eMode()) {
-    watch(state, () => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), { deep: true })
+    watch(
+      state,
+      () => {
+        const next = JSON.stringify(state)
+        // Skipping an identical write is what stops a hydrated tab from
+        // bouncing a storage event straight back at the tab it hydrated from.
+        if (next !== localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, next)
+      },
+      { deep: true },
+    )
+
+    // Every write above serialises the *whole* state, so a tab that has been
+    // sitting open holds a snapshot that predates anything another tab saved
+    // since. Without this listener the next change here — a theme toggle, an
+    // installed tool, a hotkey — writes that stale snapshot back and silently
+    // reverts the other tab's edit, including API keys the user never retyped.
+    // Re-hydrating on the other tab's write makes the tabs converge on the last
+    // save instead of resurrecting whichever one happened to be idle longest.
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (e) => {
+        if (e.key !== STORAGE_KEY || e.newValue === null) return
+        try {
+          Object.assign(state, normalizeSettings(JSON.parse(e.newValue)))
+        } catch {
+          /* another tab wrote something unparseable — keep what we have */
+        }
+      })
+    }
   }
 
   const byId = (id: string | undefined): LlmProfile | null =>
