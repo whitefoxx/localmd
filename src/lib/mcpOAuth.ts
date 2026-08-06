@@ -13,7 +13,7 @@
  * responses, but never fetches. That is not tidiness — the same OAuth exchange
  * has to be able to travel over either transport, because a server that refuses
  * browsers refuses them for its token endpoint too. The caller supplies an
- * McpWire (direct fetch, or WebCLI's proxy) and the whole flow follows it.
+ * McpWire (direct fetch, or the extension's proxy) and the whole flow follows it.
  *
  * Two ways to be a client, and we need both:
  *
@@ -63,7 +63,7 @@ export interface AuthServerMetadata {
  * The spec's own answer is the `resource_metadata` parameter of the 401's
  * WWW-Authenticate header — but a browser can only read that header when the
  * server sends Access-Control-Expose-Headers, and almost none do (15 of 103
- * measured). Through WebCLI every header is readable, so the header path is
+ * measured). Through the extension every header is readable, so the header path is
  * worth trying and the well-known paths are what actually carry the flow.
  *
  * The path-suffixed form is not decoration: an endpoint at /my/mcp advertises

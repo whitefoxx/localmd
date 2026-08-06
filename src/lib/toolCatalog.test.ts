@@ -9,7 +9,7 @@ import {
   catalogEntryById,
 } from './toolCatalog'
 import { normalizeHttpTool, secretRefs, staticOrigin, httpToolJsonSchema } from './httpTools'
-import { WEBCLI_RELAY_URL } from './webcliRelay'
+import { LOCALMD_CONNECT_RELAY_URL } from './connectRelay'
 import settings from '@/i18n/locales/settings'
 
 const httpEntries = CATALOG.filter((e) => e.kind === 'http')
@@ -21,11 +21,11 @@ describe('catalog shape', () => {
     expect(new Set(allTools.map((t) => t.name)).size).toBe(allTools.length)
   })
 
-  it('features exactly one entry, and it is WebCLI', () => {
-    const featured = CATALOG.filter((e) => e.featured)
-    expect(featured).toHaveLength(1)
-    expect(featured[0].id).toBe('webcli')
-    expect(sortedCatalog()[0].id).toBe('webcli')
+  /** localmd Connect (the product's own companion) is the one featured entry —
+   *  the install that makes everything else more likely to work. */
+  it('features exactly localmd Connect', () => {
+    expect(CATALOG.filter((e) => e.featured).map((e) => e.id)).toEqual(['localmd-connect'])
+    expect(sortedCatalog()[0].id).toBe('localmd-connect')
   })
 
   it('installs only entries that exist by default', () => {
@@ -39,13 +39,13 @@ describe('catalog shape', () => {
     }
   })
 
-  /** WebCLI's id is supplied by the relay marker at runtime, so pinning one here
-   *  would break the moment a dev build (different id) is what's installed — and
-   *  reintroduce the "which id do I type?" question the relay removed. Every
-   *  other server entry is a URL. */
-  it('pins no extension id: WebCLI is reached through the relay', () => {
-    expect(catalogEntryById('webcli')?.server?.url).toBe(WEBCLI_RELAY_URL)
-    for (const e of CATALOG.filter((x) => x.server && x.id !== 'webcli')) {
+  /** An extension's id is supplied by its relay marker at runtime, so pinning
+   *  one here would break the moment a dev build (different id) is what's
+   *  installed — and reintroduce the "which id do I type?" question the relay
+   *  removed. Every other server entry is a URL. */
+  it('pins no extension id: the extension is reached through its relay', () => {
+    expect(catalogEntryById('localmd-connect')?.server?.url).toBe(LOCALMD_CONNECT_RELAY_URL)
+    for (const e of CATALOG.filter((x) => x.server && x.kind !== 'extension')) {
       expect(e.server!.url, e.id).toMatch(/^https:\/\//)
     }
   })
@@ -87,11 +87,12 @@ describe('catalog tool specs', () => {
     }
   })
 
-  it('routes tools through WebCLI exactly when their entry says they need it', () => {
+  /** No shipped pack may silently depend on the extension: a spec pinned to
+   *  the extension transport would fail every call on a fresh profile. */
+  it('never pins a shipped tool to the extension transport', () => {
     for (const entry of httpEntries) {
       for (const tool of entry.tools ?? []) {
-        if (entry.requiresWebcli) expect(tool.transport, tool.name).toBe('webcli')
-        else expect(tool.transport, tool.name).not.toBe('webcli')
+        expect(tool.transport, tool.name).not.toBe('extension')
       }
     }
   })
@@ -157,8 +158,8 @@ describe('selection helpers', () => {
     // A retired id resolves to nothing here — settings adopts its tools once,
     // then drops the id (see migrateRetiredPacks).
     expect(toolsForEntries(['feeds'])).toEqual([])
-    expect(serversForEntries(['webcli'])).toEqual([
-      { entryId: 'webcli', name: 'webcli', url: expect.any(String) },
+    expect(serversForEntries(['localmd-connect'])).toEqual([
+      { entryId: 'localmd-connect', name: 'localmd-connect', url: expect.any(String) },
     ])
     expect(serversForEntries(['jina'])).toEqual([])
   })

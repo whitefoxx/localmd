@@ -1,27 +1,37 @@
 /**
- * WebCLI transport — JSON-RPC/MCP over `window.postMessage`.
+ * localmd Connect transport — JSON-RPC/MCP over `window.postMessage`.
  *
- * WebCLI removed `externally_connectable` from its manifest, so
- * `chrome.runtime.connect(<id>)` from a page no longer reaches it at all (that
- * field is read once at install time; nothing at runtime can widen it, and it
- * cannot express "let the user add a site"). The replacement is opt-in per
- * origin: the user adds this app's origin under "Web app access" in WebCLI's
- * popup, the extension registers a tiny relay content script on that origin,
- * and we exchange the SAME JSON-RPC frames with the relay instead of a Port.
+ * localmd Connect is this app's companion extension: the generic browser
+ * bridge (open/read/click/fetch with the user's cookies) plus marketplace site
+ * adapters and persistent site scripts. There is no `externally_connectable`
+ * path (that field is read once at install time; nothing at runtime can widen
+ * it, and it cannot express "let the user add a site"), so the extension
+ * registers a tiny relay content script per authorized origin and we exchange
+ * JSON-RPC frames with the relay instead of a Port. https://localmd.app is
+ * pre-authorized at install; only dev origins need adding in the popup under
+ * "Web app access".
  *
  *   page → ext : { webcli:'mcp', dir:'to-ext', ext, msg:<jsonrpc> }
  *   ext → page : { webcli:'mcp', dir:'to-page', ext, msg:<jsonrpc> }
  *   on attach  : { webcli:'mcp', dir:'to-page', ext, ready:true }
  *
+ * The `webcli:` envelope tag is the relay WIRE FORMAT, fixed on the extension
+ * side — a protocol constant, not a product reference; it cannot be renamed
+ * from here. Other extensions built from the same relay codebase listen for
+ * the same envelope, so `ext` is a MUST on every to-ext frame: an untargeted
+ * frame would be executed by every listener — twice or more, which matters the
+ * moment a write tool is involved. `post()` is the only sender and always
+ * addresses the install the marker names.
+ *
  * Two things this buys us over the Port:
- *   - Nothing about WebCLI is pinned. The relay writes its own extension id to
- *     `<html data-webcli-relay>` at document_start, so detection is synchronous
- *     and race-free, a dev build works with no configuration, and the app has
- *     no store id to go stale.
+ *   - Nothing about the extension is pinned. The relay writes its own extension
+ *     id to `<html data-localmd-connect>` at document_start, so detection is
+ *     synchronous and race-free, a dev build works with no configuration, and
+ *     the app has no store id to go stale.
  *   - No `initialize` state to lose. The extension's handler answers tools/call
  *     on a fresh port, and the relay silently redials its service worker when
- *     MV3 recycles it — so the reconnect-and-re-handshake dance the Port
- *     transport needed (McpExtensionClient) has no equivalent here.
+ *     MV3 recycles it — so a reconnect-and-re-handshake dance has no
+ *     equivalent here.
  *
  * What it costs: there is no disconnect event, so nothing tells us the far side
  * died — every request carries its own timeout, and a refused origin is
@@ -42,34 +52,56 @@ import {
   type McpWire,
 } from '@/lib/mcp'
 
-/** What a WebCLI server row carries in its `url` field. Deliberately not an
- *  address: the relay's marker names the build that is actually installed, so
- *  the row records only "this is WebCLI, over the relay". */
-export const WEBCLI_RELAY_URL = 'webcli://relay'
-
-export function isWebcliRelayUrl(url: string): boolean {
-  return url.trim() === WEBCLI_RELAY_URL
+/** One extension speaking the relay protocol: which DOM marker announces it,
+ *  and what to call it when talking to the user. A parameter rather than a
+ *  constant baked into the client so tests can stand up a fake extension —
+ *  and a future sibling build costs a declaration, not a fork. */
+export interface RelayExtension {
+  /** `documentElement.dataset` key of the presence marker (the camelCased form
+   *  of the `data-*` attribute the relay content script writes). */
+  marker: string
+  /** Display name for error messages and row labels. */
+  name: string
 }
 
-/** The relay's presence marker: WebCLI's extension id, or null when the relay
+export const LOCALMD_CONNECT_EXTENSION: RelayExtension = {
+  marker: 'localmdConnect',
+  name: 'localmd Connect',
+}
+
+/** What a localmd Connect server row carries in its `url` field. Deliberately
+ *  not an address: the relay's marker names the build that is actually
+ *  installed, so the row records only "this is localmd Connect, over the
+ *  relay" — never an address, never an id. */
+export const LOCALMD_CONNECT_RELAY_URL = 'localmd-connect://relay'
+
+export function isLocalmdConnectRelayUrl(url: string): boolean {
+  return url.trim() === LOCALMD_CONNECT_RELAY_URL
+}
+
+/** The relay's presence marker: the extension's id, or null when its relay
  *  isn't on this page — not installed, or this origin isn't on the user's list.
  *  Synchronous by design (set at document_start), so callers never have to wait
  *  for a handshake to know whether setup is done. */
-export function relayExtensionId(): string | null {
+export function relayExtensionId(
+  marker: string = LOCALMD_CONNECT_EXTENSION.marker,
+): string | null {
   const doc = (globalThis as { document?: Document }).document
-  const id = doc?.documentElement?.dataset?.webcliRelay?.trim()
+  const id = doc?.documentElement?.dataset?.[marker]?.trim()
   return id ? id : null
 }
 
 /** Shown when the marker is absent. Kept short: it doubles as the row label in
  *  Settings, where the setup steps sit right underneath. */
-export const RELAY_ABSENT_MESSAGE =
-  'WebCLI has not been allowed to talk to this site — see the setup steps.'
+export function relayAbsentMessage(ext: RelayExtension): string {
+  return `${ext.name} has not been allowed to talk to this site — see the setup steps.`
+}
 
 /** Shown when the relay IS here but the extension never answers, which is
  *  exactly what an origin missing from the user's list looks like. */
-const RELAY_SILENT_MESSAGE =
-  'WebCLI is on this page but did not answer — its "Web app access" list must contain this exact address, port included. Add it, then reload.'
+function relaySilentMessage(ext: RelayExtension): string {
+  return `${ext.name} is on this page but did not answer — its "Web app access" list must contain this exact address, port included. Add it, then reload.`
+}
 
 /** Handshake round trips are instant when the origin is allowed, so a slow one
  *  means "no answer is coming" rather than "still working". */
@@ -100,7 +132,7 @@ const CALL_TIMEOUT_MS = 250_000
  * `Access-Control-Expose-Headers`, which almost none do; through the extension
  * every header is readable.
  */
-export interface WebcliFetchResult {
+export interface ExtensionFetchResult {
   status?: number
   ok?: boolean
   headers?: Record<string, string>
@@ -114,9 +146,9 @@ export interface WebcliFetchResult {
 
 /** Parse a fetch_url result. The bridge reports its own failures as plain text
  *  rather than a result object, so a parse failure IS the error message. */
-export function parseWebcliFetch(out: string): WebcliFetchResult {
+export function parseExtensionFetch(out: string): ExtensionFetchResult {
   try {
-    return JSON.parse(out) as WebcliFetchResult
+    return JSON.parse(out) as ExtensionFetchResult
   } catch {
     throw new Error(out.slice(0, 300))
   }
@@ -152,13 +184,13 @@ const PROXY_MAX_BYTES = 2_000_000
 const PROXY_TIMEOUT_MS = 60_000
 
 /**
- * WebCLI's `fetch_url` as an MCP wire — the transport for endpoints that refuse
- * browsers outright. `call` runs one fetch_url tool call and returns its raw
- * text result; stores/mcp.ts binds it to whichever server row is WebCLI, which
- * is also why this takes a function rather than importing the tool name (that
- * lives in toolCatalog, which imports from here).
+ * The extension's `fetch_url` as an MCP wire — the transport for endpoints that
+ * refuse browsers outright. `call` runs one fetch_url tool call and returns its
+ * raw text result; stores/mcp.ts binds it to whichever server row provides the
+ * tool, which is also why this takes a function rather than importing the tool
+ * name (that lives in toolCatalog, which imports from here).
  */
-export function webcliWire(
+export function extensionWire(
   call: (args: Record<string, unknown>, signal?: AbortSignal) => Promise<string>,
 ): McpWire {
   return async (req, signal) => {
@@ -176,7 +208,7 @@ export function webcliWire(
       },
       signal,
     )
-    const r = parseWebcliFetch(out)
+    const r = parseExtensionFetch(out)
     return {
       status: r.status ?? 0,
       ok: r.ok === true,
@@ -202,9 +234,9 @@ interface RelayFrame {
 
 /** The `window` the page and the relay share. Absent under vitest's node
  *  environment, and the error says so rather than throwing a TypeError. */
-function pageWindow(): Window {
+function pageWindow(ext: RelayExtension): Window {
   const win = (globalThis as { window?: Window }).window
-  if (!win) throw new Error('WebCLI needs a browser window — there is none here')
+  if (!win) throw new Error(`${ext.name} needs a browser window — there is none here`)
   return win
 }
 
@@ -222,8 +254,9 @@ export class McpRelayClient implements McpClientLike {
    *  turns into a red row. */
   onLost?: (reason: string) => void
 
-  /** Takes no config on purpose: the marker supplies the target, and there is
-   *  no URL, id or token for a user to get wrong. */
+  /** The only config is WHICH extension — its marker supplies the target
+   *  install, so there is still no URL, id or token for a user to get wrong. */
+  constructor(private target: RelayExtension = LOCALMD_CONNECT_EXTENSION) {}
 
   dispose(): void {
     const win = (globalThis as { window?: Window }).window
@@ -234,7 +267,7 @@ export class McpRelayClient implements McpClientLike {
     // than leave a caller waiting out the full call timeout. The wording stays
     // clear of isRecoverable()'s vocabulary: the call may have run, so it must
     // not be resent.
-    const err = new Error('WebCLI transport was replaced')
+    const err = new Error(`${this.target.name} transport was replaced`)
     for (const p of this.pending.values()) p.reject(err)
     this.pending.clear()
   }
@@ -242,9 +275,9 @@ export class McpRelayClient implements McpClientLike {
   /** Resolve the target install and make sure we're listening. Throws when the
    *  relay isn't on this page. */
   private attach(): { win: Window; ext: string } {
-    const ext = relayExtensionId()
-    if (!ext) throw new Error(RELAY_ABSENT_MESSAGE)
-    const win = pageWindow()
+    const ext = relayExtensionId(this.target.marker)
+    if (!ext) throw new Error(relayAbsentMessage(this.target))
+    const win = pageWindow(this.target)
     this.ext = ext
     if (!this.listener) {
       this.listener = (e: MessageEvent) => this.onFrame(win, e)
@@ -319,7 +352,9 @@ export class McpRelayClient implements McpClientLike {
     } catch (err) {
       // Silence here is the refused-origin case, and "timed out" would send the
       // user looking for a slow network instead of a popup setting.
-      if (/timed out/.test((err as Error).message)) throw new Error(RELAY_SILENT_MESSAGE)
+      if (/timed out/.test((err as Error).message)) {
+        throw new Error(relaySilentMessage(this.target))
+      }
       throw err
     }
     const { win, ext } = this.attach()

@@ -61,7 +61,7 @@ describe('key requests', () => {
 
 describe('other kinds', () => {
   it('reports a connected extension', async () => {
-    const run = ask({ kind: 'extension', label: 'WebCLI', entry_id: 'webcli' })
+    const run = ask({ kind: 'extension', label: 'localmd Connect', entry_id: 'localmd-connect' })
     await onCard((id) => useSetupStore().settle(id, 'connected'))
     expect(await run).toMatch(/connected/)
   })

@@ -15,17 +15,32 @@
  * Every endpoint below was probed for browser CORS before being listed. That
  * matters more than it sounds: a browser-only app can't reach an API that
  * doesn't opt in, and "add the URL and find out" is a terrible first run. Where
- * an endpoint refuses browsers, the entry routes through WebCLI instead —
- * which is why WebCLI is the featured entry: its `fetch_url` runs in a service
- * worker with the user's cookies and no CORS, so it is the one install that
- * makes every *other* tool (and any the agent writes later) more likely to work.
+ * an endpoint refuses browsers, the entry routes through the browser extension
+ * instead — which is why localmd Connect is the featured entry: its `fetch_url`
+ * runs in a service worker with the user's cookies and no CORS, so it is the
+ * one install that makes every *other* tool (and any the agent writes later)
+ * more likely to work.
  */
 import type { HttpToolSpec } from '@/lib/httpTools'
-import { WEBCLI_RELAY_URL } from '@/lib/webcliRelay'
+import { LOCALMD_CONNECT_RELAY_URL } from '@/lib/connectRelay'
 
-/** The WebCLI tool that makes it a general HTTP transport rather than just
- *  another set of browser tools. Used to detect a usable bridge. */
-export const WEBCLI_FETCH_TOOL = 'generic__fetch_url'
+/** The localmd Connect tool that makes it a general HTTP transport rather than
+ *  just another set of browser tools. Used to detect a usable bridge. */
+export const EXTENSION_FETCH_TOOL = 'generic__fetch_url'
+
+/**
+ * localmd Connect tools that stay ACTIVE (never deferred) even though its
+ * tool count trips the defer threshold: the workhorse trio. `find_adapters` +
+ * `run_adapter` are the whole marketplace flow — the catalog of ~300 site
+ * adapters never changes the tool list precisely because loading and running
+ * are one call — and `fetch_url` is the generic HTTP transport everything else
+ * leans on. Everything beyond the trio activates via enable_tools as usual.
+ */
+export const CONNECT_ACTIVE_TOOLS: ReadonlySet<string> = new Set([
+  'generic__find_adapters',
+  'generic__run_adapter',
+  EXTENSION_FETCH_TOOL,
+])
 
 export type CatalogKind = 'extension' | 'mcp' | 'http'
 
@@ -63,7 +78,8 @@ export interface CatalogEntry {
   repo?: string
   /** kind 'extension' | 'mcp': the server entry an install adds. For an
    *  extension the url selects a transport rather than naming an address —
-   *  WEBCLI_RELAY_URL, whose marker supplies whichever build is installed.
+   *  LOCALMD_CONNECT_RELAY_URL, whose marker supplies whichever build is
+   *  installed.
    *
    *  `url`, `token` and any header value may carry `{{secret:<id>}}`, resolved
    *  when the row connects (see resolveServerSecrets). That is what lets an
@@ -73,10 +89,6 @@ export interface CatalogEntry {
   server?: { name: string; url: string; token?: string; headers?: Record<string, string> }
   /** kind 'http': the tools an install registers. */
   tools?: HttpToolSpec[]
-  /** The endpoint refuses browsers, so these tools only work with the WebCLI
-   *  extension connected. Surfaced on the card rather than discovered on the
-   *  first failed call. */
-  requiresWebcli?: boolean
   /** Values the user must supply before the tools work. */
   secrets?: CatalogSecret[]
 }
@@ -218,7 +230,7 @@ const ARXIV_TOOLS: HttpToolSpec[] = [
     },
     maxChars: 24_000,
     // arXiv sends no Access-Control-Allow-Origin, verified from the app origin.
-    transport: 'webcli',
+    transport: 'extension',
   },
 ]
 
@@ -395,18 +407,20 @@ export const RETIRED_PACKS: Record<string, HttpToolSpec[]> = {
  * What is offered on a first run, and nothing else.
  *
  * Three entries, each earning its place by being wanted before the user knows
- * what they want: WebCLI because it makes everything else more likely to work,
- * and two web searches that fail differently. Anything past that is the user's
- * choice to make, with the agent's help — see docs/app/tools.md.
+ * what they want: localmd Connect because it makes everything else more likely
+ * to work (the browser bridge, the adapter marketplace, site scripts — the
+ * product's own paid companion, not a third-party recommendation), and two web
+ * searches that fail differently. Anything past that is the user's choice to
+ * make, with the agent's help — see docs/app/tools.md.
  */
 export const CATALOG: CatalogEntry[] = [
   {
-    id: 'webcli',
+    // The product's own companion. No Web Store listing yet — the settings
+    // pane carries the dev install steps until there is one.
+    id: 'localmd-connect',
     kind: 'extension',
     featured: true,
-    homepage: 'https://chromewebstore.google.com/detail/webcli/jnhfdhpafndcbppkphhfpecflhogngge',
-    repo: 'https://github.com/whitefoxx/webcli-skills',
-    server: { name: 'webcli', url: WEBCLI_RELAY_URL },
+    server: { name: 'localmd-connect', url: LOCALMD_CONNECT_RELAY_URL },
   },
   {
     id: 'jina',

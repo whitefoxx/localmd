@@ -11,7 +11,7 @@
  *
  * Two transports, because the browser can't reach most of the web on its own:
  *   - `direct` — plain fetch(); only works when the endpoint sends CORS headers.
- *   - `webcli` — routed through the WebCLI extension's generic__fetch_url, which
+ *   - `extension` — routed through localmd Connect's generic__fetch_url, which
  *     runs in a service worker with <all_urls> and the user's cookies: no CORS
  *     limit and a logged-in session. `auto` tries direct and falls back.
  *
@@ -78,7 +78,7 @@ export interface HttpToolSpec {
   response: HttpToolResponse
   /** Result budget in characters. Default DEFAULT_MAX_CHARS. */
   maxChars?: number
-  transport?: 'direct' | 'webcli' | 'auto'
+  transport?: 'direct' | 'extension' | 'auto'
   /** Marks a tool that reads arbitrary web content, so the system prompt knows
    *  the agent has web access at all. */
   web?: boolean
@@ -239,7 +239,7 @@ export function normalizeHttpTool(raw: unknown, makeId?: () => string): HttpTool
     ...(Number.isFinite(maxChars) && maxChars > 0
       ? { maxChars: Math.min(200_000, Math.trunc(maxChars)) }
       : {}),
-    ...(r.transport === 'webcli' || r.transport === 'direct' || r.transport === 'auto'
+    ...(r.transport === 'extension' || r.transport === 'direct' || r.transport === 'auto'
       ? { transport: r.transport }
       : {}),
     ...(r.web === true ? { web: true } : {}),
@@ -745,8 +745,8 @@ export type HttpTransport = (req: BuiltRequest, signal?: AbortSignal) => Promise
 export interface RunHttpToolDeps {
   resolveSecret: (id: string) => string | undefined
   direct: HttpTransport
-  /** Present only while the WebCLI extension is connected. */
-  webcli?: HttpTransport | null
+  /** Present only while the localmd Connect extension is connected. */
+  extension?: HttpTransport | null
   signal?: AbortSignal
 }
 
@@ -756,7 +756,7 @@ export interface RunHttpToolDeps {
  *
  * `auto` exists because CORS failures are indistinguishable from network
  * failures in the browser (both a bare TypeError) — so rather than guess, we
- * retry once through WebCLI when it's connected.
+ * retry once through the extension when it's connected.
  */
 export async function runHttpTool(
   spec: HttpToolSpec,
@@ -771,9 +771,9 @@ export async function runHttpTool(
   }
 
   const transport = spec.transport ?? 'auto'
-  const viaWebcli = transport === 'webcli'
-  if (viaWebcli && !deps.webcli) {
-    return `Error: ${spec.name} needs the WebCLI browser extension, which isn't connected — install or enable it in Settings → Tools.`
+  const viaExtension = transport === 'extension'
+  if (viaExtension && !deps.extension) {
+    return `Error: ${spec.name} needs the browser extension, and none is connected — install or enable localmd Connect in Settings → Tools.`
   }
 
   const attempt = async (send: HttpTransport): Promise<string> => {
@@ -788,19 +788,19 @@ export async function runHttpTool(
   }
 
   try {
-    return await attempt(viaWebcli ? deps.webcli! : deps.direct)
+    return await attempt(viaExtension ? deps.extension! : deps.direct)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    if (transport === 'auto' && deps.webcli) {
+    if (transport === 'auto' && deps.extension) {
       try {
-        return await attempt(deps.webcli)
+        return await attempt(deps.extension)
       } catch (err2) {
-        return `Error: ${spec.name} failed directly (${message}) and through WebCLI (${(err2 as Error).message})`
+        return `Error: ${spec.name} failed directly (${message}) and through the browser extension (${(err2 as Error).message})`
       }
     }
-    if (transport === 'direct' || !deps.webcli) {
+    if (transport === 'direct' || !deps.extension) {
       // The overwhelmingly common cause, and the one the user can act on.
-      return `Error: ${spec.name} could not reach ${req.redactedUrl} — ${message}. If this endpoint doesn't allow browser (CORS) access, install the WebCLI extension in Settings → Tools and set this tool's transport to WebCLI.`
+      return `Error: ${spec.name} could not reach ${req.redactedUrl} — ${message}. If this endpoint doesn't allow browser (CORS) access, install the localmd Connect extension in Settings → Tools and set this tool's transport to "extension".`
     }
     return `Error: ${spec.name} — ${message}`
   }

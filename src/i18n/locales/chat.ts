@@ -54,6 +54,18 @@ export default {
     setupConfirm: 'Confirm',
     setupWorking: 'Working…',
     setupSkip: 'Skip',
+    // connectGuard — localmd Connect's write surface confirming before it runs
+    connectRunAdapter: 'Run “{site}/{name}” on the real site',
+    connectRunAdapterHelp:
+      'This marketplace adapter has write access — it can post, message or change things on the site, as you. It runs once, only if you confirm.',
+    connectRunAdapterUnknownHelp:
+      'This adapter’s access level could not be verified, so it is treated as a write. It runs once, only if you confirm.',
+    connectScriptCode: 'Install a site script that injects code',
+    connectScriptCodeHelp:
+      'This script will run the CSS/JS below on every matching page load until you remove it (pause or delete it any time in the localmd Connect popup). The exact patterns and code:',
+    connectScriptHide: 'Install a site script that hides page elements',
+    connectScriptHideHelp:
+      'This rule will hide the elements below on every matching page load until you remove it (pause or delete it any time in the localmd Connect popup).',
     // ApprovalCard — an ask-first write paused on the user, decided in place
     approvalWrite: 'Wants to write this file',
     approvalCreate: 'Wants to create this file',
@@ -139,6 +151,18 @@ export default {
     setupConfirm: '确认',
     setupWorking: '处理中…',
     setupSkip: '跳过',
+    // connectGuard —— localmd Connect 的写操作在执行前先确认
+    connectRunAdapter: '在真实网站上运行「{site}/{name}」',
+    connectRunAdapterHelp:
+      '这个市场适配器有写权限 —— 它能以你的身份在该网站发帖、发消息或改动内容。只有你确认后才会运行，且只运行这一次。',
+    connectRunAdapterUnknownHelp:
+      '无法核实这个适配器的权限级别，因此按写操作对待。只有你确认后才会运行，且只运行这一次。',
+    connectScriptCode: '安装一个注入代码的站点脚本',
+    connectScriptCodeHelp:
+      '这个脚本会在每次打开匹配页面时运行下面的 CSS/JS，直到你移除它（随时可在 localmd Connect 弹窗里暂停或删除）。匹配规则和代码原文如下：',
+    connectScriptHide: '安装一个隐藏页面元素的站点脚本',
+    connectScriptHideHelp:
+      '这条规则会在每次打开匹配页面时隐藏下面的元素，直到你移除它（随时可在 localmd Connect 弹窗里暂停或删除）。',
     // ApprovalCard —— 先询问模式下暂停的写入，就地决定
     approvalWrite: '想写入这个文件',
     approvalCreate: '想创建这个文件',

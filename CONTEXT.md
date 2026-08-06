@@ -115,10 +115,10 @@ fact about an *external* tool — it does not make the tool built-in.
 _Avoid_: built-in (reserved for native code), default, preset.
 
 **Connection**:
-The user-facing word for everything that reaches an outside service — the WebCLI
-extension, MCP servers, user- or agent-authored HTTP tools, GitHub sync, sign-ins.
-The paid tier is exactly the connections. WebCLI itself is free to *install*; using
-it from the app is a connection.
+The user-facing word for everything that reaches an outside service — the
+localmd Connect extension, MCP servers, user- or agent-authored HTTP tools,
+GitHub sync, sign-ins. The paid tier is exactly the connections. The extension
+itself is free to *install*; using it from the app is a connection.
 _Avoid_: integration, external services (as a category name), paid tools.
 
 **External tool**:

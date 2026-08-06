@@ -11,6 +11,8 @@ import { ref, computed } from 'vue'
 import { useToolsStore } from '@/stores/tools'
 import { useSetupStore, type SetupRequest } from '@/stores/setup'
 import { useMcpStore } from '@/stores/mcp'
+import { catalogEntryById } from '@/lib/toolCatalog'
+import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 
 const props = defineProps<{ request: SetupRequest }>()
 
@@ -39,6 +41,17 @@ function saveKey(): void {
   setup.settle(props.request.id, 'provided')
 }
 
+/** The entry's own server row — per entry, not "any fetch_url tool", so the
+ *  check answers for the extension this card is actually about. */
+const entryServerUrl = computed(() =>
+  props.request.entryId ? catalogEntryById(props.request.entryId)?.server?.url : undefined,
+)
+const entryConnected = computed(() => {
+  const url = entryServerUrl.value
+  if (!url) return tools.extensionConnected
+  return mcp.servers.some((s) => s.config.url === url && s.status === 'ok')
+})
+
 /** Install the entry if it isn't yet, reconnect, then report what we see. */
 async function checkExtension(): Promise<void> {
   const entryId = props.request.entryId
@@ -48,21 +61,27 @@ async function checkExtension(): Promise<void> {
     if (entryId && !tools.isInstalled(entryId)) tools.install(entryId)
     mcp.recheckRelay()
     await mcp.refresh()
-    if (tools.webcliConnected) setup.settle(props.request.id, 'connected')
+    if (entryConnected.value) setup.settle(props.request.id, 'connected')
     else checkFailed.value = true
   } finally {
     checking.value = false
   }
 }
 
-/** WebCLI is not reachable by installing alone: it answers only origins the user
- *  added in its popup, and it starts listening on the next page load. So the card
- *  spells out the address to add and offers the reload, rather than sending the
- *  user back and forth between Chrome and a "check again" that cannot succeed.
- *  Keyed on the connection, not on the relay marker: the marker is also present on
- *  a page whose exact address was never allowed, which is the case that most needs
- *  the address spelled out. */
-const needsRelaySetup = computed(() => props.request.entryId === 'webcli' && !tools.webcliConnected)
+/** The extension is not always reachable by installing alone: it answers only
+ *  origins on its list (localmd.app is pre-authorized; dev addresses still
+ *  need adding), and it starts listening on the next page load. So the card
+ *  spells out the address to add and offers the reload, rather than sending
+ *  the user back and forth between Chrome and a "check again" that cannot
+ *  succeed. Keyed on the connection, not on the relay marker: the marker is
+ *  also present on a page whose exact address was never allowed, which is the
+ *  case that most needs the address spelled out. */
+const needsRelaySetup = computed(
+  () =>
+    !!entryServerUrl.value &&
+    isLocalmdConnectRelayUrl(entryServerUrl.value) &&
+    !entryConnected.value,
+)
 const pageHost = computed(() => window.location.host)
 
 function reloadPage(): void {
@@ -158,16 +177,16 @@ async function signIn(): Promise<void> {
     <!-- An extension: install, allow this site, reload, then re-check. -->
     <div v-else-if="request.kind === 'extension'" class="mt-2 space-y-2">
       <p v-if="needsRelaySetup" class="text-xs text-fg-3 leading-relaxed">
-        {{ $t('settings.webcli.step2') }}
+        {{ $t('settings.lmdConnect.step2') }}
         <span class="font-mono text-fg-1">{{ pageHost }}</span>
-        {{ $t('settings.webcli.step3') }}
+        {{ $t('settings.lmdConnect.step3') }}
       </p>
       <div class="flex items-center gap-2 flex-wrap">
         <a v-if="request.url" :href="request.url" target="_blank" rel="noopener" class="btn text-xs">
           {{ $t('chat.setupInstall') }}
         </a>
         <button v-if="needsRelaySetup" class="btn text-xs" @click="reloadPage">
-          {{ $t('settings.webcli.reload') }}
+          {{ $t('settings.lmdConnect.reload') }}
         </button>
         <button class="btn text-xs" :disabled="checking" @click="checkExtension">
           {{ checking ? $t('chat.setupChecking') : $t('chat.setupRecheck') }}
@@ -175,13 +194,15 @@ async function signIn(): Promise<void> {
       </div>
     </div>
 
-    <!-- A proposed change. The detail is shown verbatim and unwrapped: the
-         address is the thing being judged, so it must not be truncated or
-         prettified into something that reads safer than it is. -->
+    <!-- A proposed change. The detail is shown verbatim: the address — or the
+         exact css/js a site script would inject — is the thing being judged,
+         so it must not be truncated or prettified into something that reads
+         safer than it is. pre-wrap keeps a multi-line script legible; the
+         scroll cap keeps a long one from swallowing the chat. -->
     <div v-else-if="request.kind === 'confirm'" class="mt-2 space-y-2">
       <p
         v-if="request.detail"
-        class="rounded-lg bg-bg-2 px-2.5 py-2 text-xs font-mono text-fg-1 break-all leading-relaxed"
+        class="rounded-lg bg-bg-2 px-2.5 py-2 text-xs font-mono text-fg-1 whitespace-pre-wrap break-words leading-relaxed max-h-48 overflow-auto"
       >{{ request.detail }}</p>
       <button class="btn text-xs" :disabled="busy" @click="confirmAction">
         {{ busy ? $t('chat.setupWorking') : $t('chat.setupConfirm') }}

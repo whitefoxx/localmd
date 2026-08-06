@@ -3,9 +3,9 @@
  *   - global: Settings (localStorage, follows the browser)
  *   - KB-level: `.agents/mcp.json` in the opened folder (travels with the KB
  *     via git; duplicate targets override global — the KB is more specific)
- * Two transports, selected by the url field: WebCLI's postMessage relay
- * (WEBCLI_RELAY_URL — see lib/webcliRelay.ts) or Streamable HTTP. Connected
- * servers contribute namespaced tools
+ * Two transports, selected by the url field: localmd Connect's postMessage
+ * relay (LOCALMD_CONNECT_RELAY_URL — see lib/connectRelay.ts) or Streamable
+ * HTTP. Connected servers contribute namespaced tools
  * (mcp__<server>__<tool>) that both agent providers append per turn.
  */
 import { defineStore } from 'pinia'
@@ -45,11 +45,11 @@ import {
 import { authorizeInPopup, redirectUri, cimdUrl } from '@/lib/oauthPopup'
 import {
   McpRelayClient,
-  isWebcliRelayUrl,
+  isLocalmdConnectRelayUrl,
   relayExtensionId,
-  webcliWire,
-} from '@/lib/webcliRelay'
-import { WEBCLI_FETCH_TOOL, CATALOG } from '@/lib/toolCatalog'
+  extensionWire,
+} from '@/lib/connectRelay'
+import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS, CATALOG } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
 import { useLicenceStore } from '@/stores/licence'
@@ -86,10 +86,10 @@ function readRecall(): Record<string, string[]> {
   }
 }
 
-/** Shown when a row asks for the WebCLI transport and WebCLI isn't there. Says
- *  what to do, because "failed to fetch" would not. */
-const WEBCLI_TRANSPORT_MISSING =
-  'This server is set to reach its endpoint through WebCLI, which is not connected — install or enable it in Settings → Tools.'
+/** Shown when a row asks for the extension transport and no extension is
+ *  there. Says what to do, because "failed to fetch" would not. */
+const EXTENSION_TRANSPORT_MISSING =
+  'This server is set to reach its endpoint through the browser extension, and none is connected — install or enable localmd Connect in Settings → Tools.'
 
 /** A KB-carried row that reached for one of the reader's stored keys. Worth
  *  naming plainly: this is someone else's config asking for your credential. */
@@ -115,19 +115,21 @@ function missingSecretMessage(ids: readonly string[]): string {
 
 /**
  * Which client a row gets. Three cases, and only the first is about the url:
- *   - WEBCLI_RELAY_URL — the row IS WebCLI, over its postMessage relay
- *   - transport 'webcli' — a normal endpoint, reached through WebCLI's fetch_url
+ *   - the relay sentinel — the row IS localmd Connect, over its postMessage
+ *     relay
+ *   - transport 'extension' — a normal endpoint, reached through the
+ *     extension's fetch_url
  *   - otherwise — a normal endpoint, reached by the browser directly
  */
-function clientFor(config: McpServerConfig, webcli: McpWire | null): McpClientLike {
-  if (isWebcliRelayUrl(config.url)) return new McpRelayClient()
-  if (config.transport !== 'webcli') return new McpHttpClient(config)
-  if (!webcli) throw new Error(WEBCLI_TRANSPORT_MISSING)
-  return new McpHttpClient(config, webcli)
+function clientFor(config: McpServerConfig, extension: McpWire | null): McpClientLike {
+  if (isLocalmdConnectRelayUrl(config.url)) return new McpRelayClient()
+  if (config.transport !== 'extension') return new McpHttpClient(config)
+  if (!extension) throw new Error(EXTENSION_TRANSPORT_MISSING)
+  return new McpHttpClient(config, extension)
 }
 
-/** How often we re-read the relay marker while a WebCLI row is waiting on it.
- *  Reading one dataset property is free; the timer only runs in that state. */
+/** How often we re-read the relay marker while the extension row is waiting on
+ *  it. Reading one dataset property is free; the timer only runs in that state. */
 const RELAY_POLL_MS = 5_000
 
 async function loadKbServers(): Promise<McpServerConfig[]> {
@@ -172,21 +174,35 @@ export const useMcpStore = defineStore('mcp', () => {
     return activated.value.get(sessionId) ?? new Set()
   }
 
+  function serverUrl(serverId: string): string {
+    return servers.value.find((s) => s.config.id === serverId)?.config.url ?? ''
+  }
+
+  /** localmd Connect's workhorse trio (find_adapters / run_adapter / fetch_url)
+   *  is pinned active — never deferred, whatever the server's tool count. Keyed
+   *  on the server's url, not the tool name alone: another server exposing the
+   *  same tool names stays under the ordinary defer policy. */
+  function pinnedActive(t: ExternalTool): boolean {
+    return CONNECT_ACTIVE_TOOLS.has(t.def.name) && isLocalmdConnectRelayUrl(serverUrl(t.serverId))
+  }
+
+  /** The defer policy with the pin applied — the one place both rules meet. */
+  function deferred(t: ExternalTool, activatedSet: ReadonlySet<string>): boolean {
+    if (pinnedActive(t)) return false
+    return isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, activatedSet)
+  }
+
   /** Tools whose schemas ride along with every request of this session. */
   function activeToolsFor(sessionId: string): ExternalTool[] {
     const set = activatedFor(sessionId)
-    return allTools.value.filter(
-      (t) => !isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, set),
-    )
+    return allTools.value.filter((t) => !deferred(t, set))
   }
 
   /** Big-server tools kept OUT of this session's requests until activated —
    *  the system prompt lists them as a compact catalog instead. */
   function deferredToolsFor(sessionId: string): ExternalTool[] {
     const set = activatedFor(sessionId)
-    return allTools.value.filter(
-      (t) => isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, set),
-    )
+    return allTools.value.filter((t) => deferred(t, set))
   }
 
   const NO_ACTIVATIONS: ReadonlySet<string> = new Set()
@@ -197,9 +213,7 @@ export const useMcpStore = defineStore('mcp', () => {
    *  prompt-cache prefix). Activation changes which schemas are sent, never
    *  the catalog text. */
   const deferredCatalog = computed<ExternalTool[]>(() =>
-    allTools.value.filter((t) =>
-      isDeferredTool(t.qualifiedName, toolCountByServer.value.get(t.serverId) ?? 0, NO_ACTIVATIONS),
-    ),
+    allTools.value.filter((t) => deferred(t, NO_ACTIVATIONS)),
   )
 
   /* ── recall ───────────────────────────────────────────────────────────── */
@@ -227,8 +241,7 @@ export const useMcpStore = defineStore('mcp', () => {
   function rememberUse(qualifiedName: string): void {
     const t = allTools.value.find((x) => x.qualifiedName === qualifiedName)
     if (!t) return
-    const count = toolCountByServer.value.get(t.serverId) ?? 0
-    if (!isDeferredTool(qualifiedName, count, NO_ACTIVATIONS)) return
+    if (!deferred(t, NO_ACTIVATIONS)) return
     const next = recallTouch(recalled.value, qualifiedName)
     if (next.join('\n') === recalled.value.join('\n')) return
     recalled.value = next
@@ -240,7 +253,7 @@ export const useMcpStore = defineStore('mcp', () => {
   function preactivate(sessionId: string): void {
     const names = recalled.value.filter((n) => {
       const t = allTools.value.find((x) => x.qualifiedName === n)
-      return !!t && isDeferredTool(n, toolCountByServer.value.get(t.serverId) ?? 0, NO_ACTIVATIONS)
+      return !!t && deferred(t, NO_ACTIVATIONS)
     })
     if (names.length) activate(sessionId, names)
   }
@@ -280,18 +293,18 @@ export const useMcpStore = defineStore('mcp', () => {
   /** Build a client for one row and handshake it. Any previous client for that
    *  id is disposed first, so ports and HTTP sessions never pile up. */
   /**
-   * WebCLI's fetch_url bound as an MCP wire, or null when WebCLI isn't
-   * connected.
+   * The extension's fetch_url bound as an MCP wire, or null when localmd
+   * Connect isn't connected.
    *
-   * Resolved per connect rather than cached: the WebCLI row can drop and come
-   * back under a proxied row that outlives it, and routing through a stale
+   * Resolved per connect rather than cached: the extension row can drop and
+   * come back under a proxied row that outlives it, and routing through a stale
    * serverId would keep failing after the thing it depends on had healed.
    */
-  function webcliWireOrNull(): McpWire | null {
-    const fetchTool = allTools.value.find((t) => t.def.name === WEBCLI_FETCH_TOOL)
+  function extensionWireOrNull(): McpWire | null {
+    const fetchTool = allTools.value.find((t) => t.def.name === EXTENSION_FETCH_TOOL)
     if (!fetchTool) return null
     const { serverId } = fetchTool
-    return webcliWire((args, signal) => callTool(serverId, WEBCLI_FETCH_TOOL, args, signal))
+    return extensionWire((args, signal) => callTool(serverId, EXTENSION_FETCH_TOOL, args, signal))
   }
 
   /* ── OAuth ─────────────────────────────────────────────────────────────── */
@@ -299,8 +312,8 @@ export const useMcpStore = defineStore('mcp', () => {
   /** The wire a row's own OAuth traffic must take: a server that refuses
    *  browsers refuses its token endpoint too. */
   function wireFor(config: McpServerConfig): McpWire | null {
-    if (config.transport !== 'webcli') return directWire
-    return webcliWireOrNull()
+    if (config.transport !== 'extension') return directWire
+    return extensionWireOrNull()
   }
 
   /** The Authorization header a signed-in row should connect with, refreshing
@@ -372,7 +385,7 @@ export const useMcpStore = defineStore('mcp', () => {
     const config = state.config
 
     const wire = wireFor(config)
-    if (!wire) return WEBCLI_TRANSPORT_MISSING
+    if (!wire) return EXTENSION_TRANSPORT_MISSING
 
     const found = await discover(wire, config.url)
     if ('error' in found) return found.error
@@ -496,11 +509,11 @@ export const useMcpStore = defineStore('mcp', () => {
     const config = { ...resolved.config, ...(await bearerFor(raw)) }
     let client: McpClientLike
     try {
-      client = clientFor(config, webcliWireOrNull())
+      client = clientFor(config, extensionWireOrNull())
     } catch (err) {
-      // Only clientFor's "WebCLI isn't connected" case reaches here, and it is a
-      // setup problem rather than a failed handshake — same red row, but the
-      // message tells them what to install.
+      // Only clientFor's "extension isn't connected" case reaches here, and it
+      // is a setup problem rather than a failed handshake — same red row, but
+      // the message tells them what to install.
       patch(config.id, { status: 'error', error: (err as Error).message, tools: [] })
       return
     }
@@ -533,14 +546,14 @@ export const useMcpStore = defineStore('mcp', () => {
       status: config.enabled === false ? 'off' : 'connecting',
       tools: [],
     }))
-    // WebCLI first, and only then everything else: a row with transport 'webcli'
-    // reaches its endpoint THROUGH WebCLI's own tools, so connecting the two
-    // concurrently would race — the proxied row would look up fetch_url before
-    // the row providing it had finished its handshake.
+    // The extension first, and only then everything else: a row with transport
+    // 'extension' reaches its endpoint THROUGH the extension's own fetch_url,
+    // so connecting the two concurrently would race — the proxied row would
+    // look up fetch_url before the row providing it had finished its handshake.
     const live = servers.value.filter((s) => s.status !== 'off')
     const [relay, rest] = [
-      live.filter((s) => isWebcliRelayUrl(s.config.url)),
-      live.filter((s) => !isWebcliRelayUrl(s.config.url)),
+      live.filter((s) => isLocalmdConnectRelayUrl(s.config.url)),
+      live.filter((s) => !isLocalmdConnectRelayUrl(s.config.url)),
     ]
     await Promise.all(relay.map((s) => connectServer(s.config, s.source)))
     await Promise.all(rest.map((s) => connectServer(s.config, s.source)))
@@ -554,32 +567,35 @@ export const useMcpStore = defineStore('mcp', () => {
     await connectServer(state.config, state.source)
   }
 
-  /* ── WebCLI relay presence ────────────────────────────────────────────── */
+  /* ── localmd Connect relay presence ───────────────────────────────────── */
 
   /**
-   * WebCLI's extension id when its relay is on this page, else null — the whole
-   * of "is WebCLI connectable?", read straight from the DOM marker.
+   * The extension's id when its relay is on this page, else null — the whole
+   * of "is localmd Connect connectable?", read straight from the DOM marker.
    *
-   * It is re-checked rather than read once because the answer is a user action
-   * away: they open WebCLI's popup, add this origin, and come back. Note what
+   * Re-checked rather than read once because the answer is a user action away:
+   * they open the extension's popup, add this origin, and come back. Note what
    * re-checking can and cannot do — the extension registers its relay for FUTURE
    * navigations, so the marker appears on the next page load, not the moment the
    * origin is added. That is why the setup panel offers Reload as the action and
-   * this only heals the cases that need no reload (WebCLI enabled again, a dev
-   * build swapped in, a stored id that turns out to be the installed one).
+   * this only heals the cases that need no reload (the extension enabled again,
+   * a dev build swapped in, a stored id that turns out to be the installed one).
    */
-  const relayExt = ref<string | null>(relayExtensionId())
-  const relayReady = computed(() => relayExt.value !== null)
+  const connectExt = ref<string | null>(relayExtensionId())
+  const connectReady = computed(() => connectExt.value !== null)
 
-  const webcliRows = computed(() => servers.value.filter((s) => isWebcliRelayUrl(s.config.url)))
+  const connectRows = computed(() =>
+    servers.value.filter((s) => isLocalmdConnectRelayUrl(s.config.url)),
+  )
 
   function recheckRelay(): void {
     const next = relayExtensionId()
-    if (next === relayExt.value) return
-    relayExt.value = next
-    // The marker turned up (or names a different build now): the WebCLI rows are
-    // connectable, so heal them instead of making the user find Reconnect.
-    if (next) for (const s of webcliRows.value) void reconnect(s.config.id)
+    if (next === connectExt.value) return
+    connectExt.value = next
+    // The marker turned up (or names a different build now): the extension's
+    // rows are connectable, so heal them instead of making the user find
+    // Reconnect.
+    if (next) for (const s of connectRows.value) void reconnect(s.config.id)
   }
 
   if (typeof window !== 'undefined') {
@@ -588,7 +604,7 @@ export const useMcpStore = defineStore('mcp', () => {
     document.addEventListener('visibilitychange', recheckRelay)
     let timer: ReturnType<typeof setInterval> | null = null
     watch(
-      () => webcliRows.value.length > 0 && !relayReady.value,
+      () => connectRows.value.length > 0 && !connectReady.value,
       (waiting) => {
         if (waiting && timer === null) timer = setInterval(recheckRelay, RELAY_POLL_MS)
         else if (!waiting && timer !== null) {
@@ -708,8 +724,8 @@ export const useMcpStore = defineStore('mcp', () => {
 
   return {
     servers,
-    relayExt,
-    relayReady,
+    connectExt,
+    connectReady,
     recheckRelay,
     allTools,
     activeToolsFor,

@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useMcpStore } from './mcp'
 import { MAX_RECALLED_TOOLS } from '@/lib/mcp'
+import { LOCALMD_CONNECT_RELAY_URL } from '@/lib/connectRelay'
 import type { McpServerState } from './mcp'
 
 /** A connected server exposing `n` tools named tool0..tool(n-1). */
-function server(id: string, n: number): McpServerState {
+function server(id: string, n: number, over: Partial<McpServerState['config']> = {}): McpServerState {
   const names = Array.from({ length: n }, (_, i) => `tool${i}`)
   return {
-    config: { id, name: id, url: `https://${id}/mcp` },
+    config: { id, name: id, url: `https://${id}/mcp`, ...over },
     source: 'global',
     status: 'ok',
     tools: names.map((name) => ({
@@ -17,6 +18,19 @@ function server(id: string, n: number): McpServerState {
       inputSchema: { type: 'object' as const },
     })),
   }
+}
+
+/** localmd Connect as connected: 36 tools including the workhorse trio. */
+function connectServer(): McpServerState {
+  const base = server('localmd-connect', 33, { url: LOCALMD_CONNECT_RELAY_URL })
+  base.tools.push(
+    ...['generic__find_adapters', 'generic__run_adapter', 'generic__fetch_url'].map((name) => ({
+      name,
+      description: name,
+      inputSchema: { type: 'object' as const },
+    })),
+  )
+  return base
 }
 
 /** The store's constructor kicks off an async refresh() that resets `servers`;
@@ -78,6 +92,44 @@ describe('mcp store — recall of deferred tools', () => {
     mcp.rememberUse('mcp__big__tool3')
     mcp.preactivate('s1')
     expect(mcp.deferredCatalog.map((t) => t.qualifiedName)).toEqual(before)
+  })
+})
+
+describe('mcp store — localmd Connect workhorse trio stays active', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('pins find_adapters / run_adapter / fetch_url past the defer threshold', async () => {
+    const mcp = await storeWith(connectServer())
+    const active = mcp.activeToolsFor('s1').map((t) => t.qualifiedName)
+    expect(active).toEqual([
+      'mcp__localmd-connect__generic__find_adapters',
+      'mcp__localmd-connect__generic__run_adapter',
+      'mcp__localmd-connect__generic__fetch_url',
+    ])
+    // Everything else on the server still defers, and the catalog omits the trio.
+    expect(mcp.deferredToolsFor('s1')).toHaveLength(33)
+    expect(mcp.deferredCatalog.map((t) => t.qualifiedName)).not.toContain(
+      'mcp__localmd-connect__generic__run_adapter',
+    )
+  })
+
+  it('does not pin the same tool names on other servers', async () => {
+    const other = server('other', 27, { url: 'https://other.example/mcp' })
+    other.tools.push({
+      name: 'generic__fetch_url',
+      description: 'fetch',
+      inputSchema: { type: 'object' as const },
+    })
+    const mcp = await storeWith(other)
+    expect(mcp.activeToolsFor('s1')).toEqual([])
+  })
+
+  it('never spends a recall slot on a pinned tool — it is already in every request', async () => {
+    const mcp = await storeWith(connectServer())
+    mcp.rememberUse('mcp__localmd-connect__generic__run_adapter')
+    expect(mcp.recalled).toEqual([])
+    mcp.rememberUse('mcp__localmd-connect__tool5')
+    expect(mcp.recalled).toEqual(['mcp__localmd-connect__tool5'])
   })
 })
 

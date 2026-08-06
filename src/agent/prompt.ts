@@ -109,6 +109,14 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
 Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
   }
 
+  // localmd Connect adds adapters + site scripts on top of the generic tools.
+  const hasConnect = mcpTools.some((t) => t.def.name === 'generic__find_adapters')
+  if (hasConnect) {
+    prompt += `
+- Site adapters (localmd Connect): BEFORE scraping or automating a mainstream site (Twitter/X, Zhihu, Reddit, YouTube, Hacker News, …), call find_adapters with the site name — a hit means a tested extractor already exists, better than hand-driving the page. Run a hit with run_adapter {site, name, args} (loads and executes in one call; args is a JSON object). An adapter whose access is "write" (posting, messaging, deleting) pauses on a confirmation card the user must approve — never claim such an action happened unless the call came back without a decline.
+- Site scripts (localmd Connect): for a RECURRING page problem ("remove the ads on X", "hide that sidebar everywhere") create a persistent rule with create_site_script — it runs on every future visit of matching pages. Find selectors with find_in_dom, then run preview_site_script FIRST (highlight: true outlines what would be hidden; dry_run_js runs the JS once without persisting) so the user judges the real effect before the confirm card. Prefer hide_selectors alone when hiding is enough; css/js scripts show the user the exact code for approval. The user's standing control is the extension popup (pause/delete any script). If these tools report runnable: false, the user has to switch on "Allow user scripts" in the extension popup — say so instead of retrying.`
+  }
+
   // Installed HTTP tools that read arbitrary web pages (the Jina pack, say).
   // Nothing is built in, so "the agent can reach the web at all" is a fact
   // about the user's Settings → Tools choices, not a constant.
@@ -124,7 +132,7 @@ Browser access: ${webToolNames} — use them for anything about live web content
   } else if (!hasExtension) {
     prompt += `
 
-Browser access: NONE this session — no browser extension is connected and no web tool is installed. You cannot search the web or fetch pages. If the user needs that, point them at Settings → Tools, where the recommended list carries the WebCLI browser extension (their real, logged-in session; it needs installing AND allowing this site in its popup, which that page walks through) or the keyless Jina web tools — and never fabricate web content or URLs in the meantime.`
+Browser access: NONE this session — no browser extension is connected and no web tool is installed. You cannot search the web or fetch pages. If the user needs that, point them at Settings → Tools, where the recommended list carries the localmd Connect browser extension (their real, logged-in session, plus site adapters and site scripts; on localmd.app it works as soon as it is installed, and that page walks through the rest) or the keyless Jina web tools — and never fabricate web content or URLs in the meantime.`
   }
 
   const kbSchema = (await fs.tryReadFile('AGENTS.md')) ?? (await fs.tryReadFile('CLAUDE.md'))

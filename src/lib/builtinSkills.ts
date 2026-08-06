@@ -58,16 +58,15 @@ called directly. Build one spec and \`manage_tools\` \`test\` it:
 
 - it works → leave \`transport: "auto"\`
 - it fails to connect → the endpoint refuses browsers. Set
-  \`transport: "webcli"\`, which routes through the WebCLI extension's
-  service-worker fetch (no CORS, carries the user's cookies).
+  \`transport: "extension"\`, which routes through the localmd Connect
+  extension's service-worker fetch (no CORS, carries the user's cookies).
 
-If WebCLI isn't connected, don't just report that — call \`request_setup\` with
-\`kind: "extension"\`, \`entry_id: "webcli"\` and let the user connect it. Connecting
-it is TWO steps on their side, and the card walks them through both: install the
-extension, then add this site under "Web app access" in its popup and reload the
-page (WebCLI answers only sites the user allowed, and starts listening on the next
-page load). So expect a reload — after one, pick the work back up rather than
-asking again.
+If no extension is connected, don't just report that — call \`request_setup\` with
+\`kind: "extension"\`, \`entry_id: "localmd-connect"\` and let the user connect it.
+On localmd.app it connects as soon as it is installed; on a development address
+the card also spells out the origin to add in its popup, and the page must be
+reloaded afterwards (the extension starts listening on the next page load). So
+expect a reload — after one, pick the work back up rather than asking again.
 
 ## 4. Design the output against a REAL response
 

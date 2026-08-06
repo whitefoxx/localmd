@@ -47,6 +47,8 @@ import { listAppDocsForAgent, appDocForAgent } from '@/lib/appDocs'
 import { WRITABLE, WRITABLE_BY_KEY, describeWritable } from '@/lib/appSettings'
 import { getLocale } from '@/i18n'
 import { CATALOG, catalogEntryById } from '@/lib/toolCatalog'
+import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
+import { confirmConnectCall, noteConnectResult } from '@/agent/connectGuard'
 import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
@@ -631,7 +633,7 @@ const saveTranscript = defineTool({
 const enableTools = defineTool({
   name: 'enable_tools',
   description:
-    'Activate deferred external tools before calling them. The system prompt lists deferred tools (name + summary) — their full schemas are loaded only on demand to save context. Pass the EXACT qualified names (e.g. ["mcp__webcli__generic__open_url"]); they become callable immediately.',
+    'Activate deferred external tools before calling them. The system prompt lists deferred tools (name + summary) — their full schemas are loaded only on demand to save context. Pass the EXACT qualified names (e.g. ["mcp__localmd-connect__generic__open_url"]); they become callable immediately.',
   schema: z.object({
     names: z.array(z.string()).min(1).describe('Qualified tool names from the deferred catalog'),
   }),
@@ -832,7 +834,9 @@ const requestSetup = defineTool({
     entry_id: z
       .string()
       .optional()
-      .describe("kind 'extension': the recommended-tools entry to install, currently only \"webcli\""),
+      .describe(
+        "kind 'extension': the recommended-tools entry to install — \"localmd-connect\"",
+      ),
     options: z.array(z.string()).optional().describe("kind 'choice': the options to offer"),
     server_url: z
       .string()
@@ -940,7 +944,7 @@ const TOOL_SPEC_HELP = `Spec format (JSON):
     "template": "- {{title}} ({{year}}) {{url}}"
   },
   "maxChars": 20000,
-  "transport": "auto",                    // auto | direct | webcli
+  "transport": "auto",                    // auto | direct | extension
   "bundle": "weread"                      // group an integration's tools; set
                                           // it via save_bundle, not by hand
 }
@@ -959,7 +963,8 @@ Guidance:
 - Test with raw:true FIRST to see the untouched response and learn the real
   field names, then write pick + template and test again. An unfilled
   {{placeholder}} means the field name is wrong.
-- If a direct call fails on CORS, set transport "webcli" (needs the extension).
+- If a direct call fails on CORS, set transport "extension" — the localmd
+  Connect route (needs the extension connected).
 - Adding a SERVICE means several tools. Build them all, then save_bundle once:
   the user approves one integration instead of clicking through five diffs.`
 
@@ -1543,7 +1548,18 @@ type McpTool = ReturnType<ReturnType<typeof useMcpStore>['activeToolsFor']>[numb
  */
 const MAX_EXTERNAL_TOOL_CHARS = 40_000
 
-function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): ExternalToolSpec {
+/** Whether a tool's server row is localmd Connect — the one server whose write
+ *  surface confirms with the user (see agent/connectGuard.ts). */
+function isConnectServer(mcp: ReturnType<typeof useMcpStore>, serverId: string): boolean {
+  const url = mcp.servers.find((s) => s.config.id === serverId)?.config.url ?? ''
+  return isLocalmdConnectRelayUrl(url)
+}
+
+function toExternalSpec(
+  mcp: ReturnType<typeof useMcpStore>,
+  t: McpTool,
+  sessionId: string,
+): ExternalToolSpec {
   return {
     name: t.qualifiedName,
     description: `[External MCP: ${t.serverName}] ${t.def.description}`.slice(0, 1024),
@@ -1551,16 +1567,34 @@ function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): Extern
     describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
     run: async (args, signal) => {
       try {
+        // localmd Connect's write surface — a write-access adapter, a site
+        // script — confirms with the user BEFORE the call reaches the
+        // extension: the extension trusts this app's UI and gates nothing
+        // itself. A declined call reports the decline instead of running.
+        if (isConnectServer(mcp, t.serverId)) {
+          const declined = await confirmConnectCall({
+            sessionId,
+            serverId: t.serverId,
+            tool: t.def.name,
+            args,
+            callTool: (tool, a) => mcp.callTool(t.serverId, tool, a, signal),
+          })
+          if (declined) return declined
+        }
         const out = await mcp.callTool(t.serverId, t.def.name, args, signal)
+        // find_adapters results feed the write-adapter gate's access cache —
+        // fed the UNclipped result, so a row past the budget still counts.
+        if (isConnectServer(mcp, t.serverId)) noteConnectResult(t.serverId, t.def.name, out)
         // A tool that actually ran earns a recall slot, so the next session in
         // this KB starts with it already active (see the store's `recalled`).
         // Only successful calls count — a tool that always throws shouldn't
         // squat on the cap.
         mcp.rememberUse(t.qualifiedName)
         // Capped here rather than in the store: internal callers reach
-        // callTool too — the WebCLI HTTP transport and the MCP-over-WebCLI wire
-        // both read a JSON envelope out of it, and clipping that would corrupt
-        // the plumbing rather than save tokens. This is the model-facing path.
+        // callTool too — the extension HTTP transport and the MCP-over-extension
+        // wire both read a JSON envelope out of it, and clipping that would
+        // corrupt the plumbing rather than save tokens. This is the model-facing
+        // path.
         return clipToBudget(out, MAX_EXTERNAL_TOOL_CHARS)
       } catch (err) {
         return `Error: ${(err as Error).message}`
@@ -1574,7 +1608,7 @@ function toExternalSpec(mcp: ReturnType<typeof useMcpStore>, t: McpTool): Extern
  *  to the model each step, so activation takes effect within the same turn. */
 export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
   const mcp = useMcpStore()
-  return mcp.activeToolsFor(sessionId).map((t) => toExternalSpec(mcp, t))
+  return mcp.activeToolsFor(sessionId).map((t) => toExternalSpec(mcp, t, sessionId))
 }
 
 /** ALL of the session's external tools, active AND deferred — registered up
@@ -1583,7 +1617,7 @@ export function externalToolSpecs(sessionId: string): ExternalToolSpec[] {
 export function allExternalToolSpecs(sessionId: string): ExternalToolSpec[] {
   const mcp = useMcpStore()
   return [...mcp.activeToolsFor(sessionId), ...mcp.deferredToolsFor(sessionId)].map((t) =>
-    toExternalSpec(mcp, t),
+    toExternalSpec(mcp, t, sessionId),
   )
 }
 

@@ -237,8 +237,8 @@ export const ENFORCE_LICENCE = true
 
 /**
  * The line: free is everything you can do with your own folder and your own
- * model. Paid is reaching past them — the WebCLI extension, MCP servers, tools
- * you author against outside services, and syncing with GitHub.
+ * model. Paid is reaching past them — the localmd Connect extension, MCP
+ * servers, tools you author against outside services, and syncing with GitHub.
  *
  * Two things are pointedly NOT paid, and both for the same reason.
  *

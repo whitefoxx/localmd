@@ -446,35 +446,35 @@ describe('runHttpTool', () => {
 
   it('reports a non-2xx as an error without retrying', async () => {
     const direct = vi.fn(async () => ({ status: 404, ok: false, body: 'nope' }))
-    const webcli = vi.fn(async () => ok('x'))
-    const out = await runHttpTool(spec(), { query: 'q' }, { resolveSecret: noSecrets, direct, webcli })
+    const extension = vi.fn(async () => ok('x'))
+    const out = await runHttpTool(spec(), { query: 'q' }, { resolveSecret: noSecrets, direct, extension })
     expect(out).toMatch(/^Error:.*HTTP 404/)
-    expect(webcli).not.toHaveBeenCalled()
+    expect(extension).not.toHaveBeenCalled()
   })
 
-  it('falls back to WebCLI when a direct call throws (CORS is indistinguishable)', async () => {
+  it('falls back to the extension when a direct call throws (CORS is indistinguishable)', async () => {
     const direct = vi.fn(async () => {
       throw new TypeError('Failed to fetch')
     })
-    const webcli = vi.fn(async () => ok('from webcli'))
-    const out = await runHttpTool(spec(), { query: 'q' }, { resolveSecret: noSecrets, direct, webcli })
-    expect(out).toBe('from webcli')
-    expect(webcli).toHaveBeenCalledOnce()
+    const extension = vi.fn(async () => ok('from the extension'))
+    const out = await runHttpTool(spec(), { query: 'q' }, { resolveSecret: noSecrets, direct, extension })
+    expect(out).toBe('from the extension')
+    expect(extension).toHaveBeenCalledOnce()
   })
 
-  it('suggests WebCLI when direct fails and no extension is connected', async () => {
+  it('suggests localmd Connect when direct fails and no extension is connected', async () => {
     const direct = vi.fn(async () => {
       throw new TypeError('Failed to fetch')
     })
     const out = await runHttpTool(spec(), { query: 'q' }, { resolveSecret: noSecrets, direct })
-    expect(out).toMatch(/WebCLI/)
+    expect(out).toMatch(/localmd Connect/)
   })
 
-  it('refuses a webcli-only tool when the extension is absent', async () => {
+  it('refuses an extension-only tool when the extension is absent', async () => {
     const direct = vi.fn(async () => ok('x'))
-    const s = spec({ transport: 'webcli' })
+    const s = spec({ transport: 'extension' })
     const out = await runHttpTool(s, { query: 'q' }, { resolveSecret: noSecrets, direct })
-    expect(out).toMatch(/needs the WebCLI browser extension/)
+    expect(out).toMatch(/needs the browser extension/)
     expect(direct).not.toHaveBeenCalled()
   })
 

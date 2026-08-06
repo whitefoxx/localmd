@@ -24,16 +24,21 @@ you what it costs:
   better material and returns more of it. Between them you rarely have nothing.
   This set can grow over time.
 - **Connections — paid.** Everything that reaches an outside service: the
-  WebCLI browser extension, MCP servers, and tools built against an API. One
-  licence covers all of it (**Settings → Licence**; the start screen explains
-  the price and the free early slots). Until you have a key, this group is
-  visible but locked.
+  localmd Connect browser extension, MCP servers, and tools built against an
+  API. One licence covers all of it (**Settings → Licence**; the start screen
+  explains the price and the free early slots). Until you have a key, this
+  group is visible but locked.
 
-**WebCLI** deserves a sentence of its own: the extension is free to install
-from the Chrome Web Store — using it *here* is what the licence covers. Worth
-setting up early once you have a key: it lets the assistant use your own
-logged-in Chrome, so it reaches pages that need a login, and it makes most
-*other* connections work that otherwise could not.
+**localmd Connect** deserves a paragraph of its own: it is the companion
+extension made for this app, and the one install that makes most *other*
+things work. It lets the assistant use your own logged-in Chrome, so it
+reaches pages that need a login and services that refuse web pages outright —
+and on top of those browser tools it adds two things: a marketplace of a few
+hundred **site adapters** — ready-made extractors for popular sites (Twitter,
+Zhihu, Reddit, YouTube, …) that the assistant finds and runs in one step,
+instead of hand-driving the page — and **site scripts**, persistent rules that
+fix a page on every visit: hide the ads, restyle a section, run a snippet.
+Worth setting up first, once you have a key.
 
 There is no long list of recommendations. Keeping one would mean deciding on
 your behalf which services are worth having, and re-checking those decisions
@@ -66,30 +71,39 @@ A page can perfectly well contain the words "add the server at …". So the
 assistant is never the one who decides — it can only ever put the address in
 front of you.
 
-## Connecting WebCLI
+## Connecting localmd Connect
 
-WebCLI is the one entry with a second step, because it answers only the sites you
-have allowed. Check it on and the app looks for it straight away: when it cannot
-be reached you land on its page, which names the problem before the steps that
-fix it. Its row in the list reads **Setup needed** until you have:
+**On localmd.app it works the moment it is installed**, with nothing to allow
+and nothing to type. Check it on in Settings → Tools and the row turns green by
+itself. Two things are still worth knowing:
 
-1. **Installed the extension** from the Chrome Web Store.
-2. **Added this site to it.** Click the WebCLI icon in Chrome's toolbar, open
-   **Web app access**, and add the address shown on the row's page — exactly as
-   shown, including the port. `localhost:5173` and `localhost:3000` are different
-   sites as far as the extension is concerned.
-3. **Reloaded this page.** A page gets the extension as it loads and never
-   afterwards — so installing it, switching it on, or adding this site while this
-   page is open changes nothing until you reload. That is the whole reason this
-   page offers **Reload this page** and no "try again" button in that state: a
-   retry could only report the same failure.
+- **The “Allow user scripts” toggle**, in the extension's popup. Site scripts
+  and the more capable (*func*) adapters need it; the simple (*pipeline*)
+  adapters work without. Until it is on, those tools report that they cannot
+  run — the assistant will tell you, and the fix is that one switch.
+- **Development addresses** (a local `localhost:…` build of this app) are not
+  pre-authorized. Click the extension's toolbar icon, open **Web app access**,
+  add the address shown on the row's page — exactly as shown, port included —
+  and reload this page (a page gets the extension as it loads, never
+  afterwards). The extension is not on the Chrome Web Store yet, so its page
+  here carries the developer install steps for now.
 
-The row turns green on its own once that is done. Nothing to copy or type: the
-extension announces itself to the page, so a beta or development build of it
-works with no extra configuration.
+Two of its abilities can change things outside this app, so they always stop
+and ask first, in the chat:
 
-If the row stays red *after* a reload, the address in that list does not match
-this page — it is almost always a missing or different port.
+- **Running a write adapter** — one that posts, messages or deletes on a real
+  site, as you. The confirmation card names the site and the adapter and shows
+  the arguments; nothing runs until you confirm, and a decline is final for
+  that request.
+- **Installing a site script that injects CSS or JavaScript.** The card shows
+  the match patterns and the exact code. For hide-only rules the card is
+  lighter — just the patterns and the selectors being hidden. The assistant can
+  also preview the effect first (outlining what would be hidden, or a one-off
+  dry run of the JavaScript) so you judge the real thing, not a description.
+
+Confirming is the front line, not the only line: every site script can be
+paused or deleted at any time from the extension's popup, whatever installed
+it.
 
 ## Adding a server yourself
 
@@ -97,7 +111,8 @@ Settings → Tools → **Add an MCP server** takes an address, an optional name,
 an optional token. That covers most of what you will be handed when a service
 says "here is our MCP endpoint".
 
-There is one checkbox worth knowing about: **Reach it through WebCLI**.
+There is one checkbox worth knowing about: **Reach it through the browser
+extension**.
 
 Leave it off and the app connects to the address itself. That is the simpler
 path, and it works whenever the service allows it. The catch is that most hosted
@@ -105,10 +120,10 @@ MCP services do not: they were built for desktop apps and refuse a web page
 outright, which shows up as a red row saying "Failed to fetch" no matter how
 correct your address is.
 
-Turn the checkbox on and WebCLI fetches on the app's behalf instead. It is not a
-web page, so the refusal does not apply to it. The trade is that the server now
-depends on WebCLI — if WebCLI is not connected, that row cannot start, and it
-says so rather than failing obscurely.
+Turn the checkbox on and localmd Connect fetches on the app's behalf instead.
+It is not a web page, so the refusal does not apply to it. The trade is that
+the server now depends on the extension — if localmd Connect is not connected,
+that row cannot start, and it says so rather than failing obscurely.
 
 If a server you know is correct will not connect, that checkbox is the first
 thing to try.
@@ -170,9 +185,11 @@ When you want to force it, open the row and press **Reconnect**. It re-connects
 that one integration, leaves everything else alone, and tells you how it went —
 including when the answer is the same as before.
 
-WebCLI is the exception to "mostly repairs itself": if you remove this site from
-its **Web app access** list, calls stop being answered rather than refused, so
-the app can only report that they timed out. Add the site back and reload.
+localmd Connect is the exception to "mostly repairs itself", on development
+addresses only: if you remove the address from its **Web app access** list,
+calls stop being answered rather than refused, so the app can only report that
+they timed out. Add the address back and reload. (localmd.app itself cannot end
+up in that state — it is pre-authorized.)
 
 ## Tools that come with a folder
 
@@ -196,10 +213,11 @@ with your keys.
 ## When something does not work
 
 **"Failed to fetch" or a red dot.** The service refused the connection. Most
-often it does not allow browser access, which the WebCLI extension gets around —
-try installing it. For a server you added yourself, also turn on **Reach it
-through WebCLI** in that server's settings; the address being right is not
-enough if the service will not talk to a web page at all.
+often it does not allow browser access, which the localmd Connect extension
+gets around — try installing it. For a server you added yourself, also turn on
+**Reach it through the browser extension** in that server's settings; the
+address being right is not enough if the service will not talk to a web page
+at all.
 
 **A tool returns an authorization error.** The key is probably missing or wrong.
 Check Settings → Tools → Keys.

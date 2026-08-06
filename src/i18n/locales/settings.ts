@@ -122,23 +122,31 @@ export default {
     checkChecking: 'Checking…',
     checkOk: 'Connected — it answered just now.',
     checkFailed: 'Still not connected.',
-    webcli: {
-      connected: 'Connected — WebCLI is answering this site.',
-      notDetected:
-        'We cannot see WebCLI on this page — it is not installed, or this site is not on its list, or it was installed/enabled/allowed after this page was opened. Only reloading can change any of those: the extension attaches to a page as it loads, and never afterwards.',
-      extension: 'Extension {id}',
+    lmdConnect: {
       setupNeeded: 'Setup needed',
-      setupTitle: 'Let WebCLI talk to this site',
-      setupIntro:
-        'WebCLI only answers sites you have allowed, so this takes two steps rather than one — install it, then add this site to its list.',
-      presentButSilent:
-        'WebCLI is on this page but is not answering it — so the address below is not the one in its list. Check the port: it counts, and it is the usual culprit.',
-      step1: 'Install the extension, if you have not already.',
-      step2: 'Click its toolbar icon → “Web app access” → add this address, exactly as shown (the port is part of it):',
-      step3:
-        'Reload this page. The extension only starts listening on pages opened after you add them, so this last step is what finishes it.',
       reload: 'Reload this page',
       recheck: 'Check again',
+      connected: 'Connected — localmd Connect is answering this site.',
+      notDetected:
+        'We cannot see localmd Connect on this page — it is not installed or not enabled, or (on a development address) this site is not on its list, or any of that changed after this page was opened. Only reloading can change those: the extension attaches to a page as it loads, and never afterwards.',
+      extension: 'Extension {id}',
+      presentButSilent:
+        'localmd Connect is on this page but is not answering it — so the address below is not the one in its list. Check the port: it counts, and it is the usual culprit.',
+      setupTitle: 'Set up localmd Connect',
+      setupIntro:
+        'On localmd.app the extension works the moment it is installed — nothing to allow, nothing to type. The steps below cover the one toggle worth switching on, and the extra step development addresses need.',
+      step1:
+        'Install the extension. It is not on the Chrome Web Store yet: build it from the web-agent repo (npm run build:localmd) and load the dist-localmd/ folder unpacked via chrome://extensions with Developer mode on (extension id enodecpmlecfpmofogpmbagdcfheamgf).',
+      stepScripts:
+        'In its popup, switch on “Allow user scripts”. Marketplace func adapters and site scripts need it; simple (pipeline) adapters work without — tools report runnable: false until it is on.',
+      step2:
+        'Development addresses only: click its toolbar icon → “Web app access” → add this address, exactly as shown (the port is part of it):',
+      noOriginNote:
+        'localmd.app itself needs no origin setup — it is pre-authorized when the extension installs.',
+      step3:
+        'Reload this page. The extension only starts listening on pages opened after you add them, so on a development address this last step is what finishes it.',
+      confirmNote:
+        'Adapters that can post or change things on a real site, and site scripts that inject code, always pause on a confirmation card in the chat before they run. Your standing control is the extension popup, where any site script can be paused or deleted.',
     },
     advanced: 'Advanced',
     advancedDesc: 'Build an integration by hand, if you would rather not have the agent do it.',
@@ -160,14 +168,13 @@ export default {
     agentToolPrompt:
       'I need a new tool. Here is what it should do (which service, what I want back):\n\n',
     catalogFeatured: 'Start here',
-    catalogNeedsWebcli: 'needs WebCLI',
     catalogNotConnected: 'not connected',
     catalogLearnMore: 'Learn more →',
     catalogRepo: 'Docs and source on GitHub',
     catalog: {
-      webcli: {
-        title: 'WebCLI browser extension',
-        desc: "Your logged-in Chrome as agent tools: open and read pages, click and type, search, and fetch any URL with your cookies — which also bypasses the CORS limit that blocks the browser from calling many APIs directly. The extension itself is free to install from the Chrome Web Store; using it here is part of the paid tier. After installing, add this site under “Web app access” in its popup, because it only answers sites you allow.",
+      'localmd-connect': {
+        title: 'localmd Connect browser extension',
+        desc: 'The companion extension made for localmd: your logged-in Chrome as agent tools — open and read pages, click and type, search, and fetch any URL with your cookies, past the CORS limit that blocks a web page from calling most APIs — plus a marketplace of ~300 site adapters (Twitter, Zhihu, Reddit, YouTube, …) the agent can find and run in one call, and persistent site scripts that fix a page on every visit (hide ads, restyle, enhance). On localmd.app it works the moment it is installed; using it here is part of the paid tier. Anything that posts to a real site or injects code asks you first.',
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -193,9 +200,9 @@ export default {
     toolName: 'Name (as the agent calls it)',
     toolNameTaken: 'That name is already taken by another tool.',
     toolTransport: 'Send through',
-    transportAuto: 'Auto (direct, then WebCLI)',
+    transportAuto: 'Auto (direct, then the browser extension)',
     transportDirect: 'Direct only',
-    transportWebcli: 'WebCLI only',
+    transportExtension: 'Browser extension only',
     toolDescription: 'Description',
     toolDescriptionPlaceholder: 'What it does and when the agent should reach for it.',
     toolUrl: 'Request',
@@ -233,12 +240,13 @@ export default {
     urlPlaceholder: 'https://…/mcp',
     serverUrlInvalid: 'Needs an http(s) address — this field takes an MCP endpoint.',
     tokenPlaceholder: 'token (optional)',
-    serverViaWebcli: 'Reach it through WebCLI',
-    serverViaWebcliHint:
-      "Turn this on when the server won't talk to a web page. Most hosted MCP servers refuse browsers outright; WebCLI fetches on this page's behalf and is not bound by that.",
-    serverViaWebcliMissing: 'WebCLI is not connected — this server cannot start until it is.',
+    serverViaExtension: 'Reach it through the browser extension',
+    serverViaExtensionHint:
+      "Turn this on when the server won't talk to a web page. Most hosted MCP servers refuse browsers outright; the browser extension (localmd Connect) fetches on this page's behalf and is not bound by that.",
+    serverViaExtensionMissing:
+      'No browser extension is connected — this server cannot start until localmd Connect is.',
     toolsHelp:
-      'A server reached directly must allow browser CORS; one reached through WebCLI need not. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
+      'A server reached directly must allow browser CORS; one reached through the browser extension need not. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
 
     // Git & GitHub
     commitAuthor: 'Commit author name',
@@ -253,7 +261,7 @@ export default {
     licenceKeyLabel: 'Licence key',
     licencePlaceholder: 'LMD1.…',
     licenceCovers:
-      'Everything else is free and always will be — web search, subagents, your own skills, and local git included. A licence covers what reaches past your folder and your model: the WebCLI browser extension, MCP servers, tools built against outside services, and syncing with GitHub.',
+      'Everything else is free and always will be — web search, subagents, your own skills, and local git included. A licence covers what reaches past your folder and your model: the localmd Connect browser extension, MCP servers, tools built against outside services, and syncing with GitHub.',
     licenceOffline:
       'Checked here in your browser, against a key built into the app. Nothing is sent anywhere, and there is no account.',
     licenceNone: 'No licence. The features above are locked.',
@@ -385,23 +393,30 @@ export default {
     checkChecking: '检测中…',
     checkOk: '已连接 —— 刚刚响应了。',
     checkFailed: '仍未连上。',
-    webcli: {
-      connected: '已连接 —— WebCLI 正在响应本站。',
-      notDetected:
-        '本页上看不到 WebCLI —— 可能是没安装、本站不在它的名单里，也可能是安装/启用/授权发生在本页打开之后。这三种都只有刷新才能改变：扩展是在页面加载的那一刻附着上去的，之后就不会了。',
-      extension: '扩展 {id}',
+    lmdConnect: {
       setupNeeded: '需要设置',
-      setupTitle: '允许 WebCLI 与本站通信',
-      setupIntro:
-        'WebCLI 只响应你允许过的站点，所以这里有两步而不是一步 —— 先安装它，再把本站加进它的名单。',
-      presentButSilent:
-        'WebCLI 就在本页上，但不响应本页 —— 说明下面这个地址不是它名单里的那个。检查端口：端口算在内，而且十次有九次是它。',
-      step1: '如果还没装，先安装扩展。',
-      step2: '点它的工具栏图标 →「Web app access」→ 按下面显示的地址原样添加（端口也算在内）：',
-      step3:
-        '刷新本页。扩展只会监听添加之后才打开的页面，所以这最后一步才是真正生效的一步。',
       reload: '刷新本页',
       recheck: '重新检测',
+      connected: '已连接 —— localmd Connect 正在响应本站。',
+      notDetected:
+        '本页上看不到 localmd Connect —— 可能是没安装或没启用，（开发地址下）也可能是本站不在它的名单里，或者这些改动发生在本页打开之后。这些都只有刷新才能改变：扩展是在页面加载的那一刻附着上去的，之后就不会了。',
+      extension: '扩展 {id}',
+      presentButSilent:
+        'localmd Connect 就在本页上，但不响应本页 —— 说明下面这个地址不是它名单里的那个。检查端口：端口算在内，而且十次有九次是它。',
+      setupTitle: '设置 localmd Connect',
+      setupIntro:
+        '在 localmd.app 上装好即用 —— 不用允许任何东西，也不用填任何东西。下面几步是一个值得打开的开关，以及开发地址需要的额外一步。',
+      step1:
+        '安装扩展。它还没上架 Chrome 应用商店：在 web-agent 仓库里构建（npm run build:localmd），然后在 chrome://extensions 打开开发者模式，「加载已解压的扩展程序」选 dist-localmd/ 目录（扩展 id 为 enodecpmlecfpmofogpmbagdcfheamgf）。',
+      stepScripts:
+        '在它的弹窗里打开「Allow user scripts」。市场里的 func 适配器和站点脚本需要它；简单的（pipeline）适配器不用 —— 开关没开之前，相关工具会报 runnable: false。',
+      step2:
+        '仅开发地址需要：点它的工具栏图标 →「Web app access」→ 按下面显示的地址原样添加（端口也算在内）：',
+      noOriginNote: 'localmd.app 本身不需要任何地址设置 —— 安装扩展时已预先授权。',
+      step3:
+        '刷新本页。扩展只会监听添加之后才打开的页面，所以在开发地址下这最后一步才是真正生效的一步。',
+      confirmNote:
+        '能在真实网站上发帖或改动内容的适配器，以及注入代码的站点脚本，运行前都会先在聊天里停在一张确认卡片上。你的长期控制权在扩展弹窗里 —— 任何站点脚本都能随时暂停或删除。',
     },
     advanced: '高级',
     advancedDesc: '手动搭一个集成 —— 如果你不想让 agent 代劳的话。',
@@ -421,14 +436,13 @@ export default {
     keyUsedBy: '被这些工具读取：{tools}',
     agentToolPrompt: '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
     catalogFeatured: '首选',
-    catalogNeedsWebcli: '需要 WebCLI',
     catalogNotConnected: '未连接',
     catalogLearnMore: '了解更多 →',
     catalogRepo: 'GitHub 上的文档与源码',
     catalog: {
-      webcli: {
-        title: 'WebCLI 浏览器扩展',
-        desc: '把你已登录的 Chrome 变成 agent 的工具：打开并读取网页、点击输入、搜索，以及带着 cookie 抓取任意 URL —— 这同时绕开了让浏览器无法直连许多 API 的 CORS 限制。官方扩展，Chrome 应用商店一键安装；装好后还要在它的弹窗里「Web app access」添加本站，因为它只响应你允许过的站点。扩展本身从 Chrome 商店免费安装；在这里使用它属于付费部分。',
+      'localmd-connect': {
+        title: 'localmd Connect 浏览器扩展',
+        desc: '为 localmd 定制的伴生扩展：把你已登录的 Chrome 变成 agent 的工具 —— 打开并读取网页、点击输入、搜索、带着 cookie 抓取任意 URL（同时绕开让网页无法直连大多数 API 的 CORS 限制）—— 另外还有约 300 个站点适配器的市场（Twitter、知乎、Reddit、YouTube……），agent 一次调用即可查找并运行；以及持久化站点脚本，每次打开页面自动生效（去广告、改样式、增强页面）。在 localmd.app 上装好即用；在这里使用它属于付费部分。任何会向真实网站发内容或注入代码的操作都会先征求你的确认。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',
@@ -454,9 +468,9 @@ export default {
     toolName: '名称（agent 调用时使用）',
     toolNameTaken: '这个名称已被其他工具占用。',
     toolTransport: '请求通道',
-    transportAuto: '自动（先直连，失败走 WebCLI）',
+    transportAuto: '自动（先直连，失败走浏览器扩展）',
     transportDirect: '仅直连',
-    transportWebcli: '仅 WebCLI',
+    transportExtension: '仅浏览器扩展',
     toolDescription: '描述',
     toolDescriptionPlaceholder: '这个工具做什么、agent 什么时候该用它。',
     toolUrl: '请求',
@@ -494,12 +508,12 @@ export default {
     urlPlaceholder: 'https://…/mcp',
     serverUrlInvalid: '需要一个 http(s) 地址 —— 这里填的是 MCP 端点。',
     tokenPlaceholder: 'token（可选）',
-    serverViaWebcli: '通过 WebCLI 连接',
-    serverViaWebcliHint:
-      '当这个服务器不接受网页直接访问时打开它。大多数托管的 MCP 服务器都直接拒绝浏览器；WebCLI 会代替本页去取，不受这条限制。',
-    serverViaWebcliMissing: 'WebCLI 未连接 —— 在它连上之前这个服务器起不来。',
+    serverViaExtension: '通过浏览器扩展连接',
+    serverViaExtensionHint:
+      '当这个服务器不接受网页直接访问时打开它。大多数托管的 MCP 服务器都直接拒绝浏览器；浏览器扩展（localmd Connect）会代替本页去取，不受这条限制。',
+    serverViaExtensionMissing: '浏览器扩展未连接 —— 在 localmd Connect 连上之前这个服务器起不来。',
     toolsHelp:
-      '直连的服务器必须允许浏览器 CORS，走 WebCLI 的则不需要。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
+      '直连的服务器必须允许浏览器 CORS，走浏览器扩展的则不需要。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
 
     // Git & GitHub
     commitAuthor: 'Commit 作者名',
@@ -514,7 +528,7 @@ export default {
     licenceKeyLabel: '许可 key',
     licencePlaceholder: 'LMD1.…',
     licenceCovers:
-      '其余部分永远免费 —— 网页搜索、子 agent、你自己的 skill、本机 git 都在内。许可覆盖的是伸到你的文件夹和你的模型之外的那些：WebCLI 浏览器扩展、MCP server、针对外部服务造的工具，以及跟 GitHub 同步。',
+      '其余部分永远免费 —— 网页搜索、子 agent、你自己的 skill、本机 git 都在内。许可覆盖的是伸到你的文件夹和你的模型之外的那些：localmd Connect 浏览器扩展、MCP server、针对外部服务造的工具，以及跟 GitHub 同步。',
     licenceOffline: '就在你的浏览器里校验，对照应用里内置的一把公钥。不会发往任何地方，也没有账号。',
     licenceNone: '没有许可，上面这些功能处于锁定状态。',
     licenceNoneYet: '没有许可 —— 但目前什么都没锁，因为付费层还没上线。',

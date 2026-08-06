@@ -12,7 +12,7 @@
  * once; changing which tools exist, or where they send data, asks again.
  *
  * Two transports. `direct` is a plain fetch and only reaches endpoints that
- * allow browser CORS. `webcli` routes through the WebCLI extension's
+ * allow browser CORS. `extension` routes through localmd Connect's
  * generic__fetch_url, which runs in a service worker with the user's cookies
  * and no CORS — so it reaches the rest of the web.
  */
@@ -33,9 +33,9 @@ import {
   CATALOG,
   catalogEntryById,
   toolsForEntries,
-  WEBCLI_FETCH_TOOL,
+  EXTENSION_FETCH_TOOL,
 } from '@/lib/toolCatalog'
-import { parseWebcliFetch } from '@/lib/webcliRelay'
+import { parseExtensionFetch } from '@/lib/connectRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
@@ -47,7 +47,7 @@ const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
 const DIRECT_TIMEOUT_MS = 45_000
 /** Enough for a JSON payload we still have to parse; the spec's own maxChars
  *  does the token-facing trimming afterwards. */
-const WEBCLI_MAX_BYTES = 500_000
+const EXTENSION_MAX_BYTES = 500_000
 
 function readTrust(): Record<string, string> {
   try {
@@ -197,8 +197,8 @@ export const useToolsStore = defineStore('tools', () => {
 
   /* ── transports ────────────────────────────────────────────────────────── */
 
-  const webcliTool = computed(() => mcp.allTools.find((t) => t.def.name === WEBCLI_FETCH_TOOL))
-  const webcliConnected = computed(() => !!webcliTool.value)
+  const fetchTool = computed(() => mcp.allTools.find((t) => t.def.name === EXTENSION_FETCH_TOOL))
+  const extensionConnected = computed(() => !!fetchTool.value)
 
   const direct: HttpTransport = async (req: BuiltRequest, signal?: AbortSignal) => {
     const timeout = AbortSignal.timeout(DIRECT_TIMEOUT_MS)
@@ -211,25 +211,25 @@ export const useToolsStore = defineStore('tools', () => {
     return { status: res.status, ok: res.ok, body: await res.text() }
   }
 
-  const webcli: HttpTransport = async (req: BuiltRequest, signal?: AbortSignal) => {
-    const tool = webcliTool.value
-    if (!tool) throw new Error('the WebCLI extension is not connected')
+  const extension: HttpTransport = async (req: BuiltRequest, signal?: AbortSignal) => {
+    const tool = fetchTool.value
+    if (!tool) throw new Error('no browser extension (localmd Connect) is connected')
     const out = await mcp.callTool(
       tool.serverId,
-      WEBCLI_FETCH_TOOL,
+      EXTENSION_FETCH_TOOL,
       {
         url: req.url,
         method: req.method,
         headers: JSON.stringify(req.headers),
         ...(req.body !== undefined ? { body: req.body } : {}),
         format: 'text',
-        max_bytes: WEBCLI_MAX_BYTES,
+        max_bytes: EXTENSION_MAX_BYTES,
       },
       signal,
     )
     // `format:'text'` guarantees the payload is in `body`, so one shaping path
     // serves both transports.
-    const parsed = parseWebcliFetch(out)
+    const parsed = parseExtensionFetch(out)
     return {
       status: parsed.status ?? 0,
       ok: parsed.ok === true,
@@ -257,7 +257,7 @@ export const useToolsStore = defineStore('tools', () => {
     return runHttpTool(spec, args, {
       resolveSecret: (id) => settings.state.toolSecrets[id],
       direct,
-      webcli: webcliConnected.value ? webcli : null,
+      extension: extensionConnected.value ? extension : null,
       ...(signal ? { signal } : {}),
     })
   }
@@ -287,7 +287,7 @@ export const useToolsStore = defineStore('tools', () => {
     kbPending,
     kbActive,
     kbTrusted,
-    webcliConnected,
+    extensionConnected,
     isInstalled,
     install,
     uninstall,

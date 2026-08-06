@@ -25,7 +25,7 @@ describe('app-provided skills', () => {
    *  use; a rename that misses it would leave silently stale instructions. */
   it('reference the tools they depend on', async () => {
     const body = (await loadSkill('connect-a-service'))!.body
-    for (const needed of ['manage_tools', 'request_setup', 'save_bundle', 'transport', 'webcli']) {
+    for (const needed of ['manage_tools', 'request_setup', 'save_bundle', 'transport', 'localmd-connect']) {
       expect(body, needed).toContain(needed)
     }
   })

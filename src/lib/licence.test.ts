@@ -199,7 +199,7 @@ describe('what the licence covers', () => {
   it('keeps the bundled search pair free, and nothing else by default', () => {
     expect(isBundledToolSource('jina')).toBe(true)
     expect(isBundledToolSource('parallel')).toBe(true)
-    expect(isBundledToolSource('webcli')).toBe(false)
+    expect(isBundledToolSource('localmd-connect')).toBe(false)
     expect(isBundledToolSource('anything-a-user-adds')).toBe(false)
   })
 
@@ -214,10 +214,10 @@ describe('what the licence covers', () => {
 
   it('frees exactly one MCP endpoint, matched by URL', () => {
     // A server row is judged on its url, so this is the whole free-server list.
-    // WebCLI is pointedly not on it — it is the paid tier's anchor.
+    // localmd Connect is pointedly not on it — it is the paid tier's anchor.
     const free = CATALOG.filter((e) => e.bundled && e.server).map((e) => e.server!.url)
     expect(free).toEqual(['https://search.parallel.ai/mcp'])
-    expect(free).not.toContain(CATALOG.find((e) => e.id === 'webcli')!.server!.url)
+    expect(free).not.toContain(CATALOG.find((e) => e.id === 'localmd-connect')!.server!.url)
   })
 
   it('leaves local git free — the no-lock-in pillar depends on it', () => {

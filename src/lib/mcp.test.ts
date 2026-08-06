@@ -244,16 +244,16 @@ describe('normalizeMcpServerList', () => {
     expect(normalizeMcpServerList({ servers: [] }, makeId)).toEqual([])
     expect(normalizeMcpServerList(undefined, makeId)).toEqual([])
   })
-  it('carries transport:webcli through, and only that spelling', () => {
+  it('carries transport:extension through, and only that spelling', () => {
     const out = normalizeMcpServerList(
       [
-        { name: 'a', url: 'https://a/mcp', transport: 'webcli' },
+        { name: 'a', url: 'https://a/mcp', transport: 'extension' },
         { name: 'b', url: 'https://b/mcp', transport: 'direct' },
         { name: 'c', url: 'https://c/mcp', transport: 'nonsense' },
       ],
       makeId,
     )
-    expect(out[0].transport).toBe('webcli')
+    expect(out[0].transport).toBe('extension')
     // 'direct' is the default, so it is absent rather than stored — a KB file
     // that says it and one that omits it must produce the same config.
     expect(out[1].transport).toBeUndefined()

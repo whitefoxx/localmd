@@ -31,7 +31,7 @@ import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
 import { useLicenceStore } from '@/stores/licence'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
-import { isWebcliRelayUrl } from '@/lib/webcliRelay'
+import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { serverSecretRefs } from '@/lib/mcp'
 import {
   normalizeHttpTool,
@@ -164,7 +164,7 @@ async function toggleEntry(entry: CatalogEntry): Promise<void> {
     // server. Bounded, because a refused origin answers with silence and a
     // checkbox that sits busy for 15s is worse than a page that says what is
     // wrong and then turns green by itself.
-    if (mcp.relayReady) await settled(entry)
+    if (mcp.connectReady) await settled(entry)
   } finally {
     checkingEntry.value = null
   }
@@ -231,17 +231,17 @@ function staticCount(n: number): { label: string; labelCls: string; dotCls: null
   return { label: nTools(n), labelCls: 'text-fg-3', dotCls: null }
 }
 
-/** How a catalog entry's row reads. WebCLI gets the one override: every way it
- *  can fail is an unfinished permission (no relay on the page, or a relay whose
- *  extension won't answer this address), and the fix is on its detail page — so
- *  the row says that in two words instead of spending 60 characters on a sentence
- *  the user cannot act on from here. */
+/** How a catalog entry's row reads. localmd Connect gets the one override:
+ *  every way it can fail is an unfinished permission (no relay on the page, or
+ *  a relay whose extension won't answer this address), and the fix is on its
+ *  detail page — so the row says that in two words instead of spending 60
+ *  characters on a sentence the user cannot act on from here. */
 function entryStatus(e: CatalogEntry): { label: string; labelCls: string; dotCls: string | null } {
   if (!e.server) return staticCount(e.tools?.length ?? 0)
   const server = entryServer(e)
-  if (isWebcliRelayUrl(e.server.url) && (!server || server.status === 'error')) {
+  if (isLocalmdConnectRelayUrl(e.server.url) && (!server || server.status === 'error')) {
     return {
-      label: t('settings.webcli.setupNeeded'),
+      label: t('settings.lmdConnect.setupNeeded'),
       labelCls: 'text-removed',
       dotCls: 'bg-removed',
     }
@@ -408,7 +408,7 @@ const form = ref({
   mode: 'text' as 'text' | 'json' | 'xml',
   pick: '',
   template: '',
-  transport: 'auto' as 'auto' | 'direct' | 'webcli',
+  transport: 'auto' as 'auto' | 'direct' | 'extension',
 })
 const params = ref<ParamRow[]>([])
 const testArgs = ref<Record<string, string>>({})
@@ -580,10 +580,10 @@ async function runTest(): Promise<void> {
 const mcpName = ref('')
 const mcpUrl = ref('')
 const mcpToken = ref('')
-/** true = reach the endpoint through WebCLI instead of fetching it from this
- *  page. Off by default: a direct connection is fewer moving parts, and most
- *  people adding a server by hand have one that works. */
-const mcpViaWebcli = ref(false)
+/** true = reach the endpoint through the extension instead of fetching it from
+ *  this page. Off by default: a direct connection is fewer moving parts, and
+ *  most people adding a server by hand have one that works. */
+const mcpViaExtension = ref(false)
 const editMcpId = ref<string | null>(null)
 
 function resetMcpForm(): void {
@@ -591,7 +591,7 @@ function resetMcpForm(): void {
   mcpName.value = ''
   mcpUrl.value = ''
   mcpToken.value = ''
-  mcpViaWebcli.value = false
+  mcpViaExtension.value = false
 }
 
 /** This field takes one thing: the endpoint of an MCP server that allows browser
@@ -617,14 +617,14 @@ function startEditMcp(s: {
   name: string
   url: string
   token?: string
-  transport?: 'direct' | 'webcli'
+  transport?: 'direct' | 'extension'
 }): void {
   returnTo.value = view.value
   editMcpId.value = s.id
   mcpName.value = s.name
   mcpUrl.value = s.url
   mcpToken.value = s.token ?? ''
-  mcpViaWebcli.value = s.transport === 'webcli'
+  mcpViaExtension.value = s.transport === 'extension'
   view.value = { name: 'serverForm' }
 }
 
@@ -646,7 +646,7 @@ function submitMcpServer(): void {
       s.url = mcpUrl.value.trim()
       if (token) s.token = token
       else delete s.token
-      if (mcpViaWebcli.value) s.transport = 'webcli'
+      if (mcpViaExtension.value) s.transport = 'extension'
       else delete s.transport
     }
   } else {
@@ -655,7 +655,7 @@ function submitMcpServer(): void {
       name: mcpName.value.trim() || 'server',
       url: mcpUrl.value.trim(),
       ...(token ? { token } : {}),
-      ...(mcpViaWebcli.value ? { transport: 'webcli' as const } : {}),
+      ...(mcpViaExtension.value ? { transport: 'extension' as const } : {}),
     })
   }
   closeMcpForm()
@@ -702,16 +702,19 @@ const detailServerConfig = computed(() =>
   detailServer.value ? store.state.mcpServers.find((s) => s.id === detailServer.value!.config.id) : undefined,
 )
 
-/* ── WebCLI: the one integration the user must opt us into ───────────────── */
+/* ── localmd Connect: the integration the user must opt us into ──────────── */
 
-/** True on the WebCLI row, whose detail page shows connection steps instead of
- *  fields: there is nothing to type, and everything to allow. Read from the
- *  config, not the live row — during a refresh there IS no live row, and falling
- *  through to the generic branch would offer to edit the transport sentinel as if
- *  it were a server address. */
-const detailIsWebcli = computed(() =>
-  isWebcliRelayUrl(detailServerConfig.value?.url ?? detailEntry.value?.server?.url ?? ''),
+/** True on the localmd Connect row, whose detail page shows connection steps
+ *  instead of fields: there is nothing to type, and everything to install.
+ *  Read from the config, not the live row — during a refresh there IS no live
+ *  row, and falling through to the generic branch would offer to edit the
+ *  transport sentinel as if it were a server address. */
+const detailIsConnect = computed(() =>
+  isLocalmdConnectRelayUrl(detailServerConfig.value?.url ?? detailEntry.value?.server?.url ?? ''),
 )
+/** This detail page's relay marker — the extension id its relay wrote into the
+ *  page, or null when it isn't attached here (or the page isn't the row's). */
+const detailRelayExt = computed(() => (detailIsConnect.value ? mcp.connectExt : null))
 
 /* ── connection checks ───────────────────────────────────────────────────── */
 
@@ -748,7 +751,7 @@ const signInBusy = ref(false)
  */
 const canSignIn = computed(() => {
   const s = detailServer.value
-  if (!s || detailDisabled.value || detailIsWebcli.value) return false
+  if (!s || detailDisabled.value || detailIsConnect.value) return false
   if (mcp.isSignedIn(s.config.id)) return true
   return s.status === 'error' && /\b401\b|unauthor|invalid_token/i.test(s.error ?? '')
 })
@@ -779,38 +782,42 @@ const CHECK_LABEL: Record<Exclude<CheckState, 'idle'>, { key: string; cls: strin
   failed: { key: 'settings.checkFailed', cls: 'text-removed' },
 }
 
-/** Whether WebCLI is actually answering — the connection, not the marker. The two
- *  come apart: WebCLI injects its relay per HOST but gates the connection on the
- *  exact ORIGIN, so on another port of an allowed host the marker is there and
- *  every call goes unanswered. Reading the marker here would paint that green. */
-const webcliUp = computed(() => detailServer.value?.status === 'ok')
+/** Whether the extension is actually answering — the connection, not the marker.
+ *  The two come apart: the relay is injected per HOST but the connection is
+ *  gated on the exact ORIGIN, so on another port of an allowed host the marker
+ *  is there and every call goes unanswered. Reading the marker here would paint
+ *  that green. */
+const relayUp = computed(() => detailServer.value?.status === 'ok')
 
-/** What the user types into WebCLI's popup — host and port, the form its own
- *  field accepts. The port is part of the identity, per the note above. */
+/** What the user types into the extension's popup — host and port, the form its
+ *  own field accepts. The port is part of the identity, per the note above. */
 const pageHost = computed(() => window.location.host)
 
-/** WebCLI starts listening on pages loaded AFTER the origin is added, so a
- *  reload is the step that finishes setup — not a wait. */
+/** The extension starts listening on pages loaded AFTER the origin is added, so
+ *  a reload is the step that finishes setup — not a wait. */
 function reloadPage(): void {
   window.location.reload()
 }
 
-/** The raw connection error, except on WebCLI — there the setup panel above says
- *  the same thing in a form the user can act on. */
+/** The raw connection error, except on the extension row — there the setup
+ *  panel above says the same thing in a form the user can act on. */
 const showConnectError = computed(
-  () => detailServer.value?.status === 'error' && !detailIsWebcli.value,
+  () => detailServer.value?.status === 'error' && !detailIsConnect.value,
 )
 
-/** Whether re-probing can possibly change the answer. For WebCLI with no relay on
- *  the page it cannot — only a navigation injects one — so every button that
- *  offers to try again is hidden in that state, Reconnect included. */
-const canProbe = computed(() => !detailIsWebcli.value || mcp.relayReady)
+/** Whether re-probing can possibly change the answer. For the extension row
+ *  with no relay on the page it cannot — only a navigation injects one — so
+ *  every button that offers to try again is hidden in that state, Reconnect
+ *  included. */
+const canProbe = computed(() => !detailIsConnect.value || detailRelayExt.value !== null)
 
 /** What is wrong, in one line, before the steps that fix it. The marker cannot
  *  tell "not installed" from "this site was never added" — both leave nothing on
  *  the page — so that diagnosis names both rather than guessing one. */
-const webcliProblem = computed(() =>
-  mcp.relayReady ? 'settings.webcli.presentButSilent' : 'settings.webcli.notDetected',
+const relayProblem = computed(() =>
+  detailRelayExt.value !== null
+    ? 'settings.lmdConnect.presentButSilent'
+    : 'settings.lmdConnect.notDetected',
 )
 
 /** Disable only exists where there is configuration worth keeping — a server's
@@ -905,52 +912,42 @@ function removeDetail(): void {
       <p v-if="signInError" class="text-xs text-removed leading-relaxed">{{ signInError }}</p>
     </div>
 
-    <!-- WebCLI. There is no address and no id to enter — the extension writes its
-         own id into the page when it is willing to talk to us — so this panel is
-         entirely about the permission: has the user added this site, and if not,
-         the three steps that do it. -->
-    <div v-if="detailEntry?.kind === 'extension' && detailIsWebcli" class="space-y-2">
-      <div v-if="webcliUp" class="space-y-1">
+    <!-- localmd Connect. There is no address and no id to enter — the extension
+         writes its own id into the page when it is willing to talk to us — so
+         this panel is about setup state: production needs nothing (localmd.app
+         is pre-authorized at install), dev origins need the address step, and
+         the "Allow user scripts" toggle is what unlocks func adapters + site
+         scripts. -->
+    <div v-if="detailEntry?.kind === 'extension' && detailIsConnect" class="space-y-2">
+      <div v-if="relayUp" class="space-y-1">
         <div class="flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-added shrink-0" />
-          <span class="text-xs text-fg-1">{{ $t('settings.webcli.connected') }}</span>
+          <span class="text-xs text-fg-1">{{ $t('settings.lmdConnect.connected') }}</span>
         </div>
         <div class="text-xs text-fg-3 font-mono break-all">
-          {{ $t('settings.webcli.extension', { id: mcp.relayExt ?? '' }) }}
+          {{ $t('settings.lmdConnect.extension', { id: detailRelayExt ?? '' }) }}
         </div>
       </div>
 
       <div v-else class="space-y-2">
-        <!-- What is wrong comes FIRST. Steps without a diagnosis leave the user
-             re-doing the one they already did; and when the relay is on the page,
-             the problem is specifically the address, nearly always its port. -->
         <div class="flex items-start gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-removed shrink-0 mt-1.5" />
-          <p class="text-xs text-removed leading-relaxed">{{ $t(webcliProblem) }}</p>
+          <p class="text-xs text-removed leading-relaxed">{{ $t(relayProblem) }}</p>
         </div>
-        <div class="pt-0.5 text-xs text-fg-1">{{ $t('settings.webcli.setupTitle') }}</div>
-        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.webcli.setupIntro') }}</p>
+        <div class="pt-0.5 text-xs text-fg-1">{{ $t('settings.lmdConnect.setupTitle') }}</div>
+        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.lmdConnect.setupIntro') }}</p>
         <ol class="text-xs text-fg-2 leading-relaxed space-y-1 list-decimal pl-4">
+          <li>{{ $t('settings.lmdConnect.step1') }}</li>
+          <li>{{ $t('settings.lmdConnect.stepScripts') }}</li>
           <li>
-            {{ $t('settings.webcli.step1') }}
-            <a
-              v-if="detailEntry.homepage"
-              :href="detailEntry.homepage"
-              target="_blank"
-              rel="noopener"
-              class="text-accent hover:underline"
-            >{{ $t('settings.installFromStore') }}</a>
-          </li>
-          <!-- The address is shown rather than described: it is the one string
-               that has to match exactly, and it differs per dev port. -->
-          <li>
-            {{ $t('settings.webcli.step2') }}
+            {{ $t('settings.lmdConnect.step2') }}
             <span class="font-mono text-fg-1">{{ pageHost }}</span>
           </li>
-          <li>{{ $t('settings.webcli.step3') }}</li>
+          <li>{{ $t('settings.lmdConnect.step3') }}</li>
         </ol>
+        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.lmdConnect.noOriginNote') }}</p>
         <div class="flex items-center gap-1.5 flex-wrap">
-          <button class="btn text-xs" @click="reloadPage">{{ $t('settings.webcli.reload') }}</button>
+          <button class="btn text-xs" @click="reloadPage">{{ $t('settings.lmdConnect.reload') }}</button>
           <!-- Offered only where it can actually succeed. With a relay on the page,
                re-probing works: the origin gate is consulted per connection, so
                adding the address needs no reload. With NO relay, nothing but a
@@ -961,7 +958,7 @@ function removeDetail(): void {
             class="btn text-xs"
             :disabled="checkState === 'checking'"
             @click="runCheck(detailServer.config.id)"
-          >{{ $t('settings.webcli.recheck') }}</button>
+          >{{ $t('settings.lmdConnect.recheck') }}</button>
           <span
             v-if="checkState !== 'idle'"
             class="text-xs"
@@ -970,15 +967,9 @@ function removeDetail(): void {
         </div>
       </div>
 
-      <a
-        v-if="detailEntry.repo"
-        :href="detailEntry.repo"
-        target="_blank"
-        rel="noopener"
-        class="inline-flex items-center gap-1 text-xs text-accent hover:underline"
-      >
-        <span class="codicon codicon-sm codicon-github" />{{ $t('settings.catalogRepo') }}
-      </a>
+      <!-- What the extension may do is gated in the chat, not in the popup —
+           worth one line here so the user knows where the confirms come from. -->
+      <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.lmdConnect.confirmNote') }}</p>
     </div>
 
     <!-- The only fields a preset leaves to the user. -->
@@ -1008,7 +999,7 @@ function removeDetail(): void {
     </div>
     <!-- A check that changes nothing still has to say it ran. -->
     <p
-      v-if="detailServer && !detailIsWebcli && checkState !== 'idle'"
+      v-if="detailServer && !detailIsConnect && checkState !== 'idle'"
       class="text-xs"
       :class="CHECK_LABEL[checkState].cls"
     >{{ $t(CHECK_LABEL[checkState].key) }}</p>
@@ -1112,7 +1103,7 @@ function removeDetail(): void {
           <select v-model="form.transport" class="input text-xs">
             <option value="auto">{{ $t('settings.transportAuto') }}</option>
             <option value="direct">{{ $t('settings.transportDirect') }}</option>
-            <option value="webcli">{{ $t('settings.transportWebcli') }}</option>
+            <option value="extension">{{ $t('settings.transportExtension') }}</option>
           </select>
         </div>
       </div>
@@ -1291,12 +1282,12 @@ function removeDetail(): void {
         autocomplete="off"
       />
       <label class="flex items-start gap-2 pt-1 cursor-pointer">
-        <input v-model="mcpViaWebcli" type="checkbox" class="mt-0.5" />
+        <input v-model="mcpViaExtension" type="checkbox" class="mt-0.5" />
         <span class="text-xs text-fg-2 leading-relaxed">
-          {{ $t('settings.serverViaWebcli') }}
-          <span class="block text-fg-3">{{ $t('settings.serverViaWebcliHint') }}</span>
-          <span v-if="mcpViaWebcli && !mcp.relayReady" class="block text-removed">
-            {{ $t('settings.serverViaWebcliMissing') }}
+          {{ $t('settings.serverViaExtension') }}
+          <span class="block text-fg-3">{{ $t('settings.serverViaExtensionHint') }}</span>
+          <span v-if="mcpViaExtension && !mcp.connectReady" class="block text-removed">
+            {{ $t('settings.serverViaExtensionMissing') }}
           </span>
         </span>
       </label>
@@ -1371,9 +1362,9 @@ function removeDetail(): void {
             <span class="flex items-center gap-1.5 flex-wrap">
               <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
               <span
-                v-if="e.id === 'webcli' && tools.isInstalled(e.id) && !tools.webcliConnected"
+                v-if="e.kind === 'extension' && tools.isInstalled(e.id) && entryServer(e)?.status !== 'ok'"
                 class="text-2xs rounded px-1 py-0.5 bg-removed/15 text-removed"
-              >{{ $t('settings.webcli.setupNeeded') }}</span>
+              >{{ $t('settings.lmdConnect.setupNeeded') }}</span>
             </span>
             <span class="block mt-0.5 text-xs text-fg-3 leading-relaxed">
               {{ $t(`settings.catalog.${e.id}.desc`) }}

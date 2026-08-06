@@ -2,14 +2,15 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import {
   McpRelayClient,
   relayExtensionId,
-  isWebcliRelayUrl,
-  WEBCLI_RELAY_URL,
-  RELAY_ABSENT_MESSAGE,
-  webcliWire,
-} from '@/lib/webcliRelay'
+  relayAbsentMessage,
+  isLocalmdConnectRelayUrl,
+  LOCALMD_CONNECT_RELAY_URL,
+  LOCALMD_CONNECT_EXTENSION,
+  extensionWire,
+} from '@/lib/connectRelay'
 import { McpHttpClient } from '@/lib/mcp'
 
-const EXT = 'jnhfdhpafndcbppkphhfpecflhogngge'
+const EXT = 'enodecpmlecfpmofogpmbagdcfheamgf'
 
 interface Frame {
   webcli?: unknown
@@ -34,9 +35,12 @@ function fakeRelay(
     /** What an origin the user never added looks like: frames accepted, nothing
      *  ever comes back (the extension drops the port without a word). */
     silent?: boolean
+    /** Which dataset key the relay writes its id to. */
+    marker?: string
   } = {},
 ) {
   const ext = opts.ext === undefined ? EXT : opts.ext
+  const marker = opts.marker ?? LOCALMD_CONNECT_EXTENSION.marker
   const listeners = new Set<(e: { source: unknown; data: unknown }) => void>()
   const sent: Frame[] = []
 
@@ -53,7 +57,8 @@ function fakeRelay(
       const f = data as Frame
       if (f.dir !== 'to-ext') return
       sent.push(f)
-      // The relay drops a frame addressed to the other install (store + dev).
+      // The relay drops a frame addressed to another install of the envelope's
+      // extension family (a dev build, a sibling extension).
       if (typeof f.ext === 'string' && ext !== null && f.ext !== ext) return
       if (opts.silent) return
       const id = f.msg?.id
@@ -78,7 +83,8 @@ function fakeRelay(
     for (const cb of [...listeners]) cb({ source: win, data })
   }
 
-  const doc = { documentElement: { dataset: ext === null ? {} : { webcliRelay: ext } } }
+  const dataset: Record<string, string> = ext === null ? {} : { [marker]: ext }
+  const doc = { documentElement: { dataset } }
   ;(globalThis as unknown as { window: unknown }).window = win
   ;(globalThis as unknown as { document: unknown }).document = doc
 
@@ -89,9 +95,9 @@ function fakeRelay(
     /** What the extension sees as the addressee of every frame. */
     targets: () => [...new Set(sent.map((f) => f.ext))],
     /** The user adding this origin in the popup and reloading. */
-    setMarker: (id: string | null) => {
-      if (id === null) delete (doc.documentElement.dataset as { webcliRelay?: string }).webcliRelay
-      else doc.documentElement.dataset.webcliRelay = id
+    setMarker: (id: string | null, key = marker) => {
+      if (id === null) delete dataset[key]
+      else dataset[key] = id
     },
     listenerCount: () => listeners.size,
   }
@@ -104,7 +110,7 @@ afterEach(() => {
 })
 
 describe('relay marker', () => {
-  it('is the whole of "is WebCLI reachable" — and reads synchronously', () => {
+  it('is the whole of "is the extension reachable" — and reads synchronously', () => {
     const relay = fakeRelay()
     expect(relayExtensionId()).toBe(EXT)
     relay.setMarker(null)
@@ -120,14 +126,24 @@ describe('relay marker', () => {
   it('reports absent outside a browser (no document at all)', () => {
     expect(relayExtensionId()).toBe(null)
   })
+
+  /** Detection is per marker: another extension's marker on the same page says
+   *  nothing about this one. */
+  it('reads only its own marker', () => {
+    const relay = fakeRelay({ ext: null })
+    relay.setMarker('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'someOtherRelay')
+    expect(relayExtensionId()).toBe(null)
+    relay.setMarker(EXT)
+    expect(relayExtensionId()).toBe(EXT)
+  })
 })
 
 describe('relay url', () => {
-  it('recognises the row that means "WebCLI, over the relay"', () => {
-    expect(isWebcliRelayUrl(WEBCLI_RELAY_URL)).toBe(true)
-    expect(isWebcliRelayUrl(` ${WEBCLI_RELAY_URL} `)).toBe(true)
-    expect(isWebcliRelayUrl(EXT)).toBe(false)
-    expect(isWebcliRelayUrl('https://mcp.deepwiki.com/mcp')).toBe(false)
+  it('recognises the row that means "localmd Connect, over the relay"', () => {
+    expect(isLocalmdConnectRelayUrl(LOCALMD_CONNECT_RELAY_URL)).toBe(true)
+    expect(isLocalmdConnectRelayUrl(` ${LOCALMD_CONNECT_RELAY_URL} `)).toBe(true)
+    expect(isLocalmdConnectRelayUrl(EXT)).toBe(false)
+    expect(isLocalmdConnectRelayUrl('https://mcp.deepwiki.com/mcp')).toBe(false)
   })
 })
 
@@ -146,8 +162,9 @@ describe('McpRelayClient', () => {
     const client = new McpRelayClient()
     await client.connect()
     await client.callTool('generic__open_url', { url: 'https://example.com' })
-    // Untargeted frames are executed by BOTH a store and a dev install — twice,
-    // which matters the moment a write tool is involved.
+    // The envelope tag is shared by every extension built from the same relay
+    // codebase, so an untargeted frame would be executed by each of them —
+    // more than once, which matters the moment a write tool is involved.
     expect(relay.targets()).toEqual([EXT])
   })
 
@@ -163,13 +180,17 @@ describe('McpRelayClient', () => {
 
   it('refuses to speak when the relay is not on the page', async () => {
     fakeRelay({ ext: null })
-    await expect(new McpRelayClient().connect()).rejects.toThrow(RELAY_ABSENT_MESSAGE)
+    await expect(new McpRelayClient().connect()).rejects.toThrow(
+      relayAbsentMessage(LOCALMD_CONNECT_EXTENSION),
+    )
   })
 
   it('picks up the marker appearing later (no client rebuild needed)', async () => {
     const relay = fakeRelay({ ext: null })
     const client = new McpRelayClient()
-    await expect(client.connect()).rejects.toThrow(RELAY_ABSENT_MESSAGE)
+    await expect(client.connect()).rejects.toThrow(
+      relayAbsentMessage(LOCALMD_CONNECT_EXTENSION),
+    )
     relay.setMarker(EXT)
     await expect(client.connect()).resolves.toHaveLength(1)
   })
@@ -186,7 +207,7 @@ describe('McpRelayClient', () => {
     await assertion
   })
 
-  it('ignores a reply from the other install', async () => {
+  it('ignores a reply from another install', async () => {
     fakeRelay({ replyExt: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })
     vi.useFakeTimers()
     const connecting = new McpRelayClient().connect()
@@ -243,7 +264,7 @@ describe('McpRelayClient', () => {
   })
 })
 
-describe('webcliWire', () => {
+describe('extensionWire', () => {
   /** The shape fetch_url actually answers with, trimmed to what we read. */
   const result = (over: Record<string, unknown> = {}) =>
     JSON.stringify({
@@ -260,7 +281,7 @@ describe('webcliWire', () => {
 
   it('passes the request through and asks fetch_url not to wait out an open stream', async () => {
     let seen: Record<string, unknown> = {}
-    const wire = webcliWire(async (args) => {
+    const wire = extensionWire(async (args) => {
       seen = args
       return result()
     })
@@ -297,7 +318,7 @@ describe('webcliWire', () => {
       'event: message\ndata: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26"}}\n',
       'event: message\ndata: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"search"}]}}\n',
     ]
-    const wire = webcliWire(async (args) =>
+    const wire = extensionWire(async (args) =>
       JSON.stringify({
         status: 200,
         ok: true,
@@ -314,7 +335,7 @@ describe('webcliWire', () => {
   })
 
   it('lowercases response headers so protocol state is findable', async () => {
-    const wire = webcliWire(async () => result())
+    const wire = extensionWire(async () => result())
     const reply = await wire({ url: 'https://e/mcp', method: 'POST', headers: {} })
     // The extension echoes whatever casing the server used; MCP looks these up
     // by a fixed lowercase name.
@@ -325,7 +346,7 @@ describe('webcliWire', () => {
   })
 
   it('reports a non-ok exchange rather than throwing, so 401 can be read', async () => {
-    const wire = webcliWire(async () =>
+    const wire = extensionWire(async () =>
       result({ status: 401, ok: false, headers: { 'WWW-Authenticate': 'Bearer realm="OAuth"' } }),
     )
     const reply = await wire({ url: 'https://e/mcp', method: 'POST', headers: {} })
@@ -336,7 +357,7 @@ describe('webcliWire', () => {
   })
 
   it('treats a plain-text answer as the bridge reporting a failure', async () => {
-    const wire = webcliWire(async () => 'fetch_url failed: signal timed out')
+    const wire = extensionWire(async () => 'fetch_url failed: signal timed out')
     await expect(wire({ url: 'https://e/mcp', method: 'POST', headers: {} })).rejects.toThrow(
       /signal timed out/,
     )

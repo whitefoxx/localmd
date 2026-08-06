@@ -2,9 +2,10 @@
  * MCP (Model Context Protocol) client over Streamable HTTP — one endpoint,
  * JSON-RPC over POST, responses either application/json or a text/event-stream
  * body. A server row picks how it is REACHED (McpWire below: the browser's own
- * fetch, or WebCLI's fetch_url for endpoints that refuse browsers) and, for
- * WebCLI itself, an entirely different transport — the postMessage relay in
- * lib/webcliRelay.ts, which satisfies McpClientLike rather than McpWire.
+ * fetch, or the localmd Connect extension's fetch_url for endpoints that
+ * refuse browsers) and, for the extension itself, an entirely different
+ * transport — the postMessage relay in lib/connectRelay.ts, which satisfies
+ * McpClientLike rather than McpWire.
  *
  * External tools are namespaced `mcp__<server>__<tool>` (Claude Code's
  * convention) so they can't shadow built-in tools.
@@ -24,8 +25,8 @@ export interface McpServerConfig {
   id: string
   /** Short name used in tool namespacing — sanitized to [a-z0-9-]. */
   name: string
-  /** A Streamable-HTTP endpoint, or WEBCLI_RELAY_URL for WebCLI's relay.
-   *  May carry `{{secret:<id>}}` — see resolveServerSecrets. */
+  /** A Streamable-HTTP endpoint, or LOCALMD_CONNECT_RELAY_URL for the
+   *  extension's relay. May carry `{{secret:<id>}}` — see resolveServerSecrets. */
   url: string
   /** Optional bearer token — sugar for `headers: { Authorization: 'Bearer …' }`,
    *  kept because it is the shape most servers and every existing config use.
@@ -42,12 +43,12 @@ export interface McpServerConfig {
    */
   headers?: Record<string, string>
   /** How to reach `url`. 'direct' (default) is a browser fetch, so the endpoint
-   *  must allow CORS. 'webcli' proxies every exchange through the WebCLI
-   *  extension's fetch_url, which runs in a service worker and is not bound by
+   *  must allow CORS. 'extension' proxies every exchange through localmd
+   *  Connect's fetch_url, which runs in a service worker and is not bound by
    *  page CORS — the only way to reach the majority of hosted MCP servers, which
-   *  send no CORS headers at all. Ignored when `url` is WEBCLI_RELAY_URL: that
-   *  row IS WebCLI. */
-  transport?: 'direct' | 'webcli'
+   *  send no CORS headers at all. Ignored when `url` is
+   *  LOCALMD_CONNECT_RELAY_URL: that row IS the extension. */
+  transport?: 'direct' | 'extension'
   /** false = keep the config but don't connect (default true). */
   enabled?: boolean
 }
@@ -180,9 +181,9 @@ export interface McpWireReply {
 
 /**
  * One request/response exchange, and the only thing that differs between
- * reaching a server directly and reaching it through WebCLI. Everything else —
- * the JSON-RPC framing, the session header, SSE parsing, the teardown — is
- * written once in McpHttpClient and works over either.
+ * reaching a server directly and reaching it through the extension. Everything
+ * else — the JSON-RPC framing, the session header, SSE parsing, the teardown —
+ * is written once in McpHttpClient and works over either.
  */
 export type McpWire = (req: McpWireRequest, signal?: AbortSignal) => Promise<McpWireReply>
 
@@ -240,8 +241,8 @@ export class McpHttpClient implements McpClientLike {
   private sessionId: string | null = null
   onLost?: (reason: string) => void
 
-  /** `wire` defaults to the browser's fetch; stores/mcp.ts hands in the WebCLI
-   *  one for rows whose endpoint refuses browsers. */
+  /** `wire` defaults to the browser's fetch; stores/mcp.ts hands in the
+   *  extension one for rows whose endpoint refuses browsers. */
   constructor(
     private cfg: McpServerConfig,
     private wire: McpWire = directWire,
@@ -424,7 +425,7 @@ export function normalizeMcpServerList(
       url,
       ...(ss.token ? { token: String(ss.token) } : {}),
       ...(headersFrom(ss.headers) ?? {}),
-      ...(ss.transport === 'webcli' ? { transport: 'webcli' as const } : {}),
+      ...(ss.transport === 'extension' ? { transport: 'extension' as const } : {}),
       ...(ss.enabled === false ? { enabled: false } : {}),
     })
   }
