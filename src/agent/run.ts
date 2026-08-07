@@ -317,8 +317,15 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   // interrupted turn as a finished one.
   if (steps >= MAX_ITERATIONS) opts.onEvent({ type: 'limit', steps })
 
-  const response = await result.response
-  return [...opts.messages, ...response.messages]
+  // `response.messages` is the LAST step's messages, not the turn's. On any
+  // multi-step turn that is just the closing assistant text, so persisting it
+  // drops every tool call and result the turn made: the next turn sees the
+  // model's own summary and no record of what it actually read, and the
+  // tool-result stubbing in lib/history.ts never has anything to stub. The
+  // steps hold the whole turn — this is how the SDK assembles history for the
+  // next step internally. See run.test.ts, which pins the distinction.
+  const turnSteps = await result.steps
+  return [...opts.messages, ...turnSteps.flatMap((s) => s.response.messages)]
 }
 
 function usageEvent(usage: LanguageModelUsage): {
