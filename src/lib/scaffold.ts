@@ -86,7 +86,18 @@ Subject: a discussion. This can be the **current conversation**, or any file the
 Finding nothing worth distilling is a perfectly normal outcome — just say so.
 `
 
+/* The two trees the app writes and the user never asked for. Offered here so a
+ * brand-new KB is already clean the first time it is committed; an existing KB
+ * gets the same line added lazily, on the first write into either (see
+ * lib/gitignore.ts). Both are regenerable derivative data — indexes, oversized
+ * tool results, composer attachments — and none of it belongs in a history. */
+const GITIGNORE = `# Written by localmd: regenerable, not part of your knowledge base.
+.trace/
+.tmp/
+`
+
 const FILES: Array<[string, string]> = [
+  ['.gitignore', GITIGNORE],
   ['AGENTS.md', AGENTS_MD],
   ['wiki/index.md', INDEX_MD],
   ['.agents/skills/ingest/SKILL.md', SKILL_INGEST],

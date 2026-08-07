@@ -10,6 +10,7 @@
  * importFile()/captureFiles().
  */
 import * as fs from '@/lib/fs'
+import { ensureIgnored } from '@/lib/gitignore'
 
 /** Neutral landing directory for KBs that don't use the raw/ layout. */
 export const INBOX_DIR = 'inbox'
@@ -95,29 +96,13 @@ export async function importFile(f: File): Promise<string> {
 
 /** KB directory for ephemeral files — pasted screenshots and other chat-composer
  *  attachments handed to the agent, which don't belong in the curated `raw/`
- *  tree. Kept out of git via ensureTmpIgnored(). */
+ *  tree. Kept out of git via ensureIgnored() on the first temp write. */
 export const TMP_DIR = '.tmp'
-
-/** Ensure the KB's `.gitignore` excludes the temp dir. Idempotent; runs on the
- *  first temp write. Honoured by both the in-app commit flow (git.isIgnored)
- *  and terminal git, so nothing under `.tmp/` ever enters the repo. */
-async function ensureTmpIgnored(): Promise<void> {
-  const line = `${TMP_DIR}/`
-  const current = (await fs.tryReadFile('.gitignore')) ?? ''
-  const ignored = current.split('\n').some((l) => {
-    const t = l.trim()
-    return t === line || t === TMP_DIR
-  })
-  if (ignored) return
-  const next =
-    current && !current.endsWith('\n') ? `${current}\n${line}\n` : `${current}${line}\n`
-  await fs.writeFile('.gitignore', next)
-}
 
 /** Write an ephemeral File into the temp dir (flat) and return its KB path.
  *  Used by the chat composer so pasted screenshots don't land in `raw/images/`. */
 export async function importTempFile(f: File): Promise<string> {
-  await ensureTmpIgnored()
+  await ensureIgnored(TMP_DIR)
   const name = ensureFilename(f.name, f.type, Date.now())
   const dest = await resolveUniquePath(`${TMP_DIR}/${name}`)
   await fs.writeFile(dest, f)

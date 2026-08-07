@@ -5,6 +5,7 @@
  * kept byte-compatible with trace-app so existing KBs interoperate.
  */
 import * as fs from '@/lib/fs'
+import { ensureIgnored } from '@/lib/gitignore'
 
 /** Zero-pad a number to 3 digits (`7` → `"007"`). */
 export function pad(n: number): string {
@@ -49,11 +50,18 @@ export function indexDirFor(kind: 'pdf' | 'epub' | 'md' | 'docx', source: string
 /**
  * Write the index files with bounded concurrency — a large book becomes
  * hundreds of section files, and firing every write at once exhausts handles.
+ *
+ * The one place every index kind writes, so it is also where `.trace/` earns
+ * its `.gitignore` line: an index is megabytes of regenerable derivative data,
+ * and a KB that only ever indexes documents would otherwise never be told.
  */
 export async function writeAll(
   indexDir: string,
   files: { path: string; content: string }[],
 ): Promise<void> {
+  await ensureIgnored('.trace').catch(() => {
+    /* the index is still worth writing if the .gitignore cannot be touched */
+  })
   const CHUNK = 24
   for (let i = 0; i < files.length; i += CHUNK) {
     await Promise.all(
