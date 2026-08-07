@@ -39,8 +39,8 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
   Individual tools are *data* created on top of it by the user or the agent:
   "search Hacker News", "add the Notion server" are conversations, not releases.
 - **The catalog is three entries, and adding a fourth needs an argument.**
-  WebCLI plus two web searches — what someone wants before they know what they
-  want. It is deliberately not a directory: a curated list is a promise that
+  localmd Connect plus two web searches — what someone wants before they know
+  what they want. It is deliberately not a directory: a curated list is a promise that
   rots (entries need re-verifying forever, and every inclusion is an editorial
   call the machinery has made unnecessary), and the app already reaches a keyed
   service, a CORS-refusing one, or one behind OAuth. Point people at mcp.so and
@@ -162,8 +162,8 @@ agent pipeline (docs/token-optimization.md has the full log):
 - **Verify browser-facing work in a real browser.** typecheck and vitest cannot
   see the three things this app actually lives on: CORS, the Chrome-extension
   transports, and the File System Access API. Drive the running dev server
-  through **Claude for Chrome** (`mcp__claude-in-chrome__*`) or **WebCLI** —
-  plain browsing of the app, never `?e2e=1`. Before claiming an endpoint works,
+  through **Claude for Chrome** (`mcp__claude-in-chrome__*`) — plain browsing of
+  the app, never `?e2e=1`. Before claiming an endpoint works,
   `fetch` it from the page origin; before claiming a feature works, click the
   path a user would rather than only the store beneath it. This is not
   ceremony: shaping real API responses caught a placeholder-regex bug that a

@@ -270,7 +270,9 @@ test('without a licence the Connections group is visible, locked, and says why',
   await expect(page.getByRole('button', { name: /Add an MCP server/ })).toBeDisabled()
 })
 
-test('WebCLI is presented as a permission to grant, not an id to copy', async ({ page }) => {
+test('localmd Connect is presented as a permission to grant, not an id to copy', async ({
+  page,
+}) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   // The activity bar is icon-only (title, no text), so locate by its icon.
   await page.locator('nav button:has(.codicon-settings-gear)').click()
@@ -278,20 +280,17 @@ test('WebCLI is presented as a permission to grant, not an id to copy', async ({
 
   // Install it the way a user does — its switch on the Tools page, in the
   // Connections group (e2e runs licensed by default, so the group is open).
-  await expect(page.getByText('WebCLI browser extension')).toBeVisible()
+  await expect(page.getByText('localmd Connect browser extension')).toBeVisible()
   await page
-    .locator('label', { hasText: 'WebCLI browser extension' })
+    .locator('label', { hasText: 'localmd Connect browser extension' })
     .getByRole('checkbox')
     .click()
 
   // Checking the box probed it and, finding nothing, brought us straight here —
   // no going back and noticing "Setup needed" on the way. What is wrong is stated
-  // BEFORE the steps that fix it — and the store link is on this page too.
-  await expect(page.getByText(/cannot see WebCLI on this page/)).toBeVisible()
-  await expect(
-    page.getByRole('link', { name: /Install from the Chrome Web Store/ }),
-  ).toHaveAttribute('href', /chromewebstore\.google\.com/)
-  await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
+  // BEFORE the steps that fix it.
+  await expect(page.getByText(/cannot see localmd Connect on this page/)).toBeVisible()
+  await expect(page.getByText('Set up localmd Connect')).toBeVisible()
   // The steps name the exact address to add — including the port, which is the
   // usual reason it fails.
   const allowStep = page.locator('li', { hasText: 'Web app access' })
@@ -309,41 +308,41 @@ test('WebCLI is presented as a permission to grant, not an id to copy', async ({
   await expect(page.getByText(/Only reloading can change/)).toBeVisible()
 
   await page.locator('button:has(.codicon-arrow-left)').click()
-  await expect(page.getByRole('button', { name: /WebCLI browser extension/ })).toContainText(
-    'Setup needed',
-  )
+  await expect(
+    page.getByRole('button', { name: /localmd Connect browser extension/ }),
+  ).toContainText('Setup needed')
 })
 
-test('a relay on the page is not the same as WebCLI answering', async ({ page }) => {
-  // WebCLI injects its relay per HOST but gates the connection on the exact
-  // ORIGIN, so on another port of an allowed host the marker is present and every
-  // call goes unanswered. Faking just the marker reproduces that exactly.
+test('a relay on the page is not the same as localmd Connect answering', async ({ page }) => {
+  // The extension injects its relay per HOST but gates the connection on the
+  // exact ORIGIN, so on another port of an allowed host the marker is present and
+  // every call goes unanswered. Faking just the marker reproduces that exactly.
   await page.addInitScript(() => {
     const mark = (): void => {
-      if (document.documentElement) document.documentElement.dataset.webcliRelay = 'a'.repeat(32)
+      if (document.documentElement) document.documentElement.dataset.localmdConnect = 'a'.repeat(32)
     }
     mark()
     document.addEventListener('DOMContentLoaded', mark)
   })
   await page.goto('/?e2e=1')
   await expect
-    .poll(() => page.evaluate(() => document.documentElement.dataset.webcliRelay ?? null))
+    .poll(() => page.evaluate(() => document.documentElement.dataset.localmdConnect ?? null))
     .not.toBeNull()
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   await page.locator('nav button:has(.codicon-settings-gear)').click()
   await page.locator('button:has(.codicon-plug)').click()
   await page
-    .locator('label', { hasText: 'WebCLI browser extension' })
+    .locator('label', { hasText: 'localmd Connect browser extension' })
     .getByRole('checkbox')
     .click()
   await page.locator('button:has(.codicon-arrow-left)').click()
-  await page.getByRole('button', { name: /WebCLI browser extension/ }).click()
+  await page.getByRole('button', { name: /localmd Connect browser extension/ }).click()
 
   // Still the setup panel — and it names the reason, which is the address, not
   // the install.
-  await expect(page.getByText('Let WebCLI talk to this site')).toBeVisible()
+  await expect(page.getByText('Set up localmd Connect')).toBeVisible()
   await expect(page.getByText(/is not answering it/)).toBeVisible()
-  await expect(page.getByText(/Connected — WebCLI is answering/)).toHaveCount(0)
+  await expect(page.getByText(/Connected — localmd Connect is answering/)).toHaveCount(0)
 
   // Here a re-probe CAN succeed — the origin gate is consulted per connection, so
   // adding the address needs no reload — and pressing it has to be visible.
