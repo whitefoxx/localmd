@@ -32,6 +32,7 @@ import {
   versionsOf as versionsOfNode,
 } from '@/lib/branch'
 import { loadSkill } from '@/lib/skills'
+import { dropToolResults } from '@/lib/toolResults'
 import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib/transcript'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
@@ -480,6 +481,10 @@ export const useChatStore = defineStore('chat', () => {
     stop(id)
     closeTab(id)
     await idb.deleteSession(id)
+    // Oversized tool results this session parked in .trace/ go with it. Best
+    // effort and unawaited: the session is already gone from the user's view,
+    // and a leftover file under .trace/ is invisible anyway.
+    void dropToolResults(id)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 

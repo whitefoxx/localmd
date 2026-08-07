@@ -35,12 +35,10 @@ import {
   groupByBundle,
   secretRefs,
   staticOrigin,
-  // The local `clip` in this file is the file-reading one (offset semantics);
-  // this is the token-budget one shared with HTTP tools.
-  clip as clipToBudget,
   KB_TOOLS_CONFIG_PATH,
   type HttpToolSpec,
 } from '@/lib/httpTools'
+import { clipWithRecall, storeToolResult } from '@/lib/toolResults'
 import { diffLines, collapseContext, type DiffLine, type HunkLine } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { listAppDocsForAgent, appDocForAgent } from '@/lib/appDocs'
@@ -1595,7 +1593,15 @@ function toExternalSpec(
         // wire both read a JSON envelope out of it, and clipping that would
         // corrupt the plumbing rather than save tokens. This is the model-facing
         // path.
-        return clipToBudget(out, MAX_EXTERNAL_TOOL_CHARS)
+        //
+        // Past the budget the tail would be gone for good, so save the whole
+        // thing first and let the clip note point at it: re-reading a file is
+        // deterministic and free, where re-calling the tool may re-rank, be
+        // refused, or have no way to ask for the part that went missing. Only
+        // this branch writes — a result that fits is not losing anything.
+        if (out.length <= MAX_EXTERNAL_TOOL_CHARS) return out
+        const stored = await storeToolResult(sessionId, t.qualifiedName, out)
+        return clipWithRecall(out, MAX_EXTERNAL_TOOL_CHARS, stored)
       } catch (err) {
         return `Error: ${(err as Error).message}`
       }

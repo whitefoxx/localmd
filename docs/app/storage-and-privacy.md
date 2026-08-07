@@ -19,7 +19,8 @@ Everything that *is* your knowledge base, plus anything meant to travel with it:
 - `AGENTS.md` — how your folder is organized
 - `MEMORY.md` — what the assistant remembers about you
 - `.agents/` — saved workflows, and any tools this folder carries
-- `.trace/` — document indexes
+- `.trace/` — document indexes, and any result too large to fit in one
+  conversation, kept so the assistant can read the rest of it back
 - `artifacts/` — interactive pages the assistant generated
 
 Share or clone the folder and all of this comes along.
