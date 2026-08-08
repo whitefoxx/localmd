@@ -964,6 +964,16 @@ Rules that will reject a spec:
   token into the chat: put {{secret:<id>}} in the spec, then call request_setup
   with kind:"key" and that same id — the app shows them a field, stores what
   they type, and tells you only that a value arrived.
+- {{now:unix}} {{now:ms}} {{now:iso}} {{uuid:v4}} are filled in by the app at
+  request time. Reach for one when a header must be FRESH per call — plenty of
+  Bearer APIs also validate a timestamp header, and an idempotency key must be
+  new each time. Never declare a parameter for the current time and pass it
+  yourself (you have no reliable clock, and a stale value comes back as an
+  authorization error that looks like a bad key), and never store one as a
+  secret (it would be stale on the second call).
+- A placeholder in the REQUEST that is not a param, not a {{secret:id}} and not
+  one of those runtime values is rejected, not silently blanked. In a response
+  "template" the opposite still holds: an unfilled one means a wrong field name.
 Guidance:
 - ALWAYS shape the response. A raw JSON payload can cost thousands of tokens per
   call; pick + template is the difference between 200 tokens and 20,000.

@@ -176,6 +176,86 @@ describe('buildRequest', () => {
   })
 })
 
+describe('buildRequest runtime values', () => {
+  it('fills a timestamp header the model never sees', () => {
+    const s = spec({
+      request: {
+        method: 'GET',
+        url: 'https://api.test.dev/s?q={{query}}',
+        headers: { 'X-Request-Timestamp': '{{now:unix}}' },
+      },
+    })
+    const before = Math.floor(Date.now() / 1000)
+    const sent = Number(buildRequest(s, { query: 'a' }, noSecrets).headers['X-Request-Timestamp'])
+    expect(sent).toBeGreaterThanOrEqual(before)
+    expect(sent).toBeLessThanOrEqual(Math.floor(Date.now() / 1000))
+    // Not a parameter, so it never appears in the schema the model is given —
+    // which is the whole point: the model cannot be asked for the time.
+    const props = httpToolJsonSchema(s).properties as Record<string, unknown>
+    expect(Object.keys(props)).toEqual(['query', 'limit'])
+  })
+
+  it('reads the clock ONCE per request, so every slot agrees', () => {
+    // +1.5s per read: two independent reads would straddle a second boundary
+    // and sign one request with two different timestamps.
+    let t = 1_700_000_000_000
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => (t += 1500))
+    try {
+      const s = spec({
+        request: {
+          method: 'GET',
+          url: 'https://api.test.dev/s?q={{query}}&t={{now:unix}}',
+          headers: { 'X-Request-Timestamp': '{{now:unix}}' },
+        },
+      })
+      const req = buildRequest(s, { query: 'a' }, noSecrets)
+      const fromUrl = new URL(req.url).searchParams.get('t')
+      expect(fromUrl).toBe('1700000001')
+      expect(req.headers['X-Request-Timestamp']).toBe(fromUrl)
+      expect(req.redactedUrl).toContain(`t=${fromUrl}`)
+      expect(now).toHaveBeenCalledTimes(1)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
+  it('gives one uuid per request and a fresh one on the next', () => {
+    const s = spec({
+      request: {
+        method: 'POST',
+        url: 'https://api.test.dev/x',
+        headers: { 'Idempotency-Key': '{{uuid:v4}}' },
+        body: '{"k":"{{uuid:v4}}"}',
+      },
+    })
+    const a = buildRequest(s, {}, noSecrets)
+    const b = buildRequest(s, {}, noSecrets)
+    expect(a.headers['Idempotency-Key']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-/)
+    expect(a.body).toContain(a.headers['Idempotency-Key'])
+    expect(b.headers['Idempotency-Key']).not.toBe(a.headers['Idempotency-Key'])
+  })
+
+  it('rejects an unknown request placeholder instead of blanking it', () => {
+    const s = spec({ request: { method: 'GET', url: 'https://api.test.dev/s?q={{query}}&t={{now}}' } })
+    expect(() => buildRequest(s, { query: 'a' }, noSecrets)).toThrow(HttpToolError)
+    // The message names the offender and the real options, so the author can fix
+    // it without reading this file.
+    expect(() => buildRequest(s, { query: 'a' }, noSecrets)).toThrow(/\{\{now\}\}/)
+    expect(() => buildRequest(s, { query: 'a' }, noSecrets)).toThrow(/now:unix/)
+  })
+
+  it('never resolves an inherited Object property as a value', () => {
+    for (const key of ['constructor', 'toString', 'hasOwnProperty']) {
+      const s = spec({ request: { method: 'GET', url: `https://api.test.dev/s?q={{${key}}}` } })
+      expect(() => buildRequest(s, {}, noSecrets)).toThrow(HttpToolError)
+    }
+  })
+
+  it('leaves RESPONSE templates blanking unknown fields — that is the wrong-field signal', () => {
+    expect(renderItem('- {{title}} [{{nope}}]', { title: 'T' })).toBe('- T []')
+  })
+})
+
 describe('pickPath', () => {
   const data = { results: [{ t: 'a', m: { y: 2020 } }, { t: 'b', m: { y: 2021 } }], n: 2 }
   it('reads plain and nested keys', () => {

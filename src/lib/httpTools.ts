@@ -9,6 +9,14 @@
  * agent itself when it authors one on request — none of which could exist if a
  * tool were a `defineTool` call compiled into the bundle.
  *
+ * THREE sources supply a request value, and a placeholder names which one it
+ * wants: `{{param}}` — the model passes it; `{{secret:id}}` — the user stored
+ * it; `{{now:unix}}` and its siblings in RUNTIME_VALUES — the runtime computes
+ * it fresh per request. The third is not a convenience: an API that validates a
+ * timestamp rejects a stored one, so no secret can carry it, and the model has
+ * no reliable wall clock, so asking it to pass one trades a correct request for
+ * a plausible-looking auth failure the user then has to decode.
+ *
  * Two transports, because the browser can't reach most of the web on its own:
  *   - `direct` — plain fetch(); only works when the endpoint sends CORS headers.
  *   - `extension` — routed through localmd Connect's generic__fetch_url, which
@@ -44,7 +52,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export interface HttpToolRequest {
   method: HttpMethod
-  /** https URL with `{{param}}` / `{{secret:id}}` placeholders. Origin static. */
+  /** https URL with `{{param}}` / `{{secret:id}}` / `{{now:unix}}` placeholders.
+   *  Origin static. */
   url: string
   headers?: Record<string, string>
   /** Request body template; ignored for GET/HEAD. */
@@ -345,8 +354,8 @@ export function httpToolJsonSchema(spec: HttpToolSpec): Record<string, unknown> 
 
 /* ── templating ──────────────────────────────────────────────────────────── */
 
-/** `{{param}}`, `{{secret:id}}`, and inside an item template the full pickPath
- *  grammar — `{{author[].family}}`, `{{issued.date-parts.0.0}}`. */
+/** `{{param}}`, `{{secret:id}}`, `{{now:unix}}`, and inside an item template the
+ *  full pickPath grammar — `{{author[].family}}`, `{{issued.date-parts.0.0}}`. */
 const PLACEHOLDER = /\{\{\s*([a-zA-Z0-9_.:[\]-]+)\s*\}\}/g
 
 /**
@@ -355,6 +364,44 @@ const PLACEHOLDER = /\{\{\s*([a-zA-Z0-9_.:[\]-]+)\s*\}\}/g
  */
 export function renderTemplate(tpl: string, resolve: (key: string) => string): string {
   return String(tpl ?? '').replace(PLACEHOLDER, (_whole, key: string) => resolve(key))
+}
+
+/**
+ * Values the runtime computes per request — the third placeholder source, for
+ * what neither an argument nor a stored secret can carry.
+ *
+ * Deliberately a CLOSED, enumerable set and not a hook. A spec can be authored
+ * by a model, which is why the invariants at the top of this file are load-
+ * bearing rather than hygiene; "run this snippet before the request" would buy
+ * the same expressiveness by trading an abstraction gap for a security hole.
+ * Every entry is a pure, argument-free read of the clock or of randomness, so a
+ * spec author can point one at nothing.
+ *
+ * Every key carries a `:` namespace, which makes collision with a parameter
+ * impossible rather than merely unlikely: `normalizeParams` admits only
+ * `[a-zA-Z][a-zA-Z0-9_]*`, so no parameter can ever be named `now:unix` — the
+ * same reason `{{secret:…}}` is safe, and why `xmlNodeToValue` drops XML
+ * namespace prefixes instead of keeping the colon.
+ *
+ * Growing this list is cheap; growing it speculatively is not the point. Add an
+ * entry when a real API needs it. Signing schemes (HMAC over a canonical
+ * request) are a different shape — a named scheme, not a value — and should not
+ * be forced in here when the first one shows up.
+ */
+export const RUNTIME_VALUES: Record<string, () => string> = {
+  /** Unix seconds. Bearer-plus-timestamp APIs validate freshness against it. */
+  'now:unix': () => String(Math.floor(Date.now() / 1000)),
+  /** Unix milliseconds. */
+  'now:ms': () => String(Date.now()),
+  /** RFC 3339 / ISO 8601, e.g. `2026-08-08T11:38:28.000Z`. */
+  'now:iso': () => new Date().toISOString(),
+  /** A fresh v4 UUID — `Idempotency-Key`, `X-Request-Id`. */
+  'uuid:v4': () => crypto.randomUUID(),
+}
+
+/** The runtime-value keys, for error messages and the authoring help. */
+export function runtimeValueKeys(): string[] {
+  return Object.keys(RUNTIME_VALUES)
 }
 
 function coerce(value: unknown, type: HttpParamType): string {
@@ -412,6 +459,20 @@ export function buildRequest(
   }
   const urlSlot: Slot = spec.anyOrigin ? 'urlwhole' : 'url'
 
+  // Runtime values are read ONCE per request and reused. A spec may put
+  // {{now:unix}} in the URL and in a header at the same time, and two
+  // independent reads of the clock can straddle a second boundary — producing
+  // exactly the inconsistent request a timestamp-validating API rejects. It
+  // also keeps `redactedUrl` an exact twin of `url` instead of one tick older.
+  const runtime = new Map<string, string>()
+  const runtimeValue = (key: string): string => {
+    const cached = runtime.get(key)
+    if (cached !== undefined) return cached
+    const value = RUNTIME_VALUES[key]()
+    runtime.set(key, value)
+    return value
+  }
+
   // One resolver, several escapings. `redact` swaps secret values for *** so the
   // same template renders a loggable twin of the real URL.
   const make =
@@ -427,8 +488,28 @@ export function buildRequest(
         }
         return redact ? '***' : escapeFor(where, value)
       }
+      if (Object.hasOwn(RUNTIME_VALUES, key)) return escapeFor(where, runtimeValue(key))
+      // An unknown placeholder is REPORTED, not rendered as emptiness. Silence
+      // here is what mcp.ts already refuses for a missing secret: "sending a
+      // half-built credential produces a 401 the user has to decode, when the
+      // real answer is you have not entered the key yet". A dropped
+      // `X-Request-Timestamp` fails the same indistinguishable way.
+      //
+      // `hasOwn` rather than a truthy read: both objects are plain literals, so
+      // `{{constructor}}` and `{{toString}}` inherit something from
+      // Object.prototype and would resolve to nonsense instead of being
+      // reported as the typo they are.
+      //
+      // Response-side templates keep the opposite rule on purpose — there an
+      // unfilled `{{field}}` is how the author learns the field name is wrong
+      // (see `renderItem`, which has its own resolver).
+      if (!Object.hasOwn(spec.params, key)) {
+        throw new HttpToolError(
+          `tool "${spec.name}" uses {{${key}}} in its request, which is not one of its ` +
+            `parameters, a {{secret:id}}, or a runtime value (${runtimeValueKeys().join(', ')})`,
+        )
+      }
       const param = spec.params[key]
-      if (!param) return ''
       const raw = args[key] ?? param.default
       if ((raw === undefined || raw === '') && param.required) {
         throw new HttpToolError(`tool "${spec.name}" requires the "${key}" argument`)
