@@ -29,6 +29,8 @@ export interface StoredSession {
   updatedAt: number
   /** Starred by the user. Optional so pre-favorite sessions load as unstarred. */
   favorite?: boolean
+  /** Snapshot of the agent's update_plan checklist (see stores/chat). */
+  plan?: unknown[]
 }
 
 function openDb(): Promise<IDBDatabase> {

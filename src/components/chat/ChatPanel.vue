@@ -1314,7 +1314,7 @@ watch(
         <button
           class="hover:text-fg-0"
           :title="$t('common.dismiss')"
-          @click="chat.currentSessionId && plan.clear(chat.currentSessionId)"
+          @click="chat.currentSessionId && chat.dismissPlan(chat.currentSessionId)"
         >
           <span class="codicon codicon-sm codicon-close" />
         </button>

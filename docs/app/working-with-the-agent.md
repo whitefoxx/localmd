@@ -53,7 +53,10 @@ written, and the assistant simply picks the question back up if you continue.
 ## Plans
 
 For anything with several steps, the assistant keeps a visible checklist so you
-can see where it is and what is left. You do not need to ask for this.
+can see where it is and what is left. You do not need to ask for this. The
+checklist belongs to its conversation and is saved with it — close the tab or
+reload the page, and it is still there when you come back. Dismissing it with
+its × is what forgets it.
 
 ## Sessions
 

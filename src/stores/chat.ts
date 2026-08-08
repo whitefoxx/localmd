@@ -5,7 +5,7 @@ import { useSetupStore } from '@/stores/setup'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
-import { usePlanStore } from '@/stores/plan'
+import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runTurn } from '@/agent/run'
@@ -195,6 +195,10 @@ interface ChatSession {
   /** Starred by the user. A visual marker that also spares the session first
    *  when the tab cap recycles an idle tab. Does NOT reorder history. */
   favorite: boolean
+  /** Persisted shadow of the agent's checklist (update_plan). The live copy is
+   *  stores/plan, which closeTab clears — this rides the session record so
+   *  reopening restores the card instead of losing what was already done. */
+  plan?: PlanItem[]
 }
 
 /** An open chat tab: a session plus its runtime flags. Multiple tabs run
@@ -427,6 +431,8 @@ export const useChatStore = defineStore('chat', () => {
     // context for that old conversation is lost, and rebuilds on the next send.
     if (!Array.isArray(s.history)) s.history = []
     if (typeof s.favorite !== 'boolean') s.favorite = false // pre-favorite sessions
+    // Rehydrate the checklist card — closeTab cleared the live store.
+    if (Array.isArray(s.plan) && s.plan.length) usePlanStore().set(s.id, s.plan)
     // Sessions persisted before branching are flat lists — link them into a
     // chain so they read and continue exactly as they did. Their one flat
     // history becomes a checkpoint on the last message: nothing recorded which
@@ -488,9 +494,21 @@ export const useChatStore = defineStore('chat', () => {
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
+  /** Dismiss the checklist card: clear the live store AND re-persist, or the
+   *  shadow in the session record would resurrect the card on the next open. */
+  async function dismissPlan(id: string): Promise<void> {
+    usePlanStore().clear(id)
+    const t = tabs.value.find((x) => x.id === id) ?? background.get(id)
+    if (t) await persist(t)
+  }
+
   async function persist(session: OpenSession): Promise<void> {
     if (!session.uiMessages.length) return
     session.updatedAt = Date.now()
+    // Shadow the live checklist into the record (undefined drops the key, so a
+    // dismissed plan is forgotten rather than resurrected).
+    const planItems = usePlanStore().itemsFor(session.id)
+    session.plan = planItems.length ? [...planItems] : undefined
     // JSON round-trip strips Vue reactivity proxies before structured clone.
     const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & {
       running?: boolean
@@ -1173,6 +1191,7 @@ export const useChatStore = defineStore('chat', () => {
     newSession,
     openSession,
     removeSession,
+    dismissPlan,
     toggleFavorite,
     activateTab,
     closeTab,
