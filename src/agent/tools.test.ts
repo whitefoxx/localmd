@@ -11,6 +11,7 @@ import { createMemoryRoot } from '@/lib/memfs'
 import { useFilesStore } from '@/stores/files'
 import { useReviewStore } from '@/stores/review'
 import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
+import { usePlanStore } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
 import type { AgentEvent } from './types'
 import { TOOLS, type ToolCtx } from './tools'
@@ -38,6 +39,8 @@ const search = tool('search_files')
 const mkdir = tool('create_directory')
 const open = tool('open_file')
 const restore = tool('git_restore')
+
+const planTool = tool('update_plan')
 
 /** Spin the microtask/timer queue until `cond` holds (an awaiting approval). */
 async function until(cond: () => boolean): Promise<void> {
@@ -322,5 +325,35 @@ describe('create_directory / open_file', () => {
     expect(useFilesStore().currentPath).toBe('wiki/note.md')
     expect(await open({ path: 'wiki' })).toContain('is a directory')
     expect(await open({ path: 'ghost.md' })).toContain('file not found')
+  })
+})
+
+describe('update_plan', () => {
+  it('names the open items, so a later turn sees what is still unchecked', async () => {
+    const out = await planTool({
+      items: [
+        { text: 'read the source', status: 'done' },
+        { text: 'write the summary', status: 'in_progress' },
+        { text: 'link it from the index', status: 'pending' },
+      ],
+    })
+    expect(usePlanStore().itemsFor('s1')).toHaveLength(3)
+    expect(out).toContain('1/3')
+    expect(out).toContain('"write the summary" (in progress)')
+    expect(out).toContain('"link it from the index"')
+    // The nudge that closes the measured gap: work finished in a LATER turn
+    // ended without the final all-done update.
+    expect(out).toContain('call update_plan once more')
+  })
+
+  it('reports completion without nagging when everything is done', async () => {
+    const out = await planTool({
+      items: [
+        { text: 'read the source', status: 'done' },
+        { text: 'write the summary', status: 'done' },
+      ],
+    })
+    expect(out).toContain('Plan complete')
+    expect(out).not.toContain('once more')
   })
 })

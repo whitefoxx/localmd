@@ -505,7 +505,16 @@ const updatePlan = defineTool({
   },
   run: async ({ items }, ctx) => {
     usePlanStore().set(ctx.sessionId, items as PlanItem[])
-    return `Plan updated (${items.length} items). Continue with the next in_progress step.`
+    // Name the open items instead of a generic "continue": this result lives in
+    // the wire history, so it is what a LATER turn sees when it finishes the
+    // remaining work — the measured failure mode is exactly that turn ending
+    // without the final all-done update. Just-in-time, costs no prompt bytes.
+    const open = (items as PlanItem[]).filter((i) => i.status !== 'done')
+    if (!open.length) return `Plan complete — all ${items.length} items done.`
+    const listed = open
+      .map((i) => `"${i.text}"${i.status === 'in_progress' ? ' (in progress)' : ''}`)
+      .join(', ')
+    return `Plan updated (${items.length - open.length}/${items.length} done). Still open: ${listed}. Before ending the task, call update_plan once more with every finished item marked done — an unchecked item reads as unfinished work.`
   },
 })
 

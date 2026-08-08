@@ -131,7 +131,9 @@ test('plan tool renders the checklist card', async ({ page }) => {
   const input = page.getByPlaceholder(/Ask or instruct/)
   await input.fill('plan')
   await input.press('Enter')
-  await expect(page.getByText('Step three')).toBeVisible({ timeout: 10_000 })
+  // exact: the update_plan tool RESULT also names the open items now, so a
+  // loose match would hit the expanded tool call as well as the card.
+  await expect(page.getByText('Step three', { exact: true })).toBeVisible({ timeout: 10_000 })
   await expect(page.getByText('2/3', { exact: true })).toBeVisible()
 })
 
