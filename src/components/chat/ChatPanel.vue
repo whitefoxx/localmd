@@ -520,7 +520,7 @@ function annotateHtml(html: string, collector: ReturnType<typeof createSourceCol
 
 function annotateAssistant(m: UiMessage): ReplyRender {
   const sig =
-    m.parts.map((p) => (p.type === 'text' ? p.text : ` ${p.type}`)).join('') +
+    m.parts.map((p) => (p.type === 'text' ? p.text : `\u0000${p.type}`)).join('\u0001') +
     `|${[...sessionCiteSources.value.keys()].join(',')}|${files.allFiles.length}`
   const cached = citeCache.get(m)
   if (cached && cached.sig === sig) return cached.value
