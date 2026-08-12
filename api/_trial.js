@@ -16,11 +16,35 @@
 
 const enc = new TextEncoder()
 
+/**
+ * Where the counters live, whatever the platform decided to call it.
+ *
+ * Vercel's Marketplace Redis (Upstash) has injected credentials under two
+ * different names across its life — `KV_REST_API_*` from the Vercel KV era it
+ * grew out of, and `UPSTASH_REDIS_REST_*` from Upstash's own SDK convention.
+ * Accepting both means the integration works whichever it provisions, instead
+ * of failing in a way that looks like the trial is broken when it is only
+ * named differently. It is the same REST protocol either way.
+ */
+export function redisCreds() {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+  return url && token ? { url, token } : null
+}
+
+function requireCreds() {
+  const creds = redisCreds()
+  if (!creds) {
+    throw new Error(
+      'trial store is not configured: set UPSTASH_REDIS_REST_URL/_TOKEN or KV_REST_API_URL/_TOKEN',
+    )
+  }
+  return creds
+}
+
 /** Upstash REST: one fetch per command, no SDK, no bundling concerns. */
 async function redis(command) {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) throw new Error('trial store is not configured')
+  const { url, token } = requireCreds()
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -31,9 +55,7 @@ async function redis(command) {
 }
 
 export async function redisPipeline(commands) {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) throw new Error('trial store is not configured')
+  const { url, token } = requireCreds()
   const res = await fetch(`${url}/pipeline`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

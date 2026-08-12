@@ -35,6 +35,8 @@
  *   TRIAL_SIGNING_SECRET      any long random string; signs session tokens.
  *   UPSTASH_REDIS_REST_URL    the counters. Without a store there is no way to
  *   UPSTASH_REDIS_REST_TOKEN  bound a session, so the endpoint refuses to run.
+ *                             Vercel's Marketplace Redis may inject these as
+ *                             KV_REST_API_URL/_TOKEN instead; both are read.
  *   TRIAL_DAILY_BUDGET_USD    optional; defaults to 10. This is the ceiling
  *                             for EVERYONE COMBINED on a given UTC day, not a
  *                             per-visitor allowance — per visitor is the
@@ -45,6 +47,7 @@ import {
   callerId,
   json,
   redis,
+  redisCreds,
   redisPipeline,
   signToken,
   today,
@@ -100,7 +103,16 @@ export default async function handler(req) {
   const path = url.pathname.replace(/^\/api\/trial\/?/, '')
 
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405)
-  if (!process.env.TRIAL_UPSTREAM_KEY) return json({ error: 'trial is not configured' }, 503)
+
+  // Names, never values. Saying which variable is missing turns a silent 503
+  // into a five-second fix during setup, and the names are documented anyway;
+  // the secrets they hold never appear here.
+  const missing = [
+    !process.env.TRIAL_UPSTREAM_KEY && 'TRIAL_UPSTREAM_KEY',
+    !process.env.TRIAL_SIGNING_SECRET && 'TRIAL_SIGNING_SECRET',
+    !redisCreds() && 'UPSTASH_REDIS_REST_URL/_TOKEN (or KV_REST_API_URL/_TOKEN)',
+  ].filter(Boolean)
+  if (missing.length) return json({ error: 'trial_off', missing }, 503)
 
   try {
     if (path === 'session') return await mintSession(req)
