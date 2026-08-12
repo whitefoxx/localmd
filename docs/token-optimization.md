@@ -117,6 +117,90 @@ P0 exists to keep those bytes stable, and activation was quietly undoing it.
   of the prompt. Re-attaching a *running* session skips pre-activation — growing
   its tool set mid-turn is the invalidation this exists to avoid.
 
+### P4 — raw bulk stays out of the main history (2026-08-12)
+
+Diagnosed from a real session (an HN-reading session compacted on four
+consecutive turns): the `.trace/` recall added in P3's wake (oversized external
+results saved to `.trace/tool-results/`, clip note pointing at the file) let a
+single turn ingest a whole web page — 40k clipped inline plus the remainder via
+`read_file` continuation at up to `MAX_READ_CHARS` = 100k. One turn reached
+~216k serialized chars, above `COMPACT_AT_CHARS` on its own. The trim/compact
+keep window (`keepTurns` = 2) protected that turn wholesale, so each compaction
+summarized only the already-stubbed old prefix, paid a summarizer call plus a
+full-prefix cache invalidation, and freed almost nothing — then fired again the
+next turn. Note the recall chain itself is append-only and cache-clean; the
+damage was the permanent history growth and the pointless compactions it forced.
+
+The fix follows the pattern Claude Code uses (subagents read bulk in throwaway
+contexts; "microcompact" clears old tool results before full summarization —
+productized server-side as Anthropic's `clear_tool_uses` context editing):
+
+- ✅ **Tool traffic keeps a one-turn window** (`history.ts` `toolKeepTurns` = 1,
+  images/reasoning keep `keepTurns` = 2): a turn's tool results are its working
+  set and the assistant reply is the digest that survives — after the turn the
+  raw results are stubbed at the next trim event. Trims stay batch events;
+  nothing here rewrites bytes per-turn.
+- ✅ **Store before the stub destroys** (`history.ts` `trimCandidates` +
+  `chat.ts` `stashTrimmable` + `toolResults.ts` `recallPathIn`): external
+  results the trim is about to stub are written to `.trace/tool-results/`
+  first, and the stub names the path — recall is one deterministic `read_file`,
+  not a re-call that may re-rank, refuse, or bill. Results already clipped at
+  call time reuse the path in their clip note. Built-in results keep the plain
+  "call the tool again" stub (deterministic, and file content is already in the
+  KB) — `isBuiltinToolName` draws that line.
+- ✅ **Clip note steers big remainders to run_subagent** (`toolResults.ts`
+  `DELEGATE_REMAINDER_CHARS` = 20k): past that, the note recommends delegating
+  "read the file, report what's needed" to a subagent — the raw text burns in
+  a discardable context (which shares the cache prefix, see P1) and only the
+  digest enters the main history. Just-in-time text on the result; zero prompt
+  bytes.
+- ✅ **Compaction refuses to run when it cannot help** (`chat.ts`): if
+  `split.recent` alone exceeds `COMPACT_AT_CHARS`, summarizing the old prefix
+  cannot bring the size under the threshold — skip instead of paying the
+  summarizer plus a full-prefix invalidation; the next turn's trim frees the
+  window instead.
+- ✅ **`COMPACT_AT_CHARS` raised to 250k** (from 150k): the old value was set
+  when nothing could reach a turn's tool results. Now that trim does, reaching
+  250k takes real conversation, and compaction — the one operation that
+  rewrites the cache prefix in full — becomes rare. The trim is what keeps a
+  session inside a provider's window; this is only the backstop behind it, so
+  it must not be pushed past a model's context. English runs ~70k tokens at
+  250k chars, CJK closer to one token per char.
+
+Replaying the diagnosed session against the new rules: the heavy turn's ~210k
+of raw page text is stubbed at the next send's trim (its digest — the
+assistant's own analysis — survives), the history drops back under
+`TRIM_AT_CHARS`, and none of the four compactions fire.
+
+One fact worth recording, found while verifying: `clipWithRecall` sits on the
+MCP path only (`toExternalSpec`). Installed HTTP tools apply their own
+`maxChars` budget inside the tools store and never reach the clip, so they
+neither store to `.trace/` at call time nor get the delegate note. They do
+still get stored by the trim, which works off the history and does not care
+where a result came from.
+
+### Verified in a real browser (not only vitest)
+
+typecheck and unit tests cannot see the File System Access API or a live
+provider, so the whole path was driven through the dev server in Chrome
+against a real KB and real sessions:
+
+| Check | Result |
+|---|---|
+| Real `send()` on an 81k-char session | persisted history 81,318 → 35,208 chars |
+| External results stored | 3 files under `.trace/tool-results/<session>/`, one of which did not exist before — proof the send path wrote it |
+| Content-addressed writes | re-storing the same result rewrote the same path, no duplicates |
+| Stubs | all three carried their recall path |
+| Recall round-trip | `read_file` on a stub's path returned exactly 27,654 chars, matching the original result |
+| Built-in results | a 27,654-char `read_file` result was correctly *not* stored, and its stub is the generic form |
+| Delegate note | deepwiki `read_wiki_contents` for `vuejs/core` returned 523,892 chars; the note fired and the whole result landed on disk |
+| Compaction guard, `recent` over threshold | skipped — no banner, no summary |
+| Compaction guard, `recent` under threshold | fired — 35,437 → 3,682 chars |
+
+The last two are the same session and the same code with only the threshold
+moved, which is what makes them a control: the guard suppresses a useless
+compaction without suppressing a useful one.
+
 ## Deliberately not done
 
 - ⏸ **Deferring the 9 git tools** — after caching, they cost ~1k tokens at 0.1×;
