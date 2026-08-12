@@ -136,7 +136,7 @@ export default {
       setupIntro:
         'On localmd.app the extension works the moment it is installed — nothing to allow, nothing to type. The steps below cover the one toggle worth switching on, and the extra step development addresses need.',
       step1:
-        'Install the extension. It is not on the Chrome Web Store yet: build it from the web-agent repo (npm run build:localmd) and load the dist-localmd/ folder unpacked via chrome://extensions with Developer mode on (extension id enodecpmlecfpmofogpmbagdcfheamgf).',
+        'Install localmd Connect from the Chrome Web Store, then come back to this page and reload it.',
       stepScripts:
         'In its popup, switch on “Allow user scripts”. Marketplace func adapters and site scripts need it; simple (pipeline) adapters work without — tools report runnable: false until it is on.',
       step2:
@@ -407,7 +407,7 @@ export default {
       setupIntro:
         '在 localmd.app 上装好即用 —— 不用允许任何东西，也不用填任何东西。下面几步是一个值得打开的开关，以及开发地址需要的额外一步。',
       step1:
-        '安装扩展。它还没上架 Chrome 应用商店：在 web-agent 仓库里构建（npm run build:localmd），然后在 chrome://extensions 打开开发者模式，「加载已解压的扩展程序」选 dist-localmd/ 目录（扩展 id 为 enodecpmlecfpmofogpmbagdcfheamgf）。',
+        '从 Chrome 应用商店安装 localmd Connect，然后回到这个页面刷新一次。',
       stepScripts:
         '在它的弹窗里打开「Allow user scripts」。市场里的 func 适配器和站点脚本需要它；简单的（pipeline）适配器不用 —— 开关没开之前，相关工具会报 runnable: false。',
       step2:

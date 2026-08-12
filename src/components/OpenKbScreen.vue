@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { isSupported } from '@/lib/fs'
@@ -28,6 +28,28 @@ async function openRecent(entry: RecentKb): Promise<void> {
   if (await kb.openRecent(entry)) {
     await files.refreshTree()
     await files.restoreTabs()
+  }
+}
+
+const copied = ref(false)
+
+/**
+ * Put the app's address on the clipboard, for a visitor who cannot use it on
+ * the device they are holding.
+ *
+ * The obvious alternative — "we'll email you the link" — would be collecting
+ * addresses under cover of helping, on the start screen of an app whose first
+ * promise is that it has no account. A phone can carry a URL to a desktop by
+ * itself.
+ */
+async function copyAddress(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText('https://localmd.app')
+    copied.value = true
+    setTimeout(() => (copied.value = false), 2500)
+  } catch {
+    // Clipboard denied (insecure context, or a browser that asks). The address
+    // is in the URL bar right above; nothing is lost by staying quiet.
   }
 }
 
@@ -168,6 +190,21 @@ async function forget(entry: RecentKb): Promise<void> {
             <span class="codicon codicon-beaker mr-2" />{{ $t('openKb.demo') }}
           </button>
           <div class="mt-1.5 text-center text-xs text-fg-3">{{ $t('openKb.demoHint') }}</div>
+
+          <!-- Someone here on a phone can see the demo but cannot ever open a
+               folder on this device. Copying the address is the whole of what
+               they need later, and asking for an email to send it would be
+               collecting addresses under cover of helping. -->
+          <div class="mt-8 pt-6 border-t border-border text-center">
+            <div class="text-xs text-fg-3 mb-2">{{ $t('openKb.laterHint') }}</div>
+            <button
+              class="text-sm text-accent hover:underline inline-flex items-center gap-1.5"
+              @click="copyAddress"
+            >
+              <span class="codicon codicon-sm" :class="copied ? 'codicon-check' : 'codicon-link'" />
+              {{ copied ? $t('openKb.copied') : $t('openKb.copyAddress') }}
+            </button>
+          </div>
         </div>
       </div>
 

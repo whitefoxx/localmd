@@ -26,8 +26,9 @@ highlighted. Nothing was uploaded to make that happen.
 
 The demo works in browsers that cannot open a local folder at all, because it
 never needs one. If you arrived on a phone, or on Firefox or Safari, this is
-the part you can still see. See `getting-started` for which browsers can do the
-rest.
+the part you can still see — and the start screen offers to copy the address so
+you can pick it up later on a desktop Chrome or Edge, which is what the rest of
+it needs. See `getting-started`.
 
 ## Asking it something
 

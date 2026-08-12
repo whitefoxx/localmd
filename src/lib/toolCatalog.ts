@@ -415,11 +415,14 @@ export const RETIRED_PACKS: Record<string, HttpToolSpec[]> = {
  */
 export const CATALOG: CatalogEntry[] = [
   {
-    // The product's own companion. No Web Store listing yet — the settings
-    // pane carries the dev install steps until there is one.
+    // The product's own companion, on the Web Store since 2026-08. The relay
+    // reports whichever build is actually installed, so a developer build still
+    // connects — the listing is where everyone else gets it.
     id: 'localmd-connect',
     kind: 'extension',
     featured: true,
+    homepage:
+      'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh',
     server: { name: 'localmd-connect', url: LOCALMD_CONNECT_RELAY_URL },
   },
   {

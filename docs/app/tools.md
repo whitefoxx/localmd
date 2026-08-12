@@ -85,8 +85,7 @@ itself. Two things are still worth knowing:
   pre-authorized. Click the extension's toolbar icon, open **Web app access**,
   add the address shown on the row's page — exactly as shown, port included —
   and reload this page (a page gets the extension as it loads, never
-  afterwards). The extension is not on the Chrome Web Store yet, so its page
-  here carries the developer install steps for now.
+  afterwards).
 
 Two of its abilities can change things outside this app, so they always stop
 and ask first, in the chat:
