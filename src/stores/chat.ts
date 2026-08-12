@@ -23,6 +23,7 @@ import {
   compactedPrefix,
 } from '@/lib/history'
 import { isBuiltinToolName } from '@/agent/tools'
+import { t } from '@/i18n'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
 import {
   branchPath,
@@ -244,6 +245,30 @@ export interface SessionSummary {
 const INLINE_MENTION_CHARS = 16_000
 
 let nextId = 1
+
+/**
+ * Turn a refusal from the free trial into something true and useful.
+ *
+ * The trial reaches the model through the ordinary provider machinery, which is
+ * the point — but it means running out arrives as whatever the SDK makes of a
+ * 402, and "connection error, check your Base URL" is both wrong and
+ * discouraging at exactly the moment someone is deciding about the product.
+ * Running out is the normal end of a trial, and the honest next step is to say
+ * that the limit was ours, not the app's.
+ *
+ * Only ever consulted for the trial profile, so no other endpoint's 402 can be
+ * mistaken for this.
+ */
+function trialRefusal(msg: string, profile: { provider: string } | null): string | null {
+  if (profile?.provider !== 'trial') return null
+  if (/trial_exhausted|\b402\b|\b429\b/.test(msg)) {
+    return `${t('demo.trialExhausted')} ${t('demo.trialExhaustedHint')}`
+  }
+  if (/trial_expired|trial_off|\b401\b|\b503\b/.test(msg)) {
+    return `${t('demo.trialUnavailable')} ${t('demo.trialUnavailableHint')}`
+  }
+  return null
+}
 
 export const useChatStore = defineStore('chat', () => {
   const kb = useKbStore()
@@ -1058,6 +1083,8 @@ export const useChatStore = defineStore('chat', () => {
       const msg = (err as Error).message
       if (name === 'AbortError' || name === 'APIUserAbortError') {
         assistant.error = 'Stopped.'
+      } else if (trialRefusal(msg, primary)) {
+        assistant.error = trialRefusal(msg, primary)!
       } else if (name === 'APIConnectionError' || /connection error/i.test(msg)) {
         assistant.error =
           'Connection error — the endpoint could not be reached from the browser. ' +

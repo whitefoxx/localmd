@@ -61,6 +61,47 @@ export async function loadDemoManifest(): Promise<DemoManifest> {
  * order, so a partial network failure leaves a prefix rather than a KB with
  * holes in the middle of it.
  */
+/** Raised when the chosen folder already has something in it. */
+export class TargetNotEmpty extends Error {
+  constructor() {
+    super('target folder is not empty')
+    this.name = 'TargetNotEmpty'
+  }
+}
+
+/**
+ * Copy the open in-memory KB into a real folder on disk, file for file.
+ *
+ * This is the demo's way out. Without it the demo is a cul-de-sac: everything
+ * a visitor does in it is thrown away, so the moment they like it they have to
+ * start again somewhere else. With it, the demo is the first step of setting
+ * up — including the paper and its prebuilt index, so the citations keep
+ * working in the copy.
+ *
+ * Refuses a folder that already has anything in it. Merging into someone's
+ * existing files is exactly the kind of surprise this app promises not to
+ * spring, and an empty folder is one right-click away.
+ */
+export async function saveDemoTo(target: FileSystemDirectoryHandle): Promise<void> {
+  for await (const _ of (target as unknown as { keys(): AsyncIterable<string> }).keys()) {
+    void _
+    throw new TargetNotEmpty()
+  }
+
+  const paths = fs.collectFiles(await fs.readTree())
+  for (const path of paths) {
+    const bytes = await fs.readBinary(path)
+    const segments = path.split('/')
+    const name = segments.pop()!
+    let dir = target
+    for (const segment of segments) dir = await dir.getDirectoryHandle(segment, { create: true })
+    const handle = await dir.getFileHandle(name, { create: true })
+    const writable = await handle.createWritable()
+    await writable.write(bytes)
+    await writable.close()
+  }
+}
+
 export async function seedDemoKb(manifest: DemoManifest): Promise<FileSystemDirectoryHandle> {
   const root = createMemoryRoot(manifest.name)
   const previous = fs.hasRoot() ? fs.getRoot() : null

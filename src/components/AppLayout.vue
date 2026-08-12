@@ -7,6 +7,8 @@ import { useReviewStore } from '@/stores/review'
 import { useGitStore } from '@/stores/git'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
+import { isDemoMode } from '@/lib/demo'
+import * as fs from '@/lib/fs'
 import FileTree from '@/components/FileTree.vue'
 import EditorTabs from '@/components/EditorTabs.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
@@ -220,6 +222,41 @@ const themeIcon = computed(
 const kbMenuOpen = ref(false)
 const menuItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
+const isDemo = isDemoMode()
+const saving = ref(false)
+const saveError = ref('')
+
+/**
+ * Copy the demo into a folder the visitor picks, then carry on in that folder.
+ * The demo's own tabs are reopened from the real copy, so the citation they
+ * were just clicking still works — landing them in an empty window would make
+ * saving feel like losing their place.
+ */
+async function saveDemo(): Promise<void> {
+  saveError.value = ''
+  const target = await fs.pickDirectory()
+  if (!target) return
+  saving.value = true
+  try {
+    const { saveDemoTo, TargetNotEmpty } = await import('@/lib/demo')
+    const open = [...files.openTabs]
+    const current = files.currentPath
+    try {
+      await saveDemoTo(target)
+    } catch (err) {
+      saveError.value =
+        err instanceof TargetNotEmpty ? t('demo.saveNotEmpty') : t('demo.saveFailed')
+      return
+    }
+    if (!(await kb.openHandle(target))) return
+    await files.refreshTree()
+    for (const path of open) await files.openFile(path)
+    if (current) await files.openFile(current)
+    kbMenuOpen.value = false
+  } finally {
+    saving.value = false
+  }
+}
 const recentsOther = computed(() => kb.recents.filter((r) => r.name !== kb.name))
 
 function toggleKbMenu(): void {
@@ -373,6 +410,16 @@ function closeKb(): void {
           >
             <span class="codicon codicon-sm codicon-book text-accent shrink-0" />
             <span class="font-semibold text-fg-0 text-sm truncate">{{ kb.name }}</span>
+            <!-- The demo lives in memory. Say so where the folder name is, not
+                 in a dialog nobody rereads: the risk is not that it is a demo,
+                 it is spending an hour in one without noticing. -->
+            <span
+              v-if="isDemo"
+              class="shrink-0 px-1.5 py-px rounded text-[10px] uppercase tracking-wide bg-bg-3 text-fg-3"
+              :title="$t('demo.badgeHint')"
+            >
+              {{ $t('demo.badge') }}
+            </span>
             <span
               class="codicon codicon-sm codicon-chevron-down text-fg-3 shrink-0 transition-transform"
               :class="{ 'rotate-180': kbMenuOpen }"
@@ -412,6 +459,15 @@ function closeKb(): void {
             <button :class="menuItem" @click="newKb">
               <span class="codicon codicon-sm codicon-add text-fg-3" />New KB…
             </button>
+            <!-- The demo's way out: without it, liking the demo means starting
+                 over somewhere else. -->
+            <button v-if="isDemo" :class="menuItem" :disabled="saving" @click="saveDemo">
+              <span class="codicon codicon-sm codicon-save-as text-fg-3" />
+              {{ saving ? $t('demo.saving') : $t('demo.save') }}
+            </button>
+            <div v-if="isDemo" class="px-3 pb-1.5 text-[11px] text-fg-3 leading-snug">
+              {{ saveError || $t('demo.saveHint') }}
+            </div>
           </div>
         </div>
 

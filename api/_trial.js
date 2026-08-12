@@ -136,8 +136,28 @@ function clientIp(req) {
  * behaviour with nothing recoverable in the store.
  */
 export async function callerId(req) {
-  const mac = await crypto.subtle.sign('HMAC', await key(), enc.encode(clientIp(req)))
+  return hashed(clientIp(req))
+}
+
+/** HMAC something into a short opaque key. Used for both rate-limit buckets:
+ *  one holds an address we should not keep, the other a value the client chose
+ *  and could otherwise make arbitrarily long or collide on purpose. */
+export async function hashed(value) {
+  const mac = await crypto.subtle.sign('HMAC', await key(), enc.encode(value))
   return b64url(mac).slice(0, 22)
+}
+
+/**
+ * The browser's own random id for this visitor, if it sent one.
+ *
+ * Shape-checked, not trusted: it is a client-supplied string, so anything that
+ * is not a plausible uuid is ignored rather than turned into a store key. A
+ * missing or malformed id is not an error — the visitor simply falls back to
+ * the address bucket, which is what someone who cleared their storage gets.
+ */
+export function visitorId(req) {
+  const raw = req.headers.get('x-trial-visitor') || ''
+  return /^[a-f0-9-]{16,64}$/i.test(raw) ? raw : null
 }
 
 export function json(body, status = 200) {
@@ -211,30 +231,52 @@ const USD_PER_M_OUTPUT = 0.28
 const DAILY_BUDGET_USD = Number(process.env.TRIAL_DAILY_BUDGET_USD || 10)
 const IP_WINDOW_S = 6 * 60 * 60
 /**
- * Sessions one address may mint per window.
+ * Two buckets, for two different jobs.
  *
- * Deliberately loose. Carrier-grade NAT and campus networks put a great many
- * real people behind one address — a tight limit here does not stop a
- * determined abuser, who can change address, but it does turn away the fifth
- * person in an office who clicked the same link. The limits that actually
- * bound the bill are the per-session budget and the daily ceiling; this one
- * only stops a script minting in a loop from one place.
+ * The visitor bucket is the one that normally applies: a random id the browser
+ * generates and keeps, sent with the request. It is not a fingerprint and not
+ * derived from the device — just a number we made up, which the visitor can
+ * clear — because an app that says it cannot see you should not start
+ * recognising people by their hardware to hand out free things.
+ *
+ * Anything the client holds can be cleared in a loop, so it cannot be the only
+ * limit; the address bucket sits behind it, deliberately loose. Carrier-grade
+ * NAT and campus networks put a great many real people behind one address, and
+ * a tight limit there does not stop a determined abuser (who can change
+ * address) — it turns away the fifth person in an office who clicked the same
+ * link. Neither of these bounds the bill. The per-session budget and the daily
+ * ceiling do.
  */
-const IP_SESSIONS_PER_WINDOW = 5
+const VISITOR_SESSIONS_PER_WINDOW = 3
+const IP_SESSIONS_PER_WINDOW = 30
 
 /** Big enough for a real question about the demo paper, small enough that
  *  nobody pastes a book into it. */
 const MAX_BODY_BYTES = 400_000
 
 export async function handleSession(req) {
-  // Hashed, not the address itself — see callerId.
-  const ipKey = `trial:ip:${today()}:${await callerId(req)}`
-  const [minted] = await redisPipeline([
+  // Both counted in one round trip, both hashed — the visitor id because it
+  // arrives from the client and must not be trusted as a key verbatim, the
+  // address because we should not keep a list of who visited.
+  const day = today()
+  const ipKey = `trial:ip:${day}:${await callerId(req)}`
+  const visitor = visitorId(req)
+  const visitorKey = visitor && `trial:visitor:${day}:${await hashed(visitor)}`
+  const counts = await redisPipeline([
     ['INCR', ipKey],
     ['EXPIRE', ipKey, String(IP_WINDOW_S)],
+    ...(visitorKey
+      ? [
+          ['INCR', visitorKey],
+          ['EXPIRE', visitorKey, String(IP_WINDOW_S)],
+        ]
+      : []),
   ])
-  if (Number(minted) > IP_SESSIONS_PER_WINDOW) {
+  if (Number(counts[0]) > IP_SESSIONS_PER_WINDOW) {
     return json({ error: 'trial_exhausted', reason: 'ip' }, 429)
+  }
+  if (visitorKey && Number(counts[2]) > VISITOR_SESSIONS_PER_WINDOW) {
+    return json({ error: 'trial_exhausted', reason: 'visitor' }, 429)
   }
   if ((await spentToday()) >= DAILY_BUDGET_USD) {
     return json({ error: 'trial_exhausted', reason: 'daily' }, 402)

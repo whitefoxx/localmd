@@ -40,6 +40,10 @@ all. It is the same feature the whole no-install idea rests on.
 
 ## Getting started
 
+If you would rather look before deciding anything, **Try a demo knowledge
+base** opens a real one that needs no folder and no key — see `trying-it-out`.
+Otherwise:
+
 1. Click **Open local folder** and choose a folder. Your browser will ask for
    permission — that permission is what lets the app read and write those files,
    and it covers only the folder you picked.

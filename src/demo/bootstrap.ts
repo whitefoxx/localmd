@@ -10,6 +10,7 @@
  * was a moment before. The payoff never depends on our being able to pay for
  * anything.
  */
+import { watch } from 'vue'
 import { seedDemoKb, loadDemoManifest } from '@/lib/demo'
 import { trialSession, trialProfile } from '@/lib/trial'
 import { useKbStore } from '@/stores/kb'
@@ -32,7 +33,30 @@ export async function bootstrapDemo(): Promise<void> {
   // paths do not exist in here. The demo opens exactly one note, on purpose.
   if (manifest.open) await files.openFile(manifest.open)
 
+  guardAgainstLosingWork()
   await lendTrialModel()
+}
+
+/**
+ * Warn before leaving, but only once there is something to lose.
+ *
+ * The demo's real hazard was never the agent writing files — nothing here
+ * touches the disk. It is a visitor spending twenty minutes in a knowledge base
+ * that evaporates when the tab closes. Warning on arrival would be noise, so
+ * the handler is only attached after the first change: the file tree gaining or
+ * losing something, or an editor buffer going dirty. Both are synchronous to
+ * read at unload time, which `beforeunload` requires.
+ */
+function guardAgainstLosingWork(): void {
+  const files = useFilesStore()
+  const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+  const stop = watch(
+    [() => files.tree.length, () => files.saveState],
+    () => {
+      window.addEventListener('beforeunload', warn)
+      stop()
+    },
+  )
 }
 
 /**

@@ -21,6 +21,33 @@
 import type { LlmProfile } from '@/stores/settings'
 
 const STORAGE_KEY = 'localmd:trial-session'
+const VISITOR_KEY = 'localmd:trial-visitor'
+
+/**
+ * A random id for this browser, kept so the trial's rate limit has something
+ * better than an address to count.
+ *
+ * Deliberately random, not derived from the device. A fingerprint would count
+ * more reliably and that is exactly the problem: an app whose front page says
+ * it cannot see you should not start recognising people by their hardware in
+ * order to hand out free things. This is a number we made up, visible in
+ * storage, clearable — and because it is clearable it can only ever be the
+ * polite bucket, never the enforcement. The server keeps a much looser count
+ * per address behind it, and neither is what bounds the bill.
+ */
+function visitorId(): string | null {
+  try {
+    const existing = localStorage.getItem(VISITOR_KEY)
+    if (existing) return existing
+    const fresh = crypto.randomUUID()
+    localStorage.setItem(VISITOR_KEY, fresh)
+    return fresh
+  } catch {
+    // Private mode, or storage denied. The server falls back to its address
+    // bucket, which is the same place a cleared browser lands.
+    return null
+  }
+}
 
 export interface TrialSession {
   token: string
@@ -57,9 +84,13 @@ export async function trialSession(): Promise<TrialSession> {
   const existing = cached()
   if (existing) return existing
 
+  const visitor = visitorId()
   let res: Response
   try {
-    res = await fetch('/api/trial/session', { method: 'POST' })
+    res = await fetch('/api/trial/session', {
+      method: 'POST',
+      headers: visitor ? { 'X-Trial-Visitor': visitor } : undefined,
+    })
   } catch {
     throw new TrialUnavailable('unavailable')
   }
