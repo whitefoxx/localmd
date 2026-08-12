@@ -208,9 +208,18 @@ export function trimCandidates(history: ModelMessage[], opts: TrimOptions = {}):
 
 /* ── compaction: summarize old turns when the history gets huge ──────────── */
 
-/** Compact when the serialized history exceeds this many characters
- *  (~50-60k tokens for mixed CJK/EN — inside every provider's window). */
-export const COMPACT_AT_CHARS = 150_000
+/** Compact when the serialized history exceeds this many characters (~70k
+ *  tokens of English; CJK runs closer to one token per char, so a
+ *  Chinese-heavy session is proportionally larger).
+ *
+ *  Raised once TRIM took over the bulk: tool results now leave after a single
+ *  turn, so a history that still reaches this size is real conversation, and
+ *  compaction — a summarizer call plus a full-prefix cache invalidation — is
+ *  the expensive last resort rather than routine hygiene. The trim is what
+ *  keeps a session inside a provider's window; this number is only the
+ *  backstop behind it, and raising it past a model's context would make it no
+ *  backstop at all. */
+export const COMPACT_AT_CHARS = 250_000
 /** Real user turns kept verbatim after compaction. */
 export const COMPACT_KEEP_TURNS = 2
 /** Transcript cap fed to the summarizer. */
