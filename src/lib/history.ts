@@ -2,8 +2,16 @@
  * Conversation-history hygiene for long agent sessions. The wire history is
  * append-only and replayed every turn — old tool results (a read_file can be
  * 100k chars) and images dominate token cost while contributing little after
- * the model has acted on them. TRIM replaces them with short stubs; the model
- * can always re-run a tool if it genuinely needs the content again.
+ * the model has acted on them. TRIM replaces them with short stubs.
+ *
+ * The governing observation: a turn's tool results are its WORKING SET, and
+ * the assistant's own reply is the digest that survives — the model read 200k
+ * chars of comments and wrote 5k of analysis; after the turn, the 5k is what
+ * later turns need. So tool traffic keeps a tighter window (the last turn
+ * only) than conversation media, and stubbing it is safe: built-in tools are
+ * deterministic to re-run, and external results are stored to `.trace/`
+ * before the stub destroys them (see lib/toolResults.ts), so the stub can
+ * point at a file recallable with one read_file.
  *
  * Trimming is a BATCH event, not a per-turn sweep: every provider prices
  * cached prefix tokens at a fraction of fresh ones (prefix-match caching), so
@@ -13,20 +21,33 @@
  * the keep window in one go; between events the history is byte-stable.
  *
  * Pure functions over the AI SDK's unified ModelMessage shape; unit-tested.
+ * The one effect — storing what a trim is about to destroy — stays with the
+ * caller: `trimCandidates` names the doomed results, the caller stores them,
+ * and `recallPaths` carries the resulting locations back into the stubs.
  */
 import type { ModelMessage } from 'ai'
 
 export interface TrimOptions {
-  /** Recent real user turns to leave untouched. */
+  /** Recent real user turns whose images and reasoning stay untouched. */
   keepTurns?: number
+  /** Recent real user turns whose tool traffic stays untouched. Defaults
+   *  tighter than keepTurns: results are the turn's working set, and the
+   *  assistant reply that follows them is the digest that survives. */
+  toolKeepTurns?: number
   /** Tool results / inputs above this length get stubbed. */
   maxChars?: number
+  /** toolCallId → KB path holding the full result (stored by the caller via
+   *  `trimCandidates` before this trim destroys it); the stub names the path
+   *  so recall is one deterministic read_file, not a re-call. */
+  recallPaths?: ReadonlyMap<string, string>
 }
 
-const DEFAULTS: Required<TrimOptions> = { keepTurns: 2, maxChars: 1500 }
+const DEFAULTS = { keepTurns: 2, toolKeepTurns: 1, maxChars: 1500 }
 
-const stub = (chars: number) =>
-  `[Earlier tool result trimmed (was ${chars} chars) — if you still need its content, call the relevant tool again]`
+const stub = (chars: number, path?: string) =>
+  path
+    ? `[Earlier tool result trimmed (was ${chars} chars) — full content saved at ${path}; read_file it if you still need it]`
+    : `[Earlier tool result trimmed (was ${chars} chars) — if you still need its content, call the relevant tool again]`
 const IMG_STUB = '[Earlier image trimmed — to view it again, call view_image]'
 const INPUT_STUB = '[trimmed]'
 
@@ -79,11 +100,11 @@ function trimToolCallInput(input: unknown, maxChars: number): unknown {
 
 /** Shrink a tool-result part's output: large text → stub; any non-text content
  *  part (image/file media) → text stub. Robust to the exact media part naming. */
-function trimToolResultOutput(output: unknown, maxChars: number): unknown {
+function trimToolResultOutput(output: unknown, maxChars: number, path?: string): unknown {
   const o = output as AnyPart | undefined
   if (!o || typeof o !== 'object') return output
   if (o.type === 'text' && typeof o.value === 'string' && o.value.length > maxChars) {
-    return { type: 'text', value: stub(o.value.length) }
+    return { type: 'text', value: stub(o.value.length, path) }
   }
   if (o.type === 'content' && Array.isArray(o.value)) {
     const value = (o.value as AnyPart[]).map((part) => {
@@ -99,21 +120,34 @@ function trimToolResultOutput(output: unknown, maxChars: number): unknown {
 }
 
 export function trimHistory(history: ModelMessage[], opts: TrimOptions = {}): ModelMessage[] {
-  const { keepTurns, maxChars } = { ...DEFAULTS, ...opts }
-  const cutoff = cutoffIndex(history, keepTurns)
+  const { keepTurns, toolKeepTurns, maxChars, recallPaths } = { ...DEFAULTS, ...opts }
+  // Two windows: tool traffic survives toolKeepTurns (tight — the last turn),
+  // images and reasoning survive keepTurns (wider — a follow-up may still be
+  // about the picture, and view_image cannot recall a pasted image).
+  const mediaCutoff = cutoffIndex(history, keepTurns)
+  const toolCutoff = cutoffIndex(history, toolKeepTurns)
   return history.map((m, i) => {
-    if (i >= cutoff || typeof m.content === 'string') return m
+    if (i >= toolCutoff || typeof m.content === 'string') return m
+    const old = i < mediaCutoff
 
     const asParts = m.content as unknown as AnyPart[]
     if (m.role === 'tool') {
       const content = asParts.map((part) =>
         part.type === 'tool-result'
-          ? { ...part, output: trimToolResultOutput(part.output, maxChars) }
+          ? {
+              ...part,
+              output: trimToolResultOutput(
+                part.output,
+                maxChars,
+                recallPaths?.get(String(part.toolCallId)),
+              ),
+            }
           : part,
       )
       return { ...m, content } as unknown as ModelMessage
     }
     if (m.role === 'user') {
+      if (!old) return m
       const content = asParts.map((part) =>
         part.type === 'image' || part.type === 'file' ? { type: 'text', text: IMG_STUB } : part,
       )
@@ -123,7 +157,7 @@ export function trimHistory(history: ModelMessage[], opts: TrimOptions = {}): Mo
       // Old chain-of-thought is dead weight on replay (official providers strip
       // it server-side; openai-compatible reasoning models may re-bill it) —
       // drop it, unless the message would end up empty.
-      const kept = asParts.filter((part) => part.type !== 'reasoning')
+      const kept = old ? asParts.filter((part) => part.type !== 'reasoning') : asParts
       const content = (kept.length ? kept : asParts).map((part) =>
         part.type === 'tool-call'
           ? { ...part, input: trimToolCallInput(part.input, maxChars) }
@@ -133,6 +167,43 @@ export function trimHistory(history: ModelMessage[], opts: TrimOptions = {}): Mo
     }
     return m
   })
+}
+
+export interface TrimCandidate {
+  toolCallId: string
+  toolName: string
+  text: string
+}
+
+/**
+ * The text tool results the next trimHistory call will stub — so the caller
+ * can store the irreproducible ones (external MCP/HTTP results re-rank,
+ * refuse, or bill on a re-call) before the stub destroys their content, and
+ * hand the paths back via `recallPaths`.
+ *
+ * Only `text` outputs qualify: external results are always strings, and the
+ * content-array shape is built-in media (view_image), cheap to re-run.
+ * Already-stubbed results fall under maxChars and drop out on their own.
+ */
+export function trimCandidates(history: ModelMessage[], opts: TrimOptions = {}): TrimCandidate[] {
+  const { toolKeepTurns, maxChars } = { ...DEFAULTS, ...opts }
+  const toolCutoff = cutoffIndex(history, toolKeepTurns)
+  const out: TrimCandidate[] = []
+  for (const m of history.slice(0, toolCutoff)) {
+    if (m.role !== 'tool' || typeof m.content === 'string') continue
+    for (const part of m.content as unknown as AnyPart[]) {
+      if (part.type !== 'tool-result') continue
+      const o = part.output as AnyPart | undefined
+      if (o?.type === 'text' && typeof o.value === 'string' && o.value.length > maxChars) {
+        out.push({
+          toolCallId: String(part.toolCallId),
+          toolName: String(part.toolName ?? ''),
+          text: o.value,
+        })
+      }
+    }
+  }
+  return out
 }
 
 /* ── compaction: summarize old turns when the history gets huge ──────────── */

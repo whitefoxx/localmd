@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   trimHistory,
+  trimCandidates,
   estimateChars,
   splitForCompaction,
   renderTranscript,
@@ -60,16 +61,114 @@ describe('trimHistory', () => {
     expect((asst[0].input as Rec).path).toBe('a.md') // small input untouched
   })
 
-  it('keeps the last keepTurns real user turns untouched', () => {
-    // keepTurns=2 → cutoff at the first user turn → nothing before it to trim.
-    const out = trimHistory(history, { keepTurns: 2, maxChars: 100 })
+  it('stubs tool traffic outside the last turn even inside the media window', () => {
+    // Default windows: toolKeepTurns=1 < keepTurns=2. The first turn's tool
+    // result goes — the assistant reply that follows it is the digest that
+    // survives — even though its images/reasoning would still be kept.
+    const out = trimHistory(history, { maxChars: 100 })
+    expect((parts(out[2])[0].output as Rec).value).toContain('trimmed')
+    expect((parts(out[1])[1].input as Rec).content).toBe('[trimmed]')
+  })
+
+  it('toolKeepTurns widens the tool window back out', () => {
+    const out = trimHistory(history, { keepTurns: 2, toolKeepTurns: 2, maxChars: 100 })
     expect((parts(out[2])[0].output as Rec).value).toBe(BIG)
+  })
+
+  it('points the stub at the recall path when the caller stored the result', () => {
+    const recallPaths = new Map([['t1', '.trace/tool-results/s/mcp-fetch-1a2b3c4d.txt']])
+    const out = trimHistory(history, { maxChars: 100, recallPaths })
+    const value = (parts(out[2])[0].output as Rec).value as string
+    expect(value).toContain('.trace/tool-results/s/mcp-fetch-1a2b3c4d.txt')
+    expect(value).toContain('read_file')
+    // The content-array part (t2) has no stored path — generic stub.
+    const inner = (parts(out[2])[1].output as Rec).value as Rec[]
+    expect(inner[0].text).toContain('call the relevant tool again')
+  })
+
+  it('keeps images and reasoning for keepTurns while their tool results go', () => {
+    const h: ModelMessage[] = [
+      { role: 'user', content: '第一问' },
+      { role: 'assistant', content: '第一答' },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '看这张图' },
+          { type: 'image', image: 'data:image/png;base64,AAAA' },
+        ],
+      } as unknown as ModelMessage,
+      {
+        role: 'assistant',
+        content: [
+          { type: 'reasoning', text: 'thinking about the picture' },
+          { type: 'tool-call', toolCallId: 'a2', toolName: 'fetch_url', input: { url: BIG } },
+        ],
+      } as unknown as ModelMessage,
+      {
+        role: 'tool',
+        content: [
+          { type: 'tool-result', toolCallId: 'a2', toolName: 'fetch_url', output: { type: 'text', value: BIG } },
+        ],
+      },
+      { role: 'assistant', content: '第二答' },
+      { role: 'user', content: '第三问' },
+      { role: 'assistant', content: '第三答' },
+    ]
+    const out = trimHistory(h, { maxChars: 100 })
+    // Turn 2 sits between the tool cutoff and the media cutoff: its tool
+    // result and oversized input are stubbed, its image and reasoning stay.
+    expect(parts(out[2])[1].type).toBe('image')
+    expect(parts(out[3]).map((p) => p.type)).toEqual(['reasoning', 'tool-call'])
+    expect((parts(out[3])[1].input as Rec).url).toBe('[trimmed]')
+    expect((parts(out[4])[0].output as Rec).value).toContain('trimmed')
+    // Turn 3 (the last) is untouched.
+    expect(out[6].content).toBe('第三问')
   })
 
   it('does not modify string-content messages', () => {
     const out = trimHistory(history, { keepTurns: 1, maxChars: 100 })
     expect(out[0].content).toBe('第一轮问题')
     expect(out[3].content).toBe('第一轮回答')
+  })
+})
+
+describe('trimCandidates', () => {
+  const history: ModelMessage[] = [
+    { role: 'user', content: '第一轮问题' },
+    {
+      role: 'tool',
+      content: [
+        { type: 'tool-result', toolCallId: 't1', toolName: 'mcp__x__fetch', output: { type: 'text', value: BIG } },
+        { type: 'tool-result', toolCallId: 't2', toolName: 'read_file', output: { type: 'text', value: 'small' } },
+        {
+          type: 'tool-result',
+          toolCallId: 't3',
+          toolName: 'view_image',
+          output: { type: 'content', value: [{ type: 'text', text: BIG }] },
+        },
+      ],
+    },
+    { role: 'assistant', content: '第一轮回答' },
+    { role: 'user', content: '第二轮问题' },
+    {
+      role: 'tool',
+      content: [
+        { type: 'tool-result', toolCallId: 't4', toolName: 'mcp__x__fetch', output: { type: 'text', value: BIG } },
+      ],
+    },
+    { role: 'assistant', content: '第二轮回答' },
+  ]
+
+  it('names the oversized text results the trim would destroy', () => {
+    const out = trimCandidates(history, { maxChars: 100 })
+    expect(out).toEqual([{ toolCallId: 't1', toolName: 'mcp__x__fetch', text: BIG }])
+  })
+
+  it('spares the last turn, small results, and content-array outputs', () => {
+    const ids = trimCandidates(history, { maxChars: 100 }).map((c) => c.toolCallId)
+    expect(ids).not.toContain('t2') // under maxChars
+    expect(ids).not.toContain('t3') // content-array (built-in media)
+    expect(ids).not.toContain('t4') // inside the tool keep window
   })
 })
 
