@@ -531,14 +531,24 @@ function restoreSavedPage(): void {
     return
   }
   restoring.value = true
-  const until = Date.now() + 20_000
-  const tick = (): void => {
-    if (disposed || !restoring.value) return
-    getScrollApi()?.scrollToPage({ pageNumber: page, behavior: 'auto' })
-    if (Date.now() < until) window.setTimeout(tick, 250)
-    else finishRestore()
+  const stop = onUserScroll()
+  // A handful of attempts while layout settles, and no more. Restoring a
+  // reading position is a courtesy, not a promise: unlike a citation jump
+  // nobody asked for it just now, so it must be the first thing to yield —
+  // both to the reader and to the clock.
+  const attempts = [60, 180, 400, 800, 1400, 2200]
+  for (const delay of attempts) {
+    window.setTimeout(() => {
+      if (disposed || !restoring.value || stop.touched) return
+      getScrollApi()?.scrollToPage({ pageNumber: page, behavior: 'auto' })
+    }, delay)
   }
-  tick()
+  // Reveal even if a page-change event for the exact target never arrives (the
+  // last page, virtualization rounding) rather than leaving the overlay up.
+  window.setTimeout(() => {
+    stop.release()
+    finishRestore()
+  }, attempts[attempts.length - 1] + 400)
 }
 
 /* ── Annotation persistence (trace-app sidecar format) ───────────────────── */
@@ -1115,10 +1125,11 @@ async function showCitation(blockId: string, nonce: number): Promise<void> {
  * newer jump supersedes this one, or at the cap.
  */
 function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number): void {
-  const until = Date.now() + 20_000
+  const until = Date.now() + 8_000
   let issued = false
+  const stop = onUserScroll()
   const tick = (): void => {
-    if (disposed || nonce !== lastDoneNonce) return
+    if (disposed || nonce !== lastDoneNonce || stop.touched) return
     const scroll = getScrollApi()
     if (issued && scroll?.getCurrentPage?.() === pageNumber) return // arrived
     scroll?.scrollToPage({
@@ -1130,8 +1141,39 @@ function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number
     })
     issued = true
     if (Date.now() < until) window.setTimeout(tick, 250)
+    else stop.release()
   }
   tick()
+}
+
+/**
+ * A latch that trips the moment the reader touches the document.
+ *
+ * Steering the viewport is only ever a guess about where someone wants to be,
+ * and the instant they scroll it stops being a guess. Without this, a retry
+ * loop long enough to survive a cold viewer is also long enough to hold the
+ * page hostage: an earlier version re-issued a scroll every 250ms for twenty
+ * seconds, so a document whose page-change event never named the exact target
+ * simply refused to move for the reader. Better to give up on a jump than to
+ * fight the person reading.
+ */
+function onUserScroll(): { touched: boolean; release: () => void } {
+  const latch = {
+    touched: false,
+    release: () => {
+      window.removeEventListener('wheel', trip, true)
+      window.removeEventListener('touchmove', trip, true)
+      window.removeEventListener('keydown', trip, true)
+    },
+  }
+  function trip(): void {
+    latch.touched = true
+    latch.release()
+  }
+  window.addEventListener('wheel', trip, true)
+  window.addEventListener('touchmove', trip, true)
+  window.addEventListener('keydown', trip, true)
+  return latch
 }
 
 /** Annotations-page jump: centre the annotation's own region. The highlight is
