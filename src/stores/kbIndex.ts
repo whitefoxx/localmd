@@ -61,57 +61,85 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   const docSections = ref<Map<string, DocSection>>(new Map())
   const refreshing = ref(false)
 
-  /** Bring the cache in sync with the tree: re-read changed files, drop deleted.
-   *  Keeps the SAME Map reference when nothing changed, so downstream computeds
-   *  (graph, health) don't re-emit and the graph view doesn't re-layout. */
+  /** A refresh was asked for while one was already running, so the running one
+   *  may have read a stale tree. Coalesced rather than dropped — see refresh(). */
+  let restale = false
+
+  /**
+   * Bring the cache in sync with the tree, coalescing concurrent callers: a
+   * request that arrives mid-run schedules exactly one more pass instead of
+   * being discarded.
+   *
+   * Dropping it was a real bug. `mdFiles` comes from the file tree, not from
+   * disk, so a refresh that starts before the tree is populated indexes
+   * nothing — and the call that arrives right after the tree lands (the
+   * backlinks panel reacting to the first opened file) was the one being
+   * thrown away. The panel then showed "no backlinks" for a KB full of them,
+   * with nothing left to trigger another attempt.
+   */
   async function refresh(): Promise<void> {
-    if (refreshing.value || !fs.hasRoot()) return
+    if (!fs.hasRoot()) return
+    if (refreshing.value) {
+      restale = true
+      return
+    }
     refreshing.value = true
     try {
-      const files = useFilesStore()
-      const mdPaths = new Set(files.mdFiles)
-      const next = new Map(pages.value)
-      let changed = false
-
-      for (const cached of next.keys()) {
-        if (!mdPaths.has(cached)) {
-          next.delete(cached)
-          changed = true
-        }
-      }
-
-      for (const path of mdPaths) {
-        const mtime = await fs.statMtime(path)
-        if (mtime === null) continue
-        const cached = next.get(path)
-        if (cached && cached.mtime === mtime) continue
-        const content = await fs.tryReadFile(path)
-        if (content === null) continue
-        const outgoing: string[] = []
-        const broken: string[] = []
-        for (const link of parseWikilinks(content)) {
-          // Citation tokens (`[[1:b14-3]]`, `[[pdf1:…]]`) aren't page links — they
-          // resolve at click-time via the doc indexes, exactly as the renderer
-          // consumes them before wikilinks. Don't count them as broken links.
-          if (isCitationToken(link.target)) continue
-          const resolved = files.resolveWikilink(link.target)
-          if (resolved) outgoing.push(resolved)
-          else broken.push(link.target)
-        }
-        // Standard markdown links (OKF bundles use these instead of wikilinks).
-        for (const href of parseMarkdownLinks(content)) {
-          const resolved = files.resolveMarkdownLink(path, href)
-          if (resolved) outgoing.push(resolved)
-          else broken.push(href)
-        }
-        next.set(path, { mtime, content, outgoing, broken, type: extractType(content) })
-        changed = true
-      }
-      if (changed) pages.value = next
-      await refreshDocSections()
+      do {
+        restale = false
+        await runRefresh()
+      } while (restale)
     } finally {
       refreshing.value = false
+      restale = false
     }
+  }
+
+  /** One pass. Keeps the SAME Map reference when nothing changed, so downstream
+   *  computeds (graph, health) don't re-emit and the graph view doesn't
+   *  re-layout. Callers go through refresh(), which owns the running flag. */
+  async function runRefresh(): Promise<void> {
+    const files = useFilesStore()
+    const mdPaths = new Set(files.mdFiles)
+    const next = new Map(pages.value)
+    let changed = false
+
+    for (const cached of next.keys()) {
+      if (!mdPaths.has(cached)) {
+        next.delete(cached)
+        changed = true
+      }
+    }
+
+    for (const path of mdPaths) {
+      const mtime = await fs.statMtime(path)
+      if (mtime === null) continue
+      const cached = next.get(path)
+      if (cached && cached.mtime === mtime) continue
+      const content = await fs.tryReadFile(path)
+      if (content === null) continue
+      const outgoing: string[] = []
+      const broken: string[] = []
+      for (const link of parseWikilinks(content)) {
+        // Citation tokens (`[[1:b14-3]]`, `[[pdf1:…]]`) aren't page links — they
+        // resolve at click-time via the doc indexes, exactly as the renderer
+        // consumes them before wikilinks. Don't count them as broken links.
+        if (isCitationToken(link.target)) continue
+        const resolved = files.resolveWikilink(link.target)
+        if (resolved) outgoing.push(resolved)
+        else broken.push(link.target)
+      }
+      // Standard markdown links (OKF bundles use these instead of wikilinks).
+      for (const href of parseMarkdownLinks(content)) {
+        const resolved = files.resolveMarkdownLink(path, href)
+        if (resolved) outgoing.push(resolved)
+        else broken.push(href)
+      }
+      next.set(path, { mtime, content, outgoing, broken, type: extractType(content) })
+      changed = true
+    }
+    if (changed) pages.value = next
+    await refreshDocSections()
   }
 
   /** Cache the section files of every PDF/EPUB/DOCX index, so document content
