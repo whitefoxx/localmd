@@ -35,6 +35,111 @@
       content="An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install."
     />
     <meta name="twitter:image" content="https://localmd.app/og.png" />
+    <!-- Structured data for search engines and LLM crawlers. The answers are
+         the public wording from the message house, verbatim where it is
+         binding (pricing); nothing here may claim what the app does not do.
+         A plain-text companion lives at /llms.txt. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "SoftwareApplication",
+            "name": "localmd",
+            "url": "https://localmd.app",
+            "applicationCategory": "Productivity",
+            "operatingSystem": "Chrome, Edge (Chromium browsers)",
+            "description": "An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "What is localmd?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "An AI knowledge base that runs in your browser and your local folder. You open a URL, grant the page access to one folder, and an AI agent can read, search, index and write the files in it — plain Markdown, PDFs and EPUBs. Nothing to install, no account."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does my data stay on my machine?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Your files stay in your folder — the app is a static page with no backend to upload to. The one thing that leaves is the text you send to the AI model you configured, which goes directly to that provider under your own API key. There is no middleman server."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Which browsers work?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Chrome, Edge or another Chromium browser for the full app — the File System Access API that lets a web page read and write a local folder exists only there. The built-in demo knowledge base runs in any modern browser, including Firefox and Safari, because it lives in memory."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Do I need an account or a subscription?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. There is nothing to sign up for. You bring your own API key from a model provider (Anthropic, OpenAI, DeepSeek, Google and others) and pay them directly at their prices; localmd adds nothing on top and sets no usage caps."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How is localmd different from NotebookLM?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "NotebookLM reads your sources but keeps the results in its own notebook. localmd writes answers into your own Markdown files, with citations that click back to the exact paragraph of the PDF they came from — and the notes remain ordinary files in your folder, usable with or without the app."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How is localmd different from Obsidian with AI plugins?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Obsidian can reach similar results if you assemble the integration yourself — plugins, MCP configuration, a local server. localmd ships the agent built in: open the page, add a key, and it already reads PDFs, writes notes and edits with your approval. It also opens an existing vault without imposing any layout on it."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can the AI edit my notes without me knowing?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. Every write appears as a line-level diff you approve or discard, and in ask-first mode nothing touches disk until you say yes. Git is built in for history."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What does localmd cost?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Everything you can do with your own folder and your own model is free forever, with no usage caps — web search included; it's your key and your money. Paid is what reaches past them: the browser extension, MCP servers, and GitHub sync. $39 once, verified offline, no account. It is not on sale yet; the start screen offers free early-access slots."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I try it without setting anything up?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes — the start screen offers a demo knowledge base: three linked notes and a real 43-page paper, open with no folder and no key. Click a citation and the PDF opens at the exact paragraph it came from. A small free model allowance lets you ask a few questions."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is localmd open source?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "The app repository is currently private. The plan is to extract the browser-side agent runtime and open-source it as a standalone package."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

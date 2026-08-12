@@ -1,0 +1,71 @@
+# localmd
+
+> An AI knowledge base that runs in your browser and your local folder. Open a
+> URL, pick a folder, start thinking — nothing to install.
+
+localmd (https://localmd.app) turns an ordinary folder on your computer into a
+knowledge base with an AI agent working inside it. The app is a static web
+page: it has no backend, stores nothing server-side, and requires no account.
+Files are read and written directly in the folder you grant it, via the
+browser's File System Access API.
+
+## Facts
+
+- The knowledge base is the folder: plain Markdown notes with `[[wikilinks]]`,
+  backlinks and a graph view, plus your PDFs, EPUBs, DOCX files and images.
+- The agent reads, searches, indexes and writes those files. PDF/EPUB/DOCX
+  documents are parsed into block-level indexes; answers carry citations that
+  click through to the exact paragraph of the source, highlighted.
+- Citations are written into your own Markdown files, so they keep working in
+  any editor, with or without localmd.
+- Every write the agent makes is shown as a line-level diff to approve or
+  discard; an ask-first mode keeps anything from touching disk until approved.
+  Git is built in (isomorphic-git, a real `.git` your terminal recognises),
+  with GitHub sync over the REST Git Data API.
+- Bring your own API key. Supported directly: Anthropic, OpenAI, DeepSeek,
+  Google Gemini, xAI, Groq, OpenRouter, Qwen, Zhipu GLM, Kimi, MiniMax, and
+  any OpenAI-compatible endpoint. Requests go from the browser straight to the
+  provider; localmd adds no middleman and no usage caps.
+- Extensible: reusable skills (`SKILL.md` files in the knowledge base), MCP
+  servers, a `MEMORY.md` the agent updates only when asked, and a companion
+  Chrome extension (localmd Connect) that lets the agent use the user's own
+  logged-in browser — 30+ sites, ~300 ready-made actions.
+- A built-in demo knowledge base (https://localmd.app/?demo=1) opens with no
+  folder and no key: three linked notes and a real 43-page paper with working
+  citations, plus a small free model allowance for a few questions.
+
+## Limits
+
+- Opening a real local folder requires Chrome, Edge or another Chromium
+  browser — the File System Access API exists only there. The demo works in
+  any modern browser, because it lives in memory.
+- Your files stay in your folder, but the text you send the agent goes to the
+  model provider you configured, under your own key. "Nothing ever leaves your
+  machine" would be false, and localmd does not claim it.
+- Scanned PDFs without a text layer are not OCRed and index to zero blocks.
+- LLM endpoints must allow browser CORS; the bundled presets are verified,
+  many self-hosted gateways are not.
+
+## Pricing
+
+Everything you can do with your own folder and your own model is free, with no
+usage caps — web search included; you pay your provider directly at their
+prices. Paid is what reaches past them: the localmd Connect browser extension,
+MCP servers, and GitHub sync — a one-time $39 licence, verified offline, with
+no account. Not on sale yet; the start screen offers free early-access slots.
+
+## Compared with
+
+- NotebookLM: reads your sources but keeps results in its notebook. localmd
+  writes answers into your own files, cites back to the exact paragraph, and
+  imposes no source limits (your key, your usage).
+- Obsidian + AI plugins: reaches similar results if you assemble plugins, MCP
+  configuration and a local server yourself. localmd ships the agent built in,
+  and opens an existing vault without imposing any layout on it.
+- Desktop AI knowledge tools: localmd installs nothing — it is a URL, and the
+  browser's own permission model is the entire security arrangement.
+
+## Links
+
+- App: https://localmd.app
+- Demo (no setup): https://localmd.app/?demo=1
