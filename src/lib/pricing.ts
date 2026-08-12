@@ -39,11 +39,16 @@ export const EARLY_SLOT_DAYS = 90
  * Where an early-slot request goes. Either an https form URL (Tally, Formspree
  * — anything that lands in an inbox) or a bare email address.
  *
- * Empty until one exists, and empty is handled: the offer is hidden entirely
- * rather than rendering a button that goes nowhere. The price and the "not live
- * yet" line still show, so the page is never broken — only smaller.
+ * A form rather than a mailto, on purpose. The point of the early slots is not
+ * the slots: it is the first honest reading of whether anyone wants the paid
+ * tier, and that reading is a rate — how many who opened the offer went on to
+ * ask for one. A mailto produces no denominator and no numerator, only however
+ * many messages happen to arrive.
+ *
+ * Empty is still handled: the offer hides entirely rather than rendering a
+ * button that goes nowhere, leaving the price and the "not live yet" line.
  */
-export const EARLY_ACCESS_CONTACT = 'yunbiaoch@gmail.com'
+export const EARLY_ACCESS_CONTACT = 'https://tally.so/r/obN72P'
 
 export function slotsLeft(taken = EARLY_SLOTS_TAKEN): number {
   return Math.max(0, EARLY_SLOTS_TOTAL - taken)
