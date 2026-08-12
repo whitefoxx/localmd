@@ -96,12 +96,26 @@ export function bearer(req) {
   return h.startsWith('Bearer ') ? h.slice(7) : ''
 }
 
-export function clientIp(req) {
+function clientIp(req) {
   return (
     req.headers.get('x-real-ip') ||
     (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
     'unknown'
   )
+}
+
+/**
+ * A stable, irreversible handle for one caller, for rate limiting only.
+ *
+ * The raw address would work just as well for counting, and that is exactly
+ * why it is not used: an app whose front page says "no account, nothing
+ * uploaded" should not keep a list of who visited, even for six hours, even in
+ * a key nobody reads. HMAC with the signing secret gives the same counting
+ * behaviour with nothing recoverable in the store.
+ */
+export async function callerId(req) {
+  const mac = await crypto.subtle.sign('HMAC', await key(), enc.encode(clientIp(req)))
+  return b64url(mac).slice(0, 22)
 }
 
 export function json(body, status = 200) {

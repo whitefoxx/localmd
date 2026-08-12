@@ -35,11 +35,14 @@
  *   TRIAL_SIGNING_SECRET      any long random string; signs session tokens.
  *   UPSTASH_REDIS_REST_URL    the counters. Without a store there is no way to
  *   UPSTASH_REDIS_REST_TOKEN  bound a session, so the endpoint refuses to run.
- *   TRIAL_DAILY_BUDGET_USD    optional; defaults to 20.
+ *   TRIAL_DAILY_BUDGET_USD    optional; defaults to 10. This is the ceiling
+ *                             for EVERYONE COMBINED on a given UTC day, not a
+ *                             per-visitor allowance — per visitor is the
+ *                             session budget above.
  */
 import {
   bearer,
-  clientIp,
+  callerId,
   json,
   redis,
   redisPipeline,
@@ -51,22 +54,40 @@ import {
 export const config = { runtime: 'edge' }
 
 /** Written here, never taken from the request. */
-const MODEL = 'deepseek-chat'
+const MODEL = 'deepseek-v4-flash'
 const UPSTREAM = 'https://api.deepseek.com/v1/chat/completions'
 const MAX_TOKENS = 1500
 
-/** What one session may spend before it is asked to bring its own key. */
+/**
+ * Thinking is on by default on this model, at `high` effort, and its reasoning
+ * tokens bill as output. A trial answer about a demo paper does not need it,
+ * and the visitor deciding in thirty seconds whether this is interesting cares
+ * more about the first token arriving. If tool loops turn out to wander
+ * without it, the honest fix is `{ type: 'enabled' }` with
+ * `reasoning_effort: 'low'` — one line, here.
+ */
+const THINKING = { type: 'disabled' }
+
+/** What one session may spend before it is asked to bring its own key.
+ *  At list price this is about $0.034 of upstream, worst case. */
 const SESSION_STEPS = 24
 const SESSION_INPUT_TOKENS = 220_000
 const SESSION_OUTPUT_TOKENS = 12_000
 const SESSION_TTL_S = 60 * 60
 
-/** Approximate DeepSeek list price, USD per million tokens. Only used to keep
- *  the daily ceiling honest; being a little pessimistic is the safe direction. */
-const USD_PER_M_INPUT = 0.3
-const USD_PER_M_OUTPUT = 1.2
+/**
+ * deepseek-v4-flash list price, USD per million tokens (2026-08).
+ *
+ * Cached input is fifty times cheaper than uncached, which is far too big a
+ * gap to average over: an agent loop re-sends its prefix every step, so most
+ * of a session's input is cache hits, and charging those at the miss price
+ * would close the day's budget while almost none of it had been spent.
+ */
+const USD_PER_M_CACHE_HIT = 0.0028
+const USD_PER_M_CACHE_MISS = 0.14
+const USD_PER_M_OUTPUT = 0.28
 
-const DAILY_BUDGET_USD = Number(process.env.TRIAL_DAILY_BUDGET_USD || 20)
+const DAILY_BUDGET_USD = Number(process.env.TRIAL_DAILY_BUDGET_USD || 10)
 const IP_WINDOW_S = 6 * 60 * 60
 const IP_SESSIONS_PER_WINDOW = 2
 
@@ -93,8 +114,8 @@ export default async function handler(req) {
 }
 
 async function mintSession(req) {
-  const ip = clientIp(req)
-  const ipKey = `trial:ip:${today()}:${ip}`
+  // Hashed, not the address itself — see callerId.
+  const ipKey = `trial:ip:${today()}:${await callerId(req)}`
   const [minted] = await redisPipeline([
     ['INCR', ipKey],
     ['EXPIRE', ipKey, String(IP_WINDOW_S)],
@@ -165,6 +186,7 @@ async function proxyCompletion(req) {
     ...body,
     model: MODEL,
     max_tokens: Math.min(Number(body.max_tokens) || MAX_TOKENS, MAX_TOKENS),
+    thinking: THINKING,
     stream_options: body.stream ? { include_usage: true } : undefined,
   }
 
@@ -226,7 +248,15 @@ function meterStream(body, sessKey) {
         const inTok = Number(usage?.prompt_tokens || 0)
         const outTok = Number(usage?.completion_tokens || 0)
         if (!inTok && !outTok) return
-        const usd = (inTok / 1e6) * USD_PER_M_INPUT + (outTok / 1e6) * USD_PER_M_OUTPUT
+        // Fall back to charging everything at the miss price when the split is
+        // absent: over-counting closes the budget early, under-counting
+        // overshoots the bill.
+        const hit = Number(usage?.prompt_cache_hit_tokens || 0)
+        const miss = Number(usage?.prompt_cache_miss_tokens ?? inTok - hit)
+        const usd =
+          (hit / 1e6) * USD_PER_M_CACHE_HIT +
+          (miss / 1e6) * USD_PER_M_CACHE_MISS +
+          (outTok / 1e6) * USD_PER_M_OUTPUT
         try {
           await redisPipeline([
             ['HINCRBY', sessKey, 'in', String(-inTok)],
