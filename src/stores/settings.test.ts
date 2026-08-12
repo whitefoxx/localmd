@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeSettings, autoLabel } from './settings'
+import { normalizeSettings, autoLabel, persistable } from './settings'
 
 describe('normalizeSettings — legacy single-provider migration', () => {
   it('migrates a configured anthropic setup', () => {
@@ -228,5 +228,50 @@ describe('normalizeSettings — retired catalog packs', () => {
     const s = normalizeSettings({ profiles: [], toolEntries: ['jina', 'parallel'] })
     expect(s.toolEntries).toEqual(['jina', 'parallel'])
     expect(s.httpTools).toEqual([])
+  })
+})
+
+describe('persistable — what reaches localStorage', () => {
+  const base = { ...normalizeSettings({}), profiles: [], slots: {} }
+  const own = { id: 'own', label: 'Mine', provider: 'anthropic', baseUrl: '', apiKey: 'sk-real', model: 'm' }
+  const trial = {
+    id: 'trial',
+    label: 'Free trial',
+    provider: 'trial',
+    baseUrl: '/api/trial/v1',
+    apiKey: 'session-token',
+    model: 'deepseek-chat',
+    ephemeral: true,
+  }
+
+  it('never writes an ephemeral profile or its token', () => {
+    const out = persistable({ ...base, profiles: [own, trial], slots: { primary: 'trial' } })
+    expect(out.profiles.map((p) => p.id)).toEqual(['own'])
+    expect(JSON.stringify(out)).not.toContain('session-token')
+  })
+
+  it('drops a slot left pointing at a profile it just removed', () => {
+    // A slot naming a profile that is not in the file reads as a broken config
+    // on the next visit.
+    const out = persistable({ ...base, profiles: [trial], slots: { primary: 'trial' } })
+    expect(out.profiles).toEqual([])
+    expect(out.slots.primary).toBeUndefined()
+  })
+
+  it('keeps slots that point at profiles which survive', () => {
+    const out = persistable({
+      ...base,
+      profiles: [own, trial],
+      slots: { primary: 'own', vision: 'trial' },
+    })
+    expect(out.slots.primary).toBe('own')
+    expect(out.slots.vision).toBeUndefined()
+  })
+
+  it('returns the same object when there is nothing ephemeral to strip', () => {
+    // Identity matters: the watcher compares the serialized result to decide
+    // whether to write at all.
+    const state = { ...base, profiles: [own], slots: { primary: 'own' } }
+    expect(persistable(state)).toBe(state)
   })
 })

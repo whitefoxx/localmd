@@ -13,7 +13,13 @@ import { useThemeStore } from '@/stores/theme'
 import { useLicenceStore } from '@/stores/licence'
 import { ENFORCE_LICENCE } from '@/lib/licence'
 import ToolsSection from '@/components/settings/ToolsSection.vue'
-import { ALL_PROVIDERS, presetFor, needsBaseUrl, providerHasImageModel } from '@/lib/providers'
+import {
+  ALL_PROVIDERS,
+  SELECTABLE_PROVIDERS,
+  presetFor,
+  needsBaseUrl,
+  providerHasImageModel,
+} from '@/lib/providers'
 import {
   HOTKEYS,
   HOTKEY_BY_ID,
@@ -326,7 +332,7 @@ function slotBadges(p: LlmProfile): string[] {
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Provider</label>
                 <select v-model="editing.provider" class="input" @change="applyProviderPreset">
-                  <option v-for="p in ALL_PROVIDERS" :key="p.id" :value="p.id">{{ p.label }}</option>
+                  <option v-for="p in SELECTABLE_PROVIDERS" :key="p.id" :value="p.id">{{ p.label }}</option>
                 </select>
               </div>
 

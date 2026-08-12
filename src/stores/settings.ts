@@ -71,6 +71,11 @@ export interface LlmProfile {
   maxTokens?: number
   /** Thinking depth; absent = provider default. */
   reasoning?: ReasoningEffort
+  /** Never written to storage. The trial profile is one of these: its key is a
+   *  session token that expires within the hour, so persisting it would leave
+   *  a profile that looks configured and answers "expired" on the next visit.
+   *  See lib/trial.ts. */
+  ephemeral?: boolean
 }
 
 export type Slot = 'primary' | 'vision' | 'image'
@@ -371,6 +376,29 @@ export function normalizeSettings(raw: unknown): SettingsState {
   return { profiles: [], slots: {}, ...EMPTY }
 }
 
+/**
+ * The settings as they should be written to disk.
+ *
+ * Ephemeral profiles are dropped — today that means the free trial, whose key
+ * is a session token good for under an hour. Storing it would leave the next
+ * visit looking configured and answering "expired", which is worse than
+ * looking unconfigured. The slot pointing at a dropped profile goes with it:
+ * a slot naming a profile that is not in the file is a config that reads as
+ * broken.
+ */
+export function persistable(state: SettingsState): SettingsState {
+  const profiles = state.profiles.filter((p) => !p.ephemeral)
+  if (profiles.length === state.profiles.length) return state
+  const kept = new Set(profiles.map((p) => p.id))
+  return {
+    ...state,
+    profiles,
+    slots: Object.fromEntries(
+      Object.entries(state.slots).filter(([, id]) => !id || kept.has(id)),
+    ) as SettingsState['slots'],
+  }
+}
+
 function load(): SettingsState {
   if (isE2eMode()) return { profiles: [], slots: {}, ...EMPTY } // never touch real config
   try {
@@ -391,7 +419,7 @@ export const useSettingsStore = defineStore('settings', () => {
     watch(
       state,
       () => {
-        const next = JSON.stringify(state)
+        const next = JSON.stringify(persistable(state))
         // Skipping an identical write is what stops a hydrated tab from
         // bouncing a storage event straight back at the tab it hydrated from.
         if (next !== localStorage.getItem(STORAGE_KEY)) localStorage.setItem(STORAGE_KEY, next)

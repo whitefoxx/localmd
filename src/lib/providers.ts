@@ -30,6 +30,11 @@ export interface ProviderPreset {
   label: string
   /** Provider package that handles this endpoint. */
   sdk: SdkKind
+  /** Kept out of the provider picker. Not a secret — just not something a user
+   *  can usefully choose, because its "key" is a session token this app mints
+   *  (see lib/trial.ts). Picking it by hand would only produce a profile that
+   *  cannot authenticate. */
+  internal?: boolean
   /** Only meaningful for 'openai-compatible'; baked into the package otherwise.
    *  Empty + `needsBaseUrl` = the user types it (Custom). */
   baseUrl: string
@@ -103,6 +108,18 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
     defaultModel: '',
     needsBaseUrl: true,
   },
+  {
+    // The free trial, on our own origin — so no CORS question arises, and the
+    // key on the wire is a session token that expires within the hour rather
+    // than anything of the user's. The endpoint decides the model; the value
+    // here only fills the profile's label.
+    id: 'trial',
+    label: 'Free trial',
+    sdk: 'openai-compatible',
+    baseUrl: '/api/trial/v1',
+    defaultModel: 'deepseek-chat',
+    internal: true,
+  },
 ]
 
 /** Providers with a dedicated `@ai-sdk/<provider>` package — base URL and wire
@@ -160,6 +177,11 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
 
 /** Every provider a profile can use, dedicated packages first. */
 export const ALL_PROVIDERS: ProviderPreset[] = [...DEDICATED_PRESETS, ...OPENAI_COMPAT_PRESETS]
+
+/** The ones worth offering in the picker — everything a user can actually
+ *  configure. Lookups still go through ALL_PROVIDERS, so an internal provider
+ *  a profile already names still resolves. */
+export const SELECTABLE_PROVIDERS: ProviderPreset[] = ALL_PROVIDERS.filter((p) => !p.internal)
 
 export function presetFor(providerId: string): ProviderPreset | undefined {
   return ALL_PROVIDERS.find((p) => p.id === providerId)
