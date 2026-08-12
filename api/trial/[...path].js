@@ -41,6 +41,13 @@
  *                             for EVERYONE COMBINED on a given UTC day, not a
  *                             per-visitor allowance — per visitor is the
  *                             session budget above.
+ *
+ * Two things about setting them that cost an afternoon if you learn them the
+ * slow way. Edge functions take their environment at BUILD time, so a variable
+ * added after a deployment is invisible to it however correct the dashboard
+ * looks — redeploy after changing any of these. And scope them to Preview as
+ * well as Production, or every preview build answers 503 and looks broken
+ * while production is fine.
  */
 import {
   bearer,
