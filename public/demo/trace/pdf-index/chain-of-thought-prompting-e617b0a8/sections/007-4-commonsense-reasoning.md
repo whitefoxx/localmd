@@ -15,32 +15,88 @@
 
 [[b7-7]] Results. Figure 7 highlights these results for PaLM (full results for LaMDA, GPT-3, and different model scales are shown in Table 4). For all tasks, scaling up model size improved the performance of standard prompting; chain-of-thought prompting led to further gains, with improvements appearing to be largest for PaLM 540B. With chain-of-thought prompting, PaLM 540B achieved strong performance relative to baselines, outperforming the prior state of the art on StrategyQA (75.6% vs 69.4%) and outperforming an unaided sports enthusiast on sports understanding (95.4% vs 84%). These results demonstrate that chain-of-thought prompting can also improve performance on tasks requiring a range of commonsense reasoning abilities (though note that gain was minimal on CSQA).
 
-[[b7-8]] CSQA StrategyQA Date Sports SayCan
+[[b7-8]] CSQA
 
-[[b7-9]] 100 90 80 100 100
+[[b7-9]] 100
 
-[[b7-10]] 80 80 60 80 Standard prompting
+[[b7-10]] 80
 
-[[b7-11]] 80 Chain of thought
+[[b7-11]] 80
 
-[[b7-12]] 60 70 40 60
+[[b7-12]] 60
 
-[[b7-13]] Prior supervised best
+[[b7-13]] 40
 
-[[b7-14]] 60
+[[b7-14]] Solve rate (%)
 
-[[b7-15]] 40 60 20 40 Human
+[[b7-15]] 20
 
-[[b7-16]] Solve rate (%)
+[[b7-16]] 8 62 540
 
-[[b7-17]] 20 50 0 40 20
+[[b7-17]] Figure 7: Chain-of-thought prompting also improves the commonsense reasoning abilities of language models. The language model shown here is PaLM. Prior best numbers are from the leaderboards of CSQA (Talmor et al., 2019) and StrategyQA (Geva et al., 2021) (single-model only, as of May 5, 2022). Additional results using various sizes of LaMDA, GPT-3, and PaLM are shown in Table 4.
 
-[[b7-18]] 8 62 540 8 62 540 8 62 540 8 62 540 8 62 540
+[[b7-18]] 2We sample examples ≤ 60 tokens to fit into our input context window, and also limit the examples to ≤ 2 steps to solve for a fair comparison with the eight exemplars that we composed.
 
-[[b7-19]] Model scale (# parameters in billions)
+[[b7-19]] 7
 
-[[b7-20]] Figure 7: Chain-of-thought prompting also improves the commonsense reasoning abilities of language models. The language model shown here is PaLM. Prior best numbers are from the leaderboards of CSQA (Talmor et al., 2019) and StrategyQA (Geva et al., 2021) (single-model only, as of May 5, 2022). Additional results using various sizes of LaMDA, GPT-3, and PaLM are shown in Table 4.
+[[b7-20]] StrategyQA
 
-[[b7-21]] 2We sample examples ≤ 60 tokens to fit into our input context window, and also limit the examples to ≤ 2 steps to solve for a fair comparison with the eight exemplars that we composed.
+[[b7-21]] Date
 
-[[b7-22]] 7
+[[b7-22]] Sports
+
+[[b7-23]] SayCan
+
+[[b7-24]] 90
+
+[[b7-25]] 80
+
+[[b7-26]] 100
+
+[[b7-27]] 100
+
+[[b7-28]] 80
+
+[[b7-29]] 60
+
+[[b7-30]] 80
+
+[[b7-31]] Standard prompting
+
+[[b7-32]] Chain of thought
+
+[[b7-33]] 70
+
+[[b7-34]] 40
+
+[[b7-35]] 60
+
+[[b7-36]] Prior supervised best
+
+[[b7-37]] 60
+
+[[b7-38]] 60
+
+[[b7-39]] 20
+
+[[b7-40]] 40
+
+[[b7-41]] Human
+
+[[b7-42]] 50
+
+[[b7-43]] 0
+
+[[b7-44]] 40
+
+[[b7-45]] 20
+
+[[b7-46]] 8 62 540
+
+[[b7-47]] 8 62 540
+
+[[b7-48]] 8 62 540
+
+[[b7-49]] 8 62 540
+
+[[b7-50]] Model scale (# parameters in billions)

@@ -515,24 +515,30 @@ function finishRestore(): void {
   restoreDone = true
 }
 
-/** Restore the saved page; retried because layout settles shortly after load. */
+/**
+ * Restore the saved page, steering until the viewer arrives — same shape and
+ * same reason as scrollToPoint above: a fixed retry window tuned on a warm
+ * viewer quietly failed on a cold one, and the reader came back to page 1.
+ * The page-change subscription calls finishRestore the moment the target is
+ * reached; the deadline here is the fallback for targets no page-change event
+ * names exactly (the last page, virtualization rounding), and drops the
+ * restore overlay rather than leaving it up forever.
+ */
 function restoreSavedPage(): void {
   const page = pendingRestorePage
-  const scroll = getScrollApi()
-  if (!page || page <= 1 || !scroll?.scrollToPage) {
+  if (!page || page <= 1 || !getScrollApi()?.scrollToPage) {
     finishRestore()
     return
   }
   restoring.value = true
-  const attempts = [60, 180, 400, 800, 1400]
-  for (const delay of attempts) {
-    window.setTimeout(() => {
-      if (!disposed && restoring.value) scroll.scrollToPage({ pageNumber: page, behavior: 'auto' })
-    }, delay)
+  const until = Date.now() + 20_000
+  const tick = (): void => {
+    if (disposed || !restoring.value) return
+    getScrollApi()?.scrollToPage({ pageNumber: page, behavior: 'auto' })
+    if (Date.now() < until) window.setTimeout(tick, 250)
+    else finishRestore()
   }
-  // Fallback: reveal even if a page-change event for the exact target never
-  // arrives (e.g. the last page, or virtualization rounding).
-  window.setTimeout(finishRestore, attempts[attempts.length - 1] + 400)
+  tick()
 }
 
 /* ── Annotation persistence (trace-app sidecar format) ───────────────────── */
@@ -1092,12 +1098,29 @@ async function showCitation(blockId: string, nonce: number): Promise<void> {
   )
 }
 
-/** Scroll a page-point to the viewport centre; retried while layout settles. */
+/**
+ * Scroll a page-point to the viewport centre, steering until the viewer
+ * actually arrives.
+ *
+ * The deadline is generous and the success check is observed, not assumed. An
+ * earlier version retried for a fixed 2.5s from the moment the jump was
+ * requested — tuned on a warm viewer, where layout settles in under a second.
+ * On a cold one (first visit, worker still compiling, a 43-page document
+ * measuring itself) the first paint can take ten, so the window died before
+ * the viewer could move and the citation silently opened on page 1. Exactly
+ * the load order every first-time demo visitor gets.
+ *
+ * Steering stops the moment the target page is reached (checked via
+ * getCurrentPage, so a user who scrolls after arrival is never fought), when a
+ * newer jump supersedes this one, or at the cap.
+ */
 function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number): void {
-  const scroll = getScrollApi()
-  const until = Date.now() + 2500
-  const doScroll = (): void => {
+  const until = Date.now() + 20_000
+  let issued = false
+  const tick = (): void => {
     if (disposed || nonce !== lastDoneNonce) return
+    const scroll = getScrollApi()
+    if (issued && scroll?.getCurrentPage?.() === pageNumber) return // arrived
     scroll?.scrollToPage({
       pageNumber,
       pageCoordinates: { x: cx, y: cy },
@@ -1105,9 +1128,10 @@ function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number
       alignX: 50,
       alignY: 50,
     })
-    if (Date.now() < until) window.setTimeout(doScroll, 150)
+    issued = true
+    if (Date.now() < until) window.setTimeout(tick, 250)
   }
-  doScroll()
+  tick()
 }
 
 /** Annotations-page jump: centre the annotation's own region. The highlight is

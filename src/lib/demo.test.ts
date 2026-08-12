@@ -87,7 +87,7 @@ describe('demo knowledge base', () => {
    */
   it('cites blocks that still say what the note claims they say', () => {
     const expected: Record<string, string> = {
-      'b2-19': 'decompose the problem into intermediate steps',
+      'b2-8': 'decompose the problem into intermediate steps',
       'b16-3': 'emerges only at certain model scales',
       'b25-1': 'without any finetuning',
       'b1-1': 'Chain-of-Thought Prompting',

@@ -3,27 +3,43 @@
 
 [[b32-2]] Table 13: Examples of correct and incorrect chains of thought produced by LaMDA 137B on the letter concatenation task.
 
-[[b32-3]] QUESTION: Take the last letters of the words in “Waldo Schmidt” and concatenate them. MODEL ANSWER (CORRECT): The last letter of “Waldo” is “o”. The last letter of “Schmidt” is “t”. Concatenating them is “ot”. So the answer is ot. X
+[[b32-3]] QUESTION: Take the last letters of the words in “Waldo Schmidt” and concatenate them.
 
-[[b32-4]] QUESTION: Take the last letters of the words in “Daniel Friedman” and concatenate them. MODEL ANSWER (INCORRECT): The last letter of “Daniel” is “l”. The last letter of “Friedman” is “m”. Concatenating them is “lm”. So the answer is lm. 7
+[[b32-4]] MODEL ANSWER (CORRECT): The last letter of “Waldo” is “o”. The last letter of “Schmidt” is “t”. Concatenating them is “ot”. So the answer is ot. X
 
-[[b32-5]] Table 14: Examples of correct and incorrect chains of thought produced by LaMDA 137B on the coinflip task.
+[[b32-5]] QUESTION: Take the last letters of the words in “Daniel Friedman” and concatenate them.
 
-[[b32-6]] QUESTION: A coin is heads up. Andree flips the coin. Audrie does not flip the coin. Is the coin still heads up? MODEL ANSWER (CORRECT): The coin was flipped by Andree. So the coin was flipped 1 time, which is an odd number. The coin started heads up, so after an odd number of flips, it will be tails up. So the answer is no. X
+[[b32-6]] MODEL ANSWER (INCORRECT): The last letter of “Daniel” is “l”. The last letter of “Friedman” is “m”. Concatenating them is “lm”. So the answer is lm. 7
 
-[[b32-7]] QUESTION: A coin is heads up. Kristian does not flip the coin. Dallas does not flip the coin. Is the coin still heads up? MODEL ANSWER (INCORRECT): The coin was flipped by Kristian. So the coin was flipped 1 time, which is an odd number. The coin started heads up, so after an odd number of flips, it will be tails up. So the answer is no. 7
+[[b32-7]] Table 14: Examples of correct and incorrect chains of thought produced by LaMDA 137B on the coinflip task.
 
-[[b32-8]] Table 15: Examples of correct and incorrect chains of thought produced by LaMDA 137B on CSQA.
+[[b32-8]] QUESTION: A coin is heads up. Andree flips the coin. Audrie does not flip the coin. Is the coin still heads up?
 
-[[b32-9]] QUESTION: When a person is beginning work, what are they building? Answer Choices: (a) time (b) accomplishing (c) working (d) momentum (e) tiredness MODEL ANSWER (CORRECT): The answer must be something that is built. Of the above choices, only momentum is built. So the answer is (d). X
+[[b32-9]] MODEL ANSWER (CORRECT): The coin was flipped by Andree. So the coin was flipped 1 time, which is an odd number. The coin started heads up, so after an odd number of flips, it will be tails up. So the answer is no. X
 
-[[b32-10]] QUESTION: Where are you likely to find a hamburger? Answer Choices: (a) fast food restaurant (b) pizza (c) ground up dead cows (d) mouth (e) cow carcus MODEL ANSWER (CORRECT): The answer must be a place where hamburgers are found. Of the above choices, only fast food restaurants serve hamburgers. So the answer is (a). X
+[[b32-10]] QUESTION: A coin is heads up. Kristian does not flip the coin. Dallas does not flip the coin. Is the coin still heads up?
 
-[[b32-11]] QUESTION: Aside from water and nourishment what does your dog need? Answer Choices: (a) bone (b) charm (c) petted (d) lots of attention (e) walked MODEL ANSWER (INCORRECT): The answer must be something that a dog needs. Of the above choices, only bone is something that a dog needs. So the answer is (a). 7 (Ground truth is (d).)
+[[b32-11]] MODEL ANSWER (INCORRECT): The coin was flipped by Kristian. So the coin was flipped 1 time, which is an odd number. The coin started heads up, so after an odd number of flips, it will be tails up. So the answer is no. 7
 
-[[b32-12]] QUESTION: What are you waiting alongside with when you’re in a reception area? Answer Choices: (a) motel (b) chair (c) hospital (d) people (e) hotels MODEL ANSWER (INCORRECT): The answer must be something that is waiting with you in a reception area. Of the above choices, only people are waiting with you in a reception area. So the answer is (e). 7 (Ground truth is (d).)
+[[b32-12]] Table 15: Examples of correct and incorrect chains of thought produced by LaMDA 137B on CSQA.
 
-[[b32-13]] 32
+[[b32-13]] QUESTION: When a person is beginning work, what are they building? Answer Choices: (a) time (b) accomplishing (c) working (d) momentum (e) tiredness
+
+[[b32-14]] MODEL ANSWER (CORRECT): The answer must be something that is built. Of the above choices, only momentum is built. So the answer is (d). X
+
+[[b32-15]] QUESTION: Where are you likely to find a hamburger? Answer Choices: (a) fast food restaurant (b) pizza (c) ground up dead cows (d) mouth (e) cow carcus
+
+[[b32-16]] MODEL ANSWER (CORRECT): The answer must be a place where hamburgers are found. Of the above choices, only fast food restaurants serve hamburgers. So the answer is (a). X
+
+[[b32-17]] QUESTION: Aside from water and nourishment what does your dog need? Answer Choices: (a) bone (b) charm (c) petted (d) lots of attention (e) walked
+
+[[b32-18]] MODEL ANSWER (INCORRECT): The answer must be something that a dog needs. Of the above choices, only bone is something that a dog needs. So the answer is (a). 7 (Ground truth is (d).)
+
+[[b32-19]] QUESTION: What are you waiting alongside with when you’re in a reception area? Answer Choices: (a) motel (b) chair (c) hospital (d) people (e) hotels
+
+[[b32-20]] MODEL ANSWER (INCORRECT): The answer must be something that is waiting with you in a reception area. Of the above choices, only people are waiting with you in a reception area. So the answer is (e). 7 (Ground truth is (d).)
+
+[[b32-21]] 32
 
 [[b33-1]] Table 16: Examples of correct and incorrect chains of thought produced by LaMDA 137B on StrategyQA.
 

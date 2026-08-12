@@ -9,7 +9,17 @@
  * exactly as pdf.js hands them over.
  */
 import { describe, it, expect } from 'vitest'
-import { layoutPage, place, bandLines, groupBlocks, boundsOf, joinLines } from './layout'
+import {
+  layoutPage,
+  place,
+  bandLines,
+  groupBlocks,
+  boundsOf,
+  joinLines,
+  splitAtWideGaps,
+  separateFloaters,
+  typicalPitch,
+} from './layout'
 
 const PAGE_H = 800
 
@@ -139,5 +149,126 @@ describe('joinLines', () => {
   it('joins CJK lines without a space and Latin lines with one', () => {
     expect(joinLines([line({ text: '知识' }), line({ text: '库' })])).toBe('知识库')
     expect(joinLines([line({ text: 'one' }), line({ text: 'two' })])).toBe('one two')
+  })
+})
+
+describe('splitAtWideGaps', () => {
+  it('cuts a band at a gap no prose line would contain', () => {
+    const [band] = bandLines(place([item('body text here', 50, 700, 200), item('legend', 400, 700, 60)]))
+    const parts = splitAtWideGaps(band)
+    expect(parts).toHaveLength(2)
+    expect(parts[0].items.map((i) => i.str)).toEqual(['body text here'])
+    expect(parts[1].items.map((i) => i.str)).toEqual(['legend'])
+  })
+
+  it('keeps word spacing together', () => {
+    // 5pt gaps at 10pt font are words, not streams.
+    const [band] = bandLines(place([item('one', 50, 700, 30), item('two', 85, 700, 30)]))
+    expect(splitAtWideGaps(band)).toHaveLength(1)
+  })
+})
+
+describe('separateFloaters', () => {
+  /** A page with a right-side wrapped figure: body wraps at x≈300, chart text
+   *  sits at 380–550 for those bands, and full-width prose follows. */
+  function wrappedFigurePage() {
+    const items = []
+    let y = 700
+    for (let r = 0; r < 4; r++) {
+      items.push(item(`wrap${r}`, 50, y, 250))
+      items.push(item(`chart${r}`, 400, y, 100))
+      y -= 15
+    }
+    // An axis row with no prose beside it.
+    items.push(item('100', 420, y, 20))
+    y -= 15
+    for (let r = 0; r < 3; r++) {
+      items.push(item(`wide${r}`, 50, y, 500))
+      y -= 15
+    }
+    return items
+  }
+
+  it('keeps prose in order and holds figure text to the end', () => {
+    const { flow, floaters } = separateFloaters(bandLines(place(wrappedFigurePage())))
+    expect(flow.map((l) => l.items[0].str)).toEqual([
+      'wrap0', 'wrap1', 'wrap2', 'wrap3', 'wide0', 'wide1', 'wide2',
+    ])
+    expect(floaters.map((l) => l.items[0].str)).toEqual([
+      'chart0', 'chart1', 'chart2', 'chart3', '100',
+    ])
+  })
+
+  it('no line ever mixes prose with figure text', () => {
+    const { flow, floaters } = separateFloaters(bandLines(place(wrappedFigurePage())))
+    for (const l of [...flow, ...floaters]) {
+      const strs = l.items.map((i) => i.str).join(' ')
+      expect(/wrap|wide/.test(strs) && /chart|100/.test(strs)).toBe(false)
+    }
+  })
+
+  it('leaves a plain page untouched', () => {
+    const items = Array.from({ length: 8 }, (_, r) => item(`line${r}`, 50, 700 - r * 15, 500))
+    const { flow, floaters } = separateFloaters(bandLines(place(items)))
+    expect(flow).toHaveLength(8)
+    expect(floaters).toHaveLength(0)
+  })
+})
+
+describe('typicalPitch', () => {
+  it('learns the page leading from the median', () => {
+    const lines = [100, 111, 122, 133, 150, 161].map((y) => line({ yTop: y }))
+    expect(typicalPitch(lines)).toBe(11)
+  })
+
+  it('declines to guess from too few lines', () => {
+    expect(typicalPitch([line({ yTop: 100 }), line({ yTop: 111 })])).toBeNull()
+  })
+})
+
+describe('groupBlocks — leading-relative paragraphs', () => {
+  const justified = { left: 50, right: 280, justified: true }
+
+  it('splits at a paragraph set apart by leading alone', () => {
+    // The measured case: 11pt pitch inside paragraphs, 17pt between them,
+    // 10pt font, no indent. An absolute gap rule misses 17 − 10 = 7 < 7.5.
+    const ys = [100, 111, 122, 133, 150, 161, 172]
+    const lines = ys.map((y) => line({ yTop: y }))
+    const blocks = groupBlocks(lines, justified)
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]).toHaveLength(4)
+    expect(blocks[1]).toHaveLength(3)
+  })
+
+  it('starts a new block when y jumps backwards (floaters)', () => {
+    const lines = [
+      line({ yTop: 100 }),
+      line({ yTop: 111 }),
+      line({ yTop: 40, x0: 400, x1: 500, text: 'chart' }),
+    ]
+    const blocks = groupBlocks(lines, justified)
+    expect(blocks.map((b) => b.length)).toEqual([2, 1])
+  })
+
+  it('does not end a paragraph at every line of figure-wrapped text', () => {
+    // Wrapped lines are justified to the wrap margin, so each ends short of
+    // the page margin — but all at the SAME short margin, which is a wrap, not
+    // a row of one-line paragraphs.
+    const lines = [
+      line({ yTop: 100, x1: 200 }),
+      line({ yTop: 111, x1: 201 }),
+      line({ yTop: 122, x1: 199 }),
+      line({ yTop: 133, x1: 200 }),
+    ]
+    expect(groupBlocks(lines, justified)).toHaveLength(1)
+  })
+
+  it('still ends a paragraph at a short line followed by a full one', () => {
+    const lines = [
+      line({ yTop: 100 }),
+      line({ yTop: 111, x1: 190, text: 'last of para' }),
+      line({ yTop: 122 }),
+    ]
+    expect(groupBlocks(lines, justified)).toHaveLength(2)
   })
 })

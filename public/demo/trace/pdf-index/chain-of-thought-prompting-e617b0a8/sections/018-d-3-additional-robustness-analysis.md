@@ -55,37 +55,37 @@
 
 [[b29-2]] Chain of thought prompting
 
-[[b29-3]] MultiArith Sports Last Letter GSM8K (MAWPS) Understanding Coin Flip Concatenation 15 60 100 100 100
+[[b29-3]] MultiArith (MAWPS) 60
 
-[[b29-4]] 75 75 75 10 40
+[[b29-4]] 75 40
 
-[[b29-5]] 50 50 50 5 20 25 25 25 Solve rate (%) 0 0 0 0 0 1 2 4 6 8 1 2 4 6 8 1 2 4 6 8 1 2 4 6 8 1 2 3 4
+[[b29-5]] 50 20 Solve rate (%) 0 1 2 4 6 8
 
-[[b29-6]] Number of few-shot exemplars
+[[b29-6]] Figure 11: The improvement of chain of thought prompting over standard prompting appears robust to varying the number of few-shot exemplars in the prompt.
 
-[[b29-7]] Figure 11: The improvement of chain of thought prompting over standard prompting appears robust to varying the number of few-shot exemplars in the prompt.
+[[b29-7]] Table 12: Summary of math word problem benchmarks we use in this paper with examples. N: number of evaluation examples. N Example problem
 
-[[b29-8]] Table 12: Summary of math word problem benchmarks we use in this paper with examples. N: number of evaluation examples. Dataset N Example problem GSM8K 1,319 Josh decides to try flipping a house. He buys a house for $80,000 and then puts
+[[b29-8]] 1,319 Josh decides to try flipping a house. He buys a house for $80,000 and then puts
 
 [[b29-9]] in $50,000 in repairs. This increased the value of the house by 150%. How
 
-[[b29-10]] much profit did he make? SVAMP 1,000 Each pack of dvds costs 76 dollars. If there is a discount of 25 dollars on each
+[[b29-10]] much profit did he make? 1,000 Each pack of dvds costs 76 dollars. If there is a discount of 25 dollars on each
 
-[[b29-11]] pack. How much do you have to pay to buy each pack? ASDiv 2,096 Ellen has six more balls than Marin. Marin has nine balls. How many balls does
+[[b29-11]] pack. How much do you have to pay to buy each pack? 2,096 Ellen has six more balls than Marin. Marin has nine balls. How many balls does
 
-[[b29-12]] Ellen have? AQuA 254 A car is being driven, in a straight line and at a uniform speed, towards the base
+[[b29-12]] Ellen have? 254 A car is being driven, in a straight line and at a uniform speed, towards the base
 
 [[b29-13]] of a vertical tower. The top of the tower is observed from the car and, in the
 
 [[b29-14]] process, it takes 10 minutes for the angle of elevation to change from 45◦ to 60◦.
 
-[[b29-15]] After how much more time will this car reach the base of the tower? Answer√ √ √ √ √
+[[b29-15]] After how much more time will this car reach the base of the tower? Answer√
 
-[[b29-16]] Choices: (a) 5 3 + 1 (b) 6 3 + 2 (c) 7 3 - 1 (d) 8 3 - 2 (e) None of these MAWPS: SingleOp 562 If there are 7 bottle caps in a box and Linda puts 7 more bottle caps inside, how
+[[b29-16]] Choices: (a) 5 3 + 1 (b) 6 3 + 2 (c) 7 3 - 1 (d) 8 3 - 2 (e) None of these 562 If there are 7 bottle caps in a box and Linda puts 7 more bottle caps inside, how
 
-[[b29-17]] many bottle caps are in the box? MAWPS: SingleEq 508 Benny bought a soft drink for 2 dollars and 5 candy bars. He spent a total of 27
+[[b29-17]] many bottle caps are in the box? 508 Benny bought a soft drink for 2 dollars and 5 candy bars. He spent a total of 27
 
-[[b29-18]] dollars. How much did each candy bar cost? MAWPS: AddSub 395 There were 6 roses in the vase. Mary cut some roses from her flower garden.
+[[b29-18]] dollars. How much did each candy bar cost? 395 There were 6 roses in the vase. Mary cut some roses from her flower garden.
 
 [[b29-19]] There are now 16 roses in the vase. How many roses did she cut? MAWPS: MultiArith 600 The school cafeteria ordered 42 red apples and 7 green apples for students
 
@@ -94,3 +94,73 @@
 [[b29-21]] end up with?
 
 [[b29-22]] 29
+
+[[b29-23]] Sports
+
+[[b29-24]] Last Letter GSM8K
+
+[[b29-25]] Understanding
+
+[[b29-26]] Coin Flip
+
+[[b29-27]] Concatenation 15
+
+[[b29-28]] 100
+
+[[b29-29]] 100
+
+[[b29-30]] 100
+
+[[b29-31]] 75
+
+[[b29-32]] 75 10
+
+[[b29-33]] 50
+
+[[b29-34]] 50 5
+
+[[b29-35]] 25
+
+[[b29-36]] 25
+
+[[b29-37]] 25
+
+[[b29-38]] 0
+
+[[b29-39]] 0
+
+[[b29-40]] 0
+
+[[b29-41]] 0 1 2 4 6 8
+
+[[b29-42]] 1 2 4 6 8
+
+[[b29-43]] 1 2 4 6 8
+
+[[b29-44]] 1 2 3 4
+
+[[b29-45]] Number of few-shot exemplars
+
+[[b29-46]] Dataset
+
+[[b29-47]] GSM8K
+
+[[b29-48]] SVAMP
+
+[[b29-49]] ASDiv
+
+[[b29-50]] AQuA
+
+[[b29-51]] √
+
+[[b29-52]] √
+
+[[b29-53]] √
+
+[[b29-54]] √
+
+[[b29-55]] MAWPS: SingleOp
+
+[[b29-56]] MAWPS: SingleEq
+
+[[b29-57]] MAWPS: AddSub

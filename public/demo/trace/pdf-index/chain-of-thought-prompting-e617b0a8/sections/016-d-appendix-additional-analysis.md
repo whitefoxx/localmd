@@ -65,18 +65,20 @@
 
 [[b26-6]] MODEL ANSWER (CORRECT BUT UNDERSPECIFIED STATEMENTS): There are 2 houses with 3 bedrooms each. Each bedroom has 2 windows each. So there are 2 x 3 = 6 windows in each house. There are an additional 4 windows in each house not connected to bedrooms. So there are 4 + 4 = 8 windows in each house. So there are 6 x 2 = 12 windows in each house. So there are 12 + 8 = 20 windows in both houses. The answer is 20.
 
-[[b26-7]] QUESTION: If Ann is 9 years old and her brother is twice her age, how old will her brother be in 3 years? MODEL ANSWER (CORRECT BUT UNRELATED STATEMENT): Ann is 9 years old. Her brother is twice her age. So her brother is 18 years old. In 3 years, she will be 12. So her brother will be 18 + 3 = 21 years old. The answer is 21.
+[[b26-7]] QUESTION: If Ann is 9 years old and her brother is twice her age, how old will her brother be in 3 years?
 
-[[b26-8]] QUESTION: A local gas station is selling gas for $3.00 a gallon. An app company is offering $.20 cashback per gallon if you fill up at this station. If someone buys 10 gallons of gas, how much with their gas be, after the cashback rewards?
+[[b26-8]] MODEL ANSWER (CORRECT BUT UNRELATED STATEMENT): Ann is 9 years old. Her brother is twice her age. So her brother is 18 years old. In 3 years, she will be 12. So her brother will be 18 + 3 = 21 years old. The answer is 21.
 
-[[b26-9]] MODEL ANSWER (CORRECT BUT IMPERFECT EQUATION): The gas is originally 3 dollars per gallon. If you buy 10 gallons, that is 3 x 10 = 30 dollars. If you get 20 cents off per gallon, that is 20 x 10 = 2 dollars. So the total is 30 - 2 = 28 dollars. The answer is 28 dollars.
+[[b26-9]] QUESTION: A local gas station is selling gas for $3.00 a gallon. An app company is offering $.20 cashback per gallon if you fill up at this station. If someone buys 10 gallons of gas, how much with their gas be, after the cashback rewards?
 
-[[b26-10]] QUESTION: Nissa hires 60 seasonal workers to play elves in her department store’s Santa village. A third of the elves quit after children vomit on them, then 10 of the remaining elves quit after kids kick their shins. How many elves are left?
+[[b26-10]] MODEL ANSWER (CORRECT BUT IMPERFECT EQUATION): The gas is originally 3 dollars per gallon. If you buy 10 gallons, that is 3 x 10 = 30 dollars. If you get 20 cents off per gallon, that is 20 x 10 = 2 dollars. So the total is 30 - 2 = 28 dollars. The answer is 28 dollars.
 
-[[b26-11]] MODEL ANSWER (CORRECT BUT IMPERFECT EQUATION): Nissa hires 60 seasonal workers. A third of them quit. So 60 - 1/3 = 40 elves are left. Then 10 elves quit. So 40 - 10 = 30 elves are left. The answer is 30 elves.
+[[b26-11]] QUESTION: Nissa hires 60 seasonal workers to play elves in her department store’s Santa village. A third of the elves quit after children vomit on them, then 10 of the remaining elves quit after kids kick their shins. How many elves are left?
 
-[[b26-12]] QUESTION: Grandma Jones baked 5 apple pies for the fireman’s luncheon. She cut each pie into 8 pieces and set the five pies out on the buffet table for the guests to serve themselves. At the end of the evening, after the guests had taken and eaten their pieces of pie, there were 14 pieces of pie remaining. How many pieces were taken by the guests?
+[[b26-12]] MODEL ANSWER (CORRECT BUT IMPERFECT EQUATION): Nissa hires 60 seasonal workers. A third of them quit. So 60 - 1/3 = 40 elves are left. Then 10 elves quit. So 40 - 10 = 30 elves are left. The answer is 30 elves.
 
-[[b26-13]] MODEL ANSWER (CORRECT BUT INVERTED SEMANTICS): 5 pies were baked and cut into 8 pieces each. The 5 pies were then served to the guests. 8 x 5 = 40 pieces of pie. The guests ate 14 pieces of pie. 40 - 14 = 26 pieces of pie were left. The answer is 26. X
+[[b26-13]] QUESTION: Grandma Jones baked 5 apple pies for the fireman’s luncheon. She cut each pie into 8 pieces and set the five pies out on the buffet table for the guests to serve themselves. At the end of the evening, after the guests had taken and eaten their pieces of pie, there were 14 pieces of pie remaining. How many pieces were taken by the guests?
 
-[[b26-14]] 26
+[[b26-14]] MODEL ANSWER (CORRECT BUT INVERTED SEMANTICS): 5 pies were baked and cut into 8 pieces each. The 5 pies were then served to the guests. 8 x 5 = 40 pieces of pie. The guests ate 14 pieces of pie. 40 - 14 = 26 pieces of pie were left. The answer is 26. X
+
+[[b26-15]] 26
