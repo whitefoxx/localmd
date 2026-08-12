@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { t } from '@/i18n'
 import { useUiStore } from '@/stores/ui'
 import { PRICE_USD } from '@/lib/pricing'
+import { FEEDBACK_URL } from '@/lib/links'
 
 defineEmits<{ open: [] }>()
 
@@ -132,7 +133,17 @@ const donts = computed(() => [
         <button class="btn-primary px-6 py-2 text-base" @click="$emit('open')">
           <span class="codicon codicon-folder-opened mr-2" />{{ $t('openKb.openFolder') }}
         </button>
-        <div class="mt-12 text-xs text-fg-3">{{ $t('about.footer') }}</div>
+        <div class="mt-12 text-xs text-fg-3">
+          {{ $t('about.footer') }}
+          <span class="mx-1.5 opacity-40">·</span>
+          <a
+            :href="FEEDBACK_URL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-fg-1 underline underline-offset-2 decoration-fg-3/40"
+            >{{ $t('about.feedback') }}</a
+          >
+        </div>
       </section>
     </div>
   </div>

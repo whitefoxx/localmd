@@ -1,7 +1,7 @@
 ---
 title: localmd 是什么
 summary: 一个跑在你的浏览器和本地文件夹里的 AI 知识库。什么都不用装，不用注册，文件就待在你放它的地方。
-source-hash: cda6a22e5d521834
+source-hash: 40500b32daa46908
 ---
 
 # localmd 是什么
@@ -85,7 +85,16 @@ git、为你常用的服务现场造出新工具 —— 也能帮你解释和修
 目前还没开卖，所以今天解锁这些部分的方式是一个免费的早期名额，详情在起始页。在你拿到
 key 之前，这些部分是锁着的；这份手册里其余的一切不用它也照常可用。
 
+## 出问题的时候
+
+Bug 和想法都公开处理，在 <https://github.com/whitefoxx/localmd-feedback> ——
+写之前值得先看一眼，可能已经有人碰到了。记得说明你用的是哪个浏览器；这里绝大多数
+不寻常的行为都跑在各家实现不同的浏览器 API 上。
+
+不方便公开讨论的——安全问题，或者没法贴进公开工单的文档——发到
+<yunbiaoch@gmail.com>。
+
 ## 相关
 
-你的文件夹怎么组织：`knowledge-base`。怎么跟助手配合：`working-with-the-agent`。
-设置存在哪：`storage-and-privacy`。
+什么都不用配就先试试：`trying-it-out`。你的文件夹怎么组织：`knowledge-base`。
+怎么跟助手配合：`working-with-the-agent`。设置存在哪：`storage-and-privacy`。

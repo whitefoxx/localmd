@@ -16,6 +16,7 @@ import { useUiStore } from '@/stores/ui'
 import { listAppDocs, appDoc } from '@/lib/appDocs'
 import { renderMarkdown } from '@/lib/markdown'
 import { getLocale } from '@/i18n'
+import { FEEDBACK_URL } from '@/lib/links'
 
 const ui = useUiStore()
 
@@ -121,6 +122,16 @@ watch(
                 <span class="codicon codicon-sm codicon-chevron-right text-fg-3 shrink-0 mt-1" />
               </button>
             </div>
+
+            <!-- The way out of the manual. Someone who read a page and still has
+                 the problem needs somewhere to go, and a manual that ends
+                 without one reads as a closed door. -->
+            <p class="mt-5 text-xs text-fg-3 leading-relaxed">
+              {{ $t('help.feedbackIntro') }}
+              <a :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">
+                {{ $t('help.feedbackLink') }}</a
+              >{{ $t('help.feedbackOutro') }}
+            </p>
           </div>
 
           <!-- ── One topic ────────────────────────────────────────────── -->

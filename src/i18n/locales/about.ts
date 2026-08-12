@@ -67,6 +67,7 @@ export default {
 
     closingTitle: 'Open a folder and start thinking.',
     footer: 'localmd · AI knowledge base in your browser and your local folder',
+    feedback: 'Report a problem',
   },
   zh: {
     whyLabel: '为什么有 localmd',
@@ -132,5 +133,6 @@ export default {
 
     closingTitle: '打开一个文件夹，开始思考。',
     footer: 'localmd · 跑在你的浏览器和本地文件夹里的 AI 知识库',
+    feedback: '反馈问题',
   },
 };

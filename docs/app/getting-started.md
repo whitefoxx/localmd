@@ -103,8 +103,19 @@ It is not on sale yet, so today the way to unlock those parts is a free early
 slot — the start screen has the details. Until you have a key, they stay
 locked; everything else in this manual works without one.
 
+## When something is wrong
+
+Bug reports and ideas go in the open, at
+<https://github.com/whitefoxx/localmd-feedback> — worth a look before writing,
+in case someone has already hit it. Say which browser you are on; almost
+everything unusual here runs on browser APIs that differ between them.
+
+Anything you would rather not discuss in public — a security issue, or a
+document you cannot paste into a public tracker — goes to
+<yunbiaoch@gmail.com> instead.
+
 ## Related
 
-Your folder and how it is organized: `knowledge-base`. Working with the
-assistant: `working-with-the-agent`. Where settings are kept:
-`storage-and-privacy`.
+Trying it with no setup at all: `trying-it-out`. Your folder and how it is
+organized: `knowledge-base`. Working with the assistant:
+`working-with-the-agent`. Where settings are kept: `storage-and-privacy`.
