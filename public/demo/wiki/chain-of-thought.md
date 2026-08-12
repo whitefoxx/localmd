@@ -16,7 +16,7 @@ Sources:
 Instead of asking a model for an answer, you show it a few worked examples that
 spell out the intermediate steps, and it starts spelling out its own. The paper
 motivates this from how a person actually solves a word problem — decompose it,
-solve each step, then answer [[1:b2-5]].
+solve each step, then answer [[1:b2-19]].
 
 That is the whole intervention. No finetuning, no extra training data, no
 task-specific model — which is why it applies across a broad range of tasks

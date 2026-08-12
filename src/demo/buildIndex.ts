@@ -8,8 +8,9 @@
  * runs in a browser: it imports the pdf.js worker through Vite's `?url` and
  * reads `location.href`, so a Node script cannot drive it.
  *
- * So: run `npm run dev`, open `/?demo-build=1`, and a JSON bundle downloads.
- * `scripts/build-demo.mjs` writes it into `public/demo/trace/`.
+ * So: run `npm run dev` and open `/?demo-build=1`. The result is POSTed to the
+ * dev server, which writes it into `public/demo/trace/` and rebuilds the
+ * manifest (see the demoIndexWriter plugin in vite.config.ts).
  *
  * Re-run this whenever the PDF changes or `INDEX_VERSION` is bumped — a stale
  * demo index fails the freshness check and the demo silently loses its
@@ -48,16 +49,11 @@ export async function buildDemoIndex(): Promise<void> {
     if (text !== null) bundle[path] = text
   }
 
-  log(`bundling ${Object.keys(bundle).length} files from ${summary.indexDir}`)
-  download('demo-index.json', JSON.stringify({ indexDir: summary.indexDir, files: bundle }, null, 2))
-  log('downloaded demo-index.json — run scripts/build-demo.mjs on it')
-}
-
-function download(name: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  a.click()
-  URL.revokeObjectURL(url)
+  log(`posting ${Object.keys(bundle).length} files from ${summary.indexDir}`)
+  const written = await fetch('/__demo-index', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ indexDir: summary.indexDir, files: bundle }),
+  })
+  log(written.ok ? await written.text() : `FAILED: ${written.status} ${await written.text()}`)
 }

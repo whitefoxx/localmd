@@ -77,6 +77,40 @@ describe('demo knowledge base', () => {
     for (const id of cited) expect(Object.keys(blocks)).toContain(id)
   })
 
+  /**
+   * Existence is not enough. Block ids are positional — regenerating the index
+   * after an extractor change renumbers them, so a citation can keep resolving
+   * while silently pointing at a different paragraph. That happened once: a
+   * note's claim about worked examples ended up aimed at a fragment of a chart
+   * legend, and every automatic check still passed. Pin the claims to their
+   * evidence by content.
+   */
+  it('cites blocks that still say what the note claims they say', () => {
+    const expected: Record<string, string> = {
+      'b2-19': 'decompose the problem into intermediate steps',
+      'b16-3': 'emerges only at certain model scales',
+      'b25-1': 'without any finetuning',
+      'b1-1': 'Chain-of-Thought Prompting',
+    }
+    const sections = Object.entries(TEXT)
+      .filter(([path]) => path.includes('/sections/'))
+      .map(([, body]) => body)
+      .join('\n')
+
+    for (const [id, phrase] of Object.entries(expected)) {
+      const block = sections
+        .split('\n')
+        .find((l) => l.includes(`[[${id}]]`))
+      expect(block, `block ${id} is missing from the index`).toBeTruthy()
+      expect(block, `block ${id} no longer contains "${phrase}"`).toContain(phrase)
+    }
+
+    // And every id pinned above must actually be cited by the note, so this
+    // table cannot rot into checking blocks nothing points at.
+    const note = text(manifest.open!)
+    for (const id of Object.keys(expected)) expect(note).toContain(id)
+  })
+
   it('serves every seeded file from an undotted asset path that exists', () => {
     for (const file of manifest.files) {
       const asset = assetOf(file)

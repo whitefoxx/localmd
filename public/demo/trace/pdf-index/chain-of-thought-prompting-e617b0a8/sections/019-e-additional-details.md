@@ -19,16 +19,42 @@
 
 [[b30-10]] Arithmetic reasoning
 
-[[b30-11]] • Math Word Problem Repository (Koncel-Kedziorski et al., 2016): AddSub (Hosseini et al., 2014): https://www.cs.washington.edu/nlp/arithmetic; MultiArith (Roy and Roth, 2015), license: CC BY 4.0. • ASDiv (Miao et al., 2020): https://github.com/chaochun/nlu-asdiv-dataset. • AQuA (Ling et al., 2017): https://github.com/deepmind/AQuA, license: https:// github.com/deepmind/AQuA/blob/master/LICENSE. • GSM8K (Cobbe et al., 2021): https://github.com/openai/grade-school-math, MIT license: https://github.com/openai/grade-school-math/blob/master/ LICENSE. • SVAMP (Patel et al., 2021): https://github.com/arkilpatel/SVAMP, MIT license: https://github.com/arkilpatel/SVAMP/blob/main/LICENSE.
+[[b30-11]] • Math Word Problem Repository (Koncel-Kedziorski et al., 2016): AddSub (Hosseini
 
-[[b30-12]] Commonsense reasoning
+[[b30-12]] et al., 2014): https://www.cs.washington.edu/nlp/arithmetic; MultiArith (Roy
 
-[[b30-13]] • CSQA (Talmor et al., 2019): https://www.tau-nlp.org/commonsenseqa, https:// github.com/jonathanherzig/commonsenseqa.
+[[b30-13]] and Roth, 2015), license: CC BY 4.0.
 
-[[b30-14]] 5https://beta.openai.com/docs/api-reference/making-requests
+[[b30-14]] • ASDiv (Miao et al., 2020): https://github.com/chaochun/nlu-asdiv-dataset.
 
-[[b30-15]] 30
+[[b30-15]] • AQuA (Ling et al., 2017): https://github.com/deepmind/AQuA, license: https://
 
-[[b31-1]] • StrategyQA (Geva et al., 2021): we use the open-domain setting (question-only set) from BIG-bench collaboration (2021): https://github.com/google/BIG-bench/ tree/main/bigbench/benchmark_tasks/strategyqa. The original dataset is from https://github.com/eladsegal/strategyqa, MIT license: https://github.com/ eladsegal/strategyqa/blob/main/LICENSE. • Date understanding and sports understanding from BIG-Bench (BIG-bench collaboration, 2021): Apache License v.2: https://github.com/google/BIG-bench/blob/main/ LICENSE. • SayCan (Ahn et al., 2022): SayCan dataset can be accessed at https://say-can.github. io/ under CC BY 4.0 license.
+[[b30-16]] github.com/deepmind/AQuA/blob/master/LICENSE.
 
-[[b31-2]] 31
+[[b30-17]] • GSM8K (Cobbe et al., 2021): https://github.com/openai/grade-school-math,
+
+[[b30-18]] MIT license: https://github.com/openai/grade-school-math/blob/master/
+
+[[b30-19]] LICENSE.
+
+[[b30-20]] • SVAMP (Patel et al., 2021): https://github.com/arkilpatel/SVAMP, MIT license:
+
+[[b30-21]] https://github.com/arkilpatel/SVAMP/blob/main/LICENSE.
+
+[[b30-22]] Commonsense reasoning
+
+[[b30-23]] • CSQA (Talmor et al., 2019): https://www.tau-nlp.org/commonsenseqa, https://
+
+[[b30-24]] github.com/jonathanherzig/commonsenseqa.
+
+[[b30-25]] 5https://beta.openai.com/docs/api-reference/making-requests
+
+[[b30-26]] 30
+
+[[b31-1]] • StrategyQA (Geva et al., 2021): we use the open-domain setting (question-only set) from BIG-bench collaboration (2021): https://github.com/google/BIG-bench/ tree/main/bigbench/benchmark_tasks/strategyqa. The original dataset is from https://github.com/eladsegal/strategyqa, MIT license: https://github.com/ eladsegal/strategyqa/blob/main/LICENSE.
+
+[[b31-2]] • Date understanding and sports understanding from BIG-Bench (BIG-bench collaboration, 2021): Apache License v.2: https://github.com/google/BIG-bench/blob/main/ LICENSE.
+
+[[b31-3]] • SayCan (Ahn et al., 2022): SayCan dataset can be accessed at https://say-can.github. io/ under CC BY 4.0 license.
+
+[[b31-4]] 31

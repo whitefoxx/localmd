@@ -1,18 +1,21 @@
 /**
  * Builds `public/demo/manifest.json` — the file list the demo KB is seeded
- * from — and, when handed the bundle that `/?demo-build=1` downloads, unpacks
- * the prebuilt document index alongside it.
+ * from — and unpacks the prebuilt document index that `/?demo-build=1`
+ * produces.
  *
- *   node scripts/build-demo.mjs                      # just rebuild the manifest
- *   node scripts/build-demo.mjs ~/Downloads/demo-index.json
+ *   node scripts/build-demo.mjs          # just rebuild the manifest
  *
- * Why the index arrives as a download rather than being generated here: the
- * indexer only runs in a browser (see src/demo/buildIndex.ts). Why `.trace/`
- * is stored as `trace/`: a leading-dot directory under `public/` is not
- * reliably published by every static host, so the assets are undotted and the
- * manifest carries both names.
+ * Normally you do not run this by hand: the dev-only `/?demo-build=1` route
+ * POSTs its bundle to the dev server, which calls straight into the two
+ * functions below (see the demoIndexWriter plugin in vite.config.ts). That
+ * replaced a browser download, which Chrome blocks when nothing on the page
+ * was clicked — silently, so it looked like the build had simply not run.
+ *
+ * Why `.trace/` is stored as `trace/`: a leading-dot directory under `public/`
+ * is not reliably published by every static host, so the assets are undotted
+ * and the manifest carries both names.
  */
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, statSync, rmSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -34,33 +37,47 @@ function walk(dir, out = []) {
   return out
 }
 
-const bundlePath = process.argv[2]
-if (bundlePath) {
-  const { indexDir, files } = JSON.parse(readFileSync(bundlePath, 'utf8'))
-  if (!indexDir.startsWith('.trace/')) throw new Error(`unexpected index dir: ${indexDir}`)
-  let n = 0
+/**
+ * Write an index bundle into `public/demo/trace/`, replacing whatever was
+ * there. Replacing matters: a rebuild that produces fewer section files than
+ * last time would otherwise leave the extras behind, and the manifest would
+ * cheerfully seed them.
+ */
+export function unpackIndex({ indexDir, files }) {
+  if (!indexDir?.startsWith('.trace/')) throw new Error(`unexpected index dir: ${indexDir}`)
+  rmSync(join(DEMO, 'trace'), { recursive: true, force: true })
   for (const [kbPath, content] of Object.entries(files)) {
     const asset = join(DEMO, kbPath.replace(/^\.trace\//, 'trace/'))
     mkdirSync(dirname(asset), { recursive: true })
     writeFileSync(asset, content)
-    n++
   }
-  console.log(`unpacked ${n} index files from ${indexDir}`)
+  return Object.keys(files).length
 }
 
-const files = walk(DEMO)
-  .filter((p) => p !== 'manifest.json')
-  .sort()
-  .map((asset) => {
-    const path = asset.startsWith('trace/') ? `.${asset}` : asset
-    const entry = { path }
-    if (asset !== path) entry.asset = asset
-    if (BINARY.test(asset)) entry.binary = true
-    return entry
-  })
+/** Rebuild `manifest.json` from whatever is on disk under `public/demo/`. */
+export function rebuildManifest() {
+  const files = walk(DEMO)
+    .filter((p) => p !== 'manifest.json')
+    .sort()
+    .map((asset) => {
+      const path = asset.startsWith('trace/') ? `.${asset}` : asset
+      const entry = { path }
+      if (asset !== path) entry.asset = asset
+      if (BINARY.test(asset)) entry.binary = true
+      return entry
+    })
 
-writeFileSync(
-  join(DEMO, 'manifest.json'),
-  JSON.stringify({ name: NAME, open: OPEN, files }, null, 2) + '\n',
-)
-console.log(`manifest.json: ${files.length} files`)
+  writeFileSync(
+    join(DEMO, 'manifest.json'),
+    JSON.stringify({ name: NAME, open: OPEN, files }, null, 2) + '\n',
+  )
+  return files.length
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const bundlePath = process.argv[2]
+  if (bundlePath) {
+    console.log(`unpacked ${unpackIndex(JSON.parse(readFileSync(bundlePath, 'utf8')))} index files`)
+  }
+  console.log(`manifest.json: ${rebuildManifest()} files`)
+}
