@@ -14,6 +14,7 @@ import { loadKbImage, toDataUrl } from '@/agent/vision'
 import { extractMentions } from '@/lib/mentions'
 import {
   trimHistory,
+  trimCandidates,
   estimateChars,
   TRIM_AT_CHARS,
   COMPACT_AT_CHARS,
@@ -21,6 +22,7 @@ import {
   renderTranscript,
   compactedPrefix,
 } from '@/lib/history'
+import { isBuiltinToolName } from '@/agent/tools'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
 import {
   branchPath,
@@ -32,7 +34,7 @@ import {
   versionsOf as versionsOfNode,
 } from '@/lib/branch'
 import { loadSkill } from '@/lib/skills'
-import { dropToolResults } from '@/lib/toolResults'
+import { dropToolResults, recallPathIn, storeToolResult } from '@/lib/toolResults'
 import { renderTranscript as renderTranscriptFile, sessionFileName } from '@/lib/transcript'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
@@ -120,6 +122,25 @@ export type MessagePart =
 function capToolResult(s: string): string {
   const MAX = 4000
   return s.length > MAX ? `${s.slice(0, MAX)}\n… (+${s.length - MAX} characters truncated)` : s
+}
+
+/** Store the external tool results the coming trim is about to destroy, so
+ *  their stubs can point at `.trace/` files — recall becomes one deterministic
+ *  read_file instead of a re-call that may re-rank, refuse, or bill. Built-in
+ *  results are skipped (cheap to re-run, file content already in the KB), and
+ *  a result clipped at call time already has its FULL text on disk — its clip
+ *  note names the path, so reuse that instead of storing a truncated copy. */
+async function stashTrimmable(
+  sessionId: string,
+  hist: ModelMessage[],
+): Promise<Map<string, string>> {
+  const recall = new Map<string, string>()
+  for (const c of trimCandidates(hist)) {
+    if (isBuiltinToolName(c.toolName)) continue
+    const path = recallPathIn(c.text) ?? (await storeToolResult(sessionId, c.toolName, c.text))
+    if (path) recall.set(c.toolCallId, path)
+  }
+  return recall
 }
 
 /** A file the user attached to a message (pasted screenshot / upload). Already
@@ -957,11 +978,17 @@ export const useChatStore = defineStore('chat', () => {
         // size crosses the threshold, stub everything outside the keep window
         // in one go (the stubs persist — old regions stay byte-stable).
         let hist = session.history as ModelMessage[]
-        if (estimateChars(hist) > TRIM_AT_CHARS) hist = trimHistory(hist)
-        // Still huge after trimming → replace the old prefix with a summary.
+        if (estimateChars(hist) > TRIM_AT_CHARS) {
+          hist = trimHistory(hist, { recallPaths: await stashTrimmable(session.id, hist) })
+        }
+        // Still huge after trimming → replace the old prefix with a summary —
+        // but only when the summary CAN help: `recent` stays verbatim, so if it
+        // alone exceeds the threshold, compacting `old` cannot bring the size
+        // down and would pay a summarizer call plus a full-prefix cache
+        // invalidation for nothing. The next turn's trim frees `recent` instead.
         if (estimateChars(hist) > COMPACT_AT_CHARS) {
           const split = splitForCompaction(hist)
-          if (split) {
+          if (split && estimateChars(split.recent) <= COMPACT_AT_CHARS) {
             onEvent({ type: 'tool', name: 'compact', detail: 'History too long, compacting context…' })
             try {
               const summary = await summarizeHistory(

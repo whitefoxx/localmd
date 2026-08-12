@@ -1695,3 +1695,16 @@ export const TOOLS: ToolSpec[] = [
   gitRemoteAdd,
   githubCreateRepo,
 ]
+
+/* run.ts registers these beyond TOOLS; they are as built-in as the rest. */
+const RUNNER_TOOL_NAMES = ['view_image', 'generate_image', 'run_subagent']
+const BUILTIN_TOOL_NAMES = new Set([...TOOLS.map((t) => t.name), ...RUNNER_TOOL_NAMES])
+
+/** Whether a history tool result came from a built-in tool — deterministic and
+ *  free to re-run, with any file content already in the KB — rather than an
+ *  external MCP/HTTP tool, whose re-call may re-rank, refuse, or bill. The
+ *  history trim stores external results before stubbing them; built-ins it
+ *  just stubs. */
+export function isBuiltinToolName(name: string): boolean {
+  return BUILTIN_TOOL_NAMES.has(name)
+}

@@ -11,6 +11,7 @@ import {
   TOOL_RESULTS_DIR,
   clipWithRecall,
   dropToolResults,
+  recallPathIn,
   storeToolResult,
   toolResultPath,
 } from './toolResults'
@@ -95,5 +96,27 @@ describe('clipWithRecall', () => {
     expect(clipWithRecall(text, 40_000, null)).toBe(
       `${'z'.repeat(40_000)}\n\n[truncated: 50000 chars total]`,
     )
+  })
+
+  it('recommends digesting via run_subagent when the remainder is large', () => {
+    const out = clipWithRecall('y'.repeat(105_000), 40_000, '.trace/tool-results/s/t-1234abcd.txt')
+    expect(out.slice(0, 40_000)).toBe('y'.repeat(40_000))
+    expect(out).toContain('run_subagent')
+    expect(out).toContain('.trace/tool-results/s/t-1234abcd.txt')
+    // The inline continuation stays available for targeted extraction.
+    expect(out).toContain('offset=40000')
+  })
+})
+
+describe('recallPathIn', () => {
+  it('finds the stored path inside a clip note', () => {
+    const path = '.trace/tool-results/s/t-1234abcd.txt'
+    expect(recallPathIn(clipWithRecall('y'.repeat(50_000), 40_000, path))).toBe(path)
+    expect(recallPathIn(clipWithRecall('y'.repeat(105_000), 40_000, path))).toBe(path)
+  })
+
+  it('returns null when the text never mentions a stored result', () => {
+    expect(recallPathIn('an ordinary tool result')).toBeNull()
+    expect(recallPathIn(clipWithRecall('y'.repeat(50_000), 40_000, null))).toBeNull()
   })
 })

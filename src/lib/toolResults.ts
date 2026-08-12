@@ -16,9 +16,12 @@
  * prompt — the agent already knows how to continue a truncated read, because
  * that is exactly how read_file's own offset works.
  *
- * ONLY clipped results are stored. A result that fits is not destroyed by
- * anything, and re-calling the tool is cheaper than leaving a file behind; a
- * threshold below the clip would be a number invented to justify writes.
+ * Results are stored at the moment something is about to destroy them, and
+ * only then: the call-time clip (here), and the history trim before it stubs
+ * an external result it never clipped (lib/history.ts `trimCandidates` +
+ * chat.ts). A result nothing threatens is not stored — re-calling the tool is
+ * cheaper than leaving a file behind, and a threshold below the destruction
+ * point would be a number invented to justify writes.
  */
 import { removeDir, writeFile } from '@/lib/fs'
 import { ensureIgnored } from '@/lib/gitignore'
@@ -70,6 +73,21 @@ export async function dropToolResults(sessionId: string): Promise<void> {
   }
 }
 
+/** A `.trace/tool-results/…` path mentioned in `text` (a clip note), so a trim
+ *  that destroys the visible part can point its stub at the file that already
+ *  holds the WHOLE result instead of storing a second, truncated copy. */
+export function recallPathIn(text: string): string | null {
+  const m = text.match(/\.trace\/tool-results\/\S+?\.txt/)
+  return m ? m[0] : null
+}
+
+/** Remainder size past which the clip note recommends digesting the file via
+ *  run_subagent instead of paging it into the main history. Below it, one
+ *  continuation read settles the matter; above it, the raw text would sit in
+ *  every later request of the session — a subagent burns it in a context that
+ *  is thrown away and only the digest comes back. */
+const DELEGATE_REMAINDER_CHARS = 20_000
+
 /**
  * Clip to the budget, telling the model where the rest is when we managed to
  * save it. Without a path this is byte-identical to the plain budget clip, so
@@ -79,6 +97,17 @@ export function clipWithRecall(text: string, maxChars: number, path: string | nu
   if (text.length <= maxChars) return text
   const head = text.slice(0, maxChars)
   if (!path) return `${head}\n\n[truncated: ${text.length} chars total]`
+  const rest = text.length - maxChars
+  if (rest > DELEGATE_REMAINDER_CHARS) {
+    return (
+      `${head}\n\n[truncated: ${maxChars} of ${text.length} chars. The full result is saved in the ` +
+      `knowledge base at ${path} — do not call this tool again. Reading the remaining ${rest} chars ` +
+      `directly would crowd your context: prefer run_subagent with a task like "Read ${path} with ` +
+      `read_file, following the offset continuations to the end, and report <what you need from it>" ` +
+      `and work from the digest. Only read_file path="${path}" offset=${maxChars} yourself when you ` +
+      `truly need the raw text.]`
+    )
+  }
   return (
     `${head}\n\n[truncated: ${maxChars} of ${text.length} chars. The full result is saved in the ` +
     `knowledge base at ${path} — read the rest with read_file path="${path}" offset=${maxChars}, ` +
