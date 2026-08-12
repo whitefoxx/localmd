@@ -50,7 +50,18 @@ export const useKbStore = defineStore('kb', () => {
     }
   }
 
-  async function openHandle(handle: FileSystemDirectoryHandle): Promise<boolean> {
+  /**
+   * Open a folder. `ephemeral` marks a memory-backed handle (the demo KB, E2E)
+   * — one that exists only in this tab. Those skip both the recents list and
+   * the lock, because neither means anything for them: the handle cannot be
+   * reopened later, so a recents row would be a dead end, and there is no
+   * shared folder on disk for a second tab to clobber, so a "another tab has
+   * this open" warning would be alarming and false.
+   */
+  async function openHandle(
+    handle: FileSystemDirectoryHandle,
+    opts: { ephemeral?: boolean } = {},
+  ): Promise<boolean> {
     error.value = null
     if (!(await fs.ensurePermission(handle))) {
       error.value = 'Permission to access the folder was declined.'
@@ -60,12 +71,10 @@ export const useKbStore = defineStore('kb', () => {
     name.value = handle.name
     isOpen.value = true
     hydrateReadingPositions(handle.name)
+    if (opts.ephemeral ?? isE2eMode()) return true
     await acquireLock(handle.name)
-    if (!isE2eMode()) {
-      // Memory handles from E2E runs must not pollute the real recents list.
-      await saveRecent(handle)
-      await refreshRecents()
-    }
+    await saveRecent(handle)
+    await refreshRecents()
     return true
   }
 

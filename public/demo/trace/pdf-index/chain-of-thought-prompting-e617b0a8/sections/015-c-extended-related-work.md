@@ -1,0 +1,22 @@
+<!-- section 015 · pages 24–24 · raw/papers/chain-of-thought-prompting.pdf -->
+# [[b24-1]] C Extended Related Work
+
+[[b24-2]] Chain-of-thought prompting is a general approach that is inspired by several prior directions: prompting, natural language explanations, program synthesis/execution, numeric and logical reasoning, and intermediate language steps.
+
+[[b24-3]] C.1 Prompting
+
+[[b24-4]] The recent success of large-scale language models has led to growing interest in improving their capability to perform tasks via prompting (Brown et al. (2020), and see Liu et al. (2021) for a survey). This paper falls in the category of general prompting approaches, whereby input prompts are optimized to allow a single large language model to better perform a variety of tasks (Li and Liang, 2021; Lester et al., 2021; Reif et al., 2022, inter alia). One recent line of work aims to improve the ability of language models to perform a task by providing instructions that describe the task (Raffel et al., 2020; Wei et al., 2022a; Ouyang et al., 2022; Sanh et al., 2022; Wang et al., 2022b). This line of work is related because it also augments input–output pairs with meta-data. But whereas an instruction augments the input to a task (instructions are typically prepended to the inputs), chain-of-thought prompting augments the outputs of language models. Another related direction is sequentially combining the outputs of language models; human–computer interaction (HCI) work (Wu et al., 2022a,b) has shown that combining sequential generations of language models improves task outcomes in a 20-person user study.
+
+[[b24-5]] C.2 Natural language explanations
+
+[[b24-6]] Another closely related direction uses natural language explanations (NLEs), often with the goal of improving model interpretability (Zhou et al., 2020; Wiegreffe and Marasovi´c, 2021, inter alia). That line of work typically focuses on natural language inference (Camburu et al., 2018; Yordanov et al., 2021; Bostrom et al., 2021), and produces explanations either simultaneously to or after the final prediction (Narang et al., 2020; Majumder et al., 2021; Wiegreffe et al., 2021, 2022). By contrast, the chain of thought processing considered in this paper occurs before the final answer. And while NLE aims mostly to improve neural network interpretability (Rajagopal et al., 2021), the goal of chain-of-thought prompting is to allow models to decompose multi-hop reasoning tasks into multiple steps—interpretability is just a side effect. Marasovi´c et al. (2022) show that prompt-based finetuning with NLE improves NLI and classification performance, though they largely focus on evaluating explanation plausibility. In comparison, our work focuses on a range of arithmetic, commonsense, and symbolic tasks that require multi-hop reasoning.
+
+[[b24-7]] C.3 Program synthesis and execution
+
+[[b24-8]] Using intermediate reasoning steps has a long history in program synthesis and execution (Zaremba and Sutskever, 2014, inter alia). Recent work along in this direction has included a number of architectural innovations (Cai et al., 2017; Dong et al., 2019; Yan et al., 2020), as well as the use of large language models (Chen et al., 2021; Austin et al., 2021). The program execution work closest to ours is perhaps Nye et al. (2021), which show that large language models can perform up to 10-digit addition, evaluate polynomials, and execute python programs. Whereas generating a program and then executing it can be viewed as a type of reasoning, our work generalizes such domain-specific primitives to natural language, which is open-domain and relevant to any text-to-text NLP task in principle.
+
+[[b24-9]] C.4 Numeric and logical reasoning
+
+[[b24-10]] Numeric and logical reasoning has been a long-studied task in machine learning and natural language processing (Lev et al., 2004, inter alia). Recent work has also aimed to inject numeric reasoning abilities in language models in various ways, such as augmenting BERT with a predefined set of executable operations (Andor et al., 2019), including a graph neural network (Ran et al., 2019), and using specialized training procedures (Pi˛ekos et al., 2021). Another line of work aims to enable language models to perform logical or formal reasoning, often by verablizing the rules in natural language formal rules using language (Clark et al., 2020; Saeed et al., 2021; Liang et al., 2021).
+
+[[b24-11]] 24

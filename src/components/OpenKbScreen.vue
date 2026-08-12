@@ -31,6 +31,19 @@ async function openRecent(entry: RecentKb): Promise<void> {
   }
 }
 
+/**
+ * Open the in-memory demo KB. The URL is stamped as well as the KB opened, so
+ * a reload lands back in the demo and the address can be handed to someone —
+ * `?demo` is the same door, and it is the one that gets linked from a post.
+ */
+async function openDemo(): Promise<void> {
+  const url = new URL(location.href)
+  url.searchParams.set('demo', '1')
+  history.replaceState(null, '', url)
+  const { bootstrapDemo } = await import('@/demo/bootstrap')
+  await bootstrapDemo()
+}
+
 /** Drop an entry from the recent list — the folder on disk is untouched. */
 async function forget(entry: RecentKb): Promise<void> {
   await kb.forgetRecent(entry.name)
@@ -75,6 +88,15 @@ async function forget(entry: RecentKb): Promise<void> {
           >
             <span class="codicon codicon-sm codicon-add" />{{ $t('openKb.newKb') }}
           </button>
+
+          <!-- The lowest-commitment door: no folder, no key, nothing kept. -->
+          <button
+            class="mt-2 w-full py-1.5 text-sm text-fg-2 hover:text-fg-0 hover:bg-bg-2 rounded transition-colors flex items-center justify-center gap-1.5"
+            @click="openDemo"
+          >
+            <span class="codicon codicon-sm codicon-beaker" />{{ $t('openKb.demo') }}
+          </button>
+          <div class="mt-1.5 text-center text-xs text-fg-3">{{ $t('openKb.demoHint') }}</div>
 
           <div v-if="kb.error" class="mt-3 text-sm text-removed">{{ kb.error }}</div>
 
@@ -135,8 +157,17 @@ async function forget(entry: RecentKb): Promise<void> {
           </template>
         </template>
 
-        <div v-else class="p-4 rounded border border-border bg-bg-1 text-sm text-fg-2">
-          {{ $t('openKb.unsupported') }}
+        <!-- No File System Access here (Firefox, Safari, phones). The demo KB
+             lives in memory and needs none of it, so this is a dead end only
+             for opening a folder — say so, then offer the door that works. -->
+        <div v-else>
+          <div class="p-4 rounded border border-border bg-bg-1 text-sm text-fg-2">
+            {{ $t('openKb.unsupported') }}
+          </div>
+          <button class="btn-primary w-full py-2 text-base mt-4" @click="openDemo">
+            <span class="codicon codicon-beaker mr-2" />{{ $t('openKb.demo') }}
+          </button>
+          <div class="mt-1.5 text-center text-xs text-fg-3">{{ $t('openKb.demoHint') }}</div>
         </div>
       </div>
 

@@ -1,0 +1,188 @@
+{
+  "version": 11,
+  "source": "raw/papers/chain-of-thought-prompting.pdf",
+  "title": "chain-of-thought-prompting",
+  "pageCount": 43,
+  "blockCount": 423,
+  "contentHash": "7d9f878c23b460e4566aa4ec9201b1abfb3b8faefb2b1356e411cb90fef72a12",
+  "parsedAt": "2026-08-12T09:24:47.854Z",
+  "structure": "outline",
+  "sections": [
+    {
+      "title": "Front matter",
+      "level": 1,
+      "startPage": 1,
+      "endPage": 1,
+      "index": 1,
+      "file": "sections/001-front-matter.md"
+    },
+    {
+      "title": "1 Introduction",
+      "level": 1,
+      "startPage": 2,
+      "endPage": 2,
+      "index": 2,
+      "file": "sections/002-1-introduction.md"
+    },
+    {
+      "title": "3 Arithmetic Reasoning",
+      "level": 1,
+      "startPage": 3,
+      "endPage": 3,
+      "index": 3,
+      "file": "sections/003-3-arithmetic-reasoning.md"
+    },
+    {
+      "title": "3.2 Results",
+      "level": 2,
+      "startPage": 4,
+      "endPage": 4,
+      "index": 4,
+      "file": "sections/004-3-2-results.md"
+    },
+    {
+      "title": "3.3 Ablation Study",
+      "level": 2,
+      "startPage": 5,
+      "endPage": 5,
+      "index": 5,
+      "file": "sections/005-3-3-ablation-study.md"
+    },
+    {
+      "title": "3.4 Robustness of Chain of Thought",
+      "level": 2,
+      "startPage": 6,
+      "endPage": 6,
+      "index": 6,
+      "file": "sections/006-3-4-robustness-of-chain-of-thought.md"
+    },
+    {
+      "title": "4 Commonsense Reasoning",
+      "level": 1,
+      "startPage": 7,
+      "endPage": 7,
+      "index": 7,
+      "file": "sections/007-4-commonsense-reasoning.md"
+    },
+    {
+      "title": "5 Symbolic Reasoning",
+      "level": 1,
+      "startPage": 8,
+      "endPage": 8,
+      "index": 8,
+      "file": "sections/008-5-symbolic-reasoning.md"
+    },
+    {
+      "title": "7 Related Work",
+      "level": 1,
+      "startPage": 9,
+      "endPage": 15,
+      "index": 9,
+      "file": "sections/009-7-related-work.md"
+    },
+    {
+      "title": "A Frequently Asked Questions",
+      "level": 1,
+      "startPage": 16,
+      "endPage": 16,
+      "index": 10,
+      "file": "sections/010-a-frequently-asked-questions.md"
+    },
+    {
+      "title": "A.2 What is the role of prompt engineering?",
+      "level": 2,
+      "startPage": 17,
+      "endPage": 17,
+      "index": 11,
+      "file": "sections/011-a-2-what-is-the-role-of-prompt-engineering.md"
+    },
+    {
+      "title": "A.3 Will chain-of-thought prompting improve performance for my task of interest?",
+      "level": 2,
+      "startPage": 18,
+      "endPage": 18,
+      "index": 12,
+      "file": "sections/012-a-3-will-chain-of-thought-prompting-improve-perf.md"
+    },
+    {
+      "title": "A.4 Why is prompting with the equation only not enough for some arithmetic reasoning datasets?",
+      "level": 2,
+      "startPage": 19,
+      "endPage": 19,
+      "index": 13,
+      "file": "sections/013-a-4-why-is-prompting-with-the-equation-only-not-.md"
+    },
+    {
+      "title": "B All Experimental Results",
+      "level": 1,
+      "startPage": 20,
+      "endPage": 23,
+      "index": 14,
+      "file": "sections/014-b-all-experimental-results.md"
+    },
+    {
+      "title": "C Extended Related Work",
+      "level": 1,
+      "startPage": 24,
+      "endPage": 24,
+      "index": 15,
+      "file": "sections/015-c-extended-related-work.md"
+    },
+    {
+      "title": "D Appendix: Additional Analysis",
+      "level": 1,
+      "startPage": 25,
+      "endPage": 26,
+      "index": 16,
+      "file": "sections/016-d-appendix-additional-analysis.md"
+    },
+    {
+      "title": "D.2 Incorrect Chain of Thought Analysis",
+      "level": 2,
+      "startPage": 27,
+      "endPage": 27,
+      "index": 17,
+      "file": "sections/017-d-2-incorrect-chain-of-thought-analysis.md"
+    },
+    {
+      "title": "D.3 Additional Robustness Analysis",
+      "level": 2,
+      "startPage": 28,
+      "endPage": 29,
+      "index": 18,
+      "file": "sections/018-d-3-additional-robustness-analysis.md"
+    },
+    {
+      "title": "E Additional Details",
+      "level": 1,
+      "startPage": 30,
+      "endPage": 31,
+      "index": 19,
+      "file": "sections/019-e-additional-details.md"
+    },
+    {
+      "title": "F Appendix: Input/Output Examples",
+      "level": 1,
+      "startPage": 32,
+      "endPage": 34,
+      "index": 20,
+      "file": "sections/020-f-appendix-input-output-examples.md"
+    },
+    {
+      "title": "G Appendix: Full Prompts",
+      "level": 1,
+      "startPage": 35,
+      "endPage": 41,
+      "index": 21,
+      "file": "sections/021-g-appendix-full-prompts.md"
+    },
+    {
+      "title": "H Appendix: Alternate Annotators for MWP",
+      "level": 1,
+      "startPage": 42,
+      "endPage": 43,
+      "index": 22,
+      "file": "sections/022-h-appendix-alternate-annotators-for-mwp.md"
+    }
+  ]
+}
