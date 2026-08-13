@@ -49,6 +49,9 @@ const files = useFilesStore()
 
 const absoluteWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
 const blobUrl = ref<string | null>(null)
+/** The component's root — polled for a rendered canvas, which is the only
+ *  trustworthy sign the viewer has actually laid out (see scrollToPoint). */
+const host = ref<HTMLElement | null>(null)
 /** Shown while we scroll to the remembered page, to mask the page-1 flash. */
 const restoring = ref(false)
 let disposed = false
@@ -1124,26 +1127,73 @@ async function showCitation(blockId: string, nonce: number): Promise<void> {
  * getCurrentPage, so a user who scrolls after arrival is never fought), when a
  * newer jump supersedes this one, or at the cap.
  */
+/**
+ * Whether the viewer has actually laid its pages out, detected as a scroll
+ * container many times taller than its viewport — a 43-page document measures
+ * ~27,000px against a ~650px client height once real.
+ *
+ * Two dead ends are baked into this shape. The probe pierces shadow roots,
+ * because EmbedPDF renders its entire UI inside nested shadow DOM where an
+ * ordinary querySelector sees nothing. And it looks for scroll extent rather
+ * than a canvas, because a fully rendered viewer contains no canvas at all —
+ * measured directly, both of them.
+ */
+function viewerHasLayout(root: Element | ShadowRoot): boolean {
+  for (const el of root.querySelectorAll('*')) {
+    if (el.scrollHeight > el.clientHeight * 3 && el.clientHeight > 100) return true
+    if (el.shadowRoot && viewerHasLayout(el.shadowRoot)) return true
+  }
+  return false
+}
+
 function scrollToPoint(pageNumber: number, cx: number, cy: number, nonce: number): void {
-  const until = Date.now() + 8_000
-  let issued = false
   const stop = onUserScroll()
-  const tick = (): void => {
-    if (disposed || nonce !== lastDoneNonce || stop.touched) return
-    const scroll = getScrollApi()
-    if (issued && scroll?.getCurrentPage?.() === pageNumber) return // arrived
-    scroll?.scrollToPage({
-      pageNumber,
-      pageCoordinates: { x: cx, y: cy },
-      behavior: 'auto',
-      alignX: 50,
-      alignY: 50,
-    })
-    issued = true
-    if (Date.now() < until) window.setTimeout(tick, 250)
+  // Phase one: wait for the viewer to actually paint. Every clock-based
+  // version of this function failed the same way, tuned on a warm viewer and
+  // dead on a cold one — the scroll plugin will accept a jump and report the
+  // target page over a completely blank viewport, and then the real layout
+  // (pages measuring themselves, the fit-width zoom recalculation) throws the
+  // position back to page 1. The only signal that survives all of that is a
+  // rendered canvas, so the steering clock starts when one exists.
+  const renderDeadline = Date.now() + 90_000
+  const awaitRender = (): void => {
+    if (disposed || nonce !== lastDoneNonce || stop.touched) {
+      stop.release()
+      return
+    }
+    if (host.value && viewerHasLayout(host.value)) {
+      steer()
+      return
+    }
+    if (Date.now() < renderDeadline) window.setTimeout(awaitRender, 300)
     else stop.release()
   }
-  tick()
+  // Phase two: steer until settled. "Arrived once" is not "done" — a late
+  // relayout can still snap back — so the whole window is watched. A correct
+  // position issues nothing, and the reader touching the document ends it.
+  const steer = (): void => {
+    const until = Date.now() + 12_000
+    const tick = (): void => {
+      if (disposed || nonce !== lastDoneNonce || stop.touched) {
+        stop.release()
+        return
+      }
+      const scroll = getScrollApi()
+      if (scroll?.getCurrentPage?.() !== pageNumber) {
+        scroll?.scrollToPage({
+          pageNumber,
+          pageCoordinates: { x: cx, y: cy },
+          behavior: 'auto',
+          alignX: 50,
+          alignY: 50,
+        })
+      }
+      if (Date.now() < until) window.setTimeout(tick, 250)
+      else stop.release()
+    }
+    tick()
+  }
+  awaitRender()
 }
 
 /**
@@ -1272,7 +1322,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="h-full w-full flex flex-col">
+  <div ref="host" class="h-full w-full flex flex-col">
     <div class="flex-1 min-h-0 relative">
       <PDFViewer
         v-if="blobUrl"
