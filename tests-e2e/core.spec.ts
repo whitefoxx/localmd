@@ -355,3 +355,21 @@ test('a relay on the page is not the same as localmd Connect answering', async (
   await expect(page.getByText('Checking…').first()).toBeVisible()
   await expect(check).toBeDisabled()
 })
+
+test('a citation quoted in code stays literal, while a real one becomes a chip', async ({
+  page,
+}) => {
+  // The agent writes about citation syntax as often as it cites — the tokens
+  // used to be rewritten by a pass over the whole text, which cannot tell the
+  // two apart and put raw anchor HTML inside the code span.
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  await input.fill('echo write `[[1:b16-3]]` to cite it, as in this claim [[1:b2-8]].')
+  await input.press('Enter')
+
+  const chip = page.locator('a.citation[data-block="b2-8"]')
+  await expect(chip).toBeVisible({ timeout: 10_000 })
+  // The quoted one is still a token, and did not become a second chip.
+  await expect(page.locator('code', { hasText: '[[1:b16-3]]' })).toBeVisible()
+  await expect(page.locator('a.citation[data-block="b16-3"]')).toHaveCount(0)
+})

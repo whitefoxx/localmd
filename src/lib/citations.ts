@@ -51,43 +51,44 @@ export function resolveCitePath(declared: string, allFiles: string[]): string | 
 }
 
 /**
- * Rewrite citation tokens to anchors (run before generic wikilink rewriting so
- * these specific tokens are consumed first). Source declarations become links
- * that open the document; inline citations become numbered chips carrying the
- * resolved source path so a click can reveal the cited block.
+ * The anchor for one citation token, or null if `inner` is not one.
  *
- * `extraSources` supplies declarations from outside this text — chat messages
- * render part-by-part, so a `[[pdf1:…]]` declared in an earlier part (or an
- * earlier message) wouldn't otherwise resolve `[[1:bxx-y]]` here. Chips that
- * still resolve to no source stay clickable: the click handler falls back to
- * locating the block through the document indexes.
+ * This is a renderer for a single token rather than a pass over the whole
+ * text, because a pass cannot tell prose from code. Citations are markup the
+ * agent also *writes about* — quoting `[[1:b14-3]]` in backticks to discuss a
+ * chip used to produce a chunk of raw anchor HTML inside the code span. The
+ * markdown tokenizer already knows where code begins and ends, so citations
+ * are tokenized alongside wikilinks (see lib/markdown) and inherit that
+ * knowledge instead of re-deriving it.
+ *
+ * Source declarations become links that open the document; inline citations
+ * become numbered chips carrying the resolved source path so a click can
+ * reveal the cited block. A chip that resolves to no source stays clickable:
+ * the click handler falls back to locating the block through the indexes.
  */
-export function renderCitationTokens(
-  body: string,
-  extraSources?: Map<string, CiteSource>,
-): string {
-  const sources = parseCiteSources(body)
-  if (extraSources) {
-    for (const [num, src] of extraSources) {
-      if (!sources.has(num)) sources.set(num, src)
-    }
-  }
+export function citationHtml(inner: string, sources: Map<string, CiteSource>): string | null {
+  const s = inner.trim()
 
   CITE_SOURCE_RE.lastIndex = 0
-  let out = body.replace(CITE_SOURCE_RE, (_m, _kind: string, _num: string, path: string) => {
-    const p = path.trim()
-    const esc = escapeHtml(p)
+  const decl = CITE_SOURCE_RE.exec(`[[${s}]]`)
+  if (decl) {
+    const esc = escapeHtml(decl[3].trim())
     return `<a href="#" class="cite-source" data-cite-path="${esc}">${esc}</a>`
-  })
+  }
 
   CITE_INLINE_RE.lastIndex = 0
-  out = out.replace(CITE_INLINE_RE, (_m, num: string | undefined, blockId: string) => {
+  const cite = CITE_INLINE_RE.exec(`[[${s}]]`)
+  if (cite) {
+    const num = cite[1] as string | undefined
+    const blockId = cite[2]
     const src = num ? sources.get(num) : undefined
     const label = num ? `[${num}]` : '[•]'
-    const title = src ? `${blockId} · ${src.path}` : `${blockId} (source located automatically on click)`
+    const title = src
+      ? `${blockId} · ${src.path}`
+      : `${blockId} (source located automatically on click)`
     const dataPath = src ? ` data-cite-path="${escapeHtml(src.path)}"` : ''
     return `<a href="#" class="citation" data-block="${escapeHtml(blockId)}"${dataPath} title="${escapeHtml(title)}">${label}</a>`
-  })
+  }
 
-  return out
+  return null
 }

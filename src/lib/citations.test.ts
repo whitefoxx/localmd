@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { parseCiteSources, renderCitationTokens, isCitationToken, resolveCitePath } from './citations'
+import {
+  parseCiteSources,
+  citationHtml,
+  isCitationToken,
+  resolveCitePath,
+  type CiteSource,
+} from './citations'
 
 describe('isCitationToken', () => {
   it('recognises source declarations and inline citations', () => {
@@ -28,15 +34,18 @@ describe('parseCiteSources', () => {
   })
 })
 
-describe('renderCitationTokens', () => {
-  it('rewrites source declarations to cite-source anchors', () => {
-    const html = renderCitationTokens('[[pdf1:raw/papers/x.pdf]]')
+describe('citationHtml', () => {
+  const noSources = new Map<string, CiteSource>()
+  const oneSource = new Map<string, CiteSource>([['1', { kind: 'pdf', path: 'raw/x.pdf' }]])
+
+  it('renders source declarations as cite-source anchors', () => {
+    const html = citationHtml('pdf1:raw/papers/x.pdf', noSources)!
     expect(html).toContain('class="cite-source"')
     expect(html).toContain('data-cite-path="raw/papers/x.pdf"')
   })
 
-  it('rewrites inline citations to numbered chips carrying the source path', () => {
-    const html = renderCitationTokens('[[pdf1:raw/x.pdf]]\nclaim [[1:b14-3]].')
+  it('renders inline citations as numbered chips carrying the source path', () => {
+    const html = citationHtml('1:b14-3', oneSource)!
     expect(html).toContain('class="citation"')
     expect(html).toContain('data-block="b14-3"')
     expect(html).toContain('data-cite-path="raw/x.pdf"')
@@ -44,31 +53,21 @@ describe('renderCitationTokens', () => {
   })
 
   it('renders a bare block citation without a source as [•]', () => {
-    const html = renderCitationTokens('claim [[b2-1]].')
+    const html = citationHtml('b2-1', noSources)!
     expect(html).toContain('>[•]<')
     expect(html).not.toContain('data-cite-path')
   })
 
-  it('leaves ordinary wikilinks untouched', () => {
-    const body = 'see [[some-page]] here'
-    expect(renderCitationTokens(body)).toBe(body)
-  })
-})
-
-describe('renderCitationTokens with extraSources', () => {
-  it('resolves a chip whose source declaration is out of this text', () => {
-    // Chat renders part-by-part: the [[pdf1:…]] declaration lives elsewhere.
-    const extra = new Map([['1', { kind: 'pdf' as const, path: 'raw/x.pdf' }]])
-    const html = renderCitationTokens('claim [[1:b14-3]].', extra)
-    expect(html).toContain('data-cite-path="raw/x.pdf"')
-    expect(html).toContain('>[1]<')
-  })
-
   it('a chip with no resolvable source stays clickable (falls back at click)', () => {
-    const html = renderCitationTokens('claim [[1:b14-3]].')
+    const html = citationHtml('1:b14-3', noSources)!
     expect(html).toContain('class="citation"')
     expect(html).toContain('data-block="b14-3"')
     expect(html).not.toContain('data-cite-path')
+  })
+
+  it('is null for anything that is not a citation token', () => {
+    expect(citationHtml('some-page', noSources)).toBeNull()
+    expect(citationHtml('some-page|label', noSources)).toBeNull()
   })
 })
 

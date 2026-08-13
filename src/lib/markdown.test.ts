@@ -65,6 +65,24 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('wikilink-broken')
   })
 
+  it('a citation inside code stays literal — writing about a chip is not one', () => {
+    // The agent quotes a token when it explains a citation rather than making
+    // one. Rewriting that produced a chunk of raw anchor HTML in the code span.
+    const inline = renderMarkdown('the note cites `[[1:b16-3]]` there', resolver)
+    expect(inline).toContain('<code>[[1:b16-3]]</code>')
+    expect(inline).not.toContain('class="citation"')
+
+    const fenced = renderMarkdown('```\nsee [[1:b16-3]] and [[pdf1:raw/x.pdf]]\n```', resolver)
+    expect(fenced).toContain('[[1:b16-3]]')
+    expect(fenced).not.toContain('class="citation"')
+    expect(fenced).not.toContain('class="cite-source"')
+
+    // A real citation in the same document still renders.
+    const both = renderMarkdown('`[[1:b1-1]]` is written as a token.\n\nreal [[1:b2-2]]', resolver)
+    expect(both).toContain('<code>[[1:b1-1]]</code>')
+    expect(both).toContain('data-block="b2-2"')
+  })
+
   it('renders GFM tables', () => {
     const html = renderMarkdown('| a | b |\n|---|---|\n| 1 | 2 |', resolver)
     expect(html).toContain('<table>')

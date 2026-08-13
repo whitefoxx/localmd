@@ -24,7 +24,7 @@ import java from 'highlight.js/lib/languages/java'
 import cpp from 'highlight.js/lib/languages/cpp'
 import diff from 'highlight.js/lib/languages/diff'
 import { splitLink, escapeHtml, splitFrontmatter } from './wiki'
-import { renderCitationTokens, type CiteSource } from './citations'
+import { citationHtml, isCitationToken, parseCiteSources, type CiteSource } from './citations'
 
 // Core build + a curated language set keeps the bundle sane; unknown
 // languages fall back to escaped plain text.
@@ -91,6 +91,12 @@ export interface WikilinkResolver {
 
 interface WikilinkToken {
   type: 'wikilink'
+  raw: string
+  inner: string
+}
+
+interface CitationToken {
+  type: 'citation'
   raw: string
   inner: string
 }
@@ -176,10 +182,15 @@ export function renderMarkdown(
   resolver: WikilinkResolver,
   opts: RenderOptions = {},
 ): string {
-  const { body: raw } = splitFrontmatter(content)
-  // Citation tokens ([[pdf1:…]], [[1:b14-3]]) share the [[…]] syntax but are
-  // not wikilinks — consume them first, before the wikilink tokenizer runs.
-  const body = renderCitationTokens(raw, opts.citeSources)
+  const { body } = splitFrontmatter(content)
+  // Which source number is which document. Collected up front because a chip
+  // may be rendered before the `[[pdf1:…]]` that declares its source is
+  // reached, and `citeSources` adds declarations from outside this text (chat
+  // messages render part by part).
+  const sources = parseCiteSources(body)
+  for (const [num, src] of opts.citeSources ?? []) {
+    if (!sources.has(num)) sources.set(num, src)
+  }
 
   const marked = new Marked({
     gfm: true,
@@ -223,6 +234,34 @@ export function renderMarkdown(
           const cls = resolved ? 'wikilink' : 'wikilink wikilink-broken'
           const data = resolved ?? target
           return `<a class="${cls}" data-target="${escapeHtml(data)}" data-resolved="${resolved ? '1' : ''}">${escapeHtml(label)}</a>`
+        },
+      },
+      // Citation tokens ([[pdf1:…]], [[1:b14-3]]) share the [[…]] syntax but
+      // are not wikilinks, so they must be tried first — which is why this is
+      // registered LAST: marked unshifts each extension, so the most recently
+      // registered tokenizer runs before the others. (The test named "consumes
+      // citation tokens before the wikilink pass" is what holds this order.)
+      //
+      // Being a tokenizer rather than a pass over the whole text is what keeps
+      // a citation written inside code literal: the tokenizer is never offered
+      // the inside of a code span or fence.
+      {
+        name: 'citation',
+        level: 'inline',
+        start(src: string) {
+          const i = src.indexOf('[[')
+          return i < 0 ? undefined : i
+        },
+        tokenizer(src: string) {
+          const m = /^\[\[([^\[\]]+)\]\]/.exec(src)
+          if (!m || !isCitationToken(m[1])) return undefined
+          return { type: 'citation', raw: m[0], inner: m[1] } as CitationToken
+        },
+        renderer(token) {
+          const inner = (token as unknown as CitationToken).inner
+          // isCitationToken passed, so this is non-null; the token's own text
+          // is the honest fallback if the two ever disagree.
+          return citationHtml(inner, sources) ?? escapeHtml(`[[${inner}]]`)
         },
       },
     ],
