@@ -22,7 +22,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useChatStore, type SessionSummary } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useCommands, type Command } from '@/composables/useCommands'
-import { fuzzyRank } from '@/lib/fuzzy'
+import { fuzzyRank, substringPositions } from '@/lib/fuzzy'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import { baseName } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
@@ -50,7 +50,10 @@ interface Row {
   positions?: number[]
   path?: string
   line?: number
+  /** Matching line from a note or an indexed document. */
   text?: string
+  /** Characters of `text` the query matched. */
+  textPositions?: number[]
   blockId?: string | null
   type?: string | null
   icon: string
@@ -171,6 +174,7 @@ const searchRows = computed<Row[]>(() => {
         path: h.path,
         line: h.line,
         text: h.text,
+        textPositions: substringPositions(h.text, text),
         blockId: h.blockId,
         icon: h.doc ? 'codicon-book' : 'codicon-search',
         type: index.types.get(h.path) ?? null,
@@ -200,17 +204,18 @@ const placeholder = computed(() =>
       : t('search.placeholder'),
 )
 
-/** Split a label into matched / unmatched runs so the matched characters can
- *  be marked up. Without this a fuzzy hit looks arbitrary. */
-function segments(row: Row): Array<{ text: string; hit: boolean }> {
-  const pos = new Set(row.positions ?? [])
-  if (!pos.size) return [{ text: row.label, hit: false }]
+/** Split text into matched / unmatched runs so the matched characters can be
+ *  marked up — a hit whose reason is invisible looks arbitrary, whether the
+ *  match was fuzzy (a file name) or a plain substring (a line of prose). */
+function segments(text: string, positions?: number[]): Array<{ text: string; hit: boolean }> {
+  const pos = new Set(positions ?? [])
+  if (!pos.size) return [{ text, hit: false }]
   const out: Array<{ text: string; hit: boolean }> = []
-  for (let i = 0; i < row.label.length; i++) {
+  for (let i = 0; i < text.length; i++) {
     const hit = pos.has(i)
     const last = out[out.length - 1]
-    if (last && last.hit === hit) last.text += row.label[i]
-    else out.push({ text: row.label[i], hit })
+    if (last && last.hit === hit) last.text += text[i]
+    else out.push({ text: text[i], hit })
   }
   return out
 }
@@ -329,7 +334,14 @@ function onKeydown(e: KeyboardEvent): void {
               <span v-else class="shrink-0 text-fg-3 font-mono text-xs">
                 {{ row.path }}:{{ row.line }}
               </span>
-              <span class="truncate text-fg-2">{{ row.text }}</span>
+              <span class="truncate text-fg-2">
+                <span
+                  v-for="(seg, s) in segments(row.text ?? '', row.textPositions)"
+                  :key="s"
+                  :class="seg.hit ? 'fz-hit' : ''"
+                  >{{ seg.text }}</span
+                >
+              </span>
             </template>
             <template v-else-if="row.kind === 'ask'">
               <span class="shrink-0 text-fg-3">{{ $t('search.askAgent') }}</span>
@@ -337,9 +349,12 @@ function onKeydown(e: KeyboardEvent): void {
             </template>
             <template v-else>
               <span class="truncate text-fg-0">
-                <span v-for="(seg, s) in segments(row)" :key="s" :class="seg.hit ? 'fz-hit' : ''">{{
-                  seg.text
-                }}</span>
+                <span
+                  v-for="(seg, s) in segments(row.label, row.positions)"
+                  :key="s"
+                  :class="seg.hit ? 'fz-hit' : ''"
+                  >{{ seg.text }}</span
+                >
               </span>
             </template>
             <span

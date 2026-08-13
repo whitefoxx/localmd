@@ -10,7 +10,7 @@ import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { isCitationToken } from '@/lib/citations'
 import { computeLint, type LintReport } from '@/lib/lint'
-import { fuzzyRank } from '@/lib/fuzzy'
+import { fuzzyRank, excerptAround } from '@/lib/fuzzy'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -288,7 +288,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       const lines = page.content.split('\n')
       for (let i = 0; i < lines.length && hits.length < MAX_HITS; i++) {
         if (lines[i].toLowerCase().includes(q)) {
-          hits.push({ path, line: i + 1, text: lines[i].trim().slice(0, 160) })
+          hits.push({ path, line: i + 1, text: excerptAround(lines[i], q) })
         }
       }
     }
@@ -304,7 +304,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
           docHits.push({
             path: section.source,
             line: i + 1,
-            text: text.trim().slice(0, 160),
+            text: excerptAround(text, q),
             doc: true,
             blockId,
           })

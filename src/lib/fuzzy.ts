@@ -146,6 +146,49 @@ export function fuzzyMatch(needle: string, haystack: string): FuzzyMatch | null 
   return { score: endScore, positions }
 }
 
+/**
+ * Every index of `needle` inside `haystack`, case-insensitively, for all
+ * occurrences. Content is searched as a plain substring rather than fuzzily,
+ * but a reader still has to see which words matched — so its hits come back in
+ * the same shape as a fuzzy match, and both highlight through one code path.
+ */
+export function substringPositions(haystack: string, needle: string): number[] {
+  const n = needle.toLowerCase()
+  if (!n) return []
+  const h = haystack.toLowerCase()
+  const out: number[] = []
+  for (let from = h.indexOf(n); from >= 0; from = h.indexOf(n, from + n.length)) {
+    for (let k = 0; k < n.length; k++) out.push(from + k)
+  }
+  return out
+}
+
+/**
+ * A one-line excerpt of `line` that actually contains the match.
+ *
+ * Taking the first N characters is only right when the match is near the
+ * start; a hit deep in a long paragraph would otherwise be shown as an opening
+ * that does not visibly contain the query — the row says "this matched" and
+ * the evidence is off the end. So the window slides to keep the match in view,
+ * with a little text before it for context and ellipses marking what was cut.
+ */
+export function excerptAround(line: string, needle: string, max = 160): string {
+  const text = line.trim()
+  if (text.length <= max) return text
+  const at = needle ? text.toLowerCase().indexOf(needle.toLowerCase()) : -1
+  // Little enough context that the match stays inside the visible width of a
+  // result row, which is far narrower than `max` — an excerpt that contains
+  // the match but pushes it past the ellipsis has not shown it.
+  const LEAD = 20
+  if (at < 0 || at <= LEAD) return `${text.slice(0, max)}…`
+  // The window starts a fixed distance before the match and simply runs out at
+  // the end of the line. Sliding it back to keep the excerpt a full `max` long
+  // would push the match to the right — the one place it must not be.
+  const from = at - LEAD
+  const cut = text.slice(from, from + max)
+  return `…${cut}${from + max < text.length ? '…' : ''}`
+}
+
 export interface Ranked<T> {
   item: T
   score: number
