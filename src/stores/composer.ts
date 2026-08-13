@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { useKbStore } from '@/stores/kb'
+import { useChatStore } from '@/stores/chat'
 
 /** Where a quoted passage was taken from, captured at selection time — the view
  *  moves on (the user scrolls, keeps chatting) but the provenance must not. The
@@ -101,9 +102,25 @@ export const useComposerStore = defineStore('composer', () => {
     liveId = null
   }
 
+  /** Quotes taken from an agent reply belong to the conversation they were taken
+   *  from — "this passage of your answer" points at nothing once another session
+   *  is open, so those chips (including pre-provenance ones, which carry neither
+   *  `file` nor `from`) are dropped on the switch. File quotes are KB-scoped and
+   *  stay: the file is still there whichever conversation you ask in. */
+  function dropForeignReplyQuotes(sessionId: string | null): void {
+    const foreign = (r: SelectionRef): boolean => !r.file && r.from?.sessionId !== sessionId
+    if (!refs.value.some(foreign)) return
+    refs.value = refs.value.filter((r) => !foreign(r))
+    if (liveId && !refs.value.some((r) => r.id === liveId)) liveId = null
+  }
+
   // Staged context belongs to the KB it was selected in — drop it on KB switch.
   const kb = useKbStore()
   watch(() => kb.name, clear)
+
+  // …and a reply quote additionally belongs to one conversation.
+  const chat = useChatStore()
+  watch(() => chat.currentSessionId, dropForeignReplyQuotes)
 
   return { refs, syncLive, clearTransient, togglePin, remove, clear }
 })
