@@ -15,9 +15,10 @@
  * a deletion the user already confirmed, and Discard merely dismisses them.
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { useFilesStore } from '@/stores/files'
+import { useKbStore } from '@/stores/kb'
 
 export interface PendingChange {
   path: string
@@ -112,11 +113,25 @@ export const useReviewStore = defineStore('review', () => {
     }
   }
 
+  /** Forget everything under review, without touching any file. */
+  function reset(): void {
+    pending.value.clear()
+    panelOpen.value = false
+  }
+
+  // A change is a snapshot of a path inside ONE folder, and Discard writes that
+  // snapshot back — through an fs root that now points somewhere else. Listing
+  // the previous KB's edits after a switch is wrong on screen and dangerous on
+  // click, so the list (and the panel it feeds) does not survive the swap.
+  const kb = useKbStore()
+  watch(() => kb.name, reset)
+
   return {
     pending,
     panelOpen,
     changes,
     count,
+    reset,
     recordWrite,
     recordDelete,
     approve,

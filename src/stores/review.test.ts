@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { nextTick } from 'vue'
 import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
 import { useReviewStore, isRestorable } from './review'
+import { useKbStore } from './kb'
 
 describe('review store — markCommitted (git sync)', () => {
   beforeEach(() => setActivePinia(createPinia()))
@@ -72,5 +74,39 @@ describe('review store — deletions', () => {
     await review.discard('wiki/new.md')
     expect(await fs.exists('wiki/new.md')).toBe(false)
     expect(review.count).toBe(0)
+  })
+})
+
+describe('review store — the list belongs to the open folder', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('drops the changes, and the panel showing them, when the KB switches', async () => {
+    const kb = useKbStore()
+    const review = useReviewStore()
+    kb.name = 'kb-a'
+    await nextTick() // let the open settle before recording against it
+    review.recordWrite('wiki/a.md', 'old\n', 'new\n')
+    review.panelOpen = true
+
+    kb.name = 'kb-b'
+    await nextTick()
+
+    // Nothing from the previous folder survives: those paths, and the
+    // snapshots Discard would write back, mean nothing here.
+    expect(review.count).toBe(0)
+    expect(review.panelOpen).toBe(false)
+  })
+
+  it('keeps the changes while the same KB stays open', async () => {
+    const kb = useKbStore()
+    const review = useReviewStore()
+    kb.name = 'kb-a'
+    await nextTick()
+    review.recordWrite('wiki/a.md', 'old\n', 'new\n')
+
+    kb.name = 'kb-a'
+    await nextTick()
+
+    expect(review.count).toBe(1)
   })
 })
