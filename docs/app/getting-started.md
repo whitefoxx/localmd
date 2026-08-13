@@ -76,6 +76,10 @@ to reach anything:
   matched are marked so you can see why. Typing more words searches inside your
   notes and your indexed documents as well, and a result from a PDF opens at the
   passage itself.
+- **Several words mean all of them, in any order.** They are not treated as a
+  phrase, so `emergent model` finds a line saying "chain-of-thought is
+  emergent: it does not help small models" — and every word it matched is
+  marked in the result.
 - **Start with `>`** to run a command instead: toggle a panel, start a new
   conversation, switch theme, open settings. Commands that have a keyboard
   shortcut show it, so the palette teaches them as you go.

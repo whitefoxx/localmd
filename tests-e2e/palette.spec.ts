@@ -42,6 +42,23 @@ test('an inexact query still finds the file, and shows which letters matched', a
   await expect(page.locator('main').getByRole('button', { name: 'index.md' })).toBeVisible()
 })
 
+test('two words mean both words, in either order — not the phrase', async ({ page }) => {
+  await openPalette(page)
+  // AGENTS.md's opening line says "This is a knowledge base…" — the words are
+  // there, the phrase "knowledge this" is not.
+  await palette(page).fill('knowledge this')
+  await expect(results(page).filter({ hasText: 'AGENTS.md' }).first()).toBeVisible()
+
+  // Reversing them changes nothing.
+  await palette(page).fill('this knowledge')
+  await expect(results(page).filter({ hasText: 'AGENTS.md' }).first()).toBeVisible()
+
+  // And every word has to land: one impossible word empties the list.
+  await palette(page).fill('knowledge zzzqqq')
+  await expect(results(page)).toHaveCount(1)
+  await expect(results(page)).toContainText('Ask the agent:')
+})
+
 test('a query that matches nothing offers the agent instead', async ({ page }) => {
   await openPalette(page)
   await palette(page).fill('zzzqqq')

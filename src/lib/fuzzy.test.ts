@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { fuzzyMatch, fuzzyRank, substringPositions, excerptAround } from './fuzzy'
+import {
+  fuzzyMatch,
+  fuzzyRank,
+  substringPositions,
+  excerptAround,
+  queryTerms,
+  hasAllTerms,
+  termPositions,
+} from './fuzzy'
 
 /** The matched substring, for asserting *where* a match landed. */
 function matched(needle: string, haystack: string): string | null {
@@ -89,22 +97,46 @@ describe('substringPositions', () => {
   })
 })
 
+describe('query terms', () => {
+  it('splits on whitespace and drops the gaps', () => {
+    expect(queryTerms('  emergent   model ')).toEqual(['emergent', 'model'])
+    expect(queryTerms('one')).toEqual(['one'])
+    expect(queryTerms('   ')).toEqual([])
+  })
+
+  it('every term has to appear, in any order', () => {
+    const line = 'Chain-of-thought is emergent: it does not help small models'
+    expect(hasAllTerms(line, ['emergent', 'model'])).toBe(true)
+    expect(hasAllTerms(line, ['model', 'emergent'])).toBe(true) // order-free
+    expect(hasAllTerms(line, ['Emergent', 'MODELS'])).toBe(true) // case-free
+    expect(hasAllTerms(line, ['emergent', 'transformer'])).toBe(false)
+    // The phrase itself is absent — matching the query as one string is what
+    // made this line invisible to "emergent model".
+    expect(line.includes('emergent model')).toBe(false)
+  })
+
+  it('highlights every term, merged in order', () => {
+    // "ab" at 0, "cd" at 2 — merged, sorted, no duplicates.
+    expect(termPositions('abcd ab', ['ab', 'cd'])).toEqual([0, 1, 2, 3, 5, 6])
+  })
+})
+
 describe('excerptAround', () => {
   const long = `${'a'.repeat(400)} NEEDLE ${'b'.repeat(400)}`
 
   it('leaves a short line alone', () => {
-    expect(excerptAround('  a short line  ', 'short')).toBe('a short line')
+    expect(excerptAround('  a short line  ', ['short'])).toBe('a short line')
   })
 
   it('keeps the head when the match is already near the start', () => {
     const line = `NEEDLE ${'x'.repeat(300)}`
-    const out = excerptAround(line, 'NEEDLE')
+    const out = excerptAround(line, ['NEEDLE'])
     expect(out.startsWith('NEEDLE')).toBe(true)
     expect(out.endsWith('…')).toBe(true)
   })
 
   it('slides the window so a match deep in the line is visible', () => {
-    const out = excerptAround(long, 'NEEDLE')
+    const out = excerptAround(long, ['NEEDLE'])
     expect(out).toContain('NEEDLE')
     expect(out.startsWith('…')).toBe(true)
     expect(out.endsWith('…')).toBe(true)
@@ -113,7 +145,7 @@ describe('excerptAround', () => {
 
   it('does not run off the end when the match is last', () => {
     const line = `${'a'.repeat(400)} NEEDLE`
-    const out = excerptAround(line, 'NEEDLE')
+    const out = excerptAround(line, ['NEEDLE'])
     expect(out).toContain('NEEDLE')
     expect(out.endsWith('NEEDLE')).toBe(true) // nothing after it to elide
   })
@@ -123,13 +155,13 @@ describe('excerptAround', () => {
     // fill it, which pushed the match off the visible width of a row.
     for (const tail of [10, 200, 2000]) {
       const line = `${'a'.repeat(300)}NEEDLE${'b'.repeat(tail)}`
-      expect(excerptAround(line, 'NEEDLE').indexOf('NEEDLE')).toBeLessThanOrEqual(25)
+      expect(excerptAround(line, ['NEEDLE']).indexOf('NEEDLE')).toBeLessThanOrEqual(25)
     }
   })
 
   it('falls back to the head when the needle is absent or empty', () => {
-    expect(excerptAround(long, 'absent')).toBe(`${long.slice(0, 160)}…`)
-    expect(excerptAround(long, '')).toBe(`${long.slice(0, 160)}…`)
+    expect(excerptAround(long, ['absent'])).toBe(`${long.slice(0, 160)}…`)
+    expect(excerptAround(long, [])).toBe(`${long.slice(0, 160)}…`)
   })
 })
 
@@ -156,5 +188,23 @@ describe('fuzzyRank', () => {
 
   it('an empty needle keeps everything in tie-break order', () => {
     expect(fuzzyRank('', files, (f) => f)).toHaveLength(4)
+  })
+
+  it('every word must match, and word order is not a requirement', () => {
+    // Both words land on the same path, in either order.
+    for (const q of ['chain prompting', 'prompting chain']) {
+      expect(fuzzyRank(q, files, (f) => f).map((r) => r.item)).toEqual([
+        'raw/papers/chain-of-thought-prompting.pdf',
+      ])
+    }
+    // One word matching is not enough.
+    expect(fuzzyRank('chain absent', files, (f) => f)).toEqual([])
+  })
+
+  it('highlights what every word matched', () => {
+    const [top] = fuzzyRank('wiki index', files, (f) => f)
+    expect(top.item).toBe('wiki/index.md')
+    const marked = top.positions.map((i) => 'wiki/index.md'[i]).join('')
+    expect(marked).toBe('wikiindex')
   })
 })

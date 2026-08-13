@@ -10,7 +10,7 @@ import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { isCitationToken } from '@/lib/citations'
 import { computeLint, type LintReport } from '@/lib/lint'
-import { fuzzyRank, excerptAround } from '@/lib/fuzzy'
+import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -274,8 +274,11 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    *  matched as a plain substring: the query is a phrase the text either
    *  contains or does not, and fuzzy-matching whole lines only invents noise. */
   function search(query: string): { files: FileMatch[]; hits: SearchHit[] } {
-    const q = query.trim().toLowerCase()
+    const q = query.trim()
     if (!q) return { files: [], hits: [] }
+    // Each word must appear, in any order — a line matches "emergent model"
+    // when it contains both, which is what someone typing two words means.
+    const terms = queryTerms(q)
     const filesStore = useFilesStore()
 
     const files = fuzzyRank(q, filesStore.allFiles, (p) => p).map(
@@ -287,8 +290,8 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       if (hits.length >= MAX_HITS) break
       const lines = page.content.split('\n')
       for (let i = 0; i < lines.length && hits.length < MAX_HITS; i++) {
-        if (lines[i].toLowerCase().includes(q)) {
-          hits.push({ path, line: i + 1, text: excerptAround(lines[i], q) })
+        if (hasAllTerms(lines[i], terms)) {
+          hits.push({ path, line: i + 1, text: excerptAround(lines[i], terms) })
         }
       }
     }
@@ -298,13 +301,13 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       if (docHits.length >= MAX_HITS) break
       const lines = section.content.split('\n')
       for (let i = 0; i < lines.length && docHits.length < MAX_HITS; i++) {
-        if (lines[i].toLowerCase().includes(q)) {
+        if (hasAllTerms(lines[i], terms)) {
           const blockId = lines[i].match(/\[\[(b\d+-\d+)\]\]/)?.[1] ?? null
           const text = lines[i].replace(/\[\[b\d+-\d+\]\]\s*/g, '').replace(/^#+\s*/, '')
           docHits.push({
             path: section.source,
             line: i + 1,
-            text: excerptAround(text, q),
+            text: excerptAround(text, terms),
             doc: true,
             blockId,
           })

@@ -147,6 +147,17 @@ export function fuzzyMatch(needle: string, haystack: string): FuzzyMatch | null 
 }
 
 /**
+ * The words a query is asking for. Every one of them has to appear in a
+ * result, in any order — which is what a search box means by two words
+ * everywhere else. Matching the query as one string instead would ask for the
+ * literal phrase, so "emergent model" would find nothing in a note that says
+ * "chain-of-thought is emergent: it does not help small models".
+ */
+export function queryTerms(query: string): string[] {
+  return query.trim().split(/\s+/).filter(Boolean)
+}
+
+/**
  * Every index of `needle` inside `haystack`, case-insensitively, for all
  * occurrences. Content is searched as a plain substring rather than fuzzily,
  * but a reader still has to see which words matched — so its hits come back in
@@ -163,6 +174,19 @@ export function substringPositions(haystack: string, needle: string): number[] {
   return out
 }
 
+/** Does every term appear in `haystack`? (Case-insensitive, any order.) */
+export function hasAllTerms(haystack: string, terms: string[]): boolean {
+  const h = haystack.toLowerCase()
+  return terms.every((t) => h.includes(t.toLowerCase()))
+}
+
+/** Where every term matched, merged and sorted — all of them get highlighted. */
+export function termPositions(haystack: string, terms: string[]): number[] {
+  const all = new Set<number>()
+  for (const t of terms) for (const i of substringPositions(haystack, t)) all.add(i)
+  return [...all].sort((a, b) => a - b)
+}
+
 /**
  * A one-line excerpt of `line` that actually contains the match.
  *
@@ -172,10 +196,12 @@ export function substringPositions(haystack: string, needle: string): number[] {
  * the evidence is off the end. So the window slides to keep the match in view,
  * with a little text before it for context and ellipses marking what was cut.
  */
-export function excerptAround(line: string, needle: string, max = 160): string {
+export function excerptAround(line: string, terms: string[], max = 160): string {
   const text = line.trim()
   if (text.length <= max) return text
-  const at = needle ? text.toLowerCase().indexOf(needle.toLowerCase()) : -1
+  // The earliest term that occurs: with several words the window can only be
+  // centred on one of them, and the first is the one a reader looks for.
+  const at = termPositions(text, terms)[0] ?? -1
   // Little enough context that the match stays inside the visible width of a
   // result row, which is far narrower than `max` — an excerpt that contains
   // the match but pushes it past the ellipsis has not shown it.
@@ -196,16 +222,40 @@ export interface Ranked<T> {
 }
 
 /**
- * Score every candidate and drop the ones that don't match. Ties break toward
- * the shorter text, then alphabetically — with equal scores, the more specific
- * name is nearly always the one meant, and stable order beats a shuffling list.
+ * Score every candidate against the whole query and drop the ones that don't
+ * match. Each word of the query is matched separately and all of them must
+ * land, so word order is not a requirement someone has to guess: "graph
+ * toggle" finds "Toggle the graph view". A candidate's score is the sum, so
+ * matching two words beats matching one well.
+ *
+ * Ties break toward the shorter text, then alphabetically — with equal scores,
+ * the more specific name is nearly always the one meant, and stable order
+ * beats a shuffling list.
  */
-export function fuzzyRank<T>(needle: string, items: T[], text: (item: T) => string): Ranked<T>[] {
+export function fuzzyRank<T>(query: string, items: T[], text: (item: T) => string): Ranked<T>[] {
+  const terms = queryTerms(query)
   const out: Ranked<T>[] = []
   for (const item of items) {
     const str = text(item)
-    const m = fuzzyMatch(needle, str)
-    if (m) out.push({ item, score: m.score, positions: m.positions })
+    if (!terms.length) {
+      out.push({ item, score: 0, positions: [] })
+      continue
+    }
+    let score = 0
+    const positions = new Set<number>()
+    let matchedAll = true
+    for (const term of terms) {
+      const m = fuzzyMatch(term, str)
+      if (!m) {
+        matchedAll = false
+        break
+      }
+      score += m.score
+      for (const i of m.positions) positions.add(i)
+    }
+    if (matchedAll) {
+      out.push({ item, score, positions: [...positions].sort((a, b) => a - b) })
+    }
   }
   out.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score

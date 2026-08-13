@@ -22,7 +22,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useChatStore, type SessionSummary } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useCommands, type Command } from '@/composables/useCommands'
-import { fuzzyRank, substringPositions } from '@/lib/fuzzy'
+import { fuzzyRank, termPositions, queryTerms } from '@/lib/fuzzy'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import { baseName } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
@@ -174,7 +174,7 @@ const searchRows = computed<Row[]>(() => {
         path: h.path,
         line: h.line,
         text: h.text,
-        textPositions: substringPositions(h.text, text),
+        textPositions: termPositions(h.text, queryTerms(text)),
         blockId: h.blockId,
         icon: h.doc ? 'codicon-book' : 'codicon-search',
         type: index.types.get(h.path) ?? null,
