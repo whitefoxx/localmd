@@ -38,7 +38,8 @@ export async function bootstrapDemo(): Promise<void> {
 }
 
 /**
- * Warn before leaving, but only once there is something to lose.
+ * Warn before leaving, but only once there is something to lose, and only
+ * while the thing to lose is still the demo.
  *
  * The demo's real hazard was never the agent writing files — nothing here
  * touches the disk. It is a visitor spending twenty minutes in a knowledge base
@@ -46,10 +47,20 @@ export async function bootstrapDemo(): Promise<void> {
  * the handler is only attached after the first change: the file tree gaining or
  * losing something, or an editor buffer going dirty. Both are synchronous to
  * read at unload time, which `beforeunload` requires.
+ *
+ * Closing the tab is not the only way out, though: opening a folder replaces
+ * the demo, and once that happens the warning is about a knowledge base that
+ * no longer exists while what IS open is a folder on disk that outlives the
+ * tab. So whether there is still anything to lose is decided at unload time —
+ * also a synchronous read — rather than at the moment the handler goes on.
  */
 function guardAgainstLosingWork(): void {
+  const kb = useKbStore()
   const files = useFilesStore()
-  const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+  const demoKb = kb.name
+  const warn = (e: BeforeUnloadEvent) => {
+    if (kb.name === demoKb) e.preventDefault()
+  }
   const stop = watch(
     [() => files.tree.length, () => files.saveState],
     () => {
