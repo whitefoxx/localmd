@@ -66,6 +66,25 @@ can wait until you want them.
 
 You can drag the edges to resize, and hide the side panels entirely.
 
+## One shortcut worth learning
+
+**⌘K** (Ctrl+K, and ⌘P works too) opens the palette, which is the fastest way
+to reach anything:
+
+- **Type part of a name** to find a file. You do not have to be exact or
+  complete — `wkchn` finds `wiki/chain-of-thought.md`, and the letters it
+  matched are marked so you can see why. Typing more words searches inside your
+  notes and your indexed documents as well, and a result from a PDF opens at the
+  passage itself.
+- **Start with `>`** to run a command instead: toggle a panel, start a new
+  conversation, switch theme, open settings. Commands that have a keyboard
+  shortcut show it, so the palette teaches them as you go.
+- **Start with `@`** to find a past conversation by title.
+- **Press ⇧Enter** at any point to hand what you typed to the assistant instead
+  of searching for it. It arrives in the message box as a draft, so you can add
+  to it before sending — useful exactly when a search comes back with nothing,
+  which is usually when you wanted to ask a question anyway.
+
 **Settings → General** holds the interface language and the appearance (system,
 light or dark). The theme icon in the bar is a shortcut for the same setting,
 and you can simply ask the assistant to switch it.
