@@ -1,6 +1,6 @@
 ---
 title: PDFs, EPUBs and Word files
-summary: How a document becomes readable and searchable, and how answers can link straight back to the exact passage they came from.
+summary: How a document becomes readable and searchable, how answers link straight back to the exact passage they came from, and which other file formats open in the app.
 ---
 
 # PDFs, EPUBs and Word files
@@ -47,6 +47,27 @@ or wrong, and passing one off as a source is worse than having no source.
 If something comes from its general knowledge rather than a page it read, it
 says so and gives no link. If it has no web access at all, it cannot cite
 external pages — see `tools`.
+
+## Everything else you can open
+
+A knowledge base collects more than documents, and most of it opens right in
+the tab:
+
+- **Images** display, and **audio and video** play with the browser's own
+  controls. Nothing is converted or uploaded — the file plays straight from
+  your folder.
+- **CSV and TSV** files show as a table, with the same Edit/Preview toggle as
+  a note when you want the raw text.
+- **Excel workbooks** (`.xlsx`) open read-only: every sheet, with values as
+  the cells display them — including dates.
+- **PowerPoint decks** (`.pptx`) open as an outline — each slide's title, text
+  and pictures. The original slide layout is not reproduced, and the view says
+  so.
+
+These are previews: you can read them, but the assistant does not index or
+cite them the way it does PDFs, EPUBs and Word files. The old binary Office
+formats (`.doc`, `.xls`, `.ppt`) predate what a browser can read — opening one
+explains how to save it in the modern format instead.
 
 ## Related
 
