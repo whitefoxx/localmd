@@ -108,6 +108,8 @@ let selText = ''
 let annotations: EpubAnnotation[] = []
 let ro: ResizeObserver | null = null
 let resizeTimer = 0
+/** Size the rendition is currently laid out at (0 until the first fit). */
+let laidOut = { w: 0, h: 0 }
 // Auto-clears the transient pulse flashCfi() puts on an existing mark.
 let flashTimer = 0
 // Set right before a programmatic jump so 'relocated' can offer a "back" button.
@@ -126,6 +128,7 @@ function destroy(): void {
   window.removeEventListener('mousedown', onWindowMousedown)
   ro?.disconnect()
   ro = null
+  laidOut = { w: 0, h: 0 }
   if (resizeTimer) {
     clearTimeout(resizeTimer)
     resizeTimer = 0
@@ -150,6 +153,41 @@ function destroy(): void {
   searchQuery.value = ''
   searchResults.value = []
   searching.value = false
+}
+
+/**
+ * Height held back from the page so the reader can lose a strip of viewport
+ * without repaginating. A Chrome infobar (the "being controlled by automated
+ * software" banner, an extension prompt, a download bar) appears while you are
+ * reading and takes ~40px off the window — and a paginated book cannot absorb
+ * that quietly: fewer lines fit per page, so the text reflows, and epub.js
+ * lands on the page CONTAINING the line you were on, which puts that line
+ * anywhere in the new page. Reading is interrupted by a jump you did not ask
+ * for, over a bar you did not ask for either.
+ *
+ * Laying the page out shorter than its slot turns that into nothing at all:
+ * the strip is bottom margin, and a viewport that shrinks by less than it just
+ * spends the margin instead of reflowing. The book is one line shorter per page
+ * for it, which is invisible next to the page bar that already floats there.
+ */
+const HEIGHT_SLACK = 48
+
+/**
+ * Lay the book out for the space it has, but only when that space actually
+ * changed shape. Width is exact — columns are as wide as the page, so a
+ * narrower panel must reflow. Height is deliberately loose in both directions:
+ * a shrink is absorbed while the current layout still fits, and a growth is
+ * absorbed until the unused strip is wide enough to be worth reclaiming.
+ */
+function refit(el: HTMLElement): void {
+  if (!rendition) return
+  const w = el.clientWidth
+  const avail = el.clientHeight
+  if (!w || !avail) return // hidden tab: nothing to lay out against
+  const fits = avail >= laidOut.h && avail - laidOut.h <= HEIGHT_SLACK * 2
+  if (w === laidOut.w && fits) return
+  laidOut = { w, h: Math.max(120, avail - HEIGHT_SLACK) }
+  rendition.resize(laidOut.w, laidOut.h)
 }
 
 async function load(path: string | null): Promise<void> {
@@ -227,9 +265,13 @@ async function load(path: string | null): Promise<void> {
       if (resizeTimer) clearTimeout(resizeTimer)
       resizeTimer = window.setTimeout(() => {
         resizeTimer = 0
-        rendition?.resize(el.clientWidth, el.clientHeight)
+        refit(el)
       }, 150)
     })
+    // observe() delivers an initial callback, which is what lays the book out
+    // with its slack — deliberately through the same debounce, because a resize
+    // straight after display() would clear the views before epub.js has a
+    // location to restore them to, leaving a blank reader.
     ro.observe(el)
   }
 
