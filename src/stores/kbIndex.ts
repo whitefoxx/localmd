@@ -10,6 +10,7 @@ import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { isCitationToken } from '@/lib/citations'
 import { computeLint, type LintReport } from '@/lib/lint'
+import { fuzzyRank } from '@/lib/fuzzy'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 
@@ -47,6 +48,13 @@ export interface SearchHit {
   doc?: boolean
   /** Block id of the hit line, for jumping straight to the passage. */
   blockId?: string | null
+}
+
+/** A filename match, ranked, with the characters the query matched. */
+export interface FileMatch {
+  path: string
+  /** Indices into `path` that the query matched — the palette underlines them. */
+  positions: number[]
 }
 
 export interface HealthReport {
@@ -259,13 +267,20 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   })
 
   /** Filename search over every file, full-text over markdown, and full-text
-   *  over indexed PDF/EPUB sections (hits carry the block id to jump to). */
-  function search(query: string): { files: string[]; hits: SearchHit[] } {
+   *  over indexed PDF/EPUB sections (hits carry the block id to jump to).
+   *
+   *  Filenames match fuzzily and come back ranked — a path is a name someone is
+   *  recalling, so `wkchn` should find `wiki/chain-of-thought.md`. Content is
+   *  matched as a plain substring: the query is a phrase the text either
+   *  contains or does not, and fuzzy-matching whole lines only invents noise. */
+  function search(query: string): { files: FileMatch[]; hits: SearchHit[] } {
     const q = query.trim().toLowerCase()
     if (!q) return { files: [], hits: [] }
     const filesStore = useFilesStore()
 
-    const files = filesStore.allFiles.filter((p) => p.toLowerCase().includes(q)).sort()
+    const files = fuzzyRank(q, filesStore.allFiles, (p) => p).map(
+      (r): FileMatch => ({ path: r.item, positions: r.positions }),
+    )
 
     const hits: SearchHit[] = []
     for (const [path, page] of pages.value) {
