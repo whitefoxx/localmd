@@ -712,6 +712,11 @@ export const useChatStore = defineStore('chat', () => {
           blocks.push(`@${p}: ${kind.toUpperCase()} document — read it via read_file through the structured index.`)
           continue
         }
+        // Binary formats must not be inlined as text — the bytes are noise.
+        if (kind === 'audio' || kind === 'video' || kind === 'sheet' || kind === 'slides' || kind === 'binary') {
+          blocks.push(`@${p}: binary ${kind} file — it has no readable text content.`)
+          continue
+        }
         if (isAnnotationsPath(p)) {
           // Sidecar JSON is rect/CFI noise — inline the readable digest instead.
           const raw = await fs.tryReadFile(p)
