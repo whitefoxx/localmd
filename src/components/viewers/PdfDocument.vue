@@ -9,12 +9,14 @@
 import {
   PDFViewer,
   registerIcon,
+  ZoomMode,
   type PluginRegistry,
   type UISchema,
   type ToolbarItem,
   type GroupItem,
   type SelectionMenuItem,
   type SelectionMenuSchema,
+  type ZoomLevel,
 } from '@embedpdf/vue-pdf-viewer'
 // Local wasm — absolute so the engine's blob: workers can resolve it.
 import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
@@ -79,6 +81,12 @@ const config = computed(() => ({
   // render CJK scans as blank boxes.
   fonts: { ui: null, signature: null },
   stamp: { manifests: [] },
+  // EmbedPDF opens at "automatic", which is fit-width capped at 100% — and a
+  // PDF point is not a screen pixel, so on any pane wider than the page (a
+  // maximised window, the agent panel closed) that cap leaves a small page
+  // marooned in white space, which reads as the reader being broken rather
+  // than as a zoom setting. Fit the width and let the toolbar do the rest.
+  zoom: { defaultZoomLevel: ZoomMode.FitWidth },
   // Trim EmbedPDF's default toolbar down to the essentials. Categories are
   // hierarchical and disabling one hides both its toolbar items AND its
   // text-selection-popup items:
@@ -177,6 +185,47 @@ let annotationApi: AnnotationApi | null = null
 function getScrollApi(): ScrollApi | undefined {
   return (viewerRegistry?.getPlugin('scroll') as undefined | { provides?: () => ScrollApi })
     ?.provides?.()
+}
+
+/** The slice of the zoom plugin the re-fit uses. */
+interface ZoomApi {
+  requestZoom: (level: ZoomLevel) => void
+  getState: () => { zoomLevel: ZoomLevel }
+}
+
+function getZoomApi(): ZoomApi | undefined {
+  return (viewerRegistry?.getPlugin('zoom') as undefined | { provides?: () => ZoomApi })?.provides?.()
+}
+
+let paneObserver: ResizeObserver | null = null
+let refitTimer: number | null = null
+let paneWidth = 0
+
+/**
+ * Re-fit when the pane changes width on its own — closing the agent panel or
+ * the sidebar widens the reader without the window resizing, and the engine
+ * only recomputes a fit on ITS idea of a resize, so the page would sit at the
+ * scale it was opened with in a pane that has since doubled.
+ *
+ * Only a fit mode is re-applied: a zoom the reader typed or picked is an answer
+ * to "how big do I want this", not to "how wide is the pane", and re-fitting
+ * would quietly throw it away.
+ */
+function watchPaneWidth(el: HTMLElement): void {
+  paneWidth = el.clientWidth
+  paneObserver = new ResizeObserver(() => {
+    if (el.clientWidth === paneWidth) return // height-only: the fit is unchanged
+    paneWidth = el.clientWidth
+    if (refitTimer !== null) window.clearTimeout(refitTimer)
+    refitTimer = window.setTimeout(() => {
+      refitTimer = null
+      const zoom = getZoomApi()
+      const level = zoom?.getState().zoomLevel
+      if (!zoom || level === undefined || typeof level === 'number') return
+      zoom.requestZoom(level)
+    }, 150)
+  })
+  paneObserver.observe(el)
 }
 
 /** The slice of the selection plugin's event surface the quote capture uses. */
@@ -1039,6 +1088,7 @@ function watchLinkSelection(r: PluginRegistry): void {
 
 function onReady(r: PluginRegistry): void {
   viewerRegistry = r
+  if (host.value) watchPaneWidth(host.value)
   customizeViewerUi(r)
   watchAnnotationToolbar(r)
   watchLinkSelection(r)
@@ -1367,6 +1417,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   disposed = true
   if (msgTimer !== null) window.clearTimeout(msgTimer)
+  if (refitTimer !== null) window.clearTimeout(refitTimer)
+  paneObserver?.disconnect()
+  paneObserver = null
   pageUnsub?.()
   unsubscribe?.()
   toolbarWatcher?.()
