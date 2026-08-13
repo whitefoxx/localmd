@@ -37,6 +37,8 @@ import { useThemeStore } from '@/stores/theme'
 import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
 import { useTtsStore } from '@/stores/tts'
 import { useFilesStore } from '@/stores/files'
+import { useUiStore } from '@/stores/ui'
+import { useComposerStore } from '@/stores/composer'
 import { baseName } from '@/lib/wiki'
 import { t } from '@/i18n'
 
@@ -44,6 +46,8 @@ const props = defineProps<{ path: string }>()
 
 const citations = useCitationsStore()
 const theme = useThemeStore()
+const ui = useUiStore()
+const composer = useComposerStore()
 const tts = useTtsStore()
 const files = useFilesStore()
 
@@ -173,6 +177,59 @@ let annotationApi: AnnotationApi | null = null
 function getScrollApi(): ScrollApi | undefined {
   return (viewerRegistry?.getPlugin('scroll') as undefined | { provides?: () => ScrollApi })
     ?.provides?.()
+}
+
+/** The slice of the selection plugin's event surface the quote capture uses. */
+interface SelectionEventsApi {
+  onSelectionChange?: (
+    cb: (e: { selection: { start: { page: number } } | null } | null) => void,
+  ) => () => void
+  onEndSelection?: (cb: () => void) => () => void
+}
+
+let selectionUnsubs: Array<() => void> = []
+/** Where the current engine selection starts, 0-based, from the last change
+ *  event — read when the selection ends, because the end event carries none. */
+let selectionStartPage: number | null = null
+
+/**
+ * Mirror the engine's text selection into the composer as a quote chip — the
+ * same behaviour markdown files get from lib/selectionContext, which cannot see
+ * in here: EmbedPDF draws its own selection inside nested shadow DOM, so the
+ * document-level `selectionchange` the generic capture listens to never fires
+ * for it. The viewer pushes instead of being observed.
+ *
+ * Semantics mirror the generic capture: the chip follows the live selection
+ * while the agent panel is open, clears when the selection does, and survives
+ * as a snapshot once pinned. Provenance is the page the selection starts on.
+ */
+function watchSelectionForQuote(r: PluginRegistry): void {
+  const api = (
+    r.getPlugin('selection') as undefined | { provides?: () => SelectionEventsApi }
+  )?.provides?.()
+  if (!api?.onSelectionChange || !api.onEndSelection) return
+  selectionUnsubs.push(
+    api.onSelectionChange((e) => {
+      const sel = e && 'selection' in e ? e.selection : null
+      if (sel) {
+        selectionStartPage = sel.start.page
+      } else {
+        selectionStartPage = null
+        composer.clearTransient()
+      }
+    }),
+    api.onEndSelection(() => {
+      void stageQuoteFromSelection()
+    }),
+  )
+}
+
+async function stageQuoteFromSelection(): Promise<void> {
+  if (!ui.agentOpen) return
+  const text = await getEngineSelection()
+  if (!text) return
+  const page = selectionStartPage !== null ? selectionStartPage + 1 : pageMemory.get(props.path)
+  composer.syncLive(props.path, text, { page })
 }
 
 /** Selected text from the engine's selection layer, '' when nothing selected. */
@@ -985,6 +1042,7 @@ function onReady(r: PluginRegistry): void {
   customizeViewerUi(r)
   watchAnnotationToolbar(r)
   watchLinkSelection(r)
+  watchSelectionForQuote(r)
   // Capture the remembered page now, before the first page-change fires. Skip
   // the restore overlay when a citation jump is pending — that wins instead.
   pendingRestorePage = pageMemory.get(props.path) ?? null
@@ -1313,6 +1371,8 @@ onBeforeUnmount(() => {
   unsubscribe?.()
   toolbarWatcher?.()
   linkWatcher?.()
+  selectionUnsubs.forEach((u) => u())
+  selectionUnsubs = []
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer)
     void doSave()

@@ -7,6 +7,8 @@ import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
 import { useTtsStore } from '@/stores/tts'
+import { useUiStore } from '@/stores/ui'
+import { useComposerStore } from '@/stores/composer'
 import { highlightSentence } from '@/composables/useTtsHighlight'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { resolveHotkey } from '@/lib/hotkeys'
@@ -31,6 +33,8 @@ const citations = useCitationsStore()
 const theme = useThemeStore()
 const settings = useSettingsStore()
 const tts = useTtsStore()
+const ui = useUiStore()
+const composer = useComposerStore()
 
 const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
@@ -184,6 +188,14 @@ async function load(path: string | null): Promise<void> {
     hl.textContent = '::highlight(tts-sentence){background-color:rgba(250,204,21,.4);color:inherit}'
     contents.document.head?.appendChild(hl)
     contents.document.addEventListener('keydown', onKey)
+    // Deselecting inside the chapter clears the transient quote chip, matching
+    // the generic capture's behaviour for markdown. Clicking the composer in
+    // the top document never collapses THIS iframe's selection, so the chip
+    // survives exactly the interaction it exists for: type about the passage.
+    contents.document.addEventListener('selectionchange', () => {
+      const sel = contents.document.getSelection?.()
+      if (!sel || sel.isCollapsed) composer.clearTransient()
+    })
     // A mousedown on the page body (never on a highlight — those live in an
     // overlay in the top document) dismisses the floating popup / citation mark.
     contents.document.addEventListener('mousedown', onContentMousedown)
@@ -228,6 +240,14 @@ async function load(path: string | null): Promise<void> {
     // Pop the color bar right at the selection so highlighting no longer needs
     // a trip to the toolbar.
     if (selText) showSelectionPopup(cfiRange, contents)
+    // Mirror the selection into the composer as a quote chip — the same
+    // behaviour markdown files get from lib/selectionContext, which cannot see
+    // in here: chapters render inside an iframe, whose selections never reach
+    // the top document's `selectionchange`. The chapter title stands in for
+    // the heading locator; EPUB "pages" are synthetic, so no page is claimed.
+    if (selText && ui.agentOpen) {
+      composer.syncLive(docPath, selText, { heading: chapterLabel.value || undefined })
+    }
   })
   // epub.js computes mark positions at insert time only — re-apply after every
   // relocation so they don't drift as the user pages around. Also track reading
