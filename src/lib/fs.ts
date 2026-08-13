@@ -109,10 +109,15 @@ export async function tryReadFile(path: string): Promise<string | null> {
   }
 }
 
-export async function readBinary(path: string): Promise<ArrayBuffer> {
+/** The File object for `path` — a disk-backed Blob. `createObjectURL(file)`
+ *  lets the browser stream it (audio/video), instead of loading it whole. */
+export async function getFile(path: string): Promise<File> {
   const fh = await getFileHandle(path)
-  const file = await fh.getFile()
-  return file.arrayBuffer()
+  return fh.getFile()
+}
+
+export async function readBinary(path: string): Promise<ArrayBuffer> {
+  return (await getFile(path)).arrayBuffer()
 }
 
 export async function statMtime(path: string): Promise<number | null> {

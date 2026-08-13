@@ -93,6 +93,37 @@ export default {
       note: 'Note',
       deleteMark: 'Delete mark',
     },
+
+    media: {
+      cantPlay:
+        "This browser can't decode {name} — its codec isn't supported here. A dedicated player may still open it.",
+    },
+
+    csv: {
+      empty: 'Empty file.',
+      rowsCut: 'Showing the first {shown} of {total} rows.',
+      colsCut: 'Some columns are not shown.',
+    },
+
+    sheet: {
+      loading: 'Opening workbook…',
+      loadFailed: 'Could not read this workbook.',
+      legacyTitle: 'Legacy .xls format',
+      legacyHint:
+        'Excel 97–2003 (.xls) is a binary format that cannot be read in the browser. Open it in Excel or Numbers and save a copy as .xlsx.',
+      cut: 'Showing the first {shown} of {total} rows.',
+      empty: 'This sheet is empty.',
+    },
+
+    slides: {
+      loading: 'Opening deck…',
+      loadFailed: 'Could not read this deck.',
+      legacyTitle: 'Legacy .ppt format',
+      legacyHint:
+        'PowerPoint 97–2003 (.ppt) is a binary format that cannot be read in the browser. Open it in PowerPoint or Keynote and save a copy as .pptx.',
+      outlineHint: 'Outline view — text and pictures, not the original slide layout.',
+      empty: 'No slides in this deck.',
+    },
   },
   zh: {
     selection: '选中内容',
@@ -182,6 +213,36 @@ export default {
       underlineRed: '下划线（红色）',
       note: '笔记',
       deleteMark: '删除划线',
+    },
+
+    media: {
+      cantPlay: '浏览器无法解码 {name}——不支持这个格式的编解码器。用本地播放器应该仍能打开。',
+    },
+
+    csv: {
+      empty: '空文件。',
+      rowsCut: '仅显示前 {shown} 行，共 {total} 行。',
+      colsCut: '部分列未显示。',
+    },
+
+    sheet: {
+      loading: '正在打开工作簿…',
+      loadFailed: '无法读取这个工作簿。',
+      legacyTitle: '旧版 .xls 格式',
+      legacyHint:
+        'Excel 97–2003 的 .xls 是二进制格式，浏览器无法解析。请用 Excel 或 Numbers 打开后另存为 .xlsx。',
+      cut: '仅显示前 {shown} 行，共 {total} 行。',
+      empty: '这个工作表是空的。',
+    },
+
+    slides: {
+      loading: '正在打开演示文稿…',
+      loadFailed: '无法读取这个演示文稿。',
+      legacyTitle: '旧版 .ppt 格式',
+      legacyHint:
+        'PowerPoint 97–2003 的 .ppt 是二进制格式，浏览器无法解析。请用 PowerPoint 或 Keynote 打开后另存为 .pptx。',
+      outlineHint: '大纲视图——只显示文字和图片，不还原原始版式。',
+      empty: '这个演示文稿没有幻灯片。',
     },
   },
 }

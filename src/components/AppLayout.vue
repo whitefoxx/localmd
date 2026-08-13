@@ -30,11 +30,15 @@ import DocxViewer from '@/components/viewers/DocxViewer.vue'
 import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
 import AnnotationsViewer from '@/components/viewers/AnnotationsViewer.vue'
 import TextPreview from '@/components/viewers/TextPreview.vue'
+import CsvPreview from '@/components/viewers/CsvPreview.vue'
+import MediaViewer from '@/components/viewers/MediaViewer.vue'
+import SheetViewer from '@/components/viewers/SheetViewer.vue'
+import SlidesViewer from '@/components/viewers/SlidesViewer.vue'
 import { isAnnotationsPath } from '@/lib/annotations'
 import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
-import { fileKind, isProseText } from '@/lib/filetypes'
+import { fileKind, isProseText, isTabular } from '@/lib/filetypes'
 import { stripMarkdown } from '@/lib/tts'
 import { useTtsStore } from '@/stores/tts'
 import { baseName, splitFrontmatter } from '@/lib/wiki'
@@ -158,6 +162,8 @@ const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : n
 const isMarkdown = computed(() => kind.value === 'markdown')
 // .txt gets a serif reading view with the same Edit/Preview toggle as markdown.
 const isPlainText = computed(() => (files.currentPath ? isProseText(files.currentPath) : false))
+// .csv/.tsv get a table view behind the same toggle.
+const isTabularFile = computed(() => (files.currentPath ? isTabular(files.currentPath) : false))
 
 /* Annotation sidecars (*.annotations.json) always render as the annotations
    page — no raw-JSON view in-app. */
@@ -486,12 +492,13 @@ function closeKb(): void {
         <!-- data-file-selection marks the open-file region: text selected here
              (and only here) is staged into the agent composer as context. -->
         <div class="flex-1 min-h-0 relative" data-file-selection>
-            <!-- Editor actions (contextual: markdown + plain-text reading) -->
+            <!-- Editor actions (contextual: markdown, plain-text, tables) -->
             <div
-              v-if="(isMarkdown || isPlainText) && files.currentPath"
+              v-if="(isMarkdown || isPlainText || isTabularFile) && files.currentPath"
               class="absolute top-2 right-3 z-10 flex gap-1"
             >
               <button
+                v-if="isMarkdown || isPlainText"
                 class="btn text-xs shadow-sm"
                 :title="$t('layout.readAloud')"
                 @mousedown.prevent
@@ -519,10 +526,14 @@ function closeKb(): void {
               <MarkdownPreview v-else-if="isMarkdown" />
               <AnnotationsViewer v-else-if="isAnnotations" />
               <TextPreview v-else-if="isPlainText && files.mode === 'preview'" />
+              <CsvPreview v-else-if="isTabularFile && files.mode === 'preview'" />
               <MarkdownEditor v-else-if="kind === 'text'" />
               <ImageViewer v-else-if="kind === 'image'" />
+              <MediaViewer v-else-if="kind === 'audio' || kind === 'video'" />
               <EpubViewer v-else-if="kind === 'epub'" />
               <DocxViewer v-else-if="kind === 'docx'" />
+              <SheetViewer v-else-if="kind === 'sheet'" />
+              <SlidesViewer v-else-if="kind === 'slides'" />
               <ArtifactViewer v-else-if="kind === 'html'" />
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">
