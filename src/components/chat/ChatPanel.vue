@@ -1041,7 +1041,9 @@ watch(
                 @click="c.file && files.openFile(c.file)"
               >
                 <span class="codicon codicon-sm codicon-quote shrink-0" />
-                <span class="shrink-0 font-medium">{{ c.file ? baseName(c.file) : $t('chat.agentReply') }}</span>
+                <span class="truncate min-w-0 font-medium">{{
+                  c.file ? baseName(c.file) : $t('chat.agentReply')
+                }}</span>
                 <span class="text-fg-3 shrink-0">·</span>
                 <span class="truncate max-w-[220px] text-fg-3 italic">{{ snippet(c.text) }}</span>
               </button>
@@ -1515,9 +1517,12 @@ watch(
             >
               <span class="codicon codicon-sm codicon-quote" />
             </button>
+            <!-- Downloaded files carry long names; the chip is capped at the
+                 composer width, so the name truncates rather than spilling. -->
             <button
               v-if="r.file"
-              class="shrink-0 font-medium text-fg-1 hover:text-fg-0 hover:underline"
+              class="truncate min-w-0 font-medium text-fg-1 hover:text-fg-0 hover:underline"
+              :title="r.file"
               @click="files.openFile(r.file)"
             >
               {{ baseName(r.file) }}
