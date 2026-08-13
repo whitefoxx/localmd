@@ -218,3 +218,15 @@ test('a .docx renders with its structure and is indexed for the agent', async ({
   await chip.click()
   await expect(reader.locator('[data-bid="b1-3"]')).toHaveClass(/docx-flash/)
 })
+
+test('View annotations opens the empty view before anything is highlighted', async ({ page }) => {
+  // The sidecar does not exist until the first mark, and the button used to do
+  // nothing at all — it added a tab, failed to read the file, and left the
+  // reader on screen. "Nothing highlighted yet" is the answer to the question.
+  await openFixture(page)
+  await page.getByTitle('View annotations').click()
+
+  await expect(page.getByText(/No annotations yet/)).toBeVisible()
+  // The document is reachable again from its own tab, not stranded.
+  await expect(page.locator('[data-tab$="field-notes.docx"]')).toBeVisible()
+})

@@ -38,3 +38,46 @@ describe('files store — revealPath (tree follows the active file)', () => {
     expect(files.expandedDirs.has('.trace')).toBe(false)
   })
 })
+
+describe('files store — openFile with a file that is not there', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    fs.setRoot(createMemoryRoot())
+    await fs.writeFile('wiki/index.md', 'I')
+    await useFilesStore().refreshTree()
+  })
+
+  it('opens an annotations sidecar that does not exist yet, empty', async () => {
+    // The sidecar is written by the first highlight. Until then the reader's
+    // View annotations button used to do nothing at all: the tab was added,
+    // the read failed, and the view never changed.
+    const files = useFilesStore()
+    await files.openFile('raw/papers/x.pdf.annotations.json')
+
+    expect(files.currentPath).toBe('raw/papers/x.pdf.annotations.json')
+    expect(files.content).toBe('')
+    expect(files.openTabs).toContain('raw/papers/x.pdf.annotations.json')
+  })
+
+  it('leaves no tab behind for an ordinary file that cannot be read', async () => {
+    const files = useFilesStore()
+    await files.openFile('wiki/index.md')
+
+    await files.openFile('wiki/gone.md')
+
+    expect(files.currentPath).toBe('wiki/index.md') // unchanged
+    expect(files.openTabs).not.toContain('wiki/gone.md')
+  })
+
+  it('keeps a tab the user already had, even when its file goes missing', async () => {
+    const files = useFilesStore()
+    await files.openFile('wiki/index.md')
+    await fs.removeFile('wiki/index.md')
+
+    // Switch away and back: the file is gone, but the tab is the user's.
+    await files.openFile('wiki/index.md.annotations.json')
+    await files.openFile('wiki/index.md')
+
+    expect(files.openTabs).toContain('wiki/index.md')
+  })
+})

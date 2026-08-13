@@ -4,6 +4,7 @@ import * as fs from '@/lib/fs'
 import { invalidateGitFsCache } from '@/lib/gitfs'
 import { fileStem, dirName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
+import { isAnnotationsPath } from '@/lib/annotations'
 import { readTabs, writeTabs } from '@/lib/tabsMemory'
 import type { TreeNode } from '@/lib/fs'
 
@@ -205,12 +206,25 @@ export const useFilesStore = defineStore('files', () => {
   }
 
   async function openFile(path: string): Promise<void> {
-    if (!openTabs.value.includes(path)) openTabs.value.push(path)
+    const wasOpen = openTabs.value.includes(path)
+    if (!wasOpen) openTabs.value.push(path)
     if (currentPath.value === path) return
     await flush()
     if (isTextual(path)) {
-      const text = await fs.tryReadFile(path)
-      if (text === null) return
+      let text = await fs.tryReadFile(path)
+      if (text === null) {
+        // An annotations sidecar is only written by the first highlight, so
+        // until then "missing" means "nothing highlighted yet" — the reader's
+        // View annotations button has to open the empty view rather than do
+        // nothing, and the view says so itself.
+        if (isAnnotationsPath(path)) text = ''
+        else {
+          // Nothing to open. Don't leave behind the tab we just created for it;
+          // a tab the user already had stays, because its file may come back.
+          if (!wasOpen) openTabs.value = openTabs.value.filter((p) => p !== path)
+          return
+        }
+      }
       currentPath.value = path
       content.value = text
       loadedMtime = await fs.statMtime(path)
