@@ -7,3 +7,5 @@ test-results/
 playwright-report/
 # Agent scratch: worktrees and session state, not part of the project.
 .claude/
+# PH launch assets — marketing material, not product code.
+ph-assets/
