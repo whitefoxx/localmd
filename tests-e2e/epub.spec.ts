@@ -161,3 +161,32 @@ test('a real change of shape still repaginates, without skipping past the reader
   })
   expect(fits).toBe(true)
 })
+
+test('zen mode leaves the page and nothing else, and the toolbar comes back on approach', async ({
+  page,
+}) => {
+  await openBook(page)
+  const chrome = page.locator('aside').getByText('wiki', { exact: true })
+  await expect(chrome).toBeVisible()
+
+  await page.getByTitle(/Zen mode/).click()
+
+  // Everything the app puts around the page is gone…
+  await expect(chrome).toBeHidden()
+  await expect(page.locator('nav')).toHaveCount(0)
+  // …including the reader's own toolbar, which is now an overlay at zero opacity
+  // rather than a gap in the layout.
+  const toolbar = page.locator('.codicon-list-tree').first().locator('xpath=ancestor::div[1]')
+  await page.mouse.move(400, 400)
+  await expect
+    .poll(() => toolbar.evaluate((el) => getComputedStyle(el).opacity))
+    .toBe('0')
+
+  // The cursor going looking for the controls brings them back.
+  await page.mouse.move(400, 8)
+  await expect.poll(() => toolbar.evaluate((el) => getComputedStyle(el).opacity)).toBe('1')
+
+  // Esc is the way out from anywhere, including with focus inside the chapter.
+  await page.keyboard.press('Escape')
+  await expect(chrome).toBeVisible()
+})

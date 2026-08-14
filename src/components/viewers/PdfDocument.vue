@@ -48,7 +48,7 @@ const props = defineProps<{ path: string }>()
 
 const citations = useCitationsStore()
 const theme = useThemeStore()
-const ui = useUiStore()
+const uiStore = useUiStore()
 const composer = useComposerStore()
 const tts = useTtsStore()
 const files = useFilesStore()
@@ -187,6 +187,58 @@ function getScrollApi(): ScrollApi | undefined {
     ?.provides?.()
 }
 
+/* ── zen mode ─────────────────────────────────────────────────────────────── */
+
+/**
+ * Hide the engine's toolbar while reading, and give it back when the cursor
+ * goes looking (uiStore.zenPeek — the whole app shares that flag).
+ *
+ * The viewer renders into a shadow root, so no stylesheet of ours can reach the
+ * toolbar from outside: this puts one INSIDE, keyed off an attribute on the
+ * host element. The toolbar is addressed by its position rather than by a class
+ * — it is the element the page content sits under, and `#document-content` is
+ * the one stable id in there. If the engine ever reshapes that, the rule stops
+ * matching and the toolbar simply stays visible: a plainer zen, never a broken
+ * reader.
+ */
+const ZEN_STYLE = `
+  :host([data-zen]) div:has(+ #document-content) {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    z-index: 30;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+  }
+  :host([data-zen][data-peek]) div:has(+ #document-content) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+`
+
+let zenStyleEl: HTMLStyleElement | null = null
+
+/** The engine's custom element, whose shadow root holds the viewer's own UI. */
+function viewerShadowHost(): (HTMLElement & { shadowRoot: ShadowRoot | null }) | null {
+  return host.value?.querySelector('embedpdf-container') ?? null
+}
+
+function applyZen(): void {
+  const el = viewerShadowHost()
+  const root = el?.shadowRoot
+  if (!el || !root) return
+  if (!zenStyleEl || zenStyleEl.ownerDocument !== root.ownerDocument || !root.contains(zenStyleEl)) {
+    zenStyleEl = document.createElement('style')
+    zenStyleEl.textContent = ZEN_STYLE
+    root.appendChild(zenStyleEl)
+  }
+  el.toggleAttribute('data-zen', uiStore.zen)
+  el.toggleAttribute('data-peek', uiStore.zen && uiStore.zenPeek)
+}
+
+watch([() => uiStore.zen, () => uiStore.zenPeek], applyZen)
+
 /** The slice of the zoom plugin the re-fit uses. */
 interface ZoomApi {
   requestZoom: (level: ZoomLevel) => void
@@ -274,7 +326,7 @@ function watchSelectionForQuote(r: PluginRegistry): void {
 }
 
 async function stageQuoteFromSelection(): Promise<void> {
-  if (!ui.agentOpen) return
+  if (!uiStore.agentOpen) return
   const text = await getEngineSelection()
   if (!text) return
   const page = selectionStartPage !== null ? selectionStartPage + 1 : pageMemory.get(props.path)
@@ -837,6 +889,20 @@ function customizeViewerUi(r: PluginRegistry): void {
     viewBox: '0 0 24 24',
     paths: [{ d: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z', fill: 'primary', stroke: 'none' }],
   })
+  // Zen (lucide "maximize"): four corners opening outwards.
+  registerIcon('bm-zen', {
+    viewBox: '0 0 24 24',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    paths: [
+      {
+        d: 'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
+        stroke: 'primary',
+        fill: 'none',
+      },
+    ],
+  })
   // Note (lucide "pencil") and view-annotations (lucide "list") glyphs.
   registerIcon('bm-note', {
     viewBox: '0 0 24 24',
@@ -936,6 +1002,14 @@ function customizeViewerUi(r: PluginRegistry): void {
       else void openNoteForSelection()
     },
   })
+  // Enter zen from the reader itself — the app's own chrome is gone by then, so
+  // this is the button someone reaches for, and the same one takes them back.
+  commands.registerCommand({
+    id: 'bm:zen',
+    label: t('viewers.zen'),
+    icon: 'bm-zen',
+    action: () => uiStore.toggleZen(),
+  })
   // Replaces EmbedPDF's comment panel button: open this book's annotations.
   commands.registerCommand({
     id: 'bm:view-annotations',
@@ -958,6 +1032,7 @@ function customizeViewerUi(r: PluginRegistry): void {
       right.items = right.items.filter((it) => it.id !== 'comment-button') // → [search]
       right.items.push(
         { type: 'command-button', id: 'bm-read-aloud-btn', commandId: 'bm:read-aloud', variant: 'icon' },
+        { type: 'command-button', id: 'bm-zen-btn', commandId: 'bm:zen', variant: 'icon' },
         {
           type: 'command-button',
           id: 'bm-view-annotations-btn',
@@ -1089,6 +1164,7 @@ function watchLinkSelection(r: PluginRegistry): void {
 function onReady(r: PluginRegistry): void {
   viewerRegistry = r
   if (host.value) watchPaneWidth(host.value)
+  applyZen() // the shadow root only exists once the viewer has rendered
   customizeViewerUi(r)
   watchAnnotationToolbar(r)
   watchLinkSelection(r)

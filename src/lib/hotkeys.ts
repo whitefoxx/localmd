@@ -13,7 +13,7 @@
  *  - `shift` is matched exactly.
  */
 
-export type HotkeyId = 'search' | 'sidebar' | 'agent' | 'tabPrev' | 'tabNext'
+export type HotkeyId = 'search' | 'sidebar' | 'agent' | 'zen' | 'tabPrev' | 'tabNext'
 
 export interface Binding {
   /** KeyboardEvent.code, e.g. 'KeyS', 'BracketLeft', 'Backquote', 'Enter'. */
@@ -61,6 +61,14 @@ export const HOTKEYS: HotkeyDef[] = [
     hint: 'Show / hide the agent conversation',
     defaultBinding: { mod: true, code: 'KeyJ' },
     aliases: [{ mod: true, code: 'Enter', notInEditable: true }],
+  },
+  {
+    id: 'zen',
+    label: 'Zen mode',
+    hint: 'Read with nothing else on screen. Esc leaves; the toolbar comes back when the cursor nears the top.',
+    // ⌘. is free in every editor and browser we care about, and reads as
+    // "quiet" rather than as an editing command.
+    defaultBinding: { mod: true, code: 'Period', notInEditable: true },
   },
   // ⌘[ / ⌘] are CodeMirror's indent — yield them inside the editor so paging tabs
   // only fires outside an editable target (the global handler runs in capture phase).

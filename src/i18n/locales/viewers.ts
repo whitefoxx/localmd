@@ -4,6 +4,7 @@
  */
 export default {
   en: {
+    zen: 'Zen mode — hide everything but the page (Esc leaves)',
     // Shared across readers.
     selection: 'Selection',
 
@@ -126,6 +127,7 @@ export default {
     },
   },
   zh: {
+    zen: '禅模式 —— 只留下页面（Esc 退出）',
     selection: '选中内容',
 
     pdf: {

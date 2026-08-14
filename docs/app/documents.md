@@ -23,6 +23,16 @@ This takes a moment for a long book. Afterwards:
 The index is rebuildable, so it is skipped when pushing to GitHub — no huge
 repositories.
 
+## Reading with nothing else on screen
+
+The button in a PDF or EPUB toolbar that opens out into four corners is **zen
+mode** (⌘.). The file tree, the tabs, the assistant panel and the toolbar itself
+step out, and the page takes the whole window.
+
+Nothing is lost, only put away. Move the cursor towards the top of the screen
+and the toolbar comes back — page numbers, search, highlighting, all of it —
+and moves away again when you do. **Esc** leaves, and so does the same button.
+
 ## Citations that jump to the source
 
 When the assistant answers from an indexed document, its citations are

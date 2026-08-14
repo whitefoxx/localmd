@@ -165,6 +165,24 @@ const isPlainText = computed(() => (files.currentPath ? isProseText(files.curren
 // .csv/.tsv get a table view behind the same toggle.
 const isTabularFile = computed(() => (files.currentPath ? isTabular(files.currentPath) : false))
 
+/** PDF and EPUB carry the zen toggle in their own toolbars; anything else needs
+ *  the escape hatch below, or it would have no visible way back. */
+const isReader = computed(() => kind.value === 'pdf' || kind.value === 'epub')
+
+/**
+ * Zen mode's peek: the cursor near the top of the page brings back the reader's
+ * toolbar and the way out. Reading happens in the middle of the screen, so the
+ * top strip is the one place a mouse only goes on purpose.
+ *
+ * The EPUB reader renders its chapters in an iframe, whose mousemoves never
+ * reach this handler — it sets the same flag from inside (see EpubViewer).
+ */
+const PEEK_PX = 72
+function onZenMove(e: MouseEvent): void {
+  if (!ui.zen) return
+  ui.zenPeek = e.clientY < PEEK_PX
+}
+
 /* Annotation sidecars (*.annotations.json) always render as the annotations
    page — no raw-JSON view in-app. */
 const isAnnotations = computed(() => !!files.currentPath && isAnnotationsPath(files.currentPath))
@@ -322,8 +340,12 @@ function closeKb(): void {
     </div>
 
     <div class="flex-1 flex min-h-0">
-      <!-- Activity bar (VS Code style) -->
-      <nav class="w-12 shrink-0 bg-bg-1 border-r border-border flex flex-col items-center py-2 gap-1">
+      <!-- Activity bar (VS Code style). Zen mode takes it, the tree, the tabs
+           and the agent panel off screen — see ui.zen. -->
+      <nav
+        v-if="!ui.zen"
+        class="w-12 shrink-0 bg-bg-1 border-r border-border flex flex-col items-center py-2 gap-1"
+      >
         <!-- Top group -->
         <button :class="actBtn" :title="$t('layout.toggleSidebar')" @click="ui.sidebarOpen = !ui.sidebarOpen">
           <span
@@ -398,7 +420,7 @@ function closeKb(): void {
 
       <!-- Sidebar (right edge is a drag handle to resize) -->
       <aside
-        v-show="ui.sidebarOpen"
+        v-show="ui.sidebarOpen && !ui.zen"
         class="shrink-0 border-r border-border bg-bg-1 flex flex-col relative"
         :style="{ width: `${ui.sidebarWidth}px` }"
       >
@@ -487,8 +509,20 @@ function closeKb(): void {
       </aside>
 
       <!-- Main content (always mounted — the graph is an overlay above it) -->
-      <main class="flex-1 min-w-0 bg-bg-0 flex flex-col">
-        <EditorTabs v-if="ui.editorTabsVisible" />
+      <main class="flex-1 min-w-0 bg-bg-0 flex flex-col relative" @mousemove="onZenMove">
+        <!-- Zen's way out, drawn with the toolbar it hides beside. Always
+             reachable in two moves — cursor to the top, click — because Esc and
+             a shortcut are not discoverable from inside a bare page. -->
+        <button
+          v-if="ui.zen && !isReader"
+          class="absolute top-2 right-3 z-30 w-7 h-7 rounded flex items-center justify-center bg-bg-1/90 border border-border text-fg-2 hover:text-fg-0 shadow transition-opacity duration-200"
+          :class="ui.zenPeek ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+          :title="$t('layout.leaveZen')"
+          @click="ui.toggleZen()"
+        >
+          <span class="codicon codicon-screen-normal" />
+        </button>
+        <EditorTabs v-if="ui.editorTabsVisible && !ui.zen" />
         <!-- data-file-selection marks the open-file region: text selected here
              (and only here) is staged into the agent composer as context. -->
         <div class="flex-1 min-h-0 relative" data-file-selection>
@@ -571,7 +605,7 @@ function closeKb(): void {
            fill the whole window as a z-40 overlay above the editor. The chat's
            own content is centered at a readable width in maximized mode. -->
       <aside
-        v-show="ui.agentOpen"
+        v-show="ui.agentOpen && !ui.zen"
         :class="
           ui.agentMaximized
             ? 'fixed inset-0 z-40 bg-bg-1'
@@ -633,7 +667,7 @@ function closeKb(): void {
 
     <!-- Floating agent button — opens the panel, hides while it is open -->
     <button
-      v-if="!ui.agentOpen"
+      v-if="!ui.agentOpen && !ui.zen"
       class="absolute bottom-5 right-2 z-30 w-9 h-9 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
       :title="$t('layout.openAgent')"
       @click="ui.agentOpen = true"

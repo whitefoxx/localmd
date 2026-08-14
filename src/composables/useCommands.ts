@@ -77,6 +77,13 @@ export function useCommands(): Command[] {
       run: () => (ui.sidebarOpen = !ui.sidebarOpen),
     },
     {
+      id: 'zen',
+      label: 'commands.zen',
+      icon: 'codicon-screen-full',
+      hotkey: 'zen',
+      run: () => ui.toggleZen(),
+    },
+    {
       id: 'graph',
       label: 'commands.graph',
       icon: 'codicon-type-hierarchy-sub',

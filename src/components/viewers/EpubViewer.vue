@@ -79,6 +79,9 @@ function onContentMouseMove(e: MouseEvent): void {
   nearBottom.value = hr.height > 0 && y >= hr.height - 140
   nearLeft.value = x < 150
   nearRight.value = hr.width > 0 && x > hr.width - 150
+  // Zen's peek is driven from the top document everywhere else; in here the
+  // page IS an iframe, so this is the only handler that sees the cursor.
+  if (ui.zen) ui.zenPeek = y < 72
 }
 function hideBottomBar(): void {
   nearBottom.value = false
@@ -366,6 +369,12 @@ function onKey(e: KeyboardEvent): void {
   // that are real app hotkeys: kill the browser default (⌘S save dialog, ⌘P
   // print) and re-dispatch on window so the single registry in App.vue runs the
   // command. Non-hotkey combos (⌘C copy, ⌘A select-all, ⌘F find) are left alone.
+  // Esc is not in the hotkey registry (App.vue handles it as "close the top
+  // layer"), and in zen it is the way out — from in here it would go nowhere.
+  if (e.key === 'Escape') {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    return
+  }
   if (resolveHotkey(e, settings.state.hotkeys)) {
     e.preventDefault()
     window.dispatchEvent(
@@ -996,10 +1005,23 @@ watch(
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full flex flex-col relative">
     <!-- Top bar: navigation/zoom on the left, search · read-aloud ·
          view-annotations on the right, title centered. -->
-    <div class="relative flex items-center gap-2 h-10 px-3 border-b border-border shrink-0">
+    <!-- Toolbar. In zen it leaves the flow and fades out — the page takes the
+         whole height, and the controls come back when the cursor nears the top
+         (ui.zenPeek), which is also what draws the way out of zen. -->
+    <div
+      class="flex items-center gap-2 h-10 px-3 border-b border-border shrink-0 bg-bg-1 transition-opacity duration-200"
+      :class="
+        ui.zen
+          ? [
+              'absolute inset-x-0 top-0 z-30',
+              ui.zenPeek ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            ]
+          : 'relative'
+      "
+    >
       <!-- Left: TOC + font zoom -->
       <button
         class="btn text-xs"
@@ -1035,6 +1057,14 @@ watch(
         </button>
         <button class="btn text-xs" :title="$t('viewers.epub.readChapter')" @click="readAloud">
           <span class="codicon codicon-sm codicon-unmute" />
+        </button>
+        <button
+          class="btn text-xs"
+          :class="{ '!text-accent': ui.zen }"
+          :title="$t('viewers.zen')"
+          @click="ui.toggleZen()"
+        >
+          <span class="codicon codicon-sm" :class="ui.zen ? 'codicon-screen-normal' : 'codicon-screen-full'" />
         </button>
         <button class="btn text-xs" :title="$t('viewers.epub.viewAnnotations')" @click="viewAnnotations">
           <span class="codicon codicon-sm codicon-list-selection" />

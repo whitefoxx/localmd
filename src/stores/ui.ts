@@ -21,6 +21,26 @@ export const useUiStore = defineStore('ui', () => {
   /** Agent panel maximized to fill the whole window (not native fullscreen —
    *  just an overlay covering the app). Transient; not persisted. */
   const agentMaximized = ref(false)
+  /**
+   * Reading with nothing else on screen: the activity bar, the file tree, the
+   * editor tabs and the agent panel all step out, and the reader's own toolbar
+   * fades until the cursor goes looking for it. A mode you enter for a chapter
+   * and leave, so it is transient — a KB that reopened with its chrome missing
+   * would read as a broken app rather than a remembered preference.
+   */
+  const zen = ref(false)
+  /**
+   * The cursor has gone looking for the controls: in zen the reader's toolbar
+   * and the way out are drawn only while this is true. Set on entering too, so
+   * the way out is on screen for as long as it takes to move the mouse — a
+   * mode with no visible exit is a trap, however well documented.
+   */
+  const zenPeek = ref(false)
+
+  function toggleZen(): void {
+    zen.value = !zen.value
+    zenPeek.value = zen.value
+  }
   const searchOpen = ref(false)
   const healthOpen = ref(false)
   const settingsOpen = ref(false)
@@ -74,6 +94,9 @@ export const useUiStore = defineStore('ui', () => {
     sidebarOpen,
     agentOpen,
     agentMaximized,
+    zen,
+    zenPeek,
+    toggleZen,
     searchOpen,
     healthOpen,
     settingsOpen,
