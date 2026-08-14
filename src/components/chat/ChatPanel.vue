@@ -31,6 +31,13 @@ import * as fs from '@/lib/fs'
 import KbImageThumb from './KbImageThumb.vue'
 import ApprovalCard from './ApprovalCard.vue'
 import type { MessagePart } from '@/stores/chat'
+import {
+  presentCall,
+  presentResult,
+  hasArgs,
+  formatDuration,
+  type CallTone,
+} from '@/lib/present'
 import { t } from '@/i18n'
 
 const emit = defineEmits<{ openSettings: []; close: [] }>()
@@ -263,67 +270,35 @@ function toolTime(part: ToolPart): string {
   if (part.status === 'running') {
     return `${Math.floor((now.value - (part.startedAt ?? now.value)) / 1000)}s`
   }
-  const ms = part.elapsedMs ?? 0
-  return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
+  return formatDuration(part.elapsedMs ?? 0)
 }
 
 /** Thinking duration: live-ticking while the block streams, frozen once sealed.
  *  Empty for pre-timing transcripts (no startedAt). */
 function thinkTime(part: ThinkPart): string {
-  if (part.elapsedMs != null) {
-    const ms = part.elapsedMs
-    return ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`
-  }
+  if (part.elapsedMs != null) return formatDuration(part.elapsedMs)
   if (part.startedAt == null) return ''
   return `${Math.floor((now.value - part.startedAt) / 1000)}s`
 }
 
-/** Per-tool glyph so the transcript reads at a glance instead of a wall of
- *  identical wrenches. While a tool runs it shows a spinner; once done, built-in
- *  tools settle back to their own glyph (below) and MCP tools show a check. */
-const TOOL_ICONS: Record<string, string> = {
-  list_files: 'codicon-list-tree',
-  read_file: 'codicon-file',
-  write_file: 'codicon-edit',
-  edit_file: 'codicon-edit',
-  search_files: 'codicon-search',
-  index_document: 'codicon-book',
-  create_artifact: 'codicon-file-code',
-  update_plan: 'codicon-checklist',
-  use_skill: 'codicon-lightbulb',
-  enable_tools: 'codicon-plug',
-  run_subagent: 'codicon-run-all',
-  view_image: 'codicon-device-camera',
-  generate_image: 'codicon-file-media',
-  compact: 'codicon-fold',
-  git_status: 'codicon-source-control',
-  git_diff: 'codicon-diff',
-  git_log: 'codicon-history',
-  git_commit: 'codicon-git-commit',
-  git_push: 'codicon-repo-push',
-  git_pull: 'codicon-repo-pull',
+/** Glyph, label, tone and expandability all come from lib/present, which the
+ *  markdown export reads too — one description of a tool row, two renderers. */
+const TOOL_TONE: Record<CallTone, string> = {
+  running: 'text-fg-2',
+  failed: 'text-removed',
+  stopped: 'text-fg-3',
+  plain: 'text-fg-3',
 }
 
-function toolIcon(part: ToolPart): string {
-  if (part.status === 'running') return 'codicon-loading codicon-modifier-spin'
-  if (part.status === 'error') return 'codicon-error'
-  // MCP tools have no per-name glyph, so a finished one shows a check; built-in
-  // tools fall through to their own icon (spinner only shows while running).
-  if (part.name.startsWith('mcp__')) return part.status === 'done' ? 'codicon-pass' : 'codicon-plug'
-  return TOOL_ICONS[part.name] ?? 'codicon-tools'
-}
-
-/** Tool calls that carry non-empty args (MCP tools) render as an expandable
- *  disclosure so the full parameters can be toggled open. */
-function toolHasArgs(part: ToolPart): boolean {
-  return !!part.args && Object.keys(part.args).length > 0
-}
-
-/** Expandable once there's anything to inspect — the call's args and/or its
- *  result (the result arrives with tool_result, so no-arg tools gain the
- *  chevron on completion). */
-function toolExpandable(part: ToolPart): boolean {
-  return toolHasArgs(part) || !!part.result
+/** What the call returned, in the few words that fit on the collapsed row: a
+ *  failure's own message, or our own wording for the outcomes that have none.
+ *  Silent on success — the row already says what was asked. */
+function toolOutcome(part: ToolPart): string {
+  const r = presentResult(part)
+  if (r.kind === 'failed') return r.message ?? t('chat.toolFailed')
+  if (r.kind === 'stopped') return t('chat.toolStopped')
+  if (r.kind === 'empty') return t('chat.toolNoOutput')
+  return ''
 }
 
 function formatArgs(part: ToolPart): string {
@@ -1239,9 +1214,9 @@ watch(
           <template v-for="(part, i) in m.parts" :key="i">
             <!-- Tool call with args and/or a result: expandable disclosure. -->
             <details
-              v-if="part.type === 'tool' && toolExpandable(part)"
+              v-if="part.type === 'tool' && presentCall(part).expandable"
               class="group text-xs font-mono"
-              :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
+              :class="TOOL_TONE[presentCall(part).tone]"
             >
               <summary
                 class="flex items-center gap-1.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-fg-2"
@@ -1249,12 +1224,19 @@ watch(
                 <span
                   class="codicon codicon-sm codicon-chevron-right shrink-0 text-fg-3 transition-transform group-open:rotate-90"
                 />
-                <span class="codicon codicon-sm shrink-0" :class="toolIcon(part)" />
-                <span class="truncate">{{ part.detail }}</span>
+                <span class="codicon codicon-sm shrink-0" :class="presentCall(part).icon" />
+                <span class="truncate">{{ presentCall(part).label }}</span>
+                <!-- Gives up width long before the label does: which file was
+                     touched matters more than the whole message, which is one
+                     click away either way. -->
+                <span
+                  v-if="toolOutcome(part)"
+                  class="truncate min-w-0 [flex-shrink:20] text-fg-3"
+                >· {{ toolOutcome(part) }}</span>
                 <span v-if="part.status" class="shrink-0 tabular-nums text-fg-3">{{ toolTime(part) }}</span>
               </summary>
               <div class="mt-1 ml-5 space-y-1.5">
-                <div v-if="toolHasArgs(part)">
+                <div v-if="hasArgs(part)">
                   <div class="mb-0.5 flex items-center justify-between">
                     <span class="text-[10px] uppercase tracking-wide text-fg-3">{{ $t('chat.params') }}</span>
                     <button
@@ -1290,10 +1272,14 @@ watch(
             <div
               v-else-if="part.type === 'tool'"
               class="flex items-center gap-1.5 text-xs font-mono"
-              :class="part.status === 'running' ? 'text-fg-2' : part.status === 'error' ? 'text-removed' : 'text-fg-3'"
+              :class="TOOL_TONE[presentCall(part).tone]"
             >
-              <span class="codicon codicon-sm shrink-0" :class="toolIcon(part)" />
-              <span class="truncate">{{ part.detail }}</span>
+              <span class="codicon codicon-sm shrink-0" :class="presentCall(part).icon" />
+              <span class="truncate">{{ presentCall(part).label }}</span>
+              <span
+                v-if="toolOutcome(part)"
+                class="truncate min-w-0 [flex-shrink:20] text-fg-3"
+              >· {{ toolOutcome(part) }}</span>
               <span v-if="part.status" class="shrink-0 tabular-nums text-fg-3">{{ toolTime(part) }}</span>
             </div>
             <details

@@ -92,4 +92,53 @@ describe('renderTranscript', () => {
     expect(r).toContain('> ⚙ edit_file — wiki/a.md ✗')
     expect(r).toContain('> ⚠ Stopped.')
   })
+
+  it('keeps the reason a tool call failed, which the saved copy used to drop', () => {
+    // A transcript is the record someone reads back weeks later; "it failed"
+    // without the message sends them to the code to guess why.
+    const r = renderTranscript(
+      session({
+        uiMessages: [
+          {
+            id: 1,
+            role: 'assistant',
+            parts: [
+              {
+                type: 'tool',
+                name: 'write_file',
+                detail: 'write wiki/x.md',
+                status: 'error',
+                result: 'Error: no such directory: wiki/nope/\n  at write_file',
+              },
+            ],
+          },
+        ] as UiMessage[],
+      }),
+    )
+    expect(r).toContain('> ⚙ write_file — write wiki/x.md ✗ no such directory: wiki/nope/')
+  })
+
+  it('files a call the user stopped as stopped, not as one that broke', () => {
+    const r = renderTranscript(
+      session({
+        uiMessages: [
+          {
+            id: 1,
+            role: 'assistant',
+            parts: [
+              {
+                type: 'tool',
+                name: 'git_push',
+                detail: 'push to origin',
+                status: 'error',
+                result: 'Stopped by the user before this tool finished.',
+              },
+            ],
+          },
+        ] as UiMessage[],
+      }),
+    )
+    expect(r).toContain('> ⚙ git_push — push to origin ⏹ stopped')
+    expect(r).not.toContain('✗')
+  })
 })

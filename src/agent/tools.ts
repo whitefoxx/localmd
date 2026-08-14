@@ -1730,7 +1730,7 @@ export const TOOLS: ToolSpec[] = [
 ]
 
 /* run.ts registers these beyond TOOLS; they are as built-in as the rest. */
-const RUNNER_TOOL_NAMES = ['view_image', 'generate_image', 'run_subagent']
+export const RUNNER_TOOL_NAMES = ['view_image', 'generate_image', 'run_subagent']
 const BUILTIN_TOOL_NAMES = new Set([...TOOLS.map((t) => t.name), ...RUNNER_TOOL_NAMES])
 
 /** The git tools that cannot act without a repository — everything but

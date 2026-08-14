@@ -143,6 +143,17 @@ tools ALL defer — they are opt-in extensions, and only the bundled web pack
 orthogonal to the deferred/active one.
 _Avoid_: lazy tool, hidden tool.
 
+**Tool row**:
+One tool call as the transcript shows it. `presentCall` / `presentResult`
+(lib/present) are the only place its **glyph**, **label**, **tone**
+(running/failed/stopped/plain) and **outcome** are decided — pure over the
+persisted part, so a reloaded session looks like a live one and the chat panel
+and the markdown export cannot disagree. They say WHAT happened (`kind`), never
+how to word it: the panel translates, the saved file stays English. Presentation
+is UI-only — nothing here reaches the model.
+_Avoid_: tool card (a **card** is a decision the user clicks — approval, setup),
+describeCall as a place to add UI logic (it writes the label, nothing else).
+
 ## Skills
 
 **Skill**:

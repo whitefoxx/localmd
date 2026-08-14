@@ -10,6 +10,7 @@
  */
 import type { UiMessage } from '@/stores/chat'
 import { INBOX_DIR } from '@/lib/capture'
+import { presentCall, presentResult } from '@/lib/present'
 
 /** The slice of a chat session the renderer needs. */
 export interface TranscriptSession {
@@ -76,8 +77,17 @@ function renderMessage(m: UiMessage): string {
       const t = p.text.trim()
       if (t) lines.push(t, '')
     } else if (p.type === 'tool') {
-      const status = p.status === 'error' ? ' ✗' : ''
-      lines.push(`> ⚙ ${p.name}${p.detail ? ` — ${excerpt(p.detail, 160)}` : ''}${status}`, '')
+      // Same presentation the chat panel renders, worded for a plain-text file:
+      // a failure now carries its own reason, which the saved copy used to drop,
+      // and a call the user stopped is no longer filed as one that broke.
+      const { label, tone } = presentCall(p)
+      const outcome =
+        tone === 'failed'
+          ? ` ✗ ${presentResult(p).message ?? 'failed'}`
+          : tone === 'stopped'
+            ? ' ⏹ stopped'
+            : ''
+      lines.push(`> ⚙ ${p.name}${label ? ` — ${excerpt(label, 160)}` : ''}${outcome}`, '')
     } else if (p.type === 'artifact') {
       if (!p.pending) lines.push(`> 📄 Artifact: ${p.path}${p.title ? ` (${p.title})` : ''}`, '')
     } else if (p.type === 'image') {

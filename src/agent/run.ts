@@ -43,6 +43,7 @@ import { withMovingBreakpoint } from '@/lib/promptCache'
 import { trimHistory } from '@/lib/history'
 import { estimateTokens } from '@/lib/tokenMeter'
 import { isContextOverflow } from '@/lib/providerError'
+import { STOPPED_RESULT } from '@/lib/present'
 import { needsLicence, lockedToolResult } from '@/lib/licence'
 import { useLicenceStore } from '@/stores/licence'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
@@ -124,10 +125,6 @@ export interface RunTurnOptions {
     opts: { keepLastMessages: number; keepTurns: number },
   ) => Promise<Map<string, string>>
 }
-
-/** What a tool call that the user stopped reports back. The turn is discarded
- *  either way; this only has to be honest if it ever reaches the model. */
-const STOPPED_RESULT = 'Stopped by the user before this tool finished.'
 
 function isAbort(err: unknown): boolean {
   const name = (err as Error)?.name
