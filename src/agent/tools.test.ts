@@ -14,7 +14,7 @@ import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { usePlanStore } from '@/stores/plan'
 import { useSettingsStore } from '@/stores/settings'
 import type { AgentEvent } from './types'
-import { TOOLS, type ToolCtx } from './tools'
+import { TOOLS, GIT_TOOLS_NEEDING_REPO, inactiveBuiltinNames, type ToolCtx } from './tools'
 
 // The settings store persists through a watcher; node has no localStorage.
 globalThis.localStorage ??= {
@@ -355,5 +355,34 @@ describe('update_plan', () => {
     })
     expect(out).toContain('Plan complete')
     expect(out).not.toContain('once more')
+  })
+})
+
+describe('git tool gating', () => {
+  it('keeps the gate set in lockstep with TOOLS', () => {
+    // Renaming a git tool must not let it silently escape the gate.
+    const names = new Set(TOOLS.map((t) => t.name))
+    for (const gated of GIT_TOOLS_NEEDING_REPO) expect(names).toContain(gated)
+    // git_init is deliberately absent: it is the tool that CREATES the repo.
+    expect(GIT_TOOLS_NEEDING_REPO.has('git_init')).toBe(false)
+  })
+
+  it('gates every repo-needing git tool, and only those', () => {
+    // No Pinia active in this describe-block scope's call: the helper treats
+    // that as "nothing withheld" (non-app callers).
+    const gitNames = TOOLS.map((t) => t.name).filter(
+      (n) => n.startsWith('git_') || n.startsWith('github_'),
+    )
+    const expected = gitNames.filter((n) => n !== 'git_init')
+    expect([...GIT_TOOLS_NEEDING_REPO].sort()).toEqual(expected.sort())
+  })
+
+  it('withholds the family in a non-repo KB and nothing once a repo exists', async () => {
+    const { useGitStore } = await import('@/stores/git')
+    const git = useGitStore()
+    git.isRepo = false
+    expect([...inactiveBuiltinNames()].sort()).toEqual([...GIT_TOOLS_NEEDING_REPO].sort())
+    git.isRepo = true
+    expect(inactiveBuiltinNames().size).toBe(0)
   })
 })

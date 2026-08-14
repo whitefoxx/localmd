@@ -203,8 +203,10 @@ compaction without suppressing a useful one.
 
 ## Deliberately not done
 
-- ⏸ **Deferring the 9 git tools** — after caching, they cost ~1k tokens at 0.1×;
-  deferral risks the model not finding them. Negative ROI.
+- ~~⏸ Deferring the 9 git tools~~ **superseded by P8** (2026-08-14): the gate
+  is repo state, not deferral — in a non-repo KB the tools can only error, so
+  withholding them there carries none of the find-ability risk this entry
+  declined. Where a repo exists they still always ride.
 - ⏸ **Compressing the citation rules** — load-bearing product semantics.
 - ⏸ **Injecting the KB tree into the system prompt** — re-sent every turn and
   destabilizes the prefix; the tool-result path is cheaper.
@@ -366,6 +368,29 @@ name whose spec never appears simply never matches, which is the same outcome
 the filter bought. Both bugs predate P7 in the MCP store (P3 shipped them);
 node tests couldn't see either, because both are load-order effects. Verified
 in a cold browser load: session restores with `weread_search` already active.
+
+### P8 — git tools ride only where a repository exists (2026-08-14)
+
+The old "Deliberately not done" entry below declined to defer the git family
+("deferral risks the model not finding them — negative ROI"). Two things
+changed since: the catalog/enable_tools machinery removed most of the
+find-ability risk, and — the sharper point — in a KB that is not a git
+repository, nine of the ten git tools cannot do anything but return an error.
+Withholding them there is not a cost dodge; it is the truth about what can act.
+
+So the gate is repo state, not a deferral policy: `activeToolNames()` consults
+`gitStore.isRepo` per step and withholds `GIT_TOOLS_NEEDING_REPO` (everything
+but git_init) when false. Registration is untouched, so git_init succeeding —
+its run already refreshes the git store — makes the family appear on the next
+step of the same turn, no enable_tools round trip. A one-line note in the
+dynamic prompt block tells the model why only git_init is offered; a lockstep
+test keeps the gate set equal to the real tool names, so a renamed git tool
+cannot silently escape it.
+
+Verified live on both states: the demo KB (no .git) sent 40 tools with only
+git_init and the note present; test-kb (a repo) sent the full family and no
+note. Saves ~1,050 est tokens per step for every non-git KB — likely the
+common case among non-developer users.
 
 ## Validating
 

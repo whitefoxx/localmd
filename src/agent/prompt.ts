@@ -13,6 +13,7 @@ import { catalogEntry } from '@/lib/mcp'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useKbStore } from '@/stores/kb'
+import { useGitStore } from '@/stores/git'
 import { getLocale, LOCALE_NAMES } from '@/i18n'
 
 const BASE = `You are the AI assistant embedded in browser-md, a local-first markdown knowledge-base app running in the user's browser. You maintain the knowledge base in the folder the user has opened, using the provided tools; all paths are relative to the KB root.
@@ -72,6 +73,13 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   const kbName = useKbStore().name
   if (kbName) {
     prompt += `\n\nThe knowledge base folder currently open is named "${kbName}" — this is the KB (directory) name; all paths are relative to it.`
+  }
+
+  // Repo state decides which git tools ride in the request (see
+  // inactiveBuiltinNames): without this line, "commit this" in a non-repo KB
+  // would leave the model hunting for a git_status that is not there.
+  if (kbName && !useGitStore().isRepo) {
+    prompt += `\n\nThis folder is not a git repository, so only git_init is available. The other git/github tools appear automatically after a successful git_init.`
   }
 
   // The system prompt is always English; the *replies* follow the conversation.

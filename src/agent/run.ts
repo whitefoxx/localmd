@@ -32,6 +32,7 @@ import {
   allHttpToolSpecs,
   externalToolSpecs,
   allExternalToolSpecs,
+  inactiveBuiltinNames,
   type ExternalToolSpec,
   type ToolCtx,
 } from './tools'
@@ -227,16 +228,21 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   // gated into the active set mid-turn; only active names are sent each step.
   for (const ext of allExternalToolSpecs(opts.sessionId)) registerDynamic(ext)
 
-  // Tools sent to the model this step: built-ins + currently-active installed
-  // tools + currently-active externals. The shadow filter keeps a skipped
+  // Tools sent to the model this step: built-ins (minus the git family when
+  // the KB is not a repository — re-checked per step, so git_init unlocks the
+  // rest within the same turn) + currently-active installed tools +
+  // currently-active externals. The shadow filter keeps a skipped
   // (built-in-colliding) name from being listed twice.
-  const activeToolNames = (): string[] => [
-    ...staticNames,
-    ...httpToolSpecs(opts.sessionId)
-      .map((s) => s.name)
-      .filter((n) => registeredHttp.has(n)),
-    ...externalToolSpecs(opts.sessionId).map((e) => e.name),
-  ]
+  const activeToolNames = (): string[] => {
+    const inactive = inactiveBuiltinNames()
+    return [
+      ...staticNames.filter((n) => !inactive.has(n)),
+      ...httpToolSpecs(opts.sessionId)
+        .map((s) => s.name)
+        .filter((n) => registeredHttp.has(n)),
+      ...externalToolSpecs(opts.sessionId).map((e) => e.name),
+    ]
+  }
 
   // Anthropic caches nothing it isn't told to: besides the two system-block
   // breakpoints, mark the last message each step so the ever-growing history

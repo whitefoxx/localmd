@@ -1273,7 +1273,7 @@ async function githubContext(): Promise<
 const gitInit = defineTool({
   name: 'git_init',
   description:
-    'Initialize a new git repository in the opened KB folder (default branch `main`) so it can be versioned and committed. Use this when git_status reports the folder is not a git repository and the user wants version control. No-op if a repo already exists.',
+    'Initialize a new git repository in the opened KB folder (default branch `main`) so it can be versioned and committed. Use this when the folder is not a git repository and the user wants version control; the other git tools become available once it succeeds. No-op if a repo already exists.',
   schema: z.object({}),
   describeCall: () => 'git init',
   run: () => lockedGit(async () => {
@@ -1732,6 +1732,36 @@ export const TOOLS: ToolSpec[] = [
 /* run.ts registers these beyond TOOLS; they are as built-in as the rest. */
 const RUNNER_TOOL_NAMES = ['view_image', 'generate_image', 'run_subagent']
 const BUILTIN_TOOL_NAMES = new Set([...TOOLS.map((t) => t.name), ...RUNNER_TOOL_NAMES])
+
+/** The git tools that cannot act without a repository — everything but
+ *  git_init, the one that creates it. A lockstep test keeps this in sync with
+ *  TOOLS, so renaming a git tool cannot silently escape the gate. */
+export const GIT_TOOLS_NEEDING_REPO: ReadonlySet<string> = new Set([
+  'git_status',
+  'git_diff',
+  'git_restore',
+  'git_log',
+  'git_commit',
+  'git_push',
+  'git_pull',
+  'git_remote_add',
+  'github_create_repo',
+])
+
+/** Built-in tools withheld from the model THIS step. The git family rides
+ *  only when the KB actually is a git repository — in any other folder those
+ *  schemas are ~1k tokens per step describing tools that can only error.
+ *  Registration is untouched; the per-step active list consults this, so
+ *  git_init succeeding (its run refreshes the git store) makes the family
+ *  appear on the very next step of the same turn. */
+export function inactiveBuiltinNames(): Set<string> {
+  try {
+    if (useGitStore().isRepo) return new Set()
+  } catch {
+    return new Set() // no Pinia (tests, non-app callers) — nothing withheld
+  }
+  return new Set(GIT_TOOLS_NEEDING_REPO)
+}
 
 /** Whether a history tool result came from a built-in tool — deterministic and
  *  free to re-run, with any file content already in the KB — rather than an
