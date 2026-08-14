@@ -17,6 +17,14 @@ import { parseCiteSources } from '@/lib/citations'
 import { classifyAnchor, createSourceCollector, type Source } from '@/lib/sources'
 import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
+import {
+  LIST_TABS_TOOL,
+  excludeSelf,
+  filterTabs,
+  parseTabs,
+  type TabRef,
+} from '@/lib/connectTabs'
+import { useMcpStore } from '@/stores/mcp'
 import { BUILTIN_DIR } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
@@ -35,9 +43,19 @@ const citations = useCitationsStore()
 const plan = usePlanStore()
 const skills = useSkillsStore()
 const composer = useComposerStore()
+const mcp = useMcpStore()
 
 // Stage text selected in the open file as removable context chips (agent-open).
 useFileSelectionCapture()
+
+/** Just the site, for the right-hand hint on a tab row. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
 
 /** One-line preview of a staged selection for its chip. */
 function snippet(text: string): string {
@@ -229,6 +247,15 @@ function onScrollHotkey(e: KeyboardEvent): void {
 onMounted(() => window.addEventListener('keydown', onScrollHotkey))
 onUnmounted(() => window.removeEventListener('keydown', onScrollHotkey))
 
+/** Coming back to this tab is both when the browser's tab list is most likely
+ *  to have changed and the cheapest moment to spend five seconds on it — long
+ *  before anyone types `@`. Throttled like every other refresh. */
+function refreshTabsOnReturn(): void {
+  if (document.visibilityState === 'visible') void loadOpenTabs()
+}
+onMounted(() => document.addEventListener('visibilitychange', refreshTabsOnReturn))
+onUnmounted(() => document.removeEventListener('visibilitychange', refreshTabsOnReturn))
+
 type ToolPart = Extract<MessagePart, { type: 'tool' }>
 type ThinkPart = Extract<MessagePart, { type: 'thinking' }>
 
@@ -363,15 +390,134 @@ function syncCaret(): void {
 }
 
 const mention = computed(() => (mentionOpen.value ? mentionQueryAt(input.value, caret.value) : null))
-const mentionMatches = computed(() =>
+
+/* ── open browser tabs in the @ menu (any server offering list_tabs) ─────── */
+
+/**
+ * The browser's tabs, as of the last time we asked.
+ *
+ * Module scope, deliberately: asking is expensive — the extension walks every
+ * tab, which measures at ~0.5s each, so a nine-tab browser answers in five
+ * seconds — and the panel is mounted and unmounted as the user shows and hides
+ * it. A cache that died with the component would make the menu start empty
+ * exactly as often as a user toggles the panel.
+ *
+ * Everything below is stale-while-revalidate around this: the menu paints from
+ * it the moment it opens, and a refresh lands underneath when it arrives.
+ */
+const openTabs = ref<TabRef[]>([])
+const tabsLoading = ref(false)
+let lastTabLoad = 0
+
+/** Servers that can list the browser's tabs. Matched on the tool rather than on
+ *  localmd Connect by name: anything providing it gets the same treatment. */
+const tabServers = computed(() =>
+  mcp.allTools
+    .filter((t) => t.def.name === LIST_TABS_TOOL)
+    .map((t) => t.serverId)
+    .filter((id, i, arr) => arr.indexOf(id) === i),
+)
+
+const tabsAvailable = computed(() => tabServers.value.length > 0)
+
+/** A list this new is not worth five seconds to fetch again. */
+const TAB_FRESH_MS = 10_000
+/** …but with nothing to show, asking again soon is the whole point: the relay
+ *  can be a moment behind the extension right after a reconnect, and a menu
+ *  that stays empty looks like the feature is missing rather than late. */
+const TAB_RETRY_MS = 2000
+
+async function fetchTabs(args: Record<string, unknown>): Promise<TabRef[]> {
+  const found: TabRef[] = []
+  for (const serverId of tabServers.value) {
+    // A browser that cannot be reached is not an error worth a dialog: the menu
+    // simply has no tabs in it, and the files are still there.
+    const out = await mcp.callTool(serverId, LIST_TABS_TOOL, args).catch(() => '')
+    for (const tab of parseTabs(out)) found.push({ ...tab, serverId })
+  }
+  return excludeSelf(found, window.location.href)
+}
+
+/**
+ * Refresh the list, in two passes, because the cost is per tab and the first
+ * answer is the one that matters: this window alone comes back in about a
+ * second, and it holds the tab the user means most of the time. The sweep of
+ * every window follows and replaces it — including dropping whatever has been
+ * closed since, which only an authoritative answer may do.
+ */
+async function loadOpenTabs(): Promise<void> {
+  if (!tabsAvailable.value || tabsLoading.value) return
+  const stale = openTabs.value.length ? TAB_FRESH_MS : TAB_RETRY_MS
+  if (Date.now() - lastTabLoad < stale) return
+  lastTabLoad = Date.now()
+  tabsLoading.value = true
+  try {
+    const near = await fetchTabs({ current_window: true })
+    // Merge rather than replace: a partial answer must not make the tabs the
+    // user could see a moment ago disappear and come back.
+    if (near.length) {
+      const rest = openTabs.value.filter((t) => !near.some((n) => n.tabId === t.tabId))
+      openTabs.value = [...near, ...rest]
+    }
+    const all = await fetchTabs({})
+    // An empty answer is far more likely a call that failed than a browser with
+    // no tabs open — this app is itself one — so keep what we had.
+    if (all.length) openTabs.value = all
+  } finally {
+    tabsLoading.value = false
+    lastTabLoad = Date.now()
+  }
+}
+
+const mentionFiles = computed(() =>
   mention.value ? filterFiles(files.allFiles, mention.value.query) : [],
 )
+const mentionTabs = computed(() =>
+  mention.value ? filterTabs(openTabs.value, mention.value.query) : [],
+)
+/** Both groups as one list, because that is what the arrow keys move through. */
+const mentionMatches = computed<Array<{ path: string } | { tab: TabRef }>>(() => [
+  ...mentionFiles.value.map((path) => ({ path })),
+  ...mentionTabs.value.map((tab) => ({ tab })),
+])
+/** Headers earn their space only when there is more than one kind to tell apart. */
+const mentionGrouped = computed(() => !!mentionFiles.value.length && !!mentionTabs.value.length)
 
 watch([input, caret], () => {
   const q = mentionQueryAt(input.value, caret.value)
+  const opening = !!q && !mentionOpen.value
   mentionOpen.value = !!q
   mentionSel.value = 0
+  // Opening the menu refreshes the tabs behind whatever is already on screen;
+  // typing on with none of them asks again, throttled, so a call that missed is
+  // not stuck being missed.
+  if (opening || (mentionOpen.value && !openTabs.value.length)) void loadOpenTabs()
 })
+
+/** Drop the `@…` the user typed to open the menu. A tab is not a path, so it
+ *  leaves no token behind in the text — it becomes a chip instead. */
+function dropMentionToken(): void {
+  const m = mention.value
+  if (!m) return
+  const before = input.value.slice(0, m.start)
+  const after = input.value.slice(caret.value)
+  input.value = before + after
+  mentionOpen.value = false
+  void nextTick(() => {
+    textarea.value?.focus()
+    textarea.value?.setSelectionRange(m.start, m.start)
+    caret.value = m.start
+  })
+}
+
+function pickMentionItem(item: { path: string } | { tab: TabRef }): void {
+  if ('tab' in item) {
+    composer.attachTab(item.tab)
+    dropMentionToken()
+    return
+  }
+  pickMention(item.path)
+}
 
 function pickMention(path: string): void {
   const m = mention.value
@@ -685,12 +831,15 @@ async function send(): Promise<void> {
   const text = input.value
   const atts = [...attachments.value]
   const sels = [...composer.refs]
+  // Attached tabs are NOT cleared: they belong to the conversation, not to the
+  // message, so the follow-up asks about the same pages without re-picking.
+  const tabs = [...composer.tabs]
   input.value = ''
   attachments.value = []
   composer.clear()
   revokeAllThumbs()
   mentionOpen.value = false
-  await chat.send(text, atts, sels)
+  await chat.send(text, atts, sels, tabs)
 }
 
 function onKeydown(e: KeyboardEvent): void {
@@ -724,7 +873,7 @@ function onKeydown(e: KeyboardEvent): void {
     }
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault()
-      pickMention(mentionMatches.value[mentionSel.value])
+      pickMentionItem(mentionMatches.value[mentionSel.value])
       return
     }
     if (e.key === 'Escape') {
@@ -1428,8 +1577,14 @@ watch(
         v-if="mentionOpen && mentionMatches.length && !slashMatches.length"
         class="absolute bottom-full left-3 right-3 mb-1 z-20 rounded-md border border-border bg-bg-1 shadow-lg overflow-hidden"
       >
+        <div
+          v-if="mentionGrouped"
+          class="px-2 pt-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-fg-3"
+        >
+          {{ $t('chat.mentionFiles') }}
+        </div>
         <button
-          v-for="(p, i) in mentionMatches"
+          v-for="(p, i) in mentionFiles"
           :key="p"
           class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
           :class="i === mentionSel ? 'bg-accent/15 text-fg-0' : 'text-fg-2 hover:bg-bg-2'"
@@ -1438,6 +1593,31 @@ watch(
         >
           <span class="codicon codicon-sm codicon-file shrink-0" />
           <span class="truncate">{{ p }}</span>
+        </button>
+        <!-- Open browser tabs, when a connected server can list them. Picking
+             one attaches it to the conversation instead of typing a token. -->
+        <div
+          v-if="mentionGrouped"
+          class="px-2 pt-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-fg-3"
+        >
+          {{ $t('chat.mentionTabs') }}
+        </div>
+        <button
+          v-for="(tab, i) in mentionTabs"
+          :key="`t${tab.tabId}`"
+          class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
+          :class="
+            mentionFiles.length + i === mentionSel
+              ? 'bg-accent/15 text-fg-0'
+              : 'text-fg-2 hover:bg-bg-2'
+          "
+          :title="tab.url"
+          @mousedown.prevent="pickMentionItem({ tab })"
+          @mousemove="mentionSel = mentionFiles.length + i"
+        >
+          <span class="codicon codicon-sm codicon-globe shrink-0" />
+          <span class="truncate min-w-0">{{ tab.title }}</span>
+          <span class="ml-auto shrink-0 text-fg-3 truncate max-w-[40%]">{{ hostOf(tab.url) }}</span>
         </button>
       </div>
 
@@ -1492,6 +1672,28 @@ watch(
               class="text-fg-3 hover:text-removed shrink-0"
               :title="$t('common.cancel')"
               @click="chat.cancelEdit()"
+            >
+              <span class="codicon codicon-sm codicon-close" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Browser tabs attached to this conversation (localmd Connect). They
+             outlive the message on purpose — see composer.tabs — so the chips
+             stay put after sending and the follow-up needs no re-picking. -->
+        <div v-if="composer.tabs.length" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
+          <div
+            v-for="tab in composer.tabs"
+            :key="tab.tabId"
+            class="group flex items-center gap-1 max-w-full text-xs pl-1.5 pr-1 py-1 rounded-md border border-border bg-bg-2/60"
+            :title="`${tab.title}\n${tab.url}\n\n${$t('chat.tabAttached')}`"
+          >
+            <span class="codicon codicon-sm codicon-globe shrink-0 text-fg-3" />
+            <span class="truncate min-w-0 text-fg-1">{{ tab.title }}</span>
+            <button
+              class="text-fg-3 hover:text-removed shrink-0 ml-0.5"
+              :title="$t('chat.removeTab')"
+              @click="composer.detachTab(tab.tabId)"
             >
               <span class="codicon codicon-sm codicon-close" />
             </button>
@@ -1579,8 +1781,11 @@ watch(
           v-model="input"
           rows="3"
           class="w-full bg-transparent border-0 outline-none resize-none font-sans text-sm text-fg-0 placeholder-fg-3 px-3 pt-2.5"
-          :placeholder="$t('chat.inputPlaceholder')"
+          :placeholder="
+            tabsAvailable ? $t('chat.inputPlaceholderTabs') : $t('chat.inputPlaceholder')
+          "
           @keydown="onKeydown"
+          @focus="loadOpenTabs()"
           @paste="onPaste"
           @input="syncCaret"
           @click="syncCaret"

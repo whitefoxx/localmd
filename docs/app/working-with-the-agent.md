@@ -110,6 +110,23 @@ name it and ask.
 When a discussion reaches a real conclusion, the assistant may offer once to
 distill it. It will not do it on its own.
 
+## Pointing it at a browser tab
+
+With localmd Connect installed (see `tools`), **@** also lists the pages you
+have open in your browser. Pick one and it becomes a chip above the box: the
+assistant can now read that tab for the rest of the conversation, so a
+follow-up needs no re-picking. Pick several and it can compare them. The ✕ on a
+chip lets a page go.
+
+What travels with your message is the address of the tab, not a copy of the
+page: the assistant reads it when it needs it, and reads it *then* rather than
+when you picked it. That matters more than it sounds — it reads the tab as you
+have it, signed in, with whatever you searched or filtered still on screen,
+which is a different page from what the same address gives a stranger.
+
+Tabs belong to the conversation they were picked in. A new conversation starts
+with none, and the ones you picked earlier are still there when you switch back.
+
 ## When it cannot reach the web
 
 The assistant has no web access until you give it some, and it will tell you so

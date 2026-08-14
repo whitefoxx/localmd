@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useChatStore } from '@/stores/chat'
+import type { TabRef } from '@/lib/connectTabs'
 
 /** Where a quoted passage was taken from, captured at selection time — the view
  *  moves on (the user scrolls, keeps chatting) but the provenance must not. The
@@ -114,13 +115,73 @@ export const useComposerStore = defineStore('composer', () => {
     if (liveId && !refs.value.some((r) => r.id === liveId)) liveId = null
   }
 
+  /* ── attached browser tabs (localmd Connect) ───────────────────────────── */
+
+  /**
+   * Tabs stay attached for the whole conversation, not for one message: "talk
+   * to these pages" is what the conversation is ABOUT, and re-picking them
+   * before every follow-up would make the feature cost more than the search it
+   * saves. So they are keyed by session — including `null`, which is the
+   * conversation that does not exist yet, since picking tabs before typing the
+   * first message is the ordinary way to start one.
+   */
+  const tabsBySession = ref(new Map<string | null, TabRef[]>())
+  const chat = useChatStore()
+
+  /** Tabs attached to the conversation on screen. */
+  const tabs = computed<TabRef[]>(() => tabsBySession.value.get(chat.currentSessionId) ?? [])
+
+  function setTabs(next: TabRef[]): void {
+    const map = new Map(tabsBySession.value)
+    if (next.length) map.set(chat.currentSessionId, next)
+    else map.delete(chat.currentSessionId)
+    tabsBySession.value = map
+  }
+
+  /** Attach a tab, or replace what is known about one already attached (the
+   *  title and URL move as the user browses). */
+  function attachTab(tab: TabRef): void {
+    setTabs([...tabs.value.filter((t) => t.tabId !== tab.tabId), tab])
+  }
+
+  function detachTab(tabId: number): void {
+    setTabs(tabs.value.filter((t) => t.tabId !== tabId))
+  }
+
   // Staged context belongs to the KB it was selected in — drop it on KB switch.
   const kb = useKbStore()
-  watch(() => kb.name, clear)
+  watch(() => kb.name, () => {
+    clear()
+    tabsBySession.value = new Map()
+  })
 
-  // …and a reply quote additionally belongs to one conversation.
-  const chat = useChatStore()
-  watch(() => chat.currentSessionId, dropForeignReplyQuotes)
+  watch(
+    () => chat.currentSessionId,
+    (id, was) => {
+      // …and a reply quote additionally belongs to one conversation.
+      dropForeignReplyQuotes(id)
+      // Sending the first message is what creates the session, so tabs picked
+      // against "no conversation yet" belong to the one that just began —
+      // otherwise the feature would break in the exact case it is designed for.
+      if (was !== null || id === null) return
+      const staged = tabsBySession.value.get(null)
+      if (!staged?.length) return
+      const map = new Map(tabsBySession.value)
+      map.delete(null)
+      map.set(id, staged)
+      tabsBySession.value = map
+    },
+  )
 
-  return { refs, syncLive, clearTransient, togglePin, remove, clear }
+  return {
+    refs,
+    syncLive,
+    clearTransient,
+    togglePin,
+    remove,
+    clear,
+    tabs,
+    attachTab,
+    detachTab,
+  }
 })

@@ -46,6 +46,7 @@ import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
 import type { HunkLine } from '@/lib/diff'
 import type { SelectionRef } from '@/stores/composer'
+import { describeTabs, type TabRef } from '@/lib/connectTabs'
 import type { ModelMessage } from 'ai'
 
 /** A user message's model-facing content: plain enriched text, or that text
@@ -677,6 +678,7 @@ export const useChatStore = defineStore('chat', () => {
     imagesTravelInline: boolean,
     visionAvailable: boolean,
     selections: SelectionRef[],
+    tabs: TabRef[],
     session: ChatSession,
   ): Promise<string> {
     let out = trimmed
@@ -753,17 +755,21 @@ export const useChatStore = defineStore('chat', () => {
       )
       out += `\n\n<selected_context>\n${blocks.join('\n\n')}\n</selected_context>`
     }
+    // Browser tabs the user attached to this conversation — addresses only; the
+    // agent reads them through Connect when it needs them.
+    if (tabs.length) out += `\n\n${describeTabs(tabs)}`
     return out
   }
 
   /** Model-facing user content (enriched text + optional inline images for a
    *  multimodal primary) plus the matching UI bubble. Shared by a normal send
    *  and a mid-turn steer so both enrich identically (@mentions, selections,
-   *  attachments, current view). */
+   *  attachments, browser tabs, current view). */
   async function prepareUserMessage(
     trimmed: string,
     attachments: Attachment[],
     selections: SelectionRef[],
+    tabs: TabRef[],
     session: ChatSession,
   ): Promise<{ content: UserContent; ui: UiMessage }> {
     const settings = useSettingsStore()
@@ -782,6 +788,7 @@ export const useChatStore = defineStore('chat', () => {
       inline,
       settings.visionAvailable,
       selections,
+      tabs,
       session,
     )
     // A multimodal primary gets images inline; the AI SDK formats them per
@@ -815,6 +822,7 @@ export const useChatStore = defineStore('chat', () => {
     text: string,
     attachments: Attachment[] = [],
     selections: SelectionRef[] = [],
+    tabs: TabRef[] = [],
   ): Promise<void> {
     const trimmed = text.trim()
     if ((!trimmed && !attachments.length && !selections.length) || !kb.name) return
@@ -843,6 +851,7 @@ export const useChatStore = defineStore('chat', () => {
         trimmed,
         attachments,
         selections,
+        tabs,
         session,
       )
       const steerMessage = { role: 'user', content: steerContent } as ModelMessage
@@ -877,7 +886,7 @@ export const useChatStore = defineStore('chat', () => {
       session.history = []
     }
 
-    const { content, ui } = await prepareUserMessage(trimmed, attachments, selections, session)
+    const { content, ui } = await prepareUserMessage(trimmed, attachments, selections, tabs, session)
     ui.wire = [{ role: 'user', content } as ModelMessage]
     appendNode(session, ui)
     // reactive() is load-bearing: onEvent mutates this object from outside the

@@ -33,6 +33,13 @@ export default {
     sources: 'Sources · {n}',
     plan: 'Plan',
     inputPlaceholder: 'Ask or instruct the agent… (@ to reference a file / skill, paste screenshots)',
+    inputPlaceholderTabs:
+      'Ask or instruct the agent… (@ to reference a file / skill / open browser tab)',
+    mentionFiles: 'Files',
+    mentionTabs: 'Browser tabs',
+    tabsLoading: 'Reading your open tabs…',
+    tabAttached: 'The agent can read this tab for the rest of this conversation',
+    removeTab: 'Detach this tab',
     noModelTitle: 'Pick a model first',
     noModelDesc:
       'The agent runs on a model you provide — add an API key from any provider and it can start working. The key stays in this browser and goes straight to that provider.',
@@ -130,6 +137,12 @@ export default {
     sources: '来源 · {n}',
     plan: '计划',
     inputPlaceholder: '向 agent 提问或下达指令…（@ 引用文件 / 技能，可粘贴截图）',
+    inputPlaceholderTabs: '向 agent 提问或下达指令…（@ 引用文件 / 技能 / 浏览器标签页）',
+    mentionFiles: '文件',
+    mentionTabs: '浏览器标签页',
+    tabsLoading: '正在读取你打开的标签页…',
+    tabAttached: '本次对话里 agent 都可以读这个标签页',
+    removeTab: '取消引用这个标签页',
     noModelTitle: '先选一个模型',
     noModelDesc:
       'agent 依赖你自己提供的模型运行 —— 填入任意提供商的 API key 就能开始。密钥只保存在这个浏览器里，并直接发往该提供商。',

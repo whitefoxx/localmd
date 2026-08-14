@@ -104,6 +104,10 @@ Confirming is the front line, not the only line: every site script can be
 paused or deleted at any time from the extension's popup, whatever installed
 it.
 
+Once it is connected, **@** in the chat box also lists the pages you have open,
+so you can hand the assistant a tab (or several) to work with — see
+`working-with-the-agent`.
+
 ## Adding a server yourself
 
 Settings → Tools → **Add an MCP server** takes an address, an optional name, and
