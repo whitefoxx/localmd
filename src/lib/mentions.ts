@@ -25,11 +25,30 @@ export function mentionQueryAt(text: string, caret: number): MentionQuery | null
   return { start: at, query }
 }
 
-/** Rank KB files against a mention query. Empty query → shortest paths first
- *  (top-level files surface). Matching is case-insensitive; basename-prefix
- *  beats basename-substring beats path-substring; ties break on path length. */
-export function filterFiles(files: string[], query: string, limit = 8): string[] {
+/**
+ * Rank KB files against a mention query. Matching is case-insensitive;
+ * basename-prefix beats basename-substring beats path-substring; ties break on
+ * path length.
+ *
+ * `open` is what the user has open in the editor, most-wanted first (the file
+ * on screen, then the other tabs). It lifts those files above equally good
+ * matches, which decides the case the menu is in most often: a bare `@` with
+ * nothing typed yet, where "the files I am working on" is a far better guess at
+ * what someone means than "the files with the shortest paths".
+ */
+export function filterFiles(
+  files: string[],
+  query: string,
+  limit = 8,
+  open: readonly string[] = [],
+): string[] {
   const q = query.toLowerCase()
+  // Enough to break a tie, never enough to outrank a better match: an open file
+  // that matches worse still loses.
+  const openBoost = (path: string): number => {
+    const i = open.indexOf(path)
+    return i < 0 ? 0 : 0.9 - Math.min(i, 8) * 0.1
+  }
   const scored: { path: string; score: number }[] = []
   for (const path of files) {
     const lower = path.toLowerCase()
@@ -40,7 +59,7 @@ export function filterFiles(files: string[], query: string, limit = 8): string[]
     else if (base.includes(q)) score = 2
     else if (lower.includes(q)) score = 1
     else continue
-    scored.push({ path, score })
+    scored.push({ path, score: score + openBoost(path) })
   }
   scored.sort((a, b) => b.score - a.score || a.path.length - b.path.length)
   return scored.slice(0, limit).map((s) => s.path)

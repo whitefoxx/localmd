@@ -40,6 +40,22 @@ describe('filterFiles', () => {
     expect(out).toHaveLength(2)
     expect(out[0]).toBe('wiki/index.md')
   })
+
+  it('offers what the user has open before the shortest paths', () => {
+    const open = ['raw/books/毛泽东选集.pdf', 'wiki/concepts/agent.md']
+    expect(filterFiles(files, '', 8, open).slice(0, 2)).toEqual(open)
+  })
+
+  it('keeps the file on screen at the top of the open ones', () => {
+    const open = ['wiki/concepts/agent.md', 'raw/books/毛泽东选集.pdf']
+    expect(filterFiles(files, '', 8, open)[0]).toBe('wiki/concepts/agent.md')
+  })
+
+  it('never lets an open file outrank a better match', () => {
+    // 'ag' hits agent.md's basename; index.md is open but matches nothing.
+    const out = filterFiles(files, 'ag', 8, ['wiki/index.md'])
+    expect(out[0]).toBe('wiki/concepts/agent.md')
+  })
 })
 
 describe('extractMentions', () => {
