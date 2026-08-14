@@ -469,8 +469,17 @@ async function loadOpenTabs(): Promise<void> {
   }
 }
 
+/** What the user is working on, best guess first: the file on screen, then the
+ *  rest of the open tabs. A bare `@` should offer these before it offers the
+ *  shortest paths in the folder. */
+const workingFiles = computed(() => {
+  const open = [...files.openTabs]
+  const current = files.currentPath
+  return current ? [current, ...open.filter((p) => p !== current)] : open
+})
+
 const mentionFiles = computed(() =>
-  mention.value ? filterFiles(files.allFiles, mention.value.query) : [],
+  mention.value ? filterFiles(files.allFiles, mention.value.query, 8, workingFiles.value) : [],
 )
 const mentionTabs = computed(() =>
   mention.value ? filterTabs(openTabs.value, mention.value.query) : [],
@@ -480,8 +489,13 @@ const mentionMatches = computed<Array<{ path: string } | { tab: TabRef }>>(() =>
   ...mentionFiles.value.map((path) => ({ path })),
   ...mentionTabs.value.map((tab) => ({ tab })),
 ])
+/** The tabs group is on screen while it has rows OR while it is still fetching
+ *  them — an empty menu that is merely slow must not read as a broken one. */
+const tabsGroupShown = computed(
+  () => tabsAvailable.value && (mentionTabs.value.length > 0 || tabsLoading.value),
+)
 /** Headers earn their space only when there is more than one kind to tell apart. */
-const mentionGrouped = computed(() => !!mentionFiles.value.length && !!mentionTabs.value.length)
+const mentionGrouped = computed(() => !!mentionFiles.value.length && tabsGroupShown.value)
 
 watch([input, caret], () => {
   const q = mentionQueryAt(input.value, caret.value)
@@ -1574,7 +1588,7 @@ watch(
 
       <!-- @-mention dropdown -->
       <div
-        v-if="mentionOpen && mentionMatches.length && !slashMatches.length"
+        v-if="mentionOpen && (mentionMatches.length || tabsGroupShown) && !slashMatches.length"
         class="absolute bottom-full left-3 right-3 mb-1 z-20 rounded-md border border-border bg-bg-1 shadow-lg overflow-hidden"
       >
         <div
@@ -1597,10 +1611,22 @@ watch(
         <!-- Open browser tabs, when a connected server can list them. Picking
              one attaches it to the conversation instead of typing a token. -->
         <div
-          v-if="mentionGrouped"
-          class="px-2 pt-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-fg-3"
+          v-if="tabsGroupShown"
+          class="flex items-center gap-1.5 px-2 pt-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-fg-3"
         >
           {{ $t('chat.mentionTabs') }}
+          <!-- Listing tabs takes seconds (the extension walks every one), so say
+               that it is happening rather than showing a gap. -->
+          <span
+            v-if="tabsLoading"
+            class="codicon codicon-loading codicon-modifier-spin !text-[11px]"
+          />
+        </div>
+        <div
+          v-if="tabsLoading && !mentionTabs.length"
+          class="px-2 py-1.5 text-xs text-fg-3"
+        >
+          {{ $t('chat.tabsLoading') }}
         </div>
         <button
           v-for="(tab, i) in mentionTabs"
