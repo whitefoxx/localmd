@@ -81,7 +81,10 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   const langName = LOCALE_NAMES[getLocale()]
   prompt += `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink".`
 
-  const skills = await listSkills()
+  // Only the model's half of the catalog: this block is re-sent on every step
+  // of every turn, so a skill the user runs by hand and the agent never picks
+  // (`invocation: user`) would be a permanent charge for nothing.
+  const skills = (await listSkills()).filter((s) => s.modelInvocable)
   if (skills.length) {
     prompt +=
       `\n\nSkills available in this knowledge base (reusable workflows). When a task matches one, call use_skill with its name and follow the loaded instructions. The user can also invoke one directly with /name:\n` +

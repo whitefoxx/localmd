@@ -560,7 +560,7 @@ const slashQuery = computed(() => {
 const slashMatches = computed(() =>
   slashQuery.value === null
     ? []
-    : skills.all.filter((s) => s.name.toLowerCase().startsWith(slashQuery.value!.toLowerCase())),
+    : skills.forUser.filter((s) => s.name.toLowerCase().startsWith(slashQuery.value!.toLowerCase())),
 )
 
 watch(slashQuery, (q) => {
@@ -585,7 +585,7 @@ function pickSkill(name: string): void {
  *  agent reaches for when the conversation calls for it — a button offering to
  *  connect a service is noise above an empty composer. They stay in the / menu
  *  for anyone who wants to force one. */
-const kbSkills = computed(() => skills.all.filter((s) => s.dir !== BUILTIN_DIR))
+const kbSkills = computed(() => skills.forUser.filter((s) => s.dir !== BUILTIN_DIR))
 
 /** How many skills get a chip of their own. The rest are one ▲ away: a folder
  *  with twenty skills should not bury the composer under rows of buttons. */

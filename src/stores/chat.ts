@@ -651,7 +651,11 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /** A leading /skill-name invocation forces that skill: the full SKILL.md
-   *  is inlined so the model executes it without a use_skill round trip. */
+   *  is inlined so the model executes it without a use_skill round trip.
+   *
+   *  Deliberately not filtered by `userInvocable`: that flag decides what the
+   *  menu OFFERS, and typing the name out is the user overruling the offer.
+   *  Refusing it here would turn a hint into a validation gate. */
   async function expandSlashSkill(trimmed: string): Promise<string> {
     const m = /^\/([\w-]+)(?:\s+([\s\S]*))?$/.exec(trimmed)
     if (!m) return trimmed

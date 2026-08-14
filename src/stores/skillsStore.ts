@@ -3,12 +3,17 @@
  * Refreshed on KB switch and lazily when the slash dropdown opens.
  */
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { listSkills, type SkillMeta } from '@/lib/skills'
 import { useKbStore } from '@/stores/kb'
 
 export const useSkillsStore = defineStore('skills', () => {
   const all = ref<SkillMeta[]>([])
+
+  /** What the UI offers. A skill marked `invocation: model` is the agent's to
+   *  choose, not a menu entry — filtered in one place so neither the slash
+   *  menu nor the composer buttons can drift from the other. */
+  const forUser = computed(() => all.value.filter((s) => s.userInvocable))
 
   async function refresh(): Promise<void> {
     const kb = useKbStore()
@@ -22,5 +27,5 @@ export const useSkillsStore = defineStore('skills', () => {
     { immediate: true },
   )
 
-  return { all, refresh }
+  return { all, forUser, refresh }
 })

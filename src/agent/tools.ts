@@ -670,7 +670,9 @@ const useSkill = defineTool({
   run: async ({ name }) => {
     const skill = await loadSkill(name)
     if (!skill) {
-      const available = (await listSkills()).map((s) => s.name)
+      // Only what the model was offered — listing a `invocation: user` skill
+      // here would re-introduce, at failure time, the bytes the filter saves.
+      const available = (await listSkills()).filter((s) => s.modelInvocable).map((s) => s.name)
       return `Error: no skill named "${name}". Available: ${available.join(', ') || '(none)'}`
     }
     const resources = skill.resources.length

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSkill } from './skills'
+import { parseSkill, invocationFlags } from './skills'
 
 describe('parseSkill', () => {
   it('parses frontmatter name and description', () => {
@@ -41,5 +41,32 @@ describe('parseSkill', () => {
     expect(s.name).toBe('win')
     expect(s.description).toBe('crlf test')
     expect(s.body).toBe('body')
+  })
+
+  it('reads the invocation audience, defaulting to both', () => {
+    const both = parseSkill('---\nname: a\n---\nbody', 'x', 'd')
+    expect(both).toMatchObject({ modelInvocable: true, userInvocable: true })
+
+    const userOnly = parseSkill('---\nname: a\ninvocation: user\n---\nbody', 'x', 'd')
+    expect(userOnly).toMatchObject({ modelInvocable: false, userInvocable: true })
+
+    const modelOnly = parseSkill('---\nname: a\ninvocation: MODEL\n---\nbody', 'x', 'd')
+    expect(modelOnly).toMatchObject({ modelInvocable: true, userInvocable: false })
+  })
+})
+
+describe('invocationFlags', () => {
+  it('accepts the three spellings, case- and space-insensitively', () => {
+    expect(invocationFlags('both')).toEqual({ modelInvocable: true, userInvocable: true })
+    expect(invocationFlags(' User ')).toEqual({ modelInvocable: false, userInvocable: true })
+    expect(invocationFlags('Model')).toEqual({ modelInvocable: true, userInvocable: false })
+  })
+
+  it('treats absent and unrecognized values as both', () => {
+    // A hand-edited typo must not make the skill invisible to everyone — the
+    // KB is a soft constraint, so the failure mode is "no filtering applied".
+    for (const v of [undefined, '', 'agent', 'true', 'nobody']) {
+      expect(invocationFlags(v)).toEqual({ modelInvocable: true, userInvocable: true })
+    }
   })
 })

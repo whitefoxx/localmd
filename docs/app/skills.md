@@ -33,6 +33,32 @@ That summary line matters: it is the only thing considered when deciding whether
 a skill applies. "How to ingest a paper into raw/papers with a summary page" is
 a better line than "paper stuff".
 
+## Who a skill is for
+
+By default a skill is offered to both of you: it is in the slash menu, and the
+assistant can pick it up on its own. Some skills only make sense one way round —
+a checklist you run by hand every Friday is not something the assistant should
+ever start, and a routine it follows silently does not need to sit in your menu.
+
+Add an `invocation` line to the top of the file to say which:
+
+```
+---
+name: weekly-review
+description: My Friday wrap-up
+invocation: user
+---
+```
+
+`user` means only you can start it. `model` means only the assistant. Leave the
+line out and it stays available to both.
+
+There is a reason to bother: the assistant is told about every skill it might
+use at the start of every reply, so a workflow only you ever run costs a little
+on each one. Marking it `user` takes it out of that list without taking it out
+of your menu. You can still type `/name` for a `model` skill — the setting
+decides what gets *offered*, not what is allowed.
+
 ## What makes a good skill
 
 Write down what you **learned**, not what the tools already say.

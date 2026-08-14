@@ -14,6 +14,9 @@
 export interface BuiltinSkill {
   name: string
   description: string
+  /** Who may invoke it, in the SKILL.md frontmatter's spelling. Omitted means
+   *  both, the same default a hand-written skill file gets. */
+  invocation?: string
   body: string
 }
 

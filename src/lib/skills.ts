@@ -11,6 +11,12 @@
  * Progressive disclosure: only name+description go into the system prompt;
  * the agent loads a skill's full body with the use_skill tool, or the user
  * forces one with a /slash command in the chat input.
+ *
+ * Those two audiences are independent, which is why a skill declares who it is
+ * for. The model's catalog is paid for on every step of every turn, so a
+ * workflow only ever run by hand (`invocation: user`) should not be in it; and
+ * a skill the agent follows on its own has no business cluttering the slash
+ * menu (`invocation: model`). Absent or unrecognized, a skill is for both.
  */
 import * as fs from '@/lib/fs'
 import { BUILTIN_SKILLS, builtinSkill } from '@/lib/builtinSkills'
@@ -21,11 +27,32 @@ export const BUILTIN_DIR = '<built-in>'
 
 export const SKILL_DIRS = ['.agents/skills', '.claude/skills']
 
+/** Who may invoke a skill. One frontmatter key rather than two booleans: the
+ *  fourth state (invocable by nobody) has no meaning, so it is not spellable. */
+export type SkillInvocation = 'both' | 'model' | 'user'
+
 export interface SkillMeta {
   name: string
   description: string
   /** KB-relative skill directory, e.g. ".agents/skills/ingest" */
   dir: string
+  /** Listed to the model in the system prompt, and loadable by use_skill. */
+  modelInvocable: boolean
+  /** Offered in the slash menu and the composer's skill buttons. */
+  userInvocable: boolean
+}
+
+/** Derive the two audience flags. Anything unrecognized reads as `both`: the
+ *  KB is a soft constraint, so a typo in a hand-edited file must not make a
+ *  skill vanish from both audiences with nothing to explain why. */
+export function invocationFlags(value: string | undefined): {
+  modelInvocable: boolean
+  userInvocable: boolean
+} {
+  const v = value?.trim().toLowerCase()
+  if (v === 'model') return { modelInvocable: true, userInvocable: false }
+  if (v === 'user') return { modelInvocable: false, userInvocable: true }
+  return { modelInvocable: true, userInvocable: true }
 }
 
 export interface Skill extends SkillMeta {
@@ -40,6 +67,7 @@ export interface Skill extends SkillMeta {
 export function parseSkill(md: string, fallbackName: string, dir: string): Omit<Skill, 'resources'> {
   let name = fallbackName
   let description = ''
+  let invocation: string | undefined
   let body = md
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(md)
   if (m) {
@@ -50,12 +78,13 @@ export function parseSkill(md: string, fallbackName: string, dir: string): Omit<
       const value = kv[2].trim().replace(/^["']|["']$/g, '')
       if (kv[1].toLowerCase() === 'name' && value) name = value
       if (kv[1].toLowerCase() === 'description') description = value
+      if (kv[1].toLowerCase() === 'invocation') invocation = value
     }
   }
   if (!description) {
     description = body.split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim().slice(0, 120) ?? ''
   }
-  return { name, description, dir, body: body.trim() }
+  return { name, description, dir, ...invocationFlags(invocation), body: body.trim() }
 }
 
 /** All skills in the KB (canonical dir first; name clashes keep the first). */
@@ -76,7 +105,13 @@ export async function listSkills(): Promise<SkillMeta[]> {
       if (!md) continue
       const parsed = parseSkill(md, node.name, node.path)
       if (!byName.has(parsed.name)) {
-        byName.set(parsed.name, { name: parsed.name, description: parsed.description, dir: parsed.dir })
+        byName.set(parsed.name, {
+          name: parsed.name,
+          description: parsed.description,
+          dir: parsed.dir,
+          modelInvocable: parsed.modelInvocable,
+          userInvocable: parsed.userInvocable,
+        })
       }
     }
   }
@@ -84,7 +119,12 @@ export async function listSkills(): Promise<SkillMeta[]> {
   // which is the right precedence for a folder the user owns.
   for (const s of BUILTIN_SKILLS) {
     if (!byName.has(s.name)) {
-      byName.set(s.name, { name: s.name, description: s.description, dir: BUILTIN_DIR })
+      byName.set(s.name, {
+        name: s.name,
+        description: s.description,
+        dir: BUILTIN_DIR,
+        ...invocationFlags(s.invocation),
+      })
     }
   }
   return [...byName.values()]
@@ -97,7 +137,16 @@ export async function loadSkill(name: string): Promise<Skill | null> {
   if (!meta) return null
   if (meta.dir === BUILTIN_DIR) {
     const b = builtinSkill(name)
-    return b ? { name: b.name, description: b.description, dir: BUILTIN_DIR, body: b.body, resources: [] } : null
+    return b
+      ? {
+          name: b.name,
+          description: b.description,
+          dir: BUILTIN_DIR,
+          ...invocationFlags(b.invocation),
+          body: b.body,
+          resources: [],
+        }
+      : null
   }
   const md = await fs.tryReadFile(`${meta.dir}/SKILL.md`)
   if (!md) return null
