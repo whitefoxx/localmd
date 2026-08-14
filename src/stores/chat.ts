@@ -19,6 +19,7 @@ import {
   splitForCompaction,
   renderTranscript,
   compactedPrefix,
+  type TrimOptions,
 } from '@/lib/history'
 import {
   estimateTokens,
@@ -142,9 +143,10 @@ function capToolResult(s: string): string {
 async function stashTrimmable(
   sessionId: string,
   hist: ModelMessage[],
+  opts?: TrimOptions,
 ): Promise<Map<string, string>> {
   const recall = new Map<string, string>()
-  for (const c of trimCandidates(hist)) {
+  for (const c of trimCandidates(hist, opts)) {
     if (isBuiltinToolName(c.toolName)) continue
     const path = recallPathIn(c.text) ?? (await storeToolResult(sessionId, c.toolName, c.text))
     if (path) recall.set(c.toolCallId, path)
@@ -1131,6 +1133,10 @@ export const useChatStore = defineStore('chat', () => {
             signal: controller.signal,
             allowSubagent: true,
             steerPending: () => steerPending(session.id),
+            // An overflow prune inside the turn destroys tool results the same
+            // way a trim does, so it gets the same recall: store first, and the
+            // stub names the path.
+            stashTrimmable: (msgs, o) => stashTrimmable(session.id, msgs, o),
           })
           session.history = next
           // The last step's prompt plus the reply it produced is exactly this

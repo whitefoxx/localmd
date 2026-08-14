@@ -40,6 +40,9 @@ import { toLanguageModel } from './model'
 import { mapLimit, untilAborted } from '@/lib/async'
 import { sdkKindFor } from '@/lib/providers'
 import { withMovingBreakpoint } from '@/lib/promptCache'
+import { trimHistory } from '@/lib/history'
+import { estimateTokens } from '@/lib/tokenMeter'
+import { isContextOverflow } from '@/lib/providerError'
 import { needsLicence, lockedToolResult } from '@/lib/licence'
 import { useLicenceStore } from '@/stores/licence'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
@@ -49,6 +52,17 @@ import type { LlmProfile } from '@/stores/settings'
 import type { AgentEventHandler } from './types'
 
 const MAX_ITERATIONS = 25
+/** How many times one turn may prune and retry after a context overflow.
+ *  Two is enough for the real case (a turn that ingested too much) and small
+ *  enough that a misclassified error cannot cost much. */
+const MAX_OVERFLOW_RECOVERIES = 2
+/** How much of the tail an overflow prune spares, per attempt. The first pass
+ *  keeps the newest call/result pair — the model's live working set — and
+ *  stubs everything older, including earlier results of this same turn. If
+ *  that still does not fit, the second spares nothing: at that point the
+ *  choice is a degraded turn or no turn, and a stubbed result names a
+ *  `.trace/` path the model can read back. */
+const OVERFLOW_KEEP_MESSAGES = [2, 0]
 const MAX_IMAGES_PER_CALL = 5
 const DEFAULT_MAX_TOKENS = 8192
 
@@ -101,6 +115,14 @@ export interface RunTurnOptions {
    *  true the step loop stops at the next clean boundary (tool results settled,
    *  no dangling call) so the caller can append the steer and continue. */
   steerPending?: () => boolean
+  /** Save the oversized tool results an overflow prune is about to stub, so the
+   *  stubs can name a `.trace/` path to read back. Supplied by the chat store
+   *  (the effect belongs with it); without it the prune still works and the
+   *  stubs fall back to "call the tool again". */
+  stashTrimmable?: (
+    messages: ModelMessage[],
+    opts: { keepLastMessages: number; keepTurns: number },
+  ) => Promise<Map<string, string>>
 }
 
 /** What a tool call that the user stopped reports back. The turn is discarded
@@ -251,6 +273,13 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   // are inert and the win comes from keeping the prefix bytes stable.
   const movingBreakpoint = sdkKindFor(opts.profile.provider) === 'anthropic'
 
+  /* One pass of the model loop over `messages`. Extracted so a context-overflow
+   * failure can prune and re-enter it — everything above (tool registration,
+   * the active-name gate) is per-turn and deliberately NOT rebuilt, so a retry
+   * cannot change the tool set the provider already cached. */
+  const runSegment = async (
+    messages: ModelMessage[],
+  ): Promise<{ steps: ModelMessage[]; error: unknown; aborted: boolean; stepCount: number }> => {
   let streamError: unknown = null
   const result = streamText({
     model,
@@ -265,7 +294,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         ? [{ role: 'system' as const, content: opts.system.dynamic, providerOptions: CACHE_BREAKPOINT }]
         : []),
     ],
-    messages: opts.messages,
+    messages,
     tools,
     activeTools: activeToolNames(),
     // Re-gate before each step so an enable_tools activation takes effect now,
@@ -320,6 +349,58 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     }
   }
 
+    // Steps completed before the failure still hold real work (tool results
+    // the user paid for). They are recoverable even when the stream errored,
+    // so read them defensively rather than assuming either outcome.
+    let done: ModelMessage[] = []
+    try {
+      done = (await result.steps).flatMap((s) => s.response.messages)
+    } catch (err) {
+      streamError ??= err
+    }
+    return { steps: done, error: streamError, aborted, stepCount: steps }
+  }
+
+  let messages = opts.messages
+  let recoveries = 0
+  let segment = await runSegment(messages)
+
+  // Context overflow is the one provider failure with a repair: the turn grew
+  // past the window mid-flight (25 steps of tool results on top of a ~20k
+  // prefix reaches it easily), and dropping that bulk makes the same request
+  // fit. Every other error belongs to the caller untouched.
+  while (
+    segment.error &&
+    !segment.aborted &&
+    recoveries < MAX_OVERFLOW_RECOVERIES &&
+    isContextOverflow(segment.error)
+  ) {
+    const before = [...messages, ...segment.steps]
+    // Counted in MESSAGES, not turns. The turn-based window protects
+    // everything after the newest user message — which mid-turn is the whole
+    // turn, i.e. exactly the tool results that just overflowed the window. A
+    // turn-based prune here would free nothing and the retry would be refused.
+    const emergency = {
+      keepLastMessages: OVERFLOW_KEEP_MESSAGES[recoveries] ?? 0,
+      keepTurns: 1,
+    }
+    const recallPaths = await opts.stashTrimmable?.(before, emergency)
+    const pruned = trimHistory(before, { ...emergency, recallPaths })
+    // Retry ONLY on measurable shrinkage. Without this the loop would re-send
+    // the same oversized request and burn the cap for nothing — a single
+    // over-window message (one huge paste) is not repairable by trimming.
+    if (estimateTokens(pruned) >= estimateTokens(before)) break
+    recoveries++
+    opts.onEvent({
+      type: 'tool',
+      name: 'compact',
+      detail: 'Context limit hit — dropping older tool output and retrying…',
+    })
+    messages = pruned
+    segment = await runSegment(messages)
+  }
+
+  const { error: streamError, aborted, stepCount } = segment
   if (streamError) throw streamError
   // The AI SDK ends the stream gracefully on abort (emits an 'abort' part) and
   // response.messages may hold a half-finished turn — a tool-call with no result
@@ -333,7 +414,7 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
 
   // Ran to the cap rather than to a conclusion — say so, or the user reads an
   // interrupted turn as a finished one.
-  if (steps >= MAX_ITERATIONS) opts.onEvent({ type: 'limit', steps })
+  if (stepCount >= MAX_ITERATIONS) opts.onEvent({ type: 'limit', steps: stepCount })
 
   // `response.messages` is the LAST step's messages, not the turn's. On any
   // multi-step turn that is just the closing assistant text, so persisting it
@@ -342,8 +423,12 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
   // tool-result stubbing in lib/history.ts never has anything to stub. The
   // steps hold the whole turn — this is how the SDK assembles history for the
   // next step internally. See run.test.ts, which pins the distinction.
-  const turnSteps = await result.steps
-  return [...opts.messages, ...turnSteps.flatMap((s) => s.response.messages)]
+  //
+  // `messages` rather than `opts.messages`: after an overflow recovery the
+  // pruned history is what the surviving steps were actually generated
+  // against, and persisting the unpruned one would put the turn straight back
+  // over the window.
+  return [...messages, ...segment.steps]
 }
 
 function usageEvent(usage: LanguageModelUsage): {

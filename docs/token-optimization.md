@@ -392,6 +392,46 @@ git_init and the note present; test-kb (a repo) sent the full family and no
 note. Saves ~1,050 est tokens per step for every non-git KB — likely the
 common case among non-developer users.
 
+### P9 — a turn that overflows now repairs itself (2026-08-14)
+
+The one user-visible failure the token work kept pointing at. Hygiene ran only
+before a send, and `runTurn` then took up to 25 steps: a turn that ingested a
+few large results could stop fitting mid-flight, and the whole turn died with
+the provider's raw error. P5's measurement is what made the risk concrete —
+every step carries the always-on prefix, so the window is closer than it looks.
+
+Borrowed from dsh's split trigger (pressure at pre-step, overflow at
+request-error) and its rule that recovery may only retry when the surface
+actually advanced:
+
+- ✅ **`lib/providerError.isContextOverflow`** — matches only wording that says
+  the input was too large, across the spellings the shipped providers use.
+  Deliberately conservative: a false positive costs one prune and retry, a
+  false negative just leaves the old behaviour. A bare 400 is NOT overflow —
+  providers use it for malformed requests too, and retrying those hides the
+  real message. The `cause` walk is depth-bounded, because a stack overflow
+  while classifying an error would replace a reportable failure with an
+  unreportable one.
+- ✅ **Prune-and-retry inside `runTurn`**, capped at 2. The stream segment was
+  extracted so a retry re-enters it without rebuilding the tool set — a retry
+  must not change the tools the provider already cached.
+- ✅ **The prune is counted in MESSAGES, not turns** (`TrimOptions.
+  keepLastMessages`). Found by a test, not by reading: the turn-based window
+  protects everything after the newest user message, which mid-turn is the
+  whole turn — precisely the results that overflowed. The first attempt spares
+  the newest call/result pair, the second spares nothing.
+- ✅ **Retry only on measurable shrinkage.** One oversized user message is not
+  repairable by trimming tool results; without this the loop would re-send the
+  same request and burn the cap.
+- ✅ **Pruned results stay recallable** — the chat store passes its
+  `stashTrimmable` in, so an emergency stub names a `.trace/` path like a
+  routine trim's does, and the surviving history is the pruned one (persisting
+  the oversized version would put the next turn straight back over the window).
+
+Seven tests drive the real `runTurn` against a mocked model, including the one
+that matters most: a turn that never overflows takes exactly one request and
+its history is unchanged, so the recovery path is inert until it is needed.
+
 ## Validating
 
 Watch the session token tooltip (chat composer status line): after the first

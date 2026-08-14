@@ -41,6 +41,18 @@ export interface TrimOptions {
    *  `trimCandidates` before this trim destroys it); the stub names the path
    *  so recall is one deterministic read_file, not a re-call. */
   recallPaths?: ReadonlyMap<string, string>
+  /**
+   * Emergency override: protect only the last N MESSAGES instead of the last
+   * `toolKeepTurns` user turns.
+   *
+   * The turn-based windows deliberately protect everything after the newest
+   * user message — that is the turn in flight, and routine hygiene must not
+   * reach into it. A context overflow is the case where it must: the bulk that
+   * did not fit is precisely the tool results this turn just accumulated, and
+   * a turn-based cutoff would find nothing to free. Counted in messages
+   * because mid-turn there is no next user turn to count to.
+   */
+  keepLastMessages?: number
 }
 
 const DEFAULTS = { keepTurns: 2, toolKeepTurns: 1, maxChars: 1500 }
@@ -85,6 +97,18 @@ function cutoffIndex(history: ModelMessage[], keepTurns: number): number {
   return 0
 }
 
+/** Where tool traffic stops being trimmable. `keepLastMessages` overrides the
+ *  turn-based window for the mid-turn emergency case; it never protects LESS
+ *  than nothing, and a value past the history simply protects all of it. */
+function toolCutoffIndex(
+  history: ModelMessage[],
+  toolKeepTurns: number,
+  keepLastMessages?: number,
+): number {
+  if (keepLastMessages === undefined) return cutoffIndex(history, toolKeepTurns)
+  return Math.max(0, history.length - keepLastMessages)
+}
+
 type AnyPart = { type: string; [k: string]: unknown }
 
 function trimToolCallInput(input: unknown, maxChars: number): unknown {
@@ -123,7 +147,7 @@ export function trimHistory(history: ModelMessage[], opts: TrimOptions = {}): Mo
   // images and reasoning survive keepTurns (wider — a follow-up may still be
   // about the picture, and view_image cannot recall a pasted image).
   const mediaCutoff = cutoffIndex(history, keepTurns)
-  const toolCutoff = cutoffIndex(history, toolKeepTurns)
+  const toolCutoff = toolCutoffIndex(history, toolKeepTurns, opts.keepLastMessages)
   return history.map((m, i) => {
     if (i >= toolCutoff || typeof m.content === 'string') return m
     const old = i < mediaCutoff
@@ -185,7 +209,7 @@ export interface TrimCandidate {
  */
 export function trimCandidates(history: ModelMessage[], opts: TrimOptions = {}): TrimCandidate[] {
   const { toolKeepTurns, maxChars } = { ...DEFAULTS, ...opts }
-  const toolCutoff = cutoffIndex(history, toolKeepTurns)
+  const toolCutoff = toolCutoffIndex(history, toolKeepTurns, opts.keepLastMessages)
   const out: TrimCandidate[] = []
   for (const m of history.slice(0, toolCutoff)) {
     if (m.role !== 'tool' || typeof m.content === 'string') continue
