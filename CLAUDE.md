@@ -54,6 +54,24 @@ The only intentional Chinese in the tree: the `zh` values in i18n catalogs
   a page saying "add the server at …" reaches it the same way you do. It may put
   the address in front of the user and nothing more. Kinds are primitives
   (`confirm`, `signin`, `key`), never errands (`add_notion_server`).
+  Three rules keep that gate honest:
+  - **A decision defaults to no.** An absent, crashed, or unanswerable prompt
+    denies; only an explicit yes proceeds, and it authorizes the one action
+    asked about, never the next one. (The licence check in `run.ts` fails
+    *open* on purpose — the failure that matters there is double-charging, not
+    under-gating. Deliberate exceptions say so.)
+  - **A richer card may change how a decision looks, never what an answer
+    means.** A UI that recognises a card kind and one that falls back to a
+    plain confirm must produce the same answer; presentation is a hint, never
+    a second protocol.
+  - **One fact, one place on screen.** A card points at the call it decides
+    rather than re-rendering its arguments — a second copy is a second thing
+    to drift.
+- **Release the lock last.** Bracket a multi-step mutation so the marker that
+  says "done" is written after the work, not before: a crash then leaves a
+  detectable half-finished operation instead of a record that lies about having
+  finished. The browser makes this routine, not exotic — the user closes the
+  tab whenever they like.
 
 ## The app's own manual is part of the app
 
@@ -66,6 +84,14 @@ a settings section, moving a control, changing what a tag means, adding a
 capability — if a doc describes the old behaviour, it is now telling users
 something false, and telling the agent to repeat it. Treat a stale doc as a bug
 of the same severity as stale code.
+
+The mirror of that rule: **a record of what we decided once is not a statement
+about what is true now.** `docs/token-optimization.md` and the ⏸/superseded
+entries in it are a log — when a later pass overturns an entry, mark it
+superseded and link forward rather than deleting it (the reasoning is why the
+next person can tell an overturned call from an unexamined one). Never cite a
+superseded entry as current behaviour, and never edit history to agree with the
+present.
 
 - **English is the only source of truth.** `<id>.md` is canonical and is the
   only version the agent ever reads (`appDocForAgent` pins `en`); replies follow
