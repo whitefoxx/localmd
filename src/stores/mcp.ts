@@ -225,6 +225,21 @@ export const useMcpStore = defineStore('mcp', () => {
    *  activation still works; it just stops being the norm. */
   const recalled = ref<string[]>([])
 
+  /** The KB's recall list, hydrating from storage when the ref is empty.
+   *  The kb-switch watch also hydrates, but callers cannot rely on it having
+   *  run: watchers on `kb.name` fire in store-construction order, and the chat
+   *  store's (which calls `preactivate` while opening tabs) may sit ahead of
+   *  ours — with only the watch, a freshly loaded page preactivated nothing.
+   *  Reading here removes the race; the ref still carries state where storage
+   *  is unavailable (private mode, node tests). */
+  function currentRecall(): string[] {
+    const kbName = useKbStore().name
+    if (!recalled.value.length && kbName) {
+      recalled.value = readRecall()[kbName] ?? []
+    }
+    return recalled.value
+  }
+
   function persistRecall(): void {
     const kbName = useKbStore().name
     if (!kbName) return
@@ -242,20 +257,29 @@ export const useMcpStore = defineStore('mcp', () => {
     const t = allTools.value.find((x) => x.qualifiedName === qualifiedName)
     if (!t) return
     if (!deferred(t, NO_ACTIVATIONS)) return
-    const next = recallTouch(recalled.value, qualifiedName)
-    if (next.join('\n') === recalled.value.join('\n')) return
+    const cur = currentRecall()
+    const next = recallTouch(cur, qualifiedName)
+    if (next.join('\n') === cur.join('\n')) return
     recalled.value = next
     persistRecall()
   }
 
-  /** Seed a new session with the recalled tools (those that still exist and are
-   *  still policy-deferred). Called once per session, before its first request. */
+  /** Seed a new session with the recalled tools. Called once per session,
+   *  before its first request.
+   *
+   *  Deliberately NOT validated against `allTools`: on a cold page load this
+   *  runs while servers are still connecting, and filtering against the
+   *  not-yet-populated list dropped the recall precisely when it mattered.
+   *  Names go into the set raw; one whose server never (re)connects simply
+   *  never matches a tool, which is the same outcome the filter bought. */
   function preactivate(sessionId: string): void {
-    const names = recalled.value.filter((n) => {
-      const t = allTools.value.find((x) => x.qualifiedName === n)
-      return !!t && deferred(t, NO_ACTIVATIONS)
-    })
-    if (names.length) activate(sessionId, names)
+    const names = currentRecall()
+    if (!names.length) return
+    const next = new Set(activatedFor(sessionId))
+    for (const n of names) next.add(n)
+    const map = new Map(activated.value)
+    map.set(sessionId, next)
+    activated.value = map
   }
 
   /** Activate deferred tools by qualified name; returns what actually matched. */

@@ -331,6 +331,42 @@ model called enable_tools, then weread_search, and got a real result in the
 same turn; the recall store then held `["weread_search"]` for the KB, so the
 next session skips even the activation round trip.
 
+### P7 — only baseline stays: strict deferral + a slimmer BASE (2026-08-14)
+
+Two follow-on cuts after P6, plus two latent bugs the verification surfaced.
+
+**Installed tools now ALL defer.** P6 kept the MCP threshold (big bundles defer,
+singletons ride), which left hn_search, wikipedia_search and six other
+singletons always-on. The policy is now categorical: an installed tool is an
+opt-in extension whatever its group size; only the catalog's bundled web pack —
+baseline capability — is pinned. Live request: 61 tools → **48** (84 at the
+start of the day). Recall still keeps a KB's actual working set active from
+request one.
+
+**BASE trimmed 2,887 → 2,269 est** (−21%). Measured per paragraph first; the
+cuts removed only what tool descriptions already carry (git_restore's
+brings-back-deleted, github_create_repo's defaults — both verified present
+before deleting the duplicate) and compressed the fattest paragraphs
+(saving/distilling 201→~80, app_help 179→~70, git 155→~60, github 156→~50).
+Every behavioral rule survives. The citation block is untouched: its ⏸
+"load-bearing product semantics" decision (this file, Deliberately-not-done)
+stands until a snapshot-test layer exists to verify a compression behaves.
+
+**Bug 1 — recall hydration race.** `recalled` was filled by a `watch(kb.name)`,
+but the chat store's own kb watch (which calls `preactivate` while opening
+tabs) can be registered ahead of it — watchers fire in store-construction
+order — so a fresh page load preactivated nothing. Both stores now hydrate
+from storage at the point of use (`currentRecall()`).
+
+**Bug 2 — preactivate validated against a half-loaded registry.** It filtered
+recall names against `specs`/`allTools`, which are still loading (tools.json
+read, MCP connects) when a cold load restores the session — the filter dropped
+the recall exactly when it mattered. Names now enter the activation set raw; a
+name whose spec never appears simply never matches, which is the same outcome
+the filter bought. Both bugs predate P7 in the MCP store (P3 shipped them);
+node tests couldn't see either, because both are load-order effects. Verified
+in a cold browser load: session restores with `weread_search` already active.
+
 ## Validating
 
 Watch the session token tooltip (chat composer status line): after the first

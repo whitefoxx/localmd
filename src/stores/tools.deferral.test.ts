@@ -17,7 +17,6 @@ globalThis.localStorage ??= {
 
 import { useToolsStore } from './tools'
 import { useSettingsStore } from './settings'
-import { DEFER_THRESHOLD } from '@/lib/mcp'
 import type { HttpToolSpec } from '@/lib/httpTools'
 
 /** A minimal installed tool; `bundle` groups it like an MCP server groups tools. */
@@ -38,7 +37,8 @@ function bundleOf(bundle: string, n: number): HttpToolSpec[] {
   return Array.from({ length: n }, (_, i) => tool(`${bundle}_${i}`, bundle))
 }
 
-const BIG = DEFER_THRESHOLD + 1
+/** Any size — the policy no longer reads group size at all. */
+const BIG = 9
 
 function storeWith(specs: HttpToolSpec[]) {
   const settings = useSettingsStore()
@@ -49,16 +49,13 @@ function storeWith(specs: HttpToolSpec[]) {
 describe('tools store — deferral of installed bundles', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('defers a big bundle and keeps small bundles, singletons and the bundled pack active', () => {
+  it('defers everything installed — bundles and singletons alike — and pins the bundled pack', () => {
+    // An installed tool is an opt-in extension whatever its group size; only
+    // the product's baseline reach (the catalog's web pack) rides always.
     const store = storeWith([...bundleOf('big', BIG), ...bundleOf('duo', 2), tool('lone')])
     const active = store.activeSpecsFor('s1').map((s) => s.name)
-    expect(active).toContain('duo_0')
-    expect(active).toContain('lone')
-    // the catalog's own web pack is pinned active — the product's baseline
-    // reach, whatever the deferral policy says
-    expect(active).toContain('web_search')
-    expect(active).not.toContain('big_0')
-    expect(store.deferredSpecsFor('s1')).toHaveLength(BIG)
+    expect(active).toEqual(['web_fetch', 'web_search'])
+    expect(store.deferredSpecsFor('s1')).toHaveLength(BIG + 3)
   })
 
   it('activates by exact name, per session', () => {
@@ -83,7 +80,7 @@ describe('tools store — deferral of installed bundles', () => {
   it('remembers only deferred tools and preactivates a fresh session with them', () => {
     const store = storeWith([...bundleOf('big', BIG), tool('lone')])
     store.rememberUse('big_2')
-    store.rememberUse('lone') // always active — a slot here would be wasted
+    store.rememberUse('web_search') // pinned active — a slot here would be wasted
     store.rememberUse('ghost') // unknown
     store.preactivate('s-new')
     const fromBig = store

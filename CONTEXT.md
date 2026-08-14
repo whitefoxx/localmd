@@ -134,12 +134,13 @@ gates ask (`ENFORCE_LICENCE && !active`) — keep the two apart.
 _Avoid_: license (spelling; code and UI use -ce), subscription, account.
 
 **Deferred tool**:
-A tool from a large group — an MCP server's tools, or an installed HTTP-tool
-bundle — that is registered but withheld from the model until `enable_tools`
-activates it, at which point it becomes an **active tool**. The threshold and the
-frozen prompt catalog are shared by both registries; only the grouping unit
-differs (server vs bundle). The built-in/external distinction is orthogonal to
-the deferred/active one.
+A tool registered but withheld from the model until `enable_tools` activates it,
+at which point it becomes an **active tool**. Both registries share the frozen
+prompt catalog and the activation/recall machinery but apply different policies:
+MCP tools defer when their server is large (`DEFER_THRESHOLD`); installed HTTP
+tools ALL defer — they are opt-in extensions, and only the bundled web pack
+(baseline capability) is pinned active. The built-in/external distinction is
+orthogonal to the deferred/active one.
 _Avoid_: lazy tool, hidden tool.
 
 ## Skills

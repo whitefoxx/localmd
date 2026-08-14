@@ -23,14 +23,13 @@ import {
   normalizeHttpToolList,
   dedupeByName,
   toolsFingerprint,
-  groupByBundle,
   KB_TOOLS_CONFIG_PATH,
   type HttpToolSpec,
   type HttpReply,
   type HttpTransport,
   type BuiltRequest,
 } from '@/lib/httpTools'
-import { isDeferredTool, recallTouch } from '@/lib/mcp'
+import { recallTouch } from '@/lib/mcp'
 import {
   CATALOG,
   catalogEntryById,
@@ -116,38 +115,32 @@ export const useToolsStore = defineStore('tools', () => {
     return dedupeByName([...licensed, ...bundledTools.value])
   })
 
-  /* ── deferral (mirrors stores/mcp.ts, unit = bundle instead of server) ──
+  /* ── deferral (mirrors stores/mcp.ts, stricter policy) ──
    *
    * Installed tools used to ride in every request whether or not the session
    * touched them — the prefix audit priced one KB's three bundles at ~28% of
-   * the always-on prefix. The MCP registry already had the answer: a big
-   * SERVER's tools stay out until enable_tools pulls them in. The same policy
-   * applies here with the bundle as the unit — a bundle is this registry's
-   * server: one service, installed together, used together. Ungrouped tools
-   * count as singletons, so a lone hn_search stays active exactly like a
-   * small MCP server's tools do. */
+   * the always-on prefix. The MCP registry already had the answer (schemas
+   * out, one-line catalog in, enable_tools on demand), and this registry
+   * applies it WITHOUT the size threshold: an installed tool is an opt-in
+   * extension, and only the product's baseline reach — the bundled web pack —
+   * earns a permanent seat. A lone hn_search is no less an integration for
+   * being alone; recall keeps the ones a KB actually uses active from a new
+   * session's first request. */
 
   /** Deferred tools the model activated, keyed by chat session (same
    *  session-scoping as the MCP store's `activated`). */
   const activated = ref(new Map<string, Set<string>>())
 
-  const bundleSizeByName = computed(() => {
-    const sizes = new Map<string, number>()
-    for (const g of groupByBundle(specs.value))
-      for (const t of g.tools) sizes.set(t.name, g.tools.length)
-    return sizes
-  })
-
   function activatedFor(sessionId: string): Set<string> {
     return activated.value.get(sessionId) ?? new Set()
   }
 
-  /** The defer policy with the bundled-pack pin applied. The catalog's own
-   *  pack (the web-search pair) is pinned active whatever its size: it is the
-   *  product's baseline reach, not an installed integration. */
+  /** The defer policy: everything installed defers; the catalog's own pack
+   *  (the web-search pair) is pinned active — baseline capability, not an
+   *  installed integration. */
   function deferredSpec(spec: HttpToolSpec, activatedSet: ReadonlySet<string>): boolean {
     if (bundledToolIds.value.has(spec.id)) return false
-    return isDeferredTool(spec.name, bundleSizeByName.value.get(spec.name) ?? 1, activatedSet)
+    return !activatedSet.has(spec.name)
   }
 
   /** Tools whose schemas ride along with every request of this session. */
@@ -191,6 +184,19 @@ export const useToolsStore = defineStore('tools', () => {
    *  provider's cache prefix) stays byte-stable from request one. */
   const recalled = ref<string[]>([])
 
+  /** The KB's recall list, hydrating from storage when the ref is empty.
+   *  The kb-switch watch also hydrates, but callers cannot rely on it having
+   *  run: watchers on `kb.name` fire in store-construction order, and the chat
+   *  store's (which calls `preactivate` while opening tabs) may sit ahead of
+   *  ours. Reading here removes the race; the ref still carries state where
+   *  storage is unavailable (private mode, node tests). */
+  function currentRecall(): string[] {
+    if (!recalled.value.length && kb.name) {
+      recalled.value = readHttpRecall()[kb.name] ?? []
+    }
+    return recalled.value
+  }
+
   function persistHttpRecall(): void {
     if (!kb.name) return
     try {
@@ -207,20 +213,29 @@ export const useToolsStore = defineStore('tools', () => {
   function rememberUse(name: string): void {
     const spec = specs.value.find((s) => s.name === name)
     if (!spec || !deferredSpec(spec, NO_ACTIVATIONS)) return
-    const next = recallTouch(recalled.value, name)
-    if (next.join('\n') === recalled.value.join('\n')) return
+    const cur = currentRecall()
+    const next = recallTouch(cur, name)
+    if (next.join('\n') === cur.join('\n')) return
     recalled.value = next
     persistHttpRecall()
   }
 
-  /** Seed a new session with the recalled tools that still exist and are
-   *  still policy-deferred. Called once per session, before its first request. */
+  /** Seed a new session with the recalled tools. Called once per session,
+   *  before its first request.
+   *
+   *  Deliberately NOT validated against `specs`: this runs while the KB's
+   *  tools.json may still be loading, and filtering against a half-loaded
+   *  list dropped the recall exactly when it matters most — a cold page
+   *  load. Names go into the set raw; a name whose spec never appears simply
+   *  never matches, and active/deferred views resolve the moment specs load. */
   function preactivate(sessionId: string): void {
-    const names = recalled.value.filter((n) => {
-      const spec = specs.value.find((s) => s.name === n)
-      return !!spec && deferredSpec(spec, NO_ACTIVATIONS)
-    })
-    if (names.length) activate(sessionId, names)
+    const names = currentRecall()
+    if (!names.length) return
+    const next = new Set(activatedFor(sessionId))
+    for (const n of names) next.add(n)
+    const map = new Map(activated.value)
+    map.set(sessionId, next)
+    activated.value = map
   }
 
   /* ── catalog install / uninstall ───────────────────────────────────────── */
