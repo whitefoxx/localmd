@@ -23,12 +23,14 @@ import {
   normalizeHttpToolList,
   dedupeByName,
   toolsFingerprint,
+  groupByBundle,
   KB_TOOLS_CONFIG_PATH,
   type HttpToolSpec,
   type HttpReply,
   type HttpTransport,
   type BuiltRequest,
 } from '@/lib/httpTools'
+import { isDeferredTool, recallTouch } from '@/lib/mcp'
 import {
   CATALOG,
   catalogEntryById,
@@ -44,6 +46,16 @@ import { isBundledToolSource, lockedToolResult } from '@/lib/licence'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
+const HTTP_RECALL_KEY = 'browser-md:http-tool-recall:v1'
+
+function readHttpRecall(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(HTTP_RECALL_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, string[]>) : {}
+  } catch {
+    return {}
+  }
+}
 const DIRECT_TIMEOUT_MS = 45_000
 /** Enough for a JSON payload we still have to parse; the spec's own maxChars
  *  does the token-facing trimming afterwards. */
@@ -103,6 +115,113 @@ export const useToolsStore = defineStore('tools', () => {
         ]
     return dedupeByName([...licensed, ...bundledTools.value])
   })
+
+  /* ── deferral (mirrors stores/mcp.ts, unit = bundle instead of server) ──
+   *
+   * Installed tools used to ride in every request whether or not the session
+   * touched them — the prefix audit priced one KB's three bundles at ~28% of
+   * the always-on prefix. The MCP registry already had the answer: a big
+   * SERVER's tools stay out until enable_tools pulls them in. The same policy
+   * applies here with the bundle as the unit — a bundle is this registry's
+   * server: one service, installed together, used together. Ungrouped tools
+   * count as singletons, so a lone hn_search stays active exactly like a
+   * small MCP server's tools do. */
+
+  /** Deferred tools the model activated, keyed by chat session (same
+   *  session-scoping as the MCP store's `activated`). */
+  const activated = ref(new Map<string, Set<string>>())
+
+  const bundleSizeByName = computed(() => {
+    const sizes = new Map<string, number>()
+    for (const g of groupByBundle(specs.value))
+      for (const t of g.tools) sizes.set(t.name, g.tools.length)
+    return sizes
+  })
+
+  function activatedFor(sessionId: string): Set<string> {
+    return activated.value.get(sessionId) ?? new Set()
+  }
+
+  /** The defer policy with the bundled-pack pin applied. The catalog's own
+   *  pack (the web-search pair) is pinned active whatever its size: it is the
+   *  product's baseline reach, not an installed integration. */
+  function deferredSpec(spec: HttpToolSpec, activatedSet: ReadonlySet<string>): boolean {
+    if (bundledToolIds.value.has(spec.id)) return false
+    return isDeferredTool(spec.name, bundleSizeByName.value.get(spec.name) ?? 1, activatedSet)
+  }
+
+  /** Tools whose schemas ride along with every request of this session. */
+  function activeSpecsFor(sessionId: string): HttpToolSpec[] {
+    const set = activatedFor(sessionId)
+    return specs.value.filter((s) => !deferredSpec(s, set))
+  }
+
+  /** Big-bundle tools kept OUT of this session's requests until activated. */
+  function deferredSpecsFor(sessionId: string): HttpToolSpec[] {
+    const set = activatedFor(sessionId)
+    return specs.value.filter((s) => deferredSpec(s, set))
+  }
+
+  const NO_ACTIVATIONS: ReadonlySet<string> = new Set()
+
+  /** Every policy-deferred tool, IGNORING session activation — frozen for the
+   *  same reason as the MCP catalog: the system prompt lists it, and its bytes
+   *  must not change when a tool is activated mid-session. */
+  const deferredCatalog = computed<HttpToolSpec[]>(() =>
+    specs.value.filter((s) => deferredSpec(s, NO_ACTIVATIONS)),
+  )
+
+  /** Activate deferred tools for one session; returns the names it knew. */
+  function activate(sessionId: string, names: string[]): string[] {
+    const known = new Set(specs.value.map((s) => s.name))
+    const accepted = names.filter((n) => known.has(n))
+    if (accepted.length) {
+      const next = new Set(activatedFor(sessionId))
+      for (const n of accepted) next.add(n)
+      const map = new Map(activated.value)
+      map.set(sessionId, next)
+      activated.value = map
+    }
+    return accepted
+  }
+
+  /** Deferred tools this KB has actually used — same recall contract as the
+   *  MCP store: a fresh session starts with them active, so the common case
+   *  costs no enable_tools round trip and the tool set (the very front of the
+   *  provider's cache prefix) stays byte-stable from request one. */
+  const recalled = ref<string[]>([])
+
+  function persistHttpRecall(): void {
+    if (!kb.name) return
+    try {
+      localStorage.setItem(
+        HTTP_RECALL_KEY,
+        JSON.stringify({ ...readHttpRecall(), [kb.name]: recalled.value }),
+      )
+    } catch {
+      /* quota exceeded or private mode — recall is best-effort */
+    }
+  }
+
+  /** Record a successful call. Only policy-deferred tools earn a slot. */
+  function rememberUse(name: string): void {
+    const spec = specs.value.find((s) => s.name === name)
+    if (!spec || !deferredSpec(spec, NO_ACTIVATIONS)) return
+    const next = recallTouch(recalled.value, name)
+    if (next.join('\n') === recalled.value.join('\n')) return
+    recalled.value = next
+    persistHttpRecall()
+  }
+
+  /** Seed a new session with the recalled tools that still exist and are
+   *  still policy-deferred. Called once per session, before its first request. */
+  function preactivate(sessionId: string): void {
+    const names = recalled.value.filter((n) => {
+      const spec = specs.value.find((s) => s.name === n)
+      return !!spec && deferredSpec(spec, NO_ACTIVATIONS)
+    })
+    if (names.length) activate(sessionId, names)
+  }
 
   /* ── catalog install / uninstall ───────────────────────────────────────── */
 
@@ -270,12 +389,14 @@ export const useToolsStore = defineStore('tools', () => {
     return run(spec, args)
   }
 
-  // KB tools follow the open folder; the approval is per KB, so both reload
-  // together and a KB with no approval starts untrusted.
+  // KB tools follow the open folder; the approval and the recall are both
+  // per KB, so all three reload together and a KB with no approval starts
+  // untrusted.
   watch(
     () => kb.name,
     (name) => {
       kbTrustedFingerprint.value = name ? (readTrust()[name] ?? null) : null
+      recalled.value = name ? (readHttpRecall()[name] ?? []) : []
       void loadKbTools()
     },
     { immediate: true },
@@ -297,5 +418,11 @@ export const useToolsStore = defineStore('tools', () => {
     reloadKbTools: loadKbTools,
     run,
     test,
+    activeSpecsFor,
+    deferredSpecsFor,
+    deferredCatalog,
+    activate,
+    rememberUse,
+    preactivate,
   }
 })

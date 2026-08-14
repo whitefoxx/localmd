@@ -7,6 +7,7 @@ import { useFilesStore } from '@/stores/files'
 import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
+import { useToolsStore } from '@/stores/tools'
 import { buildSystemPrompt } from '@/agent/prompt'
 import { runTurn } from '@/agent/run'
 import { runMockTurn } from '@/agent/mock'
@@ -425,7 +426,10 @@ export const useChatStore = defineStore('chat', () => {
     // provider's cache prefix — activating mid-turn invalidates everything).
     // Skipped for a re-attached running session: growing ITS tool set mid-turn
     // is the exact invalidation this avoids elsewhere.
-    if (!s.running) useMcpStore().preactivate(s.id)
+    if (!s.running) {
+      useMcpStore().preactivate(s.id)
+      useToolsStore().preactivate(s.id) // installed-tool bundles defer the same way
+    }
     return true
   }
 

@@ -300,6 +300,37 @@ Removed with it: `estimateChars`, `TRIM_AT_CHARS`, `COMPACT_AT_CHARS`. Leaving
 dead constants named after the old unit would have told the next reader that
 characters were still the live threshold.
 
+### P6 — installed tools were exempt from deferral (2026-08-14)
+
+The P5 audit made the prefix's composition measurable, and the second-largest
+block turned out to be a policy hole rather than a cost of doing business:
+installed HTTP tools — the KB's weread/zhihu/hn bundles, 24 tools, ~3.3k
+estimated (~28% of the prefix) — rode in EVERY request. The comment in run.ts
+said it outright: "Always active, like the built-ins." Meanwhile the same kind
+of thing arriving as an MCP server had deferral: past `DEFER_THRESHOLD` tools,
+schemas stay out and a one-line catalog goes in the prompt.
+
+The fix is the policy the MCP registry already had, with the bundle as the
+unit — a bundle is this registry's server: one service, installed together,
+used together. Ungrouped singletons stay active like small servers' tools do,
+and the catalog's own web pack is pinned active (the product's baseline reach).
+`enable_tools` now activates across both registries from one catalog; recall
+and preactivation mirror the MCP store per KB.
+
+Verified against the live request (a page-level fetch hook, since the model's
+own answer proved unreliable — a resumed session happily "listed" tools from
+memory that its request did not contain):
+
+| | before | after |
+|---|---|---|
+| tools in request | 84 | 61 |
+| weread/zhihu schemas | 23 | 0 (catalog lines instead) |
+
+Mid-turn activation closes the loop end-to-end: asked to search weread, the
+model called enable_tools, then weread_search, and got a real result in the
+same turn; the recall store then held `["weread_search"]` for the KB, so the
+next session skips even the activation round trip.
+
 ## Validating
 
 Watch the session token tooltip (chat composer status line): after the first

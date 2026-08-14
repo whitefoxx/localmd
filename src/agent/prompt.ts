@@ -91,16 +91,21 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
       skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
   }
 
-  // Deferred external tools: schemas stay out of the request until activated —
-  // the model sees this compact catalog and calls enable_tools on demand.
-  // The catalog is FROZEN (ignores activation) so the prompt bytes stay stable
-  // across turns; enable_tools' result tells the model what it activated.
+  // Deferred tools: schemas stay out of the request until activated — the
+  // model sees this compact catalog and calls enable_tools on demand. One
+  // list spans both registries (big MCP servers and big installed-tool
+  // bundles); the model needs no idea which is which. The catalog is FROZEN
+  // (ignores activation) so the prompt bytes stay stable across turns;
+  // enable_tools' result tells the model what it activated.
   const mcpStore = useMcpStore()
-  const deferred = mcpStore.deferredCatalog
-  if (deferred.length) {
+  const deferredLines = [
+    ...mcpStore.deferredCatalog.map((t) => catalogEntry(t.qualifiedName, t.def.description)),
+    ...useToolsStore().deferredCatalog.map((s) => catalogEntry(s.name, s.description)),
+  ]
+  if (deferredLines.length) {
     prompt +=
       `\n\nDeferred external tools — not callable until you activate them by calling enable_tools with their exact name(s); activation lasts for this session (tools you already enabled stay callable even though they remain listed here):\n` +
-      deferred.map((t) => catalogEntry(t.qualifiedName, t.def.description)).join('\n')
+      deferredLines.join('\n')
   }
 
   // Browser-bridge guidance appears only when the tools are connected.

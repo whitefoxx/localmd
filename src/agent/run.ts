@@ -29,6 +29,7 @@ import { z } from 'zod'
 import {
   TOOLS,
   httpToolSpecs,
+  allHttpToolSpecs,
   externalToolSpecs,
   allExternalToolSpecs,
   type ExternalToolSpec,
@@ -199,13 +200,6 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     })
   }
 
-  // Installed HTTP tools (Settings → Tools). Always active, like the built-ins.
-  // A tool may not shadow a built-in: the KB's own file and a model-authored
-  // spec both reach this list, and read_file must stay read_file.
-  for (const httpTool of httpToolSpecs()) {
-    if (httpTool.name in tools) continue
-    registerDynamic(httpTool)
-  }
   if (opts.vision) tools['view_image'] = buildViewImageTool(opts.vision, opts, nextToolId)
   if (opts.image) tools['generate_image'] = buildGenerateImageTool(opts.image, opts, nextToolId)
   // Registered in subagents too (as a refusing stub) so the serialized tool
@@ -216,13 +210,31 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     : buildSubagentStub(SUBAGENT_IN_SUBAGENT)
   const staticNames = Object.keys(tools)
 
+  // Installed HTTP tools (Settings → Tools). Registered in full — active AND
+  // deferred — so a big bundle's tool can be enabled mid-turn, but only the
+  // active ones are sent each step (the prefix audit priced one KB's bundles
+  // at ~28% of the always-on prefix, which is what deferral saves).
+  // A tool may not shadow a built-in: the KB's own file and a model-authored
+  // spec both reach this list, and read_file must stay read_file.
+  const registeredHttp = new Set<string>()
+  for (const httpTool of allHttpToolSpecs(opts.sessionId)) {
+    if (httpTool.name in tools) continue
+    registerDynamic(httpTool)
+    registeredHttp.add(httpTool.name)
+  }
+
   // Register EVERY external tool (active + deferred) so a deferred one can be
   // gated into the active set mid-turn; only active names are sent each step.
   for (const ext of allExternalToolSpecs(opts.sessionId)) registerDynamic(ext)
 
-  // Tools sent to the model this step: built-ins + currently-active externals.
+  // Tools sent to the model this step: built-ins + currently-active installed
+  // tools + currently-active externals. The shadow filter keeps a skipped
+  // (built-in-colliding) name from being listed twice.
   const activeToolNames = (): string[] => [
     ...staticNames,
+    ...httpToolSpecs(opts.sessionId)
+      .map((s) => s.name)
+      .filter((n) => registeredHttp.has(n)),
     ...externalToolSpecs(opts.sessionId).map((e) => e.name),
   ]
 

@@ -646,8 +646,14 @@ const enableTools = defineTool({
   }),
   describeCall: (a) => `enable ${a.names.length} tool(s)`,
   run: async ({ names }, ctx) => {
-    const mcp = useMcpStore()
-    const accepted = mcp.activate(ctx.sessionId, names)
+    // Two registries answer to one catalog: MCP servers and installed HTTP
+    // tools defer by the same policy, so activation must span both — the
+    // model has one list and should not need to know which registry a name
+    // came from.
+    const accepted = [
+      ...useMcpStore().activate(ctx.sessionId, names),
+      ...useToolsStore().activate(ctx.sessionId, names),
+    ]
     const unknown = names.filter((n) => !accepted.includes(n))
     if (!accepted.length) {
       return `Error: no matching tools. Unknown: ${unknown.join(', ')}. Use exact names from the deferred-tools catalog in the system prompt.`
@@ -1654,15 +1660,40 @@ export function allExternalToolSpecs(sessionId: string): ExternalToolSpec[] {
  * are no built-in web tools any more: web access is whatever the user installed
  * in Settings → Tools, which is why this list can legitimately be empty.
  */
-export function httpToolSpecs(): ExternalToolSpec[] {
-  const store = useToolsStore()
-  return store.specs.map((spec) => ({
+function toHttpSpec(
+  store: ReturnType<typeof useToolsStore>,
+  spec: HttpToolSpec,
+): ExternalToolSpec {
+  return {
     name: spec.name,
     description: spec.description,
     jsonSchema: httpToolJsonSchema(spec),
     describeCall: (args) => describeHttpCall(spec, args),
-    run: (args, signal) => store.run(spec, args, signal),
-  }))
+    run: async (args, signal) => {
+      const out = await store.run(spec, args, signal)
+      // Same recall contract as MCP tools: a deferred tool that actually ran
+      // earns a slot, so the next session in this KB starts with it active.
+      // Only successful calls count.
+      if (!out.startsWith('Error')) store.rememberUse(spec.name)
+      return out
+    },
+  }
+}
+
+/** The session's currently-ACTIVE installed tools — big bundles stay out
+ *  until enable_tools activates them, exactly like big MCP servers. */
+export function httpToolSpecs(sessionId: string): ExternalToolSpec[] {
+  const store = useToolsStore()
+  return store.activeSpecsFor(sessionId).map((spec) => toHttpSpec(store, spec))
+}
+
+/** ALL installed tools, active AND deferred — registered up front for the
+ *  same reason as allExternalToolSpecs: activation must work mid-turn. */
+export function allHttpToolSpecs(sessionId: string): ExternalToolSpec[] {
+  const store = useToolsStore()
+  return [...store.activeSpecsFor(sessionId), ...store.deferredSpecsFor(sessionId)].map((spec) =>
+    toHttpSpec(store, spec),
+  )
 }
 
 export const TOOLS: ToolSpec[] = [
