@@ -15,13 +15,19 @@ import { extractMentions } from '@/lib/mentions'
 import {
   trimHistory,
   trimCandidates,
-  estimateChars,
-  TRIM_AT_CHARS,
-  COMPACT_AT_CHARS,
   splitForCompaction,
   renderTranscript,
   compactedPrefix,
 } from '@/lib/history'
+import {
+  estimateTokens,
+  measureTokens,
+  anchorFromUsage,
+  anchorAfterShrink,
+  TRIM_AT_TOKENS,
+  COMPACT_AT_TOKENS,
+  type TokenAnchor,
+} from '@/lib/tokenMeter'
 import { isBuiltinToolName } from '@/agent/tools'
 import { t } from '@/i18n'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
@@ -228,6 +234,11 @@ interface ChatSession {
  *  concurrently; neither flag is persisted. */
 interface OpenSession extends ChatSession {
   running: boolean
+  /** Last provider-measured size of `history`, used to price context pressure
+   *  (see lib/tokenMeter). Cleared by anything that rewrites `history` rather
+   *  than appending to it, and re-earned by the next completed turn — so it is
+   *  runtime-only, and a reload simply estimates until the first reply. */
+  tokenAnchor?: TokenAnchor
   /** The user message being re-asked: its text is sitting in the composer, and
    *  sending will branch from just before it rather than continue the leaf.
    *  Transient on purpose — an abandoned edit must not survive a reload. */
@@ -333,6 +344,9 @@ export const useChatStore = defineStore('chat', () => {
   function branchTo(session: OpenSession, leafId: number | null): void {
     session.leafId = leafId
     session.history = rebuildWire(branchPath(session.uiMessages, leafId))
+    // A different conversation, rebuilt at full fidelity: nothing the provider
+    // measured about the old one describes it.
+    session.tokenAnchor = undefined
     void persist(session)
   }
 
@@ -888,6 +902,8 @@ export const useChatStore = defineStore('chat', () => {
       session.profileId = primary.id
       session.provider = providerKind
       session.history = []
+      // Emptied, and priced by a different tokenizer besides.
+      session.tokenAnchor = undefined
     }
 
     const { content, ui } = await prepareUserMessage(trimmed, attachments, selections, tabs, session)
@@ -904,6 +920,8 @@ export const useChatStore = defineStore('chat', () => {
     // Throttle streaming persistence so a reload mid-turn keeps the partial
     // reply (the turn-end persist never runs if the tab is closed first).
     let lastStreamPersist = Date.now()
+    /** Newest main-loop token usage, for the next anchor (see lib/tokenMeter). */
+    let lastMainUsage: { input: number; output: number } | undefined
 
     const onEvent = (e: AgentEvent): void => {
       const parts = assistant.parts
@@ -931,6 +949,10 @@ export const useChatStore = defineStore('chat', () => {
         u.output += e.output
         u.cacheRead += e.cacheRead
         u.cacheWrite = (u.cacheWrite ?? 0) + e.cacheWrite
+        // The displayed total sums every request; the anchor wants the LAST
+        // main-loop one, whose prompt was this conversation at its current
+        // size. Summing steps would multiply it by the step count.
+        if (!e.subagent) lastMainUsage = { input: e.input, output: e.output }
       } else if (e.type === 'tool_result') {
         const p = parts.find((x): x is Extract<MessagePart, { type: 'tool' }> =>
           x.type === 'tool' && x.id === e.id,
@@ -1021,17 +1043,36 @@ export const useChatStore = defineStore('chat', () => {
         // size crosses the threshold, stub everything outside the keep window
         // in one go (the stubs persist — old regions stay byte-stable).
         let hist = session.history as ModelMessage[]
-        if (estimateChars(hist) > TRIM_AT_CHARS) {
-          hist = trimHistory(hist, { recallPaths: await stashTrimmable(session.id, hist) })
+        // Trim is measured on the HISTORY alone, deliberately not on anchored
+        // request pressure. Stubbing old tool results cannot touch the system
+        // prompt and tool schemas, and those are ~20k tokens of every request
+        // here — a threshold mostly consumed by a constant trim cannot reduce
+        // would fire on every send and free nothing.
+        if (estimateTokens(hist) > TRIM_AT_TOKENS) {
+          const beforeTrim = hist
+          hist = trimHistory(beforeTrim, {
+            recallPaths: await stashTrimmable(session.id, beforeTrim),
+          })
+          // Same message count, less content in each. Subtract what went rather
+          // than discarding the anchor: it carries the only measurement of the
+          // always-on prefix, and compaction decides on that total next.
+          session.tokenAnchor = anchorAfterShrink(session.tokenAnchor, beforeTrim, hist)
         }
         // Still huge after trimming → replace the old prefix with a summary —
         // but only when the summary CAN help: `recent` stays verbatim, so if it
         // alone exceeds the threshold, compacting `old` cannot bring the size
         // down and would pay a summarizer call plus a full-prefix cache
         // invalidation for nothing. The next turn's trim frees `recent` instead.
-        if (estimateChars(hist) > COMPACT_AT_CHARS) {
+        // Compaction, unlike trim, exists to keep the whole request inside the
+        // model's window — so it is the one decision that wants anchored
+        // pressure, prompt and tool schemas included.
+        if (measureTokens(hist, session.tokenAnchor) > COMPACT_AT_TOKENS) {
           const split = splitForCompaction(hist)
-          if (split && estimateChars(split.recent) <= COMPACT_AT_CHARS) {
+          // Can summarizing `old` even help? `recent` survives verbatim, so if
+          // it alone is over budget the answer is no. Measured without the
+          // anchor (which prices a whole history, not a slice of one) and
+          // without the fixed prefix — neither is what a summary can shrink.
+          if (split && estimateTokens(split.recent) <= COMPACT_AT_TOKENS) {
             onEvent({ type: 'tool', name: 'compact', detail: 'History too long, compacting context…' })
             try {
               const summary = await summarizeHistory(
@@ -1045,6 +1086,9 @@ export const useChatStore = defineStore('chat', () => {
                 { role: 'assistant', content: prefix.assistant },
                 ...split.recent,
               ]
+              // A different history of a different length — the anchor named
+              // positions in the one that was just replaced.
+              session.tokenAnchor = undefined
             } catch {
               /* summarizer failed — carry on with the full history */
             }
@@ -1085,6 +1129,11 @@ export const useChatStore = defineStore('chat', () => {
             steerPending: () => steerPending(session.id),
           })
           session.history = next
+          // The last step's prompt plus the reply it produced is exactly this
+          // history, priced by the provider — system prompt and tool schemas
+          // included, which no character count could see. Steers appended
+          // below sit past `atLength` and are estimated on top.
+          session.tokenAnchor = anchorFromUsage(lastMainUsage, next.length)
           assistant.wire = (next as ModelMessage[]).slice(base)
           const steers = steerQueue.get(session.id)
           if (!steers?.length) break

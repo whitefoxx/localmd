@@ -14,8 +14,20 @@ export type AgentEvent =
   | { type: 'tool_result'; id: number; ok: boolean; result?: string }
   /** Per-API-request token usage (a turn with tool calls emits several).
    *  cacheRead/cacheWrite let the UI show how much of the input hit the
-   *  provider's prompt cache (billed at a fraction of fresh input). */
-  | { type: 'usage'; input: number; output: number; cacheRead: number; cacheWrite: number }
+   *  provider's prompt cache (billed at a fraction of fresh input).
+   *
+   *  `subagent` marks usage from a delegated context rather than this turn's.
+   *  It still counts towards what the turn COST, but it measures a different
+   *  and much smaller history — so anything reading `input` as "how big is
+   *  this conversation" (lib/tokenMeter's anchor) must skip these. */
+  | {
+      type: 'usage'
+      input: number
+      output: number
+      cacheRead: number
+      cacheWrite: number
+      subagent?: true
+    }
   /** An artifact (self-contained interactive HTML). `pending` fires when the
    *  model STARTS emitting one (its HTML streams for a while) so the chat can
    *  show a loading card; the non-pending event (once written) fills in the

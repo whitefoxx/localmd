@@ -17,8 +17,9 @@
  * cached prefix tokens at a fraction of fresh ones (prefix-match caching), so
  * rewriting history bytes every turn would invalidate the cache from the
  * rewrite point and cost more than the chars it saves. The caller trims only
- * when the serialized size crosses TRIM_AT_CHARS, stubbing everything outside
- * the keep window in one go; between events the history is byte-stable.
+ * when context pressure crosses TRIM_AT_TOKENS (measured by lib/tokenMeter),
+ * stubbing everything outside the keep window in one go; between events the
+ * history is byte-stable.
  *
  * Pure functions over the AI SDK's unified ModelMessage shape; unit-tested.
  * The one effect — storing what a trim is about to destroy — stays with the
@@ -51,24 +52,21 @@ const stub = (chars: number, path?: string) =>
 const IMG_STUB = '[Earlier image trimmed — to view it again, call view_image]'
 const INPUT_STUB = '[trimmed]'
 
-/** Trim when the serialized history exceeds this many characters. Kept well
- *  below COMPACT_AT_CHARS so stubbing gets a chance before summarization. */
-export const TRIM_AT_CHARS = 60_000
-
 /* base64 image payloads live under these keys (user image parts / tool-result
  * file parts); they are not text tokens, so the size estimate replaces them
  * with a fixed-size marker instead of counting megabytes of base64. */
 const MEDIA_KEYS = new Set(['image', 'data', 'base64'])
 const MEDIA_MARK = '[media]'
 
-/** Rough token estimate for threshold checks (CJK ≈1 token/char, EN ≈0.3).
- *  Media payloads count as a constant — an inline screenshot must not look
- *  like 300k chars of text and trigger trimming/compaction spuriously. */
-export function estimateChars(history: unknown): number {
+/** Serialize history for sizing. Media payloads collapse to a constant — an
+ *  inline screenshot must not look like 300k chars of text and trigger
+ *  trimming/compaction spuriously. lib/tokenMeter prices the result. */
+export function serializeForSizing(history: unknown): string {
   return JSON.stringify(history, (key, value) =>
     MEDIA_KEYS.has(key) && typeof value === 'string' && value.length > 1024 ? MEDIA_MARK : value,
-  ).length
+  )
 }
+
 
 /* A user message (not a tool-result carrier — those are role:'tool'). */
 function isRealUserTurn(m: ModelMessage): boolean {
@@ -208,18 +206,10 @@ export function trimCandidates(history: ModelMessage[], opts: TrimOptions = {}):
 
 /* ── compaction: summarize old turns when the history gets huge ──────────── */
 
-/** Compact when the serialized history exceeds this many characters (~70k
- *  tokens of English; CJK runs closer to one token per char, so a
- *  Chinese-heavy session is proportionally larger).
- *
- *  Raised once TRIM took over the bulk: tool results now leave after a single
- *  turn, so a history that still reaches this size is real conversation, and
- *  compaction — a summarizer call plus a full-prefix cache invalidation — is
- *  the expensive last resort rather than routine hygiene. The trim is what
- *  keeps a session inside a provider's window; this number is only the
- *  backstop behind it, and raising it past a model's context would make it no
- *  backstop at all. */
-export const COMPACT_AT_CHARS = 250_000
+/* The threshold that fires compaction is COMPACT_AT_TOKENS in
+ * lib/tokenMeter — the character version it replaced could not tell 70k
+ * tokens of English from 250k of Chinese. */
+
 /** Real user turns kept verbatim after compaction. */
 export const COMPACT_KEEP_TURNS = 2
 /** Transcript cap fed to the summarizer. */

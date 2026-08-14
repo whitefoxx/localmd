@@ -213,6 +213,93 @@ compaction without suppressing a useful one.
   against the minimal-config principle. Revisit only if usage data shows
   compaction cost mattering.
 
+### P5 — the thresholds were measuring the wrong thing (2026-08-14)
+
+Borrowed from DeepSeek Harness, whose `ctx.tokenMeter` prices a session as the
+last real provider usage plus a signed estimate of what changed since. Both of
+our thresholds counted serialized **characters**, which is not a unit anyone
+bills in, and the fix turned up something larger than the bug it was aimed at.
+
+The known problem was language. 250k characters is ~70k tokens of English and
+~250k of Chinese, so one threshold meant two entirely different things: a
+Chinese session compacted far later than intended, or blew the context window
+before the backstop fired at all.
+
+The unknown problem was the prefix. Measured against a real KB through the dev
+server — two turns on the same session, the second one anchored:
+
+| | history estimate | anchored request pressure |
+|---|---|---|
+| turn 1 (no anchor yet) | 1,085 tok | — |
+| turn 2 | 1,154 tok | **21,147 tok** |
+
+The conversation was ~1.2k tokens; the request was 21k. The other ~20k is the
+system prompt plus tool schemas — paid on every step of every turn, and
+completely invisible to a character count of the history. **The old thresholds
+were watching about 5% of actual context pressure.**
+
+- ✅ **`lib/tokenMeter`**: `pressure = anchor.tokens + estimateTokens(appended
+  since)`. The anchor is the last main-loop `usage.inputTokens` plus that step's
+  `outputTokens` — together they price the history exactly as it then stood,
+  prefix included (every provider reports the cached portion *inside* that
+  total, not beside it; verified in `@ai-sdk/anthropic`'s
+  `convert-anthropic-usage.ts` and `@ai-sdk/openai-compatible`, both of which
+  set `inputTokens.total = noCache + cacheRead + cacheWrite`). The heuristic
+  only ever prices the tail, so its error cannot compound over a session.
+- ✅ **CJK-aware estimate**: ~1 token per CJK/kana/hangul character, ~4
+  characters per token otherwise, both rounded against us — the failure that
+  matters is running hygiene too late.
+- ✅ **The two thresholds now measure different things, deliberately.** Trim is
+  decided on `estimateTokens(history)` (20k) because stubbing tool results
+  cannot shrink the prompt or the schemas; handing it the anchored total would
+  let a 20k constant it cannot reduce fire it on every single send and free
+  nothing — the same pathology P4 fixed for compaction. Compaction is decided on
+  anchored pressure (90k) because keeping the whole request inside the window is
+  exactly its job.
+- ✅ **Subagent usage is tagged and never anchored on** (`AgentEvent.usage`
+  gains `subagent?: true`): it flows through the same `onEvent` so its cost
+  shows up, but it prices a throwaway context of its own. Anchoring on it would
+  under-report the main conversation by an order of magnitude, and relying on
+  event ordering to avoid that would have been luck rather than a contract.
+- ✅ **Anchor invalidation is part of the contract**: compaction, branch
+  switching and profile switching all clear `session.tokenAnchor`, and
+  `measureTokens` additionally degrades to a pure estimate when the history has
+  shrunk below `atLength` — the anchor is set in one place and the history is
+  rewritten in several, so a missed clear must read low, never stale-high.
+- ✅ **Trim reprices the anchor instead of clearing it** (`anchorAfterShrink`).
+  Found while verifying, not while designing: the first version cleared on trim
+  like every other rewrite, and the probe showed pressure collapsing 22,776 →
+  1,286 the moment it did. Compaction runs immediately after trim and decides on
+  that number, so clearing there made the one decision that must see the whole
+  request the one decision blind to 20k of it — firing that much late on exactly
+  the sends where hygiene was already needed. A trim preserves message count, so
+  the provider-measured baseline survives and only the estimated size of what
+  was removed is subtracted; the heuristic stays responsible for the delta
+  alone. This is the signed-delta half of dsh's meter, which the first pass
+  borrowed only the anchor from.
+
+Verified in a real browser by the P4 method — the same session and the same
+code with only the thresholds moved, which is what makes it a control:
+
+| Threshold config | `willTrim` | anchor after trim | `willCompact` | banner |
+|---|---|---|---|---|
+| TRIM 100 / COMPACT 50 | true (1,286 > 100) | survived | false (recent 132 > 50) | none |
+| TRIM 100 / COMPACT 5,000 | true (1,363 > 100) | survived, 19,656 | true (recent 141 ≤ 5,000) | shown, history 18 → 6 |
+
+The pair is the point: the guard suppresses a useless compaction without
+suppressing a useful one, and in both rows the anchor carried the prefix
+through the trim so compaction judged 19,656 rather than 1,363. Trim's own
+mechanics (stubbing, `.trace/` stashing, recall paths) were not re-verified
+here — this change touches only the trigger and the anchor, and P4 verified the
+rest against a real session.
+- Runtime-only by choice: an anchor describes one exact `history` array and
+  costs a single turn to re-earn, so it stays off the persisted schema and a
+  reload simply estimates until the first reply.
+
+Removed with it: `estimateChars`, `TRIM_AT_CHARS`, `COMPACT_AT_CHARS`. Leaving
+dead constants named after the old unit would have told the next reader that
+characters were still the live threshold.
+
 ## Validating
 
 Watch the session token tooltip (chat composer status line): after the first

@@ -544,7 +544,12 @@ function buildSubagentTool(opts: RunTurnOptions, nextToolId: () => number): Tool
               // hangs on a decision nobody was shown.
               if (e.type === 'tool') {
                 opts.onEvent({ type: 'tool', name: e.name, detail: `  ↳${tag} ${e.detail}`, args: e.args })
-              } else if (e.type === 'usage' || e.type === 'approval' || e.type === 'approval_result') {
+              } else if (e.type === 'usage') {
+                // Tagged, because this prices the subagent's own throwaway
+                // context. It belongs in the turn's cost and nowhere near any
+                // measure of how large THIS conversation has grown.
+                opts.onEvent({ ...e, subagent: true })
+              } else if (e.type === 'approval' || e.type === 'approval_result') {
                 opts.onEvent(e)
               }
             },

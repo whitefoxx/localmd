@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   trimHistory,
   trimCandidates,
-  estimateChars,
+  serializeForSizing,
   splitForCompaction,
   renderTranscript,
   compactedPrefix,
@@ -172,9 +172,11 @@ describe('trimCandidates', () => {
   })
 })
 
-describe('estimateChars', () => {
+describe('serializeForSizing', () => {
+  const size = (v: unknown): number => serializeForSizing(v).length
+
   it('measures serialized size', () => {
-    expect(estimateChars([{ a: 'xx' }])).toBeGreaterThan(8)
+    expect(size([{ a: 'xx' }])).toBeGreaterThan(8)
   })
 
   it('counts media payloads as a constant, not their base64 length', () => {
@@ -188,14 +190,14 @@ describe('estimateChars', () => {
         ],
       } as unknown as ModelMessage,
     ]
-    expect(estimateChars(withImage)).toBeLessThan(1000)
+    expect(size(withImage)).toBeLessThan(1000)
     // tool-result file parts carry base64 under data.data
     const toolResult = [
       { type: 'file', data: { type: 'data', data: b64 }, mediaType: 'image/png' },
     ]
-    expect(estimateChars(toolResult)).toBeLessThan(500)
+    expect(size(toolResult)).toBeLessThan(500)
     // ordinary long text still counts in full
-    expect(estimateChars([{ type: 'text', text: 'x'.repeat(50_000) }])).toBeGreaterThan(50_000)
+    expect(size([{ type: 'text', text: 'x'.repeat(50_000) }])).toBeGreaterThan(50_000)
   })
 })
 

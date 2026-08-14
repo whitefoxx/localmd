@@ -132,7 +132,14 @@ agent pipeline (docs/token-optimization.md has the full log):
 
 - **Append, don't rewrite.** Never mutate earlier history/prompt bytes on a
   per-turn basis; hygiene (trimming, compaction) runs as discrete batch events
-  behind size thresholds (`TRIM_AT_CHARS` / `COMPACT_AT_CHARS`).
+  behind size thresholds (`TRIM_AT_TOKENS` / `COMPACT_AT_TOKENS`).
+- **Measure context in tokens, anchored on real usage.** `lib/tokenMeter`
+  prices a session as the last provider-reported `inputTokens` plus an estimate
+  of what was appended since, so the heuristic only ever prices the tail. Any
+  code path that rewrites `history` instead of appending to it must clear
+  `session.tokenAnchor` — a stale anchor reports a size the history no longer
+  has. Never anchor on subagent usage (it measures a different, tiny context;
+  those events are tagged `subagent`).
 - **Keep prompt bytes session-stable.** The system prompt's stable/dynamic
   split, the frozen deferred-tools catalog, and byte-identical subagent
   tools+system all exist so the cache prefix survives; don't add content that
