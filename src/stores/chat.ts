@@ -189,6 +189,11 @@ export interface UiMessage {
   attachments?: Attachment[]
   /** Passages the user selected in a file and staged as context (see composer). */
   contexts?: SelectionRef[]
+  /** Browser tabs the user attached to this message (see lib/connectTabs). The
+   *  chips leave the composer when the message is sent, so without this the
+   *  transcript would hold no record of what "summarize this" was pointed at —
+   *  and the one place that record belongs is the message it changed. */
+  tabs?: TabRef[]
   usage?: TokenUsage
   error?: string
   /** The turn ran out of steps rather than finishing. Rendered as an explicit
@@ -706,6 +711,13 @@ export const useChatStore = defineStore('chat', () => {
     session: ChatSession,
   ): Promise<string> {
     let out = trimmed
+    // Browser tabs the user attached to this conversation — addresses only; the
+    // agent reads them through Connect when it needs them. FIRST, and adjacent
+    // to the words it resolves: a picked tab leaves no token in the text the way
+    // `@path` does, so "summarize this" arrives with nothing next to it pointing
+    // at the tab, and the ambient notes below (what file is on screen) read as
+    // the answer instead. Deliberate context leads; ambient context trails.
+    if (tabs.length) out += `\n\n${describeTabs(tabs)}`
     // Ambient current time, so date-aware tasks work without a tool round-trip.
     out += `\n\n${currentTimeNote()}`
     const uploaded = attachments.filter((a) => !a.image).map((a) => a.path)
@@ -786,9 +798,6 @@ export const useChatStore = defineStore('chat', () => {
       )
       out += `\n\n<selected_context>\n${blocks.join('\n\n')}\n</selected_context>`
     }
-    // Browser tabs the user attached to this conversation — addresses only; the
-    // agent reads them through Connect when it needs them.
-    if (tabs.length) out += `\n\n${describeTabs(tabs)}`
     return out
   }
 
@@ -845,6 +854,7 @@ export const useChatStore = defineStore('chat', () => {
       parts: [{ type: 'text', text: trimmed }],
       attachments: attachments.length ? [...attachments] : undefined,
       contexts: selections.length ? [...selections] : undefined,
+      tabs: tabs.length ? [...tabs] : undefined,
     }
     return { content, ui }
   }

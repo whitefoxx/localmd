@@ -820,12 +820,15 @@ async function send(): Promise<void> {
   const text = input.value
   const atts = [...attachments.value]
   const sels = [...composer.refs]
-  // Attached tabs are NOT cleared: they belong to the conversation, not to the
-  // message, so the follow-up asks about the same pages without re-picking.
+  // Staged for this message and let go with it, like the quote chips: a chip
+  // left above an empty box claims the NEXT message is about that page too. The
+  // address is in the message that just went, and stays in the wire history, so
+  // a follow-up still has the tab_id.
   const tabs = [...composer.tabs]
   input.value = ''
   attachments.value = []
   composer.clear()
+  composer.clearTabs()
   revokeAllThumbs()
   mentionOpen.value = false
   await chat.send(text, atts, sels, tabs)
@@ -1168,6 +1171,23 @@ watch(
           class="rounded-lg bg-accent/10 border px-3 py-2 selectable text-fg-0 transition-colors"
           :class="chat.editing?.id === m.id ? 'border-accent reask-target' : 'border-accent/20'"
         >
+          <!-- Browser tabs this message was pointed at. Above the text, where
+               they sat in the composer, and kept here because the composer lets
+               them go on send: a bare "summarize this" is unreadable later
+               without the record of what "this" was. Not a link — the tab is a
+               live page, and re-opening its address is a different page (see
+               connectTabs); the address is in the tooltip for the eye only. -->
+          <div v-if="m.tabs?.length" class="flex flex-wrap gap-1.5" :class="{ 'mb-1.5': userText(m) || m.contexts?.length }">
+            <div
+              v-for="t in m.tabs"
+              :key="`t${t.tabId}`"
+              class="flex items-center gap-1 max-w-full text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+              :title="`${t.title}\n${t.url}`"
+            >
+              <span class="codicon codicon-sm codicon-globe shrink-0" />
+              <span class="truncate min-w-0">{{ t.title }}</span>
+            </div>
+          </div>
           <!-- Quoted passages the user attached — shown above the message. Each
                chip carries a snippet of the selected text; hovering reveals the
                full passage (the agent always received the full text). -->
@@ -1690,9 +1710,9 @@ watch(
           </div>
         </div>
 
-        <!-- Browser tabs attached to this conversation (localmd Connect). They
-             outlive the message on purpose — see composer.tabs — so the chips
-             stay put after sending and the follow-up needs no re-picking. -->
+        <!-- Browser tabs staged for the next message (localmd Connect). They go
+             with it — see composer.tabs — so this row is empty again the moment
+             it is sent. -->
         <div v-if="composer.tabs.length" class="flex flex-wrap gap-1.5 px-3 pt-2.5">
           <div
             v-for="tab in composer.tabs"

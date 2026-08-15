@@ -41,7 +41,7 @@ export default {
     mentionFiles: 'Files',
     mentionTabs: 'Browser tabs',
     tabsLoading: 'Reading your open tabs…',
-    tabAttached: 'The agent can read this tab for the rest of this conversation',
+    tabAttached: 'The agent will read this tab to answer the message you send next',
     removeTab: 'Detach this tab',
     noModelTitle: 'Pick a model first',
     noModelDesc:
@@ -147,7 +147,7 @@ export default {
     mentionFiles: '文件',
     mentionTabs: '浏览器标签页',
     tabsLoading: '正在读取你打开的标签页…',
-    tabAttached: '本次对话里 agent 都可以读这个标签页',
+    tabAttached: '接下来发出的这条消息，agent 会去读这个标签页',
     removeTab: '取消引用这个标签页',
     noModelTitle: '先选一个模型',
     noModelDesc:

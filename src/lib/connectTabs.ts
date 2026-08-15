@@ -106,15 +106,28 @@ export function filterTabs<T extends BrowserTab>(tabs: T[], query: string, limit
  * repeats on every message of the conversation because the list is the user's
  * live answer to "which pages are we talking about" — they add and drop tabs
  * mid-conversation, and a block sent once would go stale silently.
+ *
+ * It has to say who it is FOR, not just what it holds. Picking a tab leaves no
+ * token in the message the way `@path` does — the text stays a bare "summarize
+ * this" — so the model arrives at those words with two candidate targets, the
+ * tab and whatever file is open in the editor, and the ambient "currently
+ * viewing" note is the more assertive of the two. Naming that conflict here is
+ * the fix: an explicit pick outranks what happens to be on screen, and the
+ * block that knows a pick was made is the one place that can say so.
  */
 export function describeTabs(tabs: BrowserTab[]): string {
   if (!tabs.length) return ''
   const rows = tabs.map((t) => `- tab_id ${t.tabId} · ${t.title}${t.url ? ` · ${t.url}` : ''}`)
   return (
     '<browser_tabs>\n' +
-    'Open browser tabs the user has pointed you at. Their contents are NOT included — ' +
-    'read what you need with the browser tools, passing the tab_id shown here ' +
-    '(get_page_text, find_in_page, …; enable_tools first).\n' +
+    'The user PICKED these open browser tabs and attached them to this message — a ' +
+    'deliberate choice of what to talk about, not ambient context. A message that ' +
+    'points at something without naming it ("this", "the page", "summarize it", or no ' +
+    'target at all) means these tabs: NOT the file open in the editor, not anything ' +
+    'else on screen. Only a message that names some other target outranks them.\n' +
+    'Their contents are NOT included — read what you need with the browser tools, ' +
+    'passing the tab_id shown here (get_page_text, find_in_page, …; enable_tools ' +
+    'first), before answering anything that depends on what the page says.\n' +
     'Read the TAB, not the URL. Fetching the address again gets a signed-out, ' +
     'freshly-loaded page — a different page from the one the user is looking at, ' +
     'whenever a login, a search they typed, or anything else the tab is holding ' +

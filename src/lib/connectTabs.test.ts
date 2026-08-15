@@ -121,6 +121,16 @@ describe('describeTabs', () => {
     expect(block).toMatch(/NOT included/)
   })
 
+  // A picked tab leaves no token in the message text, so a bare "summarize
+  // this" reaches the model with the editor's open file as a rival target —
+  // and the ambient "currently viewing" note is the assertive one. The block
+  // has to settle that, or the agent summarizes the wrong thing.
+  it('says a picked tab outranks whatever file is open on screen', () => {
+    const block = describeTabs(parseTabs(REAL))
+    expect(block).toMatch(/PICKED/)
+    expect(block).toMatch(/NOT the file open in the editor/)
+  })
+
   it('is empty when nothing is attached, so no bytes are spent', () => {
     expect(describeTabs([])).toBe('')
   })

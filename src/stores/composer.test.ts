@@ -44,16 +44,28 @@ describe('composer — attached browser tabs', () => {
     await nextTick()
   })
 
-  it('keeps the tabs attached across sends — they belong to the conversation', async () => {
+  it('stages several tabs, and lets one go on the ✕', async () => {
     const composer = useComposerStore()
     await openSession('s1')
     composer.attachTab(tab(1))
     composer.attachTab(tab(2))
 
     expect(composer.tabs.map((t) => t.tabId)).toEqual([1, 2])
-    // Nothing in the store clears them: only the ✕ (detachTab) does.
     composer.detachTab(1)
     expect(composer.tabs.map((t) => t.tabId)).toEqual([2])
+  })
+
+  // A chip left above an empty box would claim the NEXT message is about that
+  // page too — a claim the user never made. The address is not lost with it:
+  // it went out inside the message and stays in the wire history.
+  it('lets the staged tabs go with the message that carried them', async () => {
+    const composer = useComposerStore()
+    await openSession('s1')
+    composer.attachTab(tab(1))
+    composer.attachTab(tab(2))
+
+    composer.clearTabs()
+    expect(composer.tabs).toEqual([])
   })
 
   it('re-attaching a tab updates it in place instead of doubling it', async () => {

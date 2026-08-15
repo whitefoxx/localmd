@@ -113,19 +113,21 @@ distill it. It will not do it on its own.
 ## Pointing it at a browser tab
 
 With localmd Connect installed (see `tools`), **@** also lists the pages you
-have open in your browser. Pick one and it becomes a chip above the box: the
-assistant can now read that tab for the rest of the conversation, so a
-follow-up needs no re-picking. Pick several and it can compare them. The ✕ on a
-chip lets a page go.
+have open in your browser. Pick one and it becomes a chip above the box. Type
+**@** again to add another — pick several and the assistant can compare them.
+The ✕ on a chip lets a page go.
+
+The chips go with the message you send next, and the row is empty again
+afterwards. That is the whole point of them: a chip means *this* message is
+about that page, so "summarize this" is about the tab you picked and not about
+whatever file you happen to have open in the editor. A follow-up still works
+without re-picking — the address stays in the conversation.
 
 What travels with your message is the address of the tab, not a copy of the
 page: the assistant reads it when it needs it, and reads it *then* rather than
 when you picked it. That matters more than it sounds — it reads the tab as you
 have it, signed in, with whatever you searched or filtered still on screen,
 which is a different page from what the same address gives a stranger.
-
-Tabs belong to the conversation they were picked in. A new conversation starts
-with none, and the ones you picked earlier are still there when you switch back.
 
 ## When it cannot reach the web
 

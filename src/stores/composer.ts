@@ -118,12 +118,17 @@ export const useComposerStore = defineStore('composer', () => {
   /* ── attached browser tabs (localmd Connect) ───────────────────────────── */
 
   /**
-   * Tabs stay attached for the whole conversation, not for one message: "talk
-   * to these pages" is what the conversation is ABOUT, and re-picking them
-   * before every follow-up would make the feature cost more than the search it
-   * saves. So they are keyed by session — including `null`, which is the
-   * conversation that does not exist yet, since picking tabs before typing the
-   * first message is the ordinary way to start one.
+   * Tabs are staged for ONE message and cleared when it is sent — the chip
+   * above the box means "this message is about that page", so a chip still
+   * sitting there afterwards is a claim about the next message that the user
+   * never made. Nothing is lost by letting it go: the address travels inside
+   * the sent message and stays in the wire history, so a follow-up still has
+   * the tab_id to read from.
+   *
+   * They are keyed by session anyway, because staging survives a switch between
+   * chat tabs — including `null`, the conversation that does not exist yet,
+   * since picking tabs before typing the first message is the ordinary way to
+   * start one.
    */
   const tabsBySession = ref(new Map<string | null, TabRef[]>())
   const chat = useChatStore()
@@ -146,6 +151,11 @@ export const useComposerStore = defineStore('composer', () => {
 
   function detachTab(tabId: number): void {
     setTabs(tabs.value.filter((t) => t.tabId !== tabId))
+  }
+
+  /** Drop every staged tab — what sending does, alongside `clear()`. */
+  function clearTabs(): void {
+    if (tabs.value.length) setTabs([])
   }
 
   // Staged context belongs to the KB it was selected in — drop it on KB switch.
@@ -183,5 +193,6 @@ export const useComposerStore = defineStore('composer', () => {
     tabs,
     attachTab,
     detachTab,
+    clearTabs,
   }
 })
