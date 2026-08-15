@@ -63,6 +63,10 @@ external pages — see `tools`.
 A knowledge base collects more than documents, and most of it opens right in
 the tab:
 
+- **Anything that is text** opens in the editor, whatever it is called — a
+  configuration file, a script, a file with no extension at all. What decides
+  is the content, not the name: a file only refuses to open when its bytes
+  really are not text, or when it is far too large to hold in a browser tab.
 - **Images** display, and **audio and video** play with the browser's own
   controls. Nothing is converted or uploaded — the file plays straight from
   your folder.
@@ -74,8 +78,8 @@ the tab:
   and pictures. The original slide layout is not reproduced, and the view says
   so.
 
-These are previews: you can read them, but the assistant does not index or
-cite them the way it does PDFs, EPUBs and Word files. The old binary Office
+Images, tables and decks are previews: you can read them, but the assistant
+does not index or cite them the way it does PDFs, EPUBs and Word files. The old binary Office
 formats (`.doc`, `.xls`, `.ppt`) predate what a browser can read — opening one
 explains how to save it in the modern format instead.
 
