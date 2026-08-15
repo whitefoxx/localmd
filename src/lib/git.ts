@@ -12,6 +12,7 @@ import { Buffer } from 'buffer'
 import git from 'isomorphic-git'
 import { gitFs, onIndexWriteConflict, withReadOnlyIndex } from '@/lib/gitfs'
 import * as kb from '@/lib/fs'
+import { isTextName } from '@/lib/filetypes'
 
 // isomorphic-git expects Node's Buffer as a global; Vite doesn't polyfill it.
 const g = globalThis as unknown as { Buffer?: unknown }
@@ -76,13 +77,12 @@ export async function headOid(): Promise<string | null> {
   }
 }
 
-/** Binary/media files are excluded from status + in-app commits. */
-const BINARY_RE =
-  /\.(pdf|epub|png|jpe?g|gif|webp|bmp|avif|tiff?|ico|heic|svg|mp3|wav|m4a|flac|aac|ogg|opus|mp4|mov|webm|mkv|avi|m4v|zip|gz|xlsx?|docx?|pptx?|parquet|bin|dat)$/i
-
+/** Binary/media files are excluded from content status + in-app commits — they
+ *  are detected by index membership instead (see status()). Which names count
+ *  as text is lib/filetypes' call, not a second list to keep in step. */
 export function statusEligible(filepath: string): boolean {
   if (filepath === '.trace' || filepath.startsWith('.trace/')) return false
-  return !BINARY_RE.test(filepath)
+  return isTextName(filepath)
 }
 
 /** In-app add cap for binary files — aligned with the GitHub Data API's 100MB

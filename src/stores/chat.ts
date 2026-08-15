@@ -752,13 +752,20 @@ export const useChatStore = defineStore('chat', () => {
             continue
           }
         }
-        const content = await fs.tryReadFile(p)
-        if (content === null) {
-          blocks.push(`@${p}: (file does not exist)`)
-        } else if (content.length <= INLINE_MENTION_CHARS) {
-          blocks.push(`@${p} contents:\n\`\`\`\n${content}\n\`\`\``)
+        // The extension only guessed that this is text; the bytes decide.
+        const read = await fs.readTextFile(p)
+        if (!read.ok) {
+          blocks.push(
+            read.reason === 'missing'
+              ? `@${p}: (file does not exist)`
+              : read.reason === 'binary'
+                ? `@${p}: binary file — it has no readable text content.`
+                : `@${p}: file is too large to read as text.`,
+          )
+        } else if (read.text.length <= INLINE_MENTION_CHARS) {
+          blocks.push(`@${p} contents:\n\`\`\`\n${read.text}\n\`\`\``)
         } else {
-          blocks.push(`@${p}: file is large (${content.length} characters) — use read_file to read it.`)
+          blocks.push(`@${p}: file is large (${read.text.length} characters) — use read_file to read it.`)
         }
       }
       out += `\n\n<referenced_files>\n${blocks.join('\n\n')}\n</referenced_files>`

@@ -158,12 +158,22 @@ async function onDrop(e: DragEvent): Promise<void> {
   if (git.isRepo) void git.refresh() // new files show as U immediately
 }
 
-const kind = computed(() => (files.currentPath ? fileKind(files.currentPath) : null))
+/** A name only guesses at a file's kind; the bytes decide (see lib/filetypes).
+ *  When the read came back unreadable, every text-shaped view is off and the
+ *  placeholder below explains why — one branch for both causes. */
+const kind = computed(() => {
+  if (!files.currentPath) return null
+  return files.unreadable ? 'binary' : fileKind(files.currentPath)
+})
 const isMarkdown = computed(() => kind.value === 'markdown')
 // .txt gets a serif reading view with the same Edit/Preview toggle as markdown.
-const isPlainText = computed(() => (files.currentPath ? isProseText(files.currentPath) : false))
+const isPlainText = computed(
+  () => !files.unreadable && !!files.currentPath && isProseText(files.currentPath),
+)
 // .csv/.tsv get a table view behind the same toggle.
-const isTabularFile = computed(() => (files.currentPath ? isTabular(files.currentPath) : false))
+const isTabularFile = computed(
+  () => !files.unreadable && !!files.currentPath && isTabular(files.currentPath),
+)
 
 /** PDF and EPUB carry the zen toggle in their own toolbars; anything else needs
  *  the escape hatch below, or it would have no visible way back. */
@@ -185,7 +195,9 @@ function onZenMove(e: MouseEvent): void {
 
 /* Annotation sidecars (*.annotations.json) always render as the annotations
    page — no raw-JSON view in-app. */
-const isAnnotations = computed(() => !!files.currentPath && isAnnotationsPath(files.currentPath))
+const isAnnotations = computed(
+  () => !files.unreadable && !!files.currentPath && isAnnotationsPath(files.currentPath),
+)
 
 /** Read aloud: the current text selection if there is one, else the whole
    markdown/plain-text file (markdown stripped to prose first). The button uses
@@ -572,7 +584,11 @@ function closeKb(): void {
               <div v-else class="h-full flex items-center justify-center text-fg-3">
                 <div class="text-center">
                   <span class="codicon codicon-lg codicon-file-binary block mb-2" />
-                  {{ $t('layout.binaryNoPreview') }}
+                  {{
+                    files.unreadable === 'too-large'
+                      ? $t('layout.tooLargeNoPreview')
+                      : $t('layout.binaryNoPreview')
+                  }}
                 </div>
               </div>
             </template>

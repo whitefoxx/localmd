@@ -24,7 +24,7 @@ import {
 } from '@/lib/github'
 import { applyEdit } from '@/lib/edits'
 import { renderFileList } from '@/lib/fileList'
-import { fileKind } from '@/lib/filetypes'
+import { isTextName } from '@/lib/filetypes'
 import { refreshGitStatus } from '@/lib/fileOps'
 import { isAnnotationsPath, renderAnnotationsDigest } from '@/lib/annotations'
 import {
@@ -235,7 +235,7 @@ const readFile = defineTool({
   }),
   describeCall: (a) => `read ${a.path}${a.offset ? ` @${a.offset}` : ''}`,
   run: async ({ path, offset }) => {
-    let content: string | null
+    let content: string
     if (isAnnotationsPath(path)) {
       // Highlight sidecars are rect/CFI-heavy JSON — serve the rendered digest,
       // which is what annotation Q&A actually needs. Unparseable → raw JSON.
@@ -254,9 +254,15 @@ const readFile = defineTool({
       }
       return `Error: ${path} is a ${kind.toUpperCase()} without an AI index yet. Call index_document with this path first, then read the generated index.`
     } else {
-      content = await fs.tryReadFile(path)
+      const read = await fs.readTextFile(path)
+      if (!read.ok) {
+        if (read.reason === 'missing') return `Error: file not found: ${path}`
+        return read.reason === 'binary'
+          ? `Error: ${path} holds binary data, not text — there is nothing to read.`
+          : `Error: ${path} is too large to read as text.`
+      }
+      content = read.text
     }
-    if (content === null) return `Error: file not found: ${path}`
     return clip(content, offset)
   },
 })
@@ -320,10 +326,16 @@ function guardPath(path: string, what: string): string | null {
 }
 
 /** Files we can read and write back as a string — the ones content search can
- *  scan and the review panel can restore after a delete. */
-function isTextFile(path: string): boolean {
-  const kind = fileKind(path)
-  return kind === 'markdown' || kind === 'text' || kind === 'html'
+ *  scan and the review panel can restore after a delete. Named kinds only: the
+ *  bytes get the last word wherever one is actually read. */
+const isTextFile = isTextName
+
+/** The `before` snapshot the review panel restores from — null when the file
+ *  has no text to snapshot, which is what makes a deletion final. */
+async function textSnapshot(path: string): Promise<string | null> {
+  if (!isTextFile(path)) return null
+  const read = await fs.readTextFile(path)
+  return read.ok ? read.text : null
 }
 
 /** Listing of everything a recursive delete would remove, for the approval diff. */
@@ -361,7 +373,7 @@ const deletePath = defineTool({
       return `Error: ${target} is a directory. Pass recursive: true to delete it and everything inside — after checking with the user that this is what they want.`
     }
     const listing = isDir ? await dirListing(target) : null
-    const before = isDir ? listing!.text : isTextFile(target) ? await fs.tryReadFile(target) : null
+    const before = isDir ? listing!.text : await textSnapshot(target)
     const restorable = !isDir && before !== null
     // Ask when the user reviews every write — and always when the deletion is
     // final, since there is no snapshot to undo it with.
@@ -568,9 +580,11 @@ const searchFiles = defineTool({
       // Reading every text file in a large KB is the one built-in that can run
       // for a while; give up as soon as the user stops the turn.
       if (ctx.signal?.aborted) return 'Search stopped.'
-      const content = await fs.tryReadFile(p)
-      if (!content) continue
-      const lines = content.split('\n')
+      // A name can only guess at text; a file whose bytes say otherwise is
+      // skipped rather than grepped for accidental matches in its binary noise.
+      const read = await fs.readTextFile(p)
+      if (!read.ok) continue
+      const lines = read.text.split('\n')
       for (let i = 0; i < lines.length && out.length < MAX_SEARCH_RESULTS; i++) {
         if (match(lines[i])) out.push(`${p}:${i + 1}: ${lines[i].trim().slice(0, 200)}`)
       }
@@ -1362,7 +1376,14 @@ const gitRestore = defineTool({
         failed.push(`${path} (not in HEAD)`)
         continue
       }
-      const before = await fs.tryReadFile(path)
+      // …and a working copy whose bytes are binary tells us the name lied,
+      // whatever extension it wears.
+      const read = await fs.readTextFile(path)
+      if (!read.ok && read.reason !== 'missing') {
+        failed.push(`${path} (binary — restore it from a terminal)`)
+        continue
+      }
+      const before = read.ok ? read.text : null
       if (before === head) {
         failed.push(`${path} (already matches HEAD)`)
         continue

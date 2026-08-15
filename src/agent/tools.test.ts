@@ -243,6 +243,16 @@ describe('read_file', () => {
   it('rejects an offset past the end instead of returning nothing', async () => {
     expect(await read({ path: 'wiki/note.md', offset: 9999 })).toContain('past the end')
   })
+
+  it('reads a config file no extension list knows about', async () => {
+    await fs.writeFile('.env', 'KEY=value\n')
+    expect(await read({ path: '.env' })).toBe('KEY=value\n')
+  })
+
+  it('says a file is binary rather than handing over its bytes as text', async () => {
+    await fs.writeFile('data/blob.unknown', new Blob([new Uint8Array([1, 0, 2])]))
+    expect(await read({ path: 'data/blob.unknown' })).toContain('binary data')
+  })
 })
 
 describe('search_files', () => {
@@ -269,6 +279,15 @@ describe('search_files', () => {
   it('finds files by path with names: true, binaries included', async () => {
     const out = await search({ query: 'paper', names: true })
     expect(out).toBe('raw/papers/paper.pdf')
+  })
+
+  it('greps a config file with no known extension, and skips binary bytes', async () => {
+    await fs.writeFile('.env', 'API_TOKEN=secret\n')
+    await fs.writeFile('data/blob.unknown', new Blob([new TextEncoder().encode('API\0token')]))
+
+    const out = await search({ query: 'api' })
+    expect(out).toContain('.env:1:')
+    expect(out).not.toContain('blob.unknown')
   })
 
   it('says so when nothing matches', async () => {

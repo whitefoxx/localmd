@@ -24,6 +24,9 @@ export const useFilesStore = defineStore('files', () => {
    *  tab is just a path — content loads when it becomes current. */
   const openTabs = ref<string[]>([])
   const content = ref('')
+  /** Why the current file has no editor behind it: its bytes are not text, or
+   *  it is too big to hold in a buffer. Null whenever `content` is the file. */
+  const unreadable = ref<'binary' | 'too-large' | null>(null)
   const saveState = ref<SaveState>('saved')
   const mode = ref<'edit' | 'preview'>('preview')
   /** The tree node the user has selected (file OR directory) — drives the row
@@ -211,26 +214,35 @@ export const useFilesStore = defineStore('files', () => {
     if (currentPath.value === path) return
     await flush()
     if (isTextual(path)) {
-      let text = await fs.tryReadFile(path)
-      if (text === null) {
-        // An annotations sidecar is only written by the first highlight, so
-        // until then "missing" means "nothing highlighted yet" — the reader's
-        // View annotations button has to open the empty view rather than do
-        // nothing, and the view says so itself.
-        if (isAnnotationsPath(path)) text = ''
-        else {
-          // Nothing to open. Don't leave behind the tab we just created for it;
-          // a tab the user already had stays, because its file may come back.
-          if (!wasOpen) openTabs.value = openTabs.value.filter((p) => p !== path)
-          return
-        }
+      const read = await fs.readTextFile(path)
+      // An annotations sidecar is only written by the first highlight, so until
+      // then "missing" means "nothing highlighted yet" — the reader's View
+      // annotations button has to open the empty view rather than do nothing,
+      // and the view says so itself.
+      const emptyIsFine = isAnnotationsPath(path)
+      if (!read.ok && read.reason === 'missing' && !emptyIsFine) {
+        // Nothing to open. Don't leave behind the tab we just created for it;
+        // a tab the user already had stays, because its file may come back.
+        if (!wasOpen) openTabs.value = openTabs.value.filter((p) => p !== path)
+        return
       }
       currentPath.value = path
-      content.value = text
-      loadedMtime = await fs.statMtime(path)
+      if (read.ok) {
+        unreadable.value = null
+        content.value = read.text
+        loadedMtime = await fs.statMtime(path)
+      } else {
+        // The name said text and the bytes disagreed (or there are too many of
+        // them). Show the placeholder rather than a screenful of mojibake, and
+        // keep the buffer empty so nothing can be saved back over the file.
+        unreadable.value = read.reason === 'missing' ? null : read.reason
+        content.value = ''
+        loadedMtime = null
+      }
     } else {
       // Binary formats (image/pdf/epub) are loaded by their viewer components.
       currentPath.value = path
+      unreadable.value = null
       content.value = ''
       loadedMtime = null
     }
@@ -238,6 +250,7 @@ export const useFilesStore = defineStore('files', () => {
   }
 
   function onEdited(next: string): void {
+    if (unreadable.value) return // no editor is mounted over a file we can't read
     if (next === content.value) return
     content.value = next
     saveState.value = 'dirty'
@@ -273,16 +286,15 @@ export const useFilesStore = defineStore('files', () => {
     await refreshTree()
     if (!currentPath.value || saveState.value !== 'saved' || !isTextual(currentPath.value)) return
     const mtime = await fs.statMtime(currentPath.value)
-    if (mtime !== null && loadedMtime !== null && mtime > loadedMtime) {
-      const text = await fs.tryReadFile(currentPath.value)
-      if (text !== null) {
-        content.value = text
-        loadedMtime = mtime
-      }
-    } else if (mtime === null) {
+    if (mtime === null) {
       // File was deleted externally.
       currentPath.value = null
       content.value = ''
+      unreadable.value = null
+    } else if (unreadable.value || (loadedMtime !== null && mtime > loadedMtime)) {
+      // An unreadable file carries no mtime to compare against, and whatever
+      // made it unreadable may have been replaced with text since.
+      await reloadIfClean(currentPath.value)
     }
   }
 
@@ -290,12 +302,19 @@ export const useFilesStore = defineStore('files', () => {
    *  edits — used after agent writes and review discards. */
   async function reloadIfClean(path: string): Promise<void> {
     if (currentPath.value !== path || saveState.value !== 'saved' || !isTextual(path)) return
-    const text = await fs.tryReadFile(path)
-    if (text === null) {
-      closeCurrent()
+    const read = await fs.readTextFile(path)
+    if (!read.ok) {
+      if (read.reason === 'missing') {
+        closeCurrent()
+        return
+      }
+      unreadable.value = read.reason
+      content.value = ''
+      loadedMtime = null
       return
     }
-    content.value = text
+    unreadable.value = null
+    content.value = read.text
     loadedMtime = await fs.statMtime(path)
   }
 
@@ -312,6 +331,7 @@ export const useFilesStore = defineStore('files', () => {
     }
     currentPath.value = null
     content.value = ''
+    unreadable.value = null
     saveState.value = 'saved'
   }
 
@@ -332,6 +352,7 @@ export const useFilesStore = defineStore('files', () => {
     } else {
       currentPath.value = null
       content.value = ''
+      unreadable.value = null
       saveState.value = 'saved'
     }
   }
@@ -359,6 +380,7 @@ export const useFilesStore = defineStore('files', () => {
         await openFile(openTabs.value[Math.min(curIdx, openTabs.value.length - 1)])
       } else {
         content.value = ''
+        unreadable.value = null
         saveState.value = 'saved'
       }
     }
@@ -425,6 +447,7 @@ export const useFilesStore = defineStore('files', () => {
       if (next) await openFile(next)
       else {
         content.value = ''
+        unreadable.value = null
         saveState.value = 'saved'
       }
     } else {
@@ -450,6 +473,7 @@ export const useFilesStore = defineStore('files', () => {
     openTabs,
     closeTab,
     content,
+    unreadable,
     saveState,
     mode,
     selectedPath,

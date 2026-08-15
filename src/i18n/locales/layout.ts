@@ -23,6 +23,7 @@ export default {
     readAloud: 'Read aloud (reads the selection if there is one)',
     selection: 'Selection',
     binaryNoPreview: 'Binary file — no preview',
+    tooLargeNoPreview: 'File is too large to open here',
     emptyFolderTitle: 'This folder is empty',
     scaffoldDesc:
       'You can initialize it as a knowledge base: create raw/ (source collection), wiki/ (LLM-maintained pages), AGENTS.md (conventions), and three starter skills (ingest / lint / harvest). Nothing outside this folder is touched, and existing files are never overwritten.',
@@ -60,6 +61,7 @@ export default {
     readAloud: '朗读（有选中则读选中）',
     selection: '选中内容',
     binaryNoPreview: '二进制文件——无法预览',
+    tooLargeNoPreview: '文件太大，无法在这里打开',
     emptyFolderTitle: '这个文件夹还是空的',
     scaffoldDesc:
       '可以初始化为知识库：创建 raw/（源文件收集）、wiki/（LLM 维护的页面）、AGENTS.md（约定），以及 ingest / lint / harvest 三个起步技能。只在这个文件夹内创建，已有文件不会被覆盖。',

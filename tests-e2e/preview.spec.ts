@@ -231,3 +231,18 @@ test('a PowerPoint deck previews as an outline with pictures', async ({ page }) 
   // And the header is honest about what this view is.
   await expect(page.getByText(/Outline view/)).toBeVisible()
 })
+
+test('a name nobody recognises opens as text, and only real bytes say binary', async ({ page }) => {
+  await openWith(page, [
+    ['.env', 'OPENAI_API_KEY=sk-test\n'],
+    // Same unknown extension, bytes that are not text (a zip header with NULs).
+    ['blob.unknown', Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x41, 0x42])],
+  ])
+
+  await openFromTree(page, '.env')
+  await expect(page.locator('.cm-content')).toContainText('OPENAI_API_KEY=sk-test')
+
+  await openFromTree(page, 'blob.unknown')
+  await expect(page.locator('.cm-editor')).toHaveCount(0)
+  await expect(page.getByText('Binary file — no preview')).toBeVisible()
+})

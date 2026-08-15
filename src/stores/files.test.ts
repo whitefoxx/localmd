@@ -81,3 +81,56 @@ describe('files store — openFile with a file that is not there', () => {
     expect(files.openTabs).toContain('wiki/index.md')
   })
 })
+
+describe('files store — text is decided by the bytes, not the extension', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    fs.setRoot(createMemoryRoot())
+    await fs.writeFile('.env', 'OPENAI_API_KEY=sk-test\n')
+    await fs.writeFile('wiki/index.md', 'I')
+    await fs.writeFile('data/blob.unknown', new Blob([new Uint8Array([1, 0, 2, 0])]))
+    await useFilesStore().refreshTree()
+  })
+
+  it('opens a file with no known extension as text', async () => {
+    const files = useFilesStore()
+    await files.openFile('.env')
+
+    expect(files.currentPath).toBe('.env')
+    expect(files.content).toBe('OPENAI_API_KEY=sk-test\n')
+    expect(files.unreadable).toBe(null)
+  })
+
+  it('shows the placeholder instead of mojibake when the bytes are binary', async () => {
+    const files = useFilesStore()
+    await files.openFile('data/blob.unknown')
+
+    expect(files.currentPath).toBe('data/blob.unknown')
+    expect(files.unreadable).toBe('binary')
+    expect(files.content).toBe('')
+    // No editor is mounted over it, and nothing can save an empty buffer back.
+    files.onEdited('clobber')
+    expect(files.saveState).toBe('saved')
+    expect(files.content).toBe('')
+  })
+
+  it('clears the placeholder when the next file is readable', async () => {
+    const files = useFilesStore()
+    await files.openFile('data/blob.unknown')
+    await files.openFile('wiki/index.md')
+
+    expect(files.unreadable).toBe(null)
+    expect(files.content).toBe('I')
+  })
+
+  it('picks the file up once its bytes become text', async () => {
+    const files = useFilesStore()
+    await files.openFile('data/blob.unknown')
+    await fs.writeFile('data/blob.unknown', 'now text\n')
+
+    await files.reloadIfClean('data/blob.unknown')
+
+    expect(files.unreadable).toBe(null)
+    expect(files.content).toBe('now text\n')
+  })
+})

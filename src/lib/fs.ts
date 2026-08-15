@@ -9,6 +9,8 @@
  * and commits atomically on close(), so interrupted writes never corrupt files.
  */
 
+import { looksBinary, SNIFF_BYTES } from '@/lib/filetypes'
+
 export interface TreeNode {
   name: string
   path: string
@@ -107,6 +109,34 @@ export async function tryReadFile(path: string): Promise<string | null> {
     if ((err as DOMException).name === 'NotFoundError') return null
     throw err
   }
+}
+
+export type TextRead =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'missing' | 'binary' | 'too-large' }
+
+/** Largest file we will hold in an editor buffer as a string. Past this the
+ *  browser tab is what breaks, so refusing is the readable outcome. */
+export const MAX_TEXT_BYTES = 50 * 1024 * 1024
+
+/**
+ * Read `path` as text, checking the bytes first — the counterpart to
+ * `fileKind`'s optimistic naming rule (see lib/filetypes). Callers that show a
+ * file to a human or to the model use this; `tryReadFile` stays the raw read
+ * for content we wrote ourselves and already know the shape of.
+ */
+export async function readTextFile(path: string): Promise<TextRead> {
+  let file: File
+  try {
+    file = await getFile(path)
+  } catch (err) {
+    if ((err as DOMException).name === 'NotFoundError') return { ok: false, reason: 'missing' }
+    throw err
+  }
+  if (file.size > MAX_TEXT_BYTES) return { ok: false, reason: 'too-large' }
+  const head = new Uint8Array(await file.slice(0, SNIFF_BYTES).arrayBuffer())
+  if (looksBinary(head)) return { ok: false, reason: 'binary' }
+  return { ok: true, text: await file.text() }
 }
 
 /** The File object for `path` — a disk-backed Blob. `createObjectURL(file)`
