@@ -28,6 +28,7 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.26.3",
     "@embedpdf/vue-pdf-viewer": "^2.14.4",
+    "@vercel/analytics": "^2.0.1",
     "@vscode/codicons": "^0.0.45",
     "ai": "^7.0.29",
     "buffer": "^6.0.3",

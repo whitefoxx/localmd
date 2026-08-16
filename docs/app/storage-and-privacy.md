@@ -53,8 +53,16 @@ Only these, and only when the relevant thing happens:
 - **To a tool's service** — only the request that tool makes, only when it runs.
 - **To GitHub** — only when you push.
 
-That is the complete list. Nothing is sent in the background, and nothing goes
-anywhere on a schedule.
+One thing happens without you asking: loading the app counts an anonymous
+visit — which page, where you arrived from, and rough facts about the browser
+(country, device, browser name). It is measured by the host that serves the
+site, with no cookie and no identifier that follows you between visits or
+between sites, and it says nothing about your folder, your notes or your
+conversation. A content blocker that stops it changes nothing about how the app
+works.
+
+That is the complete list. Nothing else is sent in the background, and nothing
+goes anywhere on a schedule.
 
 ## Working offline
 

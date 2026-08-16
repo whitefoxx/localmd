@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { inject as injectAnalytics } from '@vercel/analytics'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.vue'
 import { i18n } from './i18n'
@@ -8,6 +9,17 @@ import './assets/main.css'
 registerSW({ immediate: true })
 
 createApp(App).use(createPinia()).use(i18n).mount('#app')
+
+// Vercel Web Analytics — an anonymous page view for the deployed site, and the
+// only thing this app sends without the user asking for it (docs/app/
+// storage-and-privacy.md says so, and must keep saying so). Built as a single
+// page with no router, so one injection at boot is the whole story; the
+// `@vercel/analytics/vue` entry is not usable here because it imports
+// vue-router at module scope. PROD-only keeps dev traffic — and the e2e suite,
+// which runs against the dev server — out of the numbers.
+if (import.meta.env.PROD) {
+  injectAnalytics()
+}
 
 // E2E mode: in-memory KB + mock provider (see src/e2e/bootstrap.ts).
 if (new URLSearchParams(location.search).has('e2e')) {
