@@ -16,6 +16,14 @@
 .font-wordmark {
   font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
 }
+/* The same face, used for landing headlines. Only weight 700 is loaded, so
+   anything wearing this class has to be bold — which is what a display line
+   wants anyway. */
+.font-display {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+}
 
 /* Theme palettes — RGB triplets consumed by tailwind.config.ts via
    rgb(var(--c-…) / alpha). `data-theme` on <html> picks the set; the theme
@@ -99,6 +107,25 @@
   .btn-primary {
     @apply px-2 py-1 text-sm rounded border border-accent bg-accent/10 text-accent hover:bg-accent/20 disabled:opacity-50;
   }
+  /* One measure for the whole landing page. The hero and every section below
+     it share this container so the left edge of the text never moves as you
+     scroll — the product shot is the only thing allowed to break out of it. */
+  .landing-wrap {
+    @apply mx-auto w-full max-w-[1200px] px-6 sm:px-10;
+  }
+  /* Landing calls to action. `text-bg-0` rather than a literal white: the
+     accent is dark blue on a light theme and pale blue on a dark one, and the
+     page background is the one color guaranteed to contrast with it in both. */
+  .btn-cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-accent
+           bg-accent px-5 py-2.5 font-medium text-bg-0 transition duration-150
+           hover:brightness-110 active:translate-y-px;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-border
+           px-5 py-2.5 font-medium text-fg-1 transition-colors
+           hover:border-fg-3 hover:bg-bg-2;
+  }
   .input {
     @apply w-full px-2 py-1 text-sm rounded border border-border bg-bg-1 text-fg-0 placeholder-fg-3 focus:outline-none focus:border-accent;
   }
@@ -114,6 +141,116 @@
     @apply overflow-auto;
     scrollbar-width: thin;
     scrollbar-color: rgb(var(--c-border)) transparent;
+  }
+}
+
+/* ── Landing surface ──────────────────────────────────────────────────────
+   The start screen and the about page are marketing, not app chrome: they get
+   their own type scale, a display face and an ink band. Everything here is
+   scoped under .landing so none of it can leak into the workspace, where 14px
+   system sans is deliberate. */
+.landing {
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Faint graph-paper texture, masked so it fades out before it reaches the
+   content. Decorative only — it sits in a ::before with no pointer events. */
+.landing-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--c-fg-3) / 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--c-fg-3) / 0.09) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 30% 10%, #000 20%, transparent 70%);
+  mask-image: radial-gradient(ellipse 75% 55% at 30% 10%, #000 20%, transparent 70%);
+}
+
+/* A band that stays dark in both themes. It re-points the palette variables
+   rather than restating colors, so every token class inside it (text-fg-2,
+   border-border, bg-accent/10 …) flips along with it and the markup is the
+   same markup. Deliberately theme-independent: this is the product's own ink,
+   and it is what the launch imagery is set in. */
+.ink {
+  --c-bg-0: 12 15 21;
+  --c-bg-1: 20 25 33;
+  --c-bg-2: 29 35 45;
+  --c-bg-3: 38 44 54;
+  --c-fg-0: 235 241 247;
+  --c-fg-1: 198 207 217;
+  --c-fg-2: 141 151 163;
+  --c-fg-3: 116 125 138;
+  --c-accent: 105 176 255;
+  --c-border: 45 52 62;
+  color-scheme: dark;
+  background-color: rgb(var(--c-bg-0));
+  color: rgb(var(--c-fg-1));
+}
+
+/* The framed product shot. The screenshot is shown at its own scale and
+   clipped by the frame, so the interface reads at the size it really is
+   instead of shrinking into illegibility. */
+.app-frame {
+  border-radius: 12px;
+  border: 1px solid rgb(var(--c-border));
+  background-color: rgb(var(--c-bg-1));
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / 0.06),
+    0 8px 24px -8px rgb(0 0 0 / 0.18),
+    0 40px 80px -32px rgb(0 0 0 / 0.35);
+  overflow: hidden;
+}
+/* On a dark page the shot is a dark rectangle on a dark ground, so the frame
+   has to supply the edge the contrast no longer does. */
+:root[data-theme='dark'] .app-frame,
+.ink .app-frame {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.09),
+    0 30px 90px -30px rgb(0 0 0 / 0.85);
+}
+
+/* A shot of a PDF page. The reader does not invert pages — a page is white
+   paper in the app whatever the theme — so this does not invert one either; a
+   landing that showed a dark PDF would be advertising a feature that is not
+   there. All it does is take the glare off, so on a dark page it reads as a lit
+   sheet rather than as a hole punched through the layout. */
+:root[data-theme='dark'] .shot-paper img {
+  filter: brightness(0.86) contrast(1.02);
+}
+
+/* A crop that stops mid-sentence reads as a broken render. Fading the cut edge
+   instead reads as a window onto something larger, which is what it is. The
+   mask goes on the frame rather than the image so the border fades with it —
+   a crisp border around faded content would only move the problem. */
+.shot-fade-r {
+  -webkit-mask-image: linear-gradient(to right, #000 72%, transparent 98%);
+  mask-image: linear-gradient(to right, #000 72%, transparent 98%);
+}
+
+/* The hero's page-load entrance. Scoped to the no-preference query so that
+   with reduced motion the elements are simply *there* — a hidden state must
+   never be what a user is left looking at. (The scroll reveal below the fold
+   is driven from useReveal.ts for the same reason, one step further: it hides
+   nothing until it knows it can un-hide it.)
+
+   Anything wearing `rise` must not also carry a transform utility: the
+   animation ends on `transform: none` and would cancel it. */
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: landing-rise 0.75s cubic-bezier(0.22, 0.68, 0.24, 1) both;
+  }
+  @keyframes landing-rise {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 }
 
