@@ -74,16 +74,24 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') closeTopLayer()
 }
 
-/** Esc closes the top-most open layer, one per press: search → settings →
- *  git → review → health → chat history → graph → restore maximized agent →
+/** Esc closes the top-most open layer, one per press: help → search → settings
+ *  → git → review → health → chat history → graph → restore maximized agent →
  *  leave zen. Zen is last because it is the quietest layer: anything else on
  *  screen was opened on top of it and goes first.
  *  (SearchPalette also handles Esc itself while its input has focus — this is
- *  the fallback.) */
+ *  the fallback.)
+ *
+ *  Help leads because it is genuinely the top-most: every modal here is z-50,
+ *  so stacking falls to DOM order, and HelpPanel is mounted last in AppLayout —
+ *  it draws over the others. Putting it ahead also means the chain behaves
+ *  exactly as it always did whenever Help is shut, which was every state it had
+ *  until now: Help was the one modal Esc did not close, while its own close
+ *  button advertised "Close (Esc)". */
 function closeTopLayer(): void {
   const review = useReviewStore()
   const chat = useChatStore()
-  if (ui.searchOpen) ui.searchOpen = false
+  if (ui.helpOpen) ui.helpOpen = false
+  else if (ui.searchOpen) ui.searchOpen = false
   else if (ui.pricingOpen) ui.pricingOpen = false
   else if (ui.settingsOpen) ui.settingsOpen = false
   else if (git.panelOpen) git.panelOpen = false
