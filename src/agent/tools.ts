@@ -47,6 +47,7 @@ import { getLocale } from '@/i18n'
 import { CATALOG, catalogEntryById } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { confirmConnectCall, noteConnectResult } from '@/agent/connectGuard'
+import { noteOpenedTab } from '@/agent/connectJanitor'
 import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
@@ -1630,7 +1631,13 @@ function toExternalSpec(
         const out = await mcp.callTool(t.serverId, t.def.name, args, signal)
         // find_adapters results feed the write-adapter gate's access cache —
         // fed the UNclipped result, so a row past the budget still counts.
-        if (isConnectServer(mcp, t.serverId)) noteConnectResult(t.serverId, t.def.name, out)
+        // A call that left a browser tab behind is recorded for the turn's end
+        // reap (agent/connectJanitor.ts): the extension hands us the tab and
+        // considers its job done, so closing it is this side's contract.
+        if (isConnectServer(mcp, t.serverId)) {
+          noteConnectResult(t.serverId, t.def.name, out)
+          noteOpenedTab(sessionId, t.serverId, out)
+        }
         // A tool that actually ran earns a recall slot, so the next session in
         // this KB starts with it already active (see the store's `recalled`).
         // Only successful calls count — a tool that always throws shouldn't

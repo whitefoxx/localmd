@@ -31,6 +31,7 @@ import {
   type TokenAnchor,
 } from '@/lib/tokenMeter'
 import { isBuiltinToolName } from '@/agent/tools'
+import { reapOpenedTabs, CLOSE_TAB_TOOL } from '@/agent/connectJanitor'
 import { t } from '@/i18n'
 import { summarize as summarizeHistory, generateTitle } from '@/agent/summarize'
 import {
@@ -1223,6 +1224,13 @@ export const useChatStore = defineStore('chat', () => {
         // as 'stopped' and stamp the card (the abort listener usually beat us to
         // it — both paths are idempotent).
         useApprovalsStore().clearSession(session.id)
+        // Close the background browser tabs localmd Connect opened for this
+        // turn. Inside the ownership guard on purpose: a turn that unwinds late
+        // must not reap the tabs its SUCCESSOR just opened. Fire-and-forget —
+        // nothing about the conversation waits on the browser tidying up.
+        void reapOpenedTabs(session.id, (serverId, tabId) =>
+          useMcpStore().callTool(serverId, CLOSE_TAB_TOOL, { tab_id: tabId }),
+        )
       }
       // A tool still "running" means the turn died mid-call (abort/error) before
       // its tool_result — settle it so the spinner doesn't spin forever. Scoped

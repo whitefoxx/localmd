@@ -104,6 +104,13 @@ Confirming is the front line, not the only line: every site script can be
 paused or deleted at any time from the extension's popup, whatever installed
 it.
 
+When it browses, it works in a window of its own, its tabs collected under a
+“localmd Connect” group, so its pages never mix into the window you are working
+in. The ones it opened only to read are closed as soon as it finishes answering.
+A page it deliberately brought to the front for you to look at stays open —
+that one is yours to close, and nothing here will take it away while you are
+reading it.
+
 Once it is connected, **@** in the chat box also lists the pages you have open,
 so you can hand the assistant a tab (or several) to work with — see
 `working-with-the-agent`.
