@@ -51,7 +51,19 @@ export default defineConfig({
     demoIndexWriter(),
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', not 'autoUpdate'. The registration script the plugin injects
+      // for autoUpdate ends in `window.location.reload()` the moment a new
+      // service worker activates — mid-session, unannounced, and the page has
+      // no say in it. That reload took the open KB with it: the directory
+      // handle lives only in memory, so a deploy silently threw the user back
+      // to the start screen mid-sentence.
+      //
+      // Under 'prompt' the new worker stays in `waiting` instead: this page
+      // keeps being served by the precache it was loaded against (so its lazy
+      // chunks — CodeMirror languages, the PDF and EPUB readers — can't 404
+      // out from under it), and stores/update decides when to apply it. That
+      // also means the plugin no longer forces `workbox.skipWaiting`.
+      registerType: 'prompt',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'localmd',

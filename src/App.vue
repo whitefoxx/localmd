@@ -15,6 +15,7 @@ import AppLayout from '@/components/AppLayout.vue'
 import NarrowScreenNotice from '@/components/NarrowScreenNotice.vue'
 import TtsBar from '@/components/TtsBar.vue'
 import PricingDialog from '@/components/PricingDialog.vue'
+import UpdateBanner from '@/components/UpdateBanner.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
 
 const kb = useKbStore()
@@ -109,8 +110,28 @@ function onBeforeUnload(): void {
   void files.flush()
 }
 
+/** Read the recents list, then reopen last session's folder if the browser
+ *  still has permission — and load its tree and tabs exactly as opening it by
+ *  hand would. A reload should be survivable, not a reset. */
+async function boot(): Promise<void> {
+  // Safety valve on the start screen being held back: IndexedDB can block
+  // indefinitely (another tab mid version-upgrade), and a blank page is a
+  // worse answer than the start screen. Giving up only releases the paint —
+  // the restore is still allowed to land, late, if it lands at all.
+  const giveUp = setTimeout(() => (kb.restoring = false), 3000)
+  try {
+    await kb.refreshRecents()
+    if (await kb.restoreLast()) {
+      await files.refreshTree()
+      await files.restoreTabs()
+    }
+  } finally {
+    clearTimeout(giveUp)
+  }
+}
+
 onMounted(() => {
-  void kb.refreshRecents()
+  void boot()
   window.addEventListener('focus', onFocus)
   // Capture phase: claim hotkeys before the PDF viewer / browser default can.
   window.addEventListener('keydown', onKeydown, true)
@@ -127,7 +148,12 @@ onBeforeUnmount(() => {
 <template>
   <div class="h-full bg-bg-0 text-fg-1">
     <AppLayout v-if="kb.isOpen" />
-    <OpenKbScreen v-else />
+    <!-- Nothing while `restoring`: last session's folder may be about to come
+         back, and showing the landing page first only to replace it is the
+         flicker we would be fixing here anyway. That wait costs an IndexedDB
+         read and is skipped entirely for anyone with no folder to restore —
+         see `restoring` in stores/kb. -->
+    <OpenKbScreen v-else-if="!kb.restoring" />
     <!-- Only over the workspace. The start screen is laid out for a phone and
          degrades correctly there on its own — it is the three-column workspace
          behind it that has no narrow form. -->
@@ -136,5 +162,8 @@ onBeforeUnmount(() => {
     <!-- Mounted at the root, not inside the start screen: the Licence pane
          opens it too, and by then the start screen is gone. -->
     <PricingDialog />
+    <!-- Also root-level: which screen is up decides whether a waiting build is
+         offered or just applied (main.ts), not where the offer is drawn. -->
+    <UpdateBanner />
   </div>
 </template>

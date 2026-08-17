@@ -70,6 +70,10 @@ Reading, writing and searching your notes all work with no internet at all — t
 files are local. Only the assistant needs a connection, since the model is
 remote.
 
+That works because the browser keeps its own copy of the app. A newer one is
+fetched in the background when it exists, and put to use when you say so rather
+than in the middle of your work — see `getting-started`.
+
 ## A note on external tools
 
 Results that come back from an outside service are treated as data, never as

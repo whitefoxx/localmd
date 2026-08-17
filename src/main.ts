@@ -4,11 +4,30 @@ import { inject as injectAnalytics } from '@vercel/analytics'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.vue'
 import { i18n } from './i18n'
+import { useKbStore } from './stores/kb'
+import { useUpdateStore } from './stores/update'
 import './assets/main.css'
 
-registerSW({ immediate: true })
-
 createApp(App).use(createPinia()).use(i18n).mount('#app')
+
+// Service worker. Registered after the mount, not before it, because the
+// update callback reads pinia stores — and because nothing here should delay
+// the first paint.
+//
+// `onNeedRefresh` is what makes this a prompt rather than an ambush: without a
+// callback the plugin's client reloads the page by itself (see vite.config.ts).
+// A no-op is deliberately not enough either — the offer has to reach the user.
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    const update = useUpdateStore()
+    update.offer(updateSW)
+    // With no KB open there is no unsaved work, no agent turn and no folder
+    // handle to lose, so reloading now is invisible rather than clever — and
+    // it keeps the common case (a visitor on the start screen) always current.
+    if (!useKbStore().isOpen) void update.applyNow()
+  },
+})
 
 // Vercel Web Analytics — an anonymous page view for the deployed site, and the
 // only thing this app sends without the user asking for it (docs/app/

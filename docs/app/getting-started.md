@@ -56,6 +56,27 @@ Otherwise:
 Nothing else is required. Tools, git and document indexing are all optional and
 can wait until you want them.
 
+## Coming back
+
+Reload the page — on purpose, or because the browser did it for you — and
+localmd reopens the folder you had open, with its files and the tabs you left.
+
+Whether it can do that silently comes down to one choice in the browser's
+permission dialog. Choose **Allow on every visit** and the browser remembers,
+so coming back takes nothing. Choose the one-visit option and it cannot: a page
+is not allowed to ask for a folder again unless you click something first. Your
+folder is then the first entry on the start screen, one click away.
+
+Closing the folder yourself is remembered too — that was you asking for the
+start screen, so that is where the next visit begins.
+
+## When a new version arrives
+
+localmd picks up new versions in the background, but it will not reload the page
+under you while a folder is open: a reload ends whatever the assistant was in
+the middle of. Instead a small note appears offering to reload, and waits. Put
+it off and the new version is used the next time you open the app anyway.
+
 ## The three areas of the screen
 
 - **Left** — the icon bar, and your files. The icons are, top to bottom: files,
