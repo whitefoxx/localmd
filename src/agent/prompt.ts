@@ -65,6 +65,60 @@ export interface SystemPromptParts {
   dynamic: string
 }
 
+/** A session's frozen system prompt: the parts it sends every turn, plus the
+ *  fingerprint of the inputs they were built from. Runtime-only (never
+ *  persisted) — a reload rebuilds it on the first send. */
+export interface SessionSystemPrompt {
+  fingerprint: string
+  parts: SystemPromptParts
+}
+
+/**
+ * The non-file inputs of `buildSystemPrompt`, cheap enough to check on every
+ * send. These are the changes that MUST refresh a running session's prompt,
+ * because each one changes what the agent can do right now: a server or the
+ * browser extension connecting, a tool pack installed, git_init turning the
+ * folder into a repository, the interface language switching.
+ *
+ * Deliberately absent: everything read from files — MEMORY.md, AGENTS.md,
+ * the skills list. Those change mid-session mainly because the agent itself
+ * just wrote them (a "remember this" or a new skill), and the writer already
+ * knows the content from its own turn; re-reading them into the prompt would
+ * change the dynamic block's bytes and — the prefix being one cumulative cache
+ * key — invalidate the entire message history behind it, on exactly the
+ * routine KB-agent operations that should be cheap. They are picked up when
+ * the next session opens.
+ */
+export function systemPromptFingerprint(): string {
+  const mcpStore = useMcpStore()
+  const toolsStore = useToolsStore()
+  const mcpTools = mcpStore.allTools
+  return JSON.stringify([
+    useKbStore().name,
+    useGitStore().isRepo,
+    getLocale(),
+    mcpStore.deferredCatalog.map((t) => t.qualifiedName),
+    toolsStore.deferredCatalog.map((s) => s.name),
+    mcpTools.some((t) => t.qualifiedName.includes('__generic__')),
+    mcpTools.some((t) => t.def.name === 'generic__find_adapters'),
+    toolsStore.specs.filter((t) => t.web).map((t) => t.name),
+  ])
+}
+
+/**
+ * The prompt a session should send this turn: the cached one while its
+ * fingerprint holds, rebuilt (files re-read) the moment any fingerprinted
+ * input changes. The caller stores the result back on the session — this
+ * function owns only the decision, so it stays testable without a chat store.
+ */
+export async function sessionSystemPrompt(
+  cache: SessionSystemPrompt | undefined,
+): Promise<SessionSystemPrompt> {
+  const fingerprint = systemPromptFingerprint()
+  if (cache && cache.fingerprint === fingerprint) return cache
+  return { fingerprint, parts: await buildSystemPrompt() }
+}
+
 export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   let prompt = ''
 

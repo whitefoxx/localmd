@@ -8,7 +8,7 @@ import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
-import { buildSystemPrompt } from '@/agent/prompt'
+import { sessionSystemPrompt, type SessionSystemPrompt } from '@/agent/prompt'
 import { runTurn } from '@/agent/run'
 import { runMockTurn } from '@/agent/mock'
 import { loadKbImage, toDataUrl } from '@/agent/vision'
@@ -251,6 +251,12 @@ interface OpenSession extends ChatSession {
    *  sending will branch from just before it rather than continue the leaf.
    *  Transient on purpose — an abandoned edit must not survive a reload. */
   editingFrom?: number
+  /** System prompt frozen for this session (see sessionSystemPrompt): rebuilt
+   *  only when its fingerprinted inputs change, so a mid-session MEMORY.md or
+   *  skill write cannot change the prompt bytes and cascade-invalidate the
+   *  provider's cached history behind them. Runtime-only — a new session (or a
+   *  reload) reads the files fresh. */
+  system?: SessionSystemPrompt
 }
 
 export interface SessionSummary {
@@ -585,9 +591,18 @@ export const useChatStore = defineStore('chat', () => {
     const snapshot = JSON.parse(JSON.stringify(session)) as idb.StoredSession & {
       running?: boolean
       editingFrom?: number
+      system?: SessionSystemPrompt
+      tokenAnchor?: TokenAnchor
     }
     delete snapshot.running
     delete snapshot.editingFrom
+    // Runtime-only by contract: the frozen prompt must be re-read from the
+    // live KB when a session reopens, and the anchor (see lib/tokenMeter)
+    // describes a history a reload merely estimates until the first reply.
+    // Stored sessions are spread back into tabs wholesale, so anything not
+    // stripped here silently becomes persistent.
+    delete snapshot.system
+    delete snapshot.tokenAnchor
     await idb.saveSession(snapshot)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
@@ -1041,7 +1056,10 @@ export const useChatStore = defineStore('chat', () => {
     const controller = new AbortController()
     controllers.set(session.id, controller)
     try {
-      const system = await buildSystemPrompt()
+      // Frozen per session, not rebuilt per send: prompt bytes are a cache key
+      // (see sessionSystemPrompt for what does and does not refresh it).
+      session.system = await sessionSystemPrompt(session.system)
+      const system = session.system.parts
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
