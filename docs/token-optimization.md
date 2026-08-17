@@ -432,6 +432,75 @@ Seven tests drive the real `runTurn` against a mocked model, including the one
 that matters most: a turn that never overflows takes exactly one request and
 its history is unchanged, so the recovery path is inert until it is needed.
 
+### P10 — the prefix survives the user's pauses, and the session's own writes (2026-08-17)
+
+Two cache-lifetime holes left after P0–P9, both found by asking when the
+carefully-stabilized bytes actually get to be *read* from cache. The reference
+point was Claude Code's published system-prompt design
+(platform.claude.com/docs/en/release-notes/system-prompts): its prompt is a
+frozen per-session snapshot, and everything volatile — dates, reminders,
+environment — is injected into **user messages**, which are append-only and
+therefore never disturb the prefix. localmd already did the second half (the
+time/viewing notes ride in user messages); these close the remaining gaps.
+
+- ✅ **1h cache TTL on every Anthropic breakpoint** (`run.ts`
+  `CACHE_BREAKPOINT`, `promptCache.ts` `BREAKPOINT`). The default TTL is 5
+  minutes, and this app's rhythm is think-read-write: the user leaves the chat
+  to read a document or edit a note and comes back past the expiry, at which
+  point the ENTIRE prefix — tools, system, history — is re-written at write
+  price. 1h writes cost 2× base input (vs 1.25×) but each token is written
+  once, while every expiry avoided turns a full re-write (1.25×) into a re-read
+  (0.1×) — one survived gap pays for a session's worth of the premium, and
+  reads refresh the TTL so an active session never expires. All four
+  breakpoints carry the same TTL: mixing is legal only longest-first, and
+  keeping them identical sidesteps the ordering rule. Non-Anthropic providers
+  ignore the field, as they ignored the marker.
+- ✅ **The dynamic system block is frozen per session** (`prompt.ts`
+  `sessionSystemPrompt` + `systemPromptFingerprint`, cached on the session in
+  `chat.ts`). It was rebuilt from live stores *and files* on every send, and
+  the files are ones this agent routinely writes mid-session: a "remember
+  this" (MEMORY.md), a new skill, an AGENTS.md. Each such write changed the
+  dynamic block's bytes on the next send — and the prefix being one cumulative
+  cache key, invalidated the entire message history behind it, precisely on
+  the sessions that were going well. Now a cheap fingerprint of the
+  **non-file** inputs (KB name, repo state, locale, both deferred catalogs,
+  extension/Connect presence, web-tool names) is checked each send: unchanged →
+  the exact same prompt object, zero file reads, zero byte drift; changed
+  (a server connects, git_init succeeds, the locale switches — things that
+  alter what the agent can DO right now) → a full rebuild, files re-read.
+  File edits surface at the next session. The user manual already promised
+  exactly that ("reads it at the start of every session"), so no doc lied
+  either way; skills are unaffected in function (use_skill and /name read the
+  file live — only the prompt's menu is frozen).
+- ✅ **`persist()` now strips what the schema calls runtime-only.** Found while
+  adding the snapshot: stored sessions are spread back into tabs wholesale,
+  and persist only deleted `running`/`editingFrom` — so `tokenAnchor`,
+  documented in P5 as "stays off the persisted schema", was in fact riding
+  through IDB and back. Harmless by luck (anchor and history were persisted
+  atomically, and `measureTokens` degrades on length mismatch), but the
+  contract now matches the code: `system` and `tokenAnchor` are both deleted
+  before the write.
+
+Verified in a real browser by the P4 method — dev server, demo KB, an
+Anthropic profile with a deliberately invalid key, and a page-level fetch hook
+capturing the request bodies (the 401 lands after the bytes are on the wire,
+which is the part our code controls):
+
+| Check | Result |
+|---|---|
+| Request 1: system blocks | both carry `cache_control: {type: ephemeral, ttl: 1h}` (9,021 + 4,206 chars) |
+| Request 1: moving breakpoint | last user message carries the same `ttl: 1h` marker |
+| MEMORY.md edited via the editor, request 2 (same session) | system bytes byte-identical to request 1 (13,228 = 13,228); the edit absent |
+| Request 3 (fresh session tab) | the edit present (13,286 chars), TTL markers intact — the freeze is per session, not forever |
+| typecheck · vitest | green, 938 tests (new: `prompt.test.ts` pins the freeze decision) |
+
+One item deliberately left open: the invalid key means the live API never
+*validated* the ttl field (401 precedes body validation). The 1h TTL is GA per
+Anthropic's docs and the SDK types accept it, but the first real-key message
+should confirm via the usage tooltip that cache writes/reads still flow; if
+the API ever rejected it, the failure is loud (a 400 naming cache_control),
+and the rollback is dropping the `ttl` field from the two constants.
+
 ## Validating
 
 Watch the session token tooltip (chat composer status line): after the first

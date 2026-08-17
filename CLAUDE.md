@@ -167,9 +167,11 @@ agent pipeline (docs/token-optimization.md has the full log):
   has. Never anchor on subagent usage (it measures a different, tiny context;
   those events are tagged `subagent`).
 - **Keep prompt bytes session-stable.** The system prompt's stable/dynamic
-  split, the frozen deferred-tools catalog, and byte-identical subagent
-  tools+system all exist so the cache prefix survives; don't add content that
-  varies turn-to-turn.
+  split, the session-frozen dynamic block (`sessionSystemPrompt` — file inputs
+  like MEMORY.md are read once per session, only capability changes rebuild),
+  the frozen deferred-tools catalog, and byte-identical subagent tools+system
+  all exist so the cache prefix survives; don't add content that varies
+  turn-to-turn.
 - **Always-on text is paid on every step of every turn.** Before extending the
   system prompt or a tool description, prefer just-in-time delivery: error
   messages, tool results, use_skill, enable_tools.
