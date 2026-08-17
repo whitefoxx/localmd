@@ -13,12 +13,23 @@
  * breakpoints per request (two are spent on the system blocks), so earlier
  * marks are stripped. Operates on copies; callers pass in-flight message
  * arrays and persisted history never carries markers.
+ *
+ * TTL is 1h, not the default 5m, because this app's rhythm is think-read-write:
+ * the user leaves the chat to read a document or edit a note, and comes back
+ * past the 5-minute expiry — at which point the ENTIRE prefix (tools, system,
+ * history) is re-written at write price. 1h writes cost 2× base input (vs
+ * 1.25× for 5m) but each token is written once, while every expiry avoided
+ * re-reads the whole prefix at 0.1× instead of re-writing it — one survived
+ * gap pays for a session's worth of the premium. Reads refresh the TTL, so an
+ * active session never expires. Must match run.ts CACHE_BREAKPOINT: mixing
+ * TTLs is legal only when longer ones come first, and keeping them identical
+ * sidesteps the ordering rule entirely.
  */
 import type { ModelMessage } from 'ai'
 
 type ProviderOptions = Record<string, Record<string, unknown>>
 
-const BREAKPOINT = { cacheControl: { type: 'ephemeral' } }
+const BREAKPOINT = { cacheControl: { type: 'ephemeral', ttl: '1h' } }
 
 /** Remove an anthropic cacheControl marker, dropping now-empty containers. */
 function strip(m: ModelMessage): ModelMessage {

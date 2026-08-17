@@ -16,7 +16,7 @@ describe('withMovingBreakpoint', () => {
     ])
     expect(cc(out[0])).toBeUndefined()
     expect(cc(out[1])).toBeUndefined()
-    expect(cc(out[2])).toEqual({ type: 'ephemeral' })
+    expect(cc(out[2])).toEqual({ type: 'ephemeral', ttl: '1h' })
   })
 
   it('moves an existing marker instead of accumulating (≤4 breakpoint limit)', () => {
@@ -26,7 +26,7 @@ describe('withMovingBreakpoint', () => {
     ])
     const next = withMovingBreakpoint([...marked, { role: 'user', content: 'c' }])
     expect(cc(next[1])).toBeUndefined() // previous marker stripped
-    expect(cc(next[2])).toEqual({ type: 'ephemeral' })
+    expect(cc(next[2])).toEqual({ type: 'ephemeral', ttl: '1h' })
   })
 
   it('preserves unrelated providerOptions while stripping', () => {

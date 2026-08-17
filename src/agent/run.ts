@@ -94,7 +94,12 @@ const SUBAGENT_TASK_PREFACE = `[You are running as a SUBAGENT on one scoped task
 
 Task: `
 
-const CACHE_BREAKPOINT = { anthropic: { cacheControl: { type: 'ephemeral' as const } } }
+/* 1h TTL to survive the user's think-read-write gaps between turns; the full
+ * rationale (and the rule that this must match the moving breakpoint's TTL)
+ * lives in lib/promptCache.ts. */
+const CACHE_BREAKPOINT = {
+  anthropic: { cacheControl: { type: 'ephemeral' as const, ttl: '1h' as const } },
+}
 
 export interface RunTurnOptions {
   profile: LlmProfile
