@@ -1,0 +1,263 @@
+<!doctype html>
+<meta charset="utf-8" />
+<!--
+  The illustration beside "Your knowledge is scattered." on the landing page.
+  Rendered to src/assets/landing-scatter{,-dark}.png by scripts/shoot-diagram.mjs.
+
+  It is a CONTRAST, not a migration. The obvious drawing — scattered things
+  funnelling into one new folder — would assert on the page the one thing the
+  product says it never does: there is no import, because there is no format to
+  import into. So the two halves sit either side of a rule and the reader makes
+  the comparison, which is also how the copy beside it is built ("localmd makes
+  the opposite bet").
+
+  Palette and metrics are lifted from src/assets/main.css so the drawing belongs
+  to the same page it sits on. Keep them in step by hand; this file is rendered
+  standalone and cannot import them.
+-->
+<style>
+  :root {
+    --bg-0: 255 255 255;
+    --bg-1: 246 248 250;
+    --bg-2: 234 238 242;
+    --fg-0: 31 35 40;
+    --fg-2: 87 96 106;
+    --fg-3: 110 119 129;
+    --accent: 9 105 218;
+    --border: 208 215 222;
+    --shadow: 0 0 0 / 0.07;
+  }
+  :root[data-theme='dark'] {
+    --bg-0: 13 17 23;
+    --bg-1: 22 27 34;
+    --bg-2: 31 36 44;
+    --fg-0: 230 237 243;
+    --fg-2: 139 148 158;
+    --fg-3: 110 118 129;
+    --accent: 88 166 255;
+    --border: 48 54 61;
+    --shadow: 0 0 0 / 0.5;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+  }
+  /* Height is whatever the content comes to — shoot-diagram.mjs captures this
+     box, not the viewport, so there is nothing to keep in step. */
+  body {
+    width: 460px;
+    padding-bottom: 2px;
+    background: rgb(var(--bg-0));
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  .mono {
+    font-family: Menlo, Monaco, ui-monospace, monospace;
+  }
+
+  /* ── The scatter ──────────────────────────────────────────────────────
+     Four cards, one per clause of the paragraph next to it: notes in one
+     app, PDFs in a downloads folder, highlights locked in a reader, papers
+     everywhere. Tilted and overlapping, because that is the point. */
+  .scatter {
+    position: relative;
+    height: 236px;
+  }
+  .card {
+    position: absolute;
+    width: 176px;
+    padding: 9px 11px 11px;
+    border: 1px solid rgb(var(--border));
+    border-radius: 7px;
+    background: rgb(var(--bg-1));
+    box-shadow: 0 6px 18px -8px rgb(var(--shadow));
+  }
+  .card .name {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10.5px;
+    color: rgb(var(--fg-3));
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+  /* ✗ / ✓ in the same two colours the "what we do / don't do" lists use on the
+     page below — grey for the ruled-out, accent for the one we mean. Borrowing
+     that pairing rather than inventing a red/green one keeps the drawing
+     speaking the page's language. */
+  .mark {
+    position: absolute;
+    top: 8px;
+    right: 9px;
+    width: 11px;
+    height: 11px;
+  }
+  /* Bottom-right, not top-right: the longest label ("a reader you'll cancel")
+     fills its card's width exactly, and a mark up there landed on top of it.
+     Down here it sits in the gap the bars leave. */
+  .card .mark {
+    color: rgb(var(--fg-3) / 0.85);
+    top: auto;
+    bottom: 9px;
+  }
+  .card .bars {
+    margin-top: 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .card .bars i {
+    display: block;
+    height: 4px;
+    border-radius: 2px;
+    background: rgb(var(--fg-3) / 0.28);
+  }
+  /* The wall each one puts around what you put in it. */
+  .lock {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    opacity: 0.75;
+  }
+
+  /* Kept a few pixels clear of both edges: a rotated card overhangs its own
+     box, and a clipped corner reads as a mistake rather than as scatter. */
+  .c1 { left: 8px;   top: 10px;  transform: rotate(-5.5deg); }
+  .c2 { left: 238px; top: 0;     transform: rotate(4.5deg); }
+  .c3 { left: 20px;  top: 118px; transform: rotate(3deg); }
+  .c4 { left: 250px; top: 136px; transform: rotate(-4deg); }
+
+  /* ── The rule between the two claims ─────────────────────────────── */
+  .rule {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 4px 0 26px;
+    color: rgb(var(--fg-3));
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .rule::before,
+  .rule::after {
+    content: '';
+    height: 1px;
+    background: rgb(var(--border));
+    flex: 1;
+  }
+
+  /* ── The folder you already have ──────────────────────────────────── */
+  .folder {
+    border: 1px solid rgb(var(--accent) / 0.45);
+    border-radius: 9px;
+    background: rgb(var(--bg-1));
+    box-shadow: 0 10px 30px -14px rgb(var(--accent) / 0.45);
+    overflow: hidden;
+  }
+  .folder {
+    position: relative;
+  }
+  .folder .mark {
+    color: rgb(var(--accent));
+    top: 11px;
+    right: 12px;
+  }
+  .folder .top {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 12px;
+    border-bottom: 1px solid rgb(var(--border));
+    background: rgb(var(--bg-2));
+    font-size: 11.5px;
+    color: rgb(var(--fg-0));
+  }
+  .folder .files {
+    padding: 9px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .folder .files span {
+    font-size: 11.5px;
+    color: rgb(var(--fg-2));
+  }
+  .folder .files span b {
+    color: rgb(var(--accent));
+    font-weight: 400;
+  }
+  .foot {
+    margin-top: 12px;
+    font-size: 10.5px;
+    color: rgb(var(--fg-3));
+    letter-spacing: 0.01em;
+  }
+</style>
+
+<div class="scatter">
+  <div class="card c1">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+    <div class="name mono">
+      <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+        <rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      </svg>
+      a notes app
+    </div>
+    <div class="bars"><i style="width: 88%"></i><i style="width: 64%"></i><i style="width: 77%"></i></div>
+  </div>
+
+  <div class="card c2">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+    <div class="name mono">~/Downloads/*.pdf</div>
+    <div class="bars"><i style="width: 71%"></i><i style="width: 74%"></i></div>
+  </div>
+
+  <div class="card c3">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+    <div class="name mono">
+      <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6">
+        <rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      </svg>
+      a reader you'll cancel
+    </div>
+    <div class="bars"><i style="width: 58%"></i><i style="width: 83%"></i><i style="width: 46%"></i></div>
+  </div>
+
+  <div class="card c4">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+    <div class="name mono">half-read papers</div>
+    <div class="bars"><i style="width: 80%"></i><i style="width: 55%"></i></div>
+  </div>
+</div>
+
+<div class="rule mono">the opposite bet</div>
+
+<div class="folder">
+  <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 13l4.5 4.5L19 7" />
+  </svg>
+  <div class="top mono">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgb(var(--accent))" stroke-width="2">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+    a folder on your own computer
+  </div>
+  <div class="files mono">
+    <span>wiki/<b>chain-of-thought.md</b></span>
+    <span>raw/papers/<b>attention.pdf</b></span>
+    <span><b>AGENTS.md</b></span>
+  </div>
+</div>
+
+<div class="foot mono">plain files &middot; no login &middot; readable without us</div>

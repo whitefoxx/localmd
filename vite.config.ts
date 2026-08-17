@@ -63,7 +63,12 @@ export default defineConfig({
         icons: [{ src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,woff,woff2,ttf}'],
+        // `jpg` is here for the landing screenshots, which are part of the
+        // first screen an offline visitor sees, and `assets/*.png` for the
+        // landing diagram. Bare `**/*.png` would additionally drag in the
+        // 350KB og image, which sits at the root and no visitor ever loads —
+        // only crawlers fetch it, and never from the service worker.
+        globPatterns: ['**/*.{js,css,html,svg,jpg,woff,woff2,ttf}', 'assets/*.png'],
         // pdf.js worker and CodeMirror language chunks are large but should
         // still be precached for offline use.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
