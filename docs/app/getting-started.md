@@ -66,6 +66,12 @@ can wait until you want them.
 
 You can drag the edges to resize, and hide the side panels entirely.
 
+On a screen too narrow to hold all three at once — a phone, or a very small
+window — the two side panels become drawers instead. They start closed so the
+document has the room, open over it rather than squeezing it, and close again
+when you tap the document beside them. One at a time: opening one puts the other
+away.
+
 ## One shortcut worth learning
 
 **⌘K** (Ctrl+K, and ⌘P works too) opens the palette, which is the fastest way

@@ -12,6 +12,7 @@ import { useTtsStore } from '@/stores/tts'
 import { useMcpStore } from '@/stores/mcp'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
+import NarrowScreenNotice from '@/components/NarrowScreenNotice.vue'
 import TtsBar from '@/components/TtsBar.vue'
 import PricingDialog from '@/components/PricingDialog.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
@@ -127,6 +128,10 @@ onBeforeUnmount(() => {
   <div class="h-full bg-bg-0 text-fg-1">
     <AppLayout v-if="kb.isOpen" />
     <OpenKbScreen v-else />
+    <!-- Only over the workspace. The start screen is laid out for a phone and
+         degrades correctly there on its own — it is the three-column workspace
+         behind it that has no narrow form. -->
+    <NarrowScreenNotice v-if="kb.isOpen" />
     <TtsBar />
     <!-- Mounted at the root, not inside the start screen: the Licence pane
          opens it too, and by then the start screen is gone. -->

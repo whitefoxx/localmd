@@ -351,7 +351,10 @@ function closeKb(): void {
       {{ $t('layout.concurrentWarning') }}
     </div>
 
-    <div class="flex-1 flex min-h-0">
+    <!-- `relative` is the drawers' containing block: on a narrow screen the two
+         side panels leave the flex row and lie over the document instead of
+         squeezing it, which on a phone squeezed it to one word per line. -->
+    <div class="flex-1 flex min-h-0 relative">
       <!-- Activity bar (VS Code style). Zen mode takes it, the tree, the tabs
            and the agent panel off screen — see ui.zen. -->
       <nav
@@ -430,13 +433,26 @@ function closeKb(): void {
         </button>
       </nav>
 
+      <!-- The drawers' way out. Sits over the document but stops short of the
+           activity bar, so the strip a drawer leaves showing is tappable and the
+           icons beside it still work — reaching for a different panel stays one
+           tap, not two. Below the drawers (z-30) and above everything else. -->
+      <div
+        v-if="ui.isNarrow && !ui.zen && !ui.agentMaximized && (ui.sidebarOpen || ui.agentOpen)"
+        class="absolute inset-y-0 left-12 right-0 z-20 bg-black/40"
+        @click="ui.closeDrawers()"
+      />
+
       <!-- Sidebar (right edge is a drag handle to resize) -->
       <aside
         v-show="ui.sidebarOpen && !ui.zen"
-        class="shrink-0 border-r border-border bg-bg-1 flex flex-col relative"
-        :style="{ width: `${ui.sidebarWidth}px` }"
+        class="border-r border-border bg-bg-1 flex flex-col"
+        :class="ui.isNarrow ? 'absolute left-12 top-0 bottom-0 z-30 shadow-2xl' : 'relative shrink-0'"
+        :style="{ width: `${ui.shownSidebarWidth}px` }"
       >
+        <!-- Dragging an edge is a pointer gesture; a drawer is sized for us. -->
         <div
+          v-if="!ui.isNarrow"
           class="absolute right-0 top-0 bottom-0 w-1 -mr-0.5 z-20 cursor-col-resize hover:bg-accent/40"
           :title="$t('layout.dragResize')"
           @mousedown.prevent="startSidebarResize"
@@ -493,11 +509,11 @@ function closeKb(): void {
               <span class="truncate">{{ r.name }}</span>
             </button>
             <div v-if="!recentsOther.length" class="px-3 py-1 text-xs text-fg-3">
-              No other folders
+              {{ $t('layout.noOtherFolders') }}
             </div>
             <div class="border-t border-border my-1" />
             <button :class="menuItem" @click="newKb">
-              <span class="codicon codicon-sm codicon-add text-fg-3" />New KB…
+              <span class="codicon codicon-sm codicon-add text-fg-3" />{{ $t('layout.newKb') }}
             </button>
             <!-- The demo's way out: without it, liking the demo means starting
                  over somewhere else. -->
@@ -625,12 +641,14 @@ function closeKb(): void {
         :class="
           ui.agentMaximized
             ? 'fixed inset-0 z-40 bg-bg-1'
-            : 'relative shrink-0 border-l border-border'
+            : ui.isNarrow
+              ? 'absolute right-0 top-0 bottom-0 z-30 border-l border-border bg-bg-1 shadow-2xl'
+              : 'relative shrink-0 border-l border-border'
         "
-        :style="ui.agentMaximized ? undefined : { width: `${ui.agentWidth}px` }"
+        :style="ui.agentMaximized ? undefined : { width: `${ui.shownAgentWidth}px` }"
       >
         <div
-          v-if="!ui.agentMaximized"
+          v-if="!ui.agentMaximized && !ui.isNarrow"
           class="absolute left-0 top-0 bottom-0 w-1 -ml-0.5 z-20 cursor-col-resize hover:bg-accent/40"
           :title="$t('layout.dragResize')"
           @mousedown.prevent="startAgentResize"
@@ -685,6 +703,7 @@ function closeKb(): void {
     <button
       v-if="!ui.agentOpen && !ui.zen"
       class="absolute bottom-5 right-2 z-30 w-9 h-9 rounded-full bg-accent text-white shadow-lg shadow-black/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+      :style="ui.narrowNoticeOpen ? { bottom: `${ui.narrowNoticeHeight + 12}px` } : undefined"
       :title="$t('layout.openAgent')"
       @click="ui.agentOpen = true"
     >
