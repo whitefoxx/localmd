@@ -15,8 +15,14 @@ export default {
     noPreviousChats: 'No previous chats',
     currentBadge: 'Current',
     openBadge: 'Open',
-    emptyState:
-      'Ask questions about your knowledge base, or let the agent maintain it. It can list, read, search, index and write files in the opened folder — writes appear in the review panel. Paste screenshots or drop files here to add them; type @ to reference a file.',
+    // The empty panel, split from one paragraph into a lead and three rows. The
+    // facts are unchanged — what it is for, what it may touch, how to hand it
+    // something — but this is the first thing anyone sees in the panel, and a
+    // block of small grey prose is a block nobody reads.
+    emptyLead: 'Ask about your knowledge base, or let the agent maintain it.',
+    emptyRead: 'Lists, reads, searches and indexes the files in the folder you opened.',
+    emptyWrite: 'Writes and edits them too — every change lands in the review panel first.',
+    emptyInput: 'Type @ to point it at a file. Paste a screenshot or drop files right here.',
     agentReply: 'Agent reply',
     reAsk: 'Ask this again — the reply it got is kept on its own branch',
     reAsking: 'Asking again',
@@ -25,6 +31,11 @@ export default {
     thinking: 'Thinking',
     thinkingEllipsis: 'Thinking…',
     allSkills: 'All skills',
+    // Labels for the two built-in prompts offered when the KB has no skills of
+    // its own. The prompts themselves stay in English wherever they are written
+    // — they are addressed to the model, not to the reader.
+    presetIngest: 'Ingest',
+    presetLint: 'Lint',
     params: 'Arguments',
     result: 'Result',
     toolFailed: 'failed',
@@ -122,8 +133,10 @@ export default {
     noPreviousChats: '暂无历史会话',
     currentBadge: '当前',
     openBadge: '已打开',
-    emptyState:
-      '就你的知识库提问，或让 agent 来维护它。它可以在已打开的文件夹里列出、读取、搜索、索引和写入文件——写入会显示在审阅面板中。粘贴截图或拖入文件即可添加；输入 @ 可引用文件。',
+    emptyLead: '就你的知识库提问，或让 agent 来维护它。',
+    emptyRead: '在你打开的文件夹里列出、读取、搜索和索引文件。',
+    emptyWrite: '也能写入和修改它们——每一处改动都先进审阅面板。',
+    emptyInput: '输入 @ 指向某个文件。截图直接粘贴，文件直接拖到这里。',
     agentReply: 'Agent 回复',
     reAsk: '重新问这一句——原来的回复会保留在它自己的分支上',
     reAsking: '重新提问',
@@ -132,6 +145,8 @@ export default {
     thinking: '思考',
     thinkingEllipsis: '思考中…',
     allSkills: '全部技能',
+    presetIngest: '归档新材料',
+    presetLint: '体检',
     params: '参数',
     result: '结果',
     toolFailed: '失败',

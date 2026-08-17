@@ -1056,14 +1056,14 @@ function removeDetail(): void {
             <span class="flex-1" />
             <template v-if="!isKbTool(s)">
               <button
-                class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="text-fg-3 hover:text-fg-0 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 :title="$t('common.edit')"
                 @click="editTool(s)"
               >
                 <span class="codicon codicon-sm codicon-edit" />
               </button>
               <button
-                class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="text-fg-3 hover:text-removed shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 :title="$t('common.delete')"
                 @click="removeTool(s.id)"
               >

@@ -89,7 +89,7 @@ function onAuxClick(e: MouseEvent, path: string): void {
       />
       <span
         v-else
-        class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 shrink-0"
+        class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
         :class="{ '!opacity-100': path === files.currentPath }"
         @click.stop="files.closeTab(path)"
       />

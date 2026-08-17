@@ -450,12 +450,26 @@ function slotBadges(p: LlmProfile): string[] {
               <div>
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.profilesHeading') }}</span>
-                  <button class="btn text-xs" @click="addProfile">
+                  <!-- Hidden while the list is empty: the placeholder below
+                       carries the same action, and two copies of one button a
+                       finger apart is just a second thing to aim at. -->
+                  <button v-if="store.state.profiles.length" class="btn text-xs" @click="addProfile">
                     <span class="codicon codicon-sm codicon-add mr-1" />{{ $t('settings.addProfile') }}
                   </button>
                 </div>
-                <div v-if="!store.state.profiles.length" class="text-sm text-fg-3 py-3">
-                  {{ $t('settings.noProfiles') }}
+                <!-- Adding the first key is the one thing standing between a
+                     new visitor and a working agent, so the empty state carries
+                     the action itself rather than pointing at the button in the
+                     far corner. Same handler — one action, drawn twice. -->
+                <div
+                  v-if="!store.state.profiles.length"
+                  class="rounded-lg border border-dashed border-border px-4 py-6 text-center"
+                >
+                  <span class="codicon codicon-sparkle text-fg-3" />
+                  <p class="mt-2 text-sm text-fg-2">{{ $t('settings.noProfiles') }}</p>
+                  <button class="btn-primary text-xs mt-3" @click="addProfile">
+                    <span class="codicon codicon-sm codicon-add mr-1" />{{ $t('settings.addProfile') }}
+                  </button>
                 </div>
                 <div v-else class="rounded-lg border border-border divide-y divide-border overflow-hidden">
                   <div
@@ -473,11 +487,11 @@ function slotBadges(p: LlmProfile): string[] {
                       :key="b"
                       class="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent shrink-0"
                     >{{ b }}</span>
-                    <button class="text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100" :title="$t('common.edit')" @click="editProfile(p)">
+                    <button class="text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" :title="$t('common.edit')" @click="editProfile(p)">
                       <span class="codicon codicon-sm codicon-edit" />
                     </button>
                     <button
-                      class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100"
+                      class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
                       :title="$t('common.delete')"
                       @click="store.deleteProfile(p.id)"
                     >

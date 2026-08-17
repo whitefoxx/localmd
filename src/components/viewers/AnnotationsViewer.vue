@@ -264,7 +264,7 @@ function focusEl(el: unknown): void {
             <div class="mt-2 flex items-center gap-2">
               <span class="flex-1" />
               <div
-                class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 @click.stop
               >
                 <button

@@ -63,7 +63,7 @@ const expanded = ref(true)
         />
         <span
           v-else
-          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 shrink-0"
+          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
           @click.stop="files.closeTab(p)"
         />
       </button>

@@ -55,6 +55,15 @@ const mcp = useMcpStore()
 // Stage text selected in the open file as removable context chips (agent-open).
 useFileSelectionCapture()
 
+/** The empty panel's three rows: what it reads, what it writes, how to hand it
+ *  something. Computed rather than a constant so switching the interface
+ *  language re-renders them — t() is read at build time in a plain array. */
+const emptyRows = computed(() => [
+  { icon: 'codicon-search', text: t('chat.emptyRead') },
+  { icon: 'codicon-edit', text: t('chat.emptyWrite') },
+  { icon: 'codicon-mention', text: t('chat.emptyInput') },
+])
+
 /** Just the site, for the right-hand hint on a tab row. */
 function hostOf(url: string): string {
   try {
@@ -1050,7 +1059,7 @@ watch(
         />
         <span class="truncate flex-1 min-w-0 text-left">{{ t.title }}</span>
         <span
-          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 shrink-0"
+          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
           :class="{ '!opacity-100': t.id === chat.currentSessionId }"
           @click.stop="chat.closeTab(t.id)"
         />
@@ -1136,7 +1145,7 @@ watch(
           {{ new Date(s.updatedAt).toLocaleDateString() }}
         </span>
         <button
-          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 shrink-0"
+          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
           :title="$t('common.delete')"
           @click.stop="chat.removeSession(s.id)"
         >
@@ -1160,8 +1169,21 @@ watch(
       :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
       @scroll.passive="onTranscriptScroll"
     >
-      <div v-if="!chat.messages.length" class="text-xs text-fg-3 leading-relaxed">
-        {{ $t('chat.emptyState') }}
+      <!-- Empty panel: a lead in reading-weight text, then the three things
+           worth knowing as rows. One child of the scroller, so the transcript's
+           own spacing is untouched the moment a message exists. -->
+      <div v-if="!chat.messages.length">
+        <p class="text-sm text-fg-1 leading-relaxed">{{ $t('chat.emptyLead') }}</p>
+        <ul class="mt-3 space-y-2">
+          <li
+            v-for="row in emptyRows"
+            :key="row.icon"
+            class="flex gap-2.5 text-xs text-fg-3 leading-relaxed"
+          >
+            <span class="codicon codicon-sm shrink-0 mt-0.5" :class="row.icon" />
+            <span>{{ row.text }}</span>
+          </li>
+        </ul>
       </div>
 
       <!-- data-msg: the anchor the composer's re-ask chip scrolls back to. -->
@@ -1552,13 +1574,13 @@ watch(
           class="btn text-xs"
           @click="preset('Ingest the un-processed sources under raw/: read each one, then create or update wiki pages for them following the KB schema. Link new pages from the index.')"
         >
-          Ingest
+          {{ $t('chat.presetIngest') }}
         </button>
         <button
           class="btn text-xs"
           @click="preset('Check this knowledge base for problems: orphan pages, broken wikilinks, missing index entries, contradictions. Report what you find; only fix things after listing them.')"
         >
-          Lint
+          {{ $t('chat.presetLint') }}
         </button>
       </template>
     </div>
@@ -1785,7 +1807,7 @@ watch(
             >
               <img :src="thumbFor(a.path)" class="w-full h-full object-cover" alt="" />
               <button
-                class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-bg-0/80 text-fg-2 hover:text-fg-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-bg-0/80 text-fg-2 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 :title="$t('common.remove')"
                 @click="removeAttachment(i)"
               >
