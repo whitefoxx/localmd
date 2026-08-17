@@ -9,6 +9,11 @@ export const useKbStore = defineStore('kb', () => {
   const name = ref<string | null>(null)
   const isOpen = ref(false)
   const recents = ref<RecentKb[]>([])
+  /** False until the first read of the recents list has come back. An empty
+   *  list and a list nobody has looked at yet are different things, and the
+   *  start screen shows a different half of itself for each — without this it
+   *  renders the first-visit copy for a frame and then yanks it away. */
+  const recentsKnown = ref(false)
   const error = ref<string | null>(null)
   /** Another tab holds this KB open — concurrent writes would clobber each
    *  other (autosave, .git/index, sidecars). We warn rather than hard-block. */
@@ -47,6 +52,8 @@ export const useKbStore = defineStore('kb', () => {
       recents.value = await listRecents()
     } catch {
       recents.value = []
+    } finally {
+      recentsKnown.value = true
     }
   }
 
@@ -118,6 +125,7 @@ export const useKbStore = defineStore('kb', () => {
     name,
     isOpen,
     recents,
+    recentsKnown,
     error,
     lockedByOther,
     refreshRecents,
