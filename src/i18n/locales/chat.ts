@@ -58,7 +58,7 @@ export default {
     removeTab: 'Detach this tab',
     noModelTitle: 'Pick a model first',
     noModelDesc:
-      'The agent runs on a model you provide — add an API key from any provider and it can start working. The key stays in this browser and goes straight to that provider.',
+      'The agent runs on a model you bring. Add a key from any provider — or point it at a model on your own machine. Your key stays in this browser and goes straight to the provider, never through us.',
     noModelAction: 'Configure a model',
     noModelDemo: 'Or try a demo knowledge base',
     stoppedAtLimit: 'Stopped at the step limit — the work may be unfinished.',
@@ -171,7 +171,7 @@ export default {
     removeTab: '取消引用这个标签页',
     noModelTitle: '先选一个模型',
     noModelDesc:
-      'agent 依赖你自己提供的模型运行 —— 填入任意提供商的 API key 就能开始。密钥只保存在这个浏览器里，并直接发往该提供商。',
+      'agent 用的是你自己的模型。填任意厂商的 key，或者指向你自己机器上跑的模型。key 只存在这个浏览器里，直接发给厂商，不经过我们。',
     noModelAction: '去配置模型',
     noModelDemo: '或者先试试示例知识库',
     stoppedAtLimit: '达到单轮步数上限而停下 —— 事情可能没做完。',

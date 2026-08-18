@@ -17,8 +17,9 @@ Click **Add model**, pick a provider, paste the API key, and type the model
 name. Everything else is filled in for you.
 
 Anthropic, OpenAI, Google, DeepSeek, Zhipu, Qwen, xAI and any
-OpenAI-compatible endpoint all work. You can add several and switch between
-them.
+OpenAI-compatible endpoint all work — including a model running on your own
+machine, through Ollama or anything like it. You can add several and switch
+between them.
 
 If a key or model name is wrong, the chat area will tell you when you first send
 a message.

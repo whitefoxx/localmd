@@ -41,27 +41,28 @@ export default {
       xhigh: 'Very high',
     },
     reasoningHelp:
-      'How long the model deliberates before it answers. Lower means shorter thinking, less waiting and a smaller bill; higher is worth it for multi-step work. Left at Default, the provider decides. Models that cannot think ignore it, and a few endpoints reject it outright — the chat area will say so.',
+      'How long the model thinks before it answers. Less is faster and cheaper; more is worth it for multi-step work. Left at Default the provider decides, and a model that cannot think ignores it.',
     defaultPlaceholder: 'Default',
     profileHelp:
-      'Once you pick a provider you only need the API key and model name — the base URL and API adapter are built into the SDK. The endpoint must allow browser (CORS) access; the chat area will warn you if the connection fails.',
+      'Pick a provider, then paste its API key and the model name — that is all. The key is kept in this browser and sent straight to that provider, never through us. A model running on your own machine (Ollama and the like) works too. If a connection does not work, the chat area says so.',
 
     // Models list
     profilesHeading: 'Model profiles',
-    noProfiles: 'No models configured yet — add an API key so the agent can work.',
+    noProfiles:
+      'No models yet. Add a key from any provider — it stays in this browser and goes straight to them, never through us.',
     badge: { primary: 'Primary', vision: 'Vision', image: 'Image' },
     slotsHeading: 'Model roles',
     slot: { primary: 'Primary', vision: 'Vision', image: 'Image generation' },
     notConfigured: 'Not set',
     visionHelp:
-      'A Claude primary is multimodal by nature — no vision slot needed. For an OpenAI-compatible primary: if it is itself multimodal (e.g. qwen-vl, glm-4v, gpt-4o), point the vision slot at itself (images go straight into context); if it is text-only (e.g. deepseek-v4-flash), point the vision slot at a dedicated vision model (the agent calls it through the view_image tool).',
+      'Claude models read pictures on their own, so this can stay empty. With another provider: if your main model already reads pictures, point this at the same one; if it does not, point it at one that does and the agent will use it whenever something needs looking at.',
     imageHelp:
-      'The image-generation slot is optional; once set, the primary can create pictures with the generate_image tool (saved into the KB). Supported: OpenAI (DALL·E), Google (Imagen), xAI, and OpenAI-compatible /images/generations endpoints (Zhipu CogView, Qwen, custom, …). Enter the matching image model name; the endpoint must allow browser CORS.',
+      'Optional. Set it and the agent can make pictures and save them into your knowledge base. Works with OpenAI, Google, xAI and services compatible with them — enter the image model name.',
 
     // Agent behavior
     writeMode: 'Write mode',
     writeModeDesc:
-      'In ask mode, every write, edit and delete pauses the conversation on an approval card in the chat — the diff and the Approve/Reject buttons are right there, and the agent waits for your click. Deleting a folder or a binary file asks in BOTH modes — nothing can bring those back. Files already changed can be reviewed in the “Agent changes” panel; whether and how to commit is up to you in the Git panel.',
+      'In ask mode every write, edit and delete stops in the chat, shows exactly what would change, and waits for your click. Deleting a folder, or a picture, video or PDF, asks in both modes — nothing brings those back. Either way, what did change is listed in the “Agent changes” panel.',
     writeAuto: 'Write directly (review afterward)',
     writeAsk: 'Ask first (approve each time)',
     multiTab: 'Multi-tab sessions',
@@ -84,7 +85,7 @@ export default {
     // KB health scope
     healthScope: 'Scan scope',
     healthDesc:
-      "What the health check (broken links, orphan pages) skips — written the way a .gitignore is. 'raw/' covers a folder and everything in it, 'AGENTS.md' matches that name at any depth, and '*' matches inside one path segment. Everything else is scanned.",
+      "What the health check skips. 'raw/' skips that folder and everything in it, 'AGENTS.md' skips that name wherever it sits, and '*' stands for part of a name. Everything else is checked.",
     ignorePlaceholder: 'Search files and folders to ignore…',
     ignoreAddPattern: 'Ignore “{pattern}” as a pattern',
     ignoredHeading: 'Ignored ({n})',
@@ -99,7 +100,7 @@ export default {
       'These ship with the app and cost nothing, ever. Today that is web search and page reading; the set can grow.',
     connectionsGroup: 'Connections — paid',
     connectionsDesc:
-      'Everything that reaches an outside service: the browser extension, MCP servers, and tools built against an API. One licence covers all of it.',
+      'Anything that reaches a service outside this browser. One licence covers all of it.',
     connectionsLocked: 'Adding and using connections needs a licence —',
     rowNeedsLicence: 'Needs a licence',
     connectTitle: 'Connect something',
@@ -158,7 +159,7 @@ export default {
     editServerTitle: 'Edit MCP server',
     keys: 'Keys',
     keysDesc:
-      'API keys the installed tools need. They stay in this browser and are never shown to the agent — a tool refers to a key by name, so the agent can tell you which one is missing without ever seeing its value.',
+      'Keys the tools you installed need. They stay in this browser and are never shown to the agent — it knows a key by name only, so it can tell you which one is missing without seeing it.',
     getKey: 'Get one →',
     keyUsedBy: 'Read by {tools}',
     agentToolPrompt:
@@ -242,7 +243,7 @@ export default {
     serverViaExtensionMissing:
       'No browser extension is connected — this server cannot start until localmd Connect is.',
     toolsHelp:
-      'A server reached directly must allow browser CORS; one reached through the browser extension need not. This is the global config; a knowledge base can also carry its own .agents/mcp.json (travels with git; on a duplicate target the KB wins; keep tokens here rather than in the file). Tools appear in the agent tool list as mcp__name__tool; results from external tools are treated as untrusted data.',
+      'Some servers refuse to answer a web page directly; those work through the browser extension instead. This is the global list — a knowledge base can also carry its own in .agents/mcp.json, which travels with it (keep tokens here, not in that file). Whatever a server returns is treated as untrusted.',
 
     // Git & GitHub
     commitAuthor: 'Commit author name',
@@ -311,27 +312,28 @@ export default {
       xhigh: '很高',
     },
     reasoningHelp:
-      '模型回答前思考多久。调低意味着思考更短、等待更少、账单更小；多步骤的活儿才值得调高。留在「默认」就交给 provider 自己决定。不会思考的模型会忽略它，少数端点则直接拒绝——聊天区会提示。',
+      '模型回答前思考多久。想得少更快也更便宜；多步骤的活儿值得想久一点。留在「默认」就由厂商决定，不会思考的模型会忽略它。',
     defaultPlaceholder: '默认',
     profileHelp:
-      '选好 provider 后只需填 API key 和模型名——base URL 与接口适配由 SDK 内置。端点须允许浏览器（CORS）访问；连接失败时聊天区会给出提示。',
+      '选好厂商，填上 API key 和模型名就行。key 只存在这个浏览器里，直接发给该厂商，不经过我们。跑在你自己机器上的模型（Ollama 之类）也可以。连不上时聊天区会提示。',
 
     // Models list
     profilesHeading: '模型 Profiles',
-    noProfiles: '还没有配置模型 — 添加一个 API key 后 agent 才能工作。',
+    noProfiles:
+      '还没有模型。加一个任意厂商的 key —— 它只存在这个浏览器里，直接发给厂商，不经过我们。',
     badge: { primary: '主模型', vision: '视觉', image: '图像' },
     slotsHeading: '模型分工',
     slot: { primary: '主模型', vision: '视觉理解', image: '图像生成' },
     notConfigured: '未配置',
     visionHelp:
-      'Claude 主模型天生多模态，无需配置视觉槽。OpenAI 兼容主模型：若它本身是多模态（如 qwen-vl、glm-4v、gpt-4o），视觉槽选它自己（图片直接进上下文）；若是纯文本模型（如 deepseek-v4-flash），视觉槽指一个专门的视觉模型（agent 通过 view_image 工具调用它）。',
+      'Claude 系列自己就能看图，这里可以留空。用别的厂商时：主模型本来就能看图，就指向它自己；不能看图，就指向一个能看图的模型，需要看图时 agent 会去用它。',
     imageHelp:
-      '图像生成槽可选，配置后主模型可用 generate_image 工具作图（保存进知识库）。支持 OpenAI（DALL·E）、Google（Imagen）、xAI，以及 OpenAI 兼容的 /images/generations 端点（智谱 CogView、Qwen、自定义等）；模型名填对应的作图模型，端点须允许浏览器 CORS。',
+      '可选。配好之后 agent 就能生成图片并存进知识库。支持 OpenAI、Google、xAI 以及与它们兼容的服务——填上对应的图像模型名即可。',
 
     // Agent behavior
     writeMode: '写入模式',
     writeModeDesc:
-      '先询问模式下，每次写入、修改、删除都会让对话停在聊天里的一张确认卡片上——改动对照和「批准 / 拒绝」按钮就在原地，agent 会一直等你点。删除文件夹或二进制文件在两种模式下都会先询问——它们没有任何办法找回。已写入的改动可在 “Agent changes” 面板查看，是否提交、如何提交由你在 Git 面板自行决定。',
+      '「先询问」模式下，每次写入、修改、删除都会停在聊天里，把要改什么摆给你看，等你点确认。删除文件夹，或者图片、视频、PDF，两种模式下都会先问——那些删了找不回来。无论哪种模式，改过什么都列在 “Agent changes” 面板里。',
     writeAuto: '直接写入（事后审查）',
     writeAsk: '先询问（每次批准）',
     multiTab: '多标签页会话',
@@ -354,7 +356,7 @@ export default {
     // KB health scope
     healthScope: '检测范围',
     healthDesc:
-      '健康检查（断链、孤立页）跳过哪些内容——写法和 .gitignore 一样：「raw/」覆盖整个目录，「AGENTS.md」匹配任意层级的同名文件，「*」只在单层路径内匹配。其余全部检测。',
+      '健康检查跳过哪些内容。「raw/」跳过整个目录；「AGENTS.md」跳过任意位置的同名文件；「*」代表名字里的一段。其余都会检查。',
     ignorePlaceholder: '搜索要忽略的文件或目录……',
     ignoreAddPattern: '把「{pattern}」作为规则加入',
     ignoredHeading: '已忽略（{n}）',
@@ -367,8 +369,7 @@ export default {
     bundledGroup: '自带工具 —— 免费',
     bundledDesc: '随应用附带，永远不收费。目前是网页搜索和读网页；这个集合以后会变多。',
     connectionsGroup: '外部接入 —— 付费',
-    connectionsDesc:
-      '所有伸到外部服务的能力：浏览器扩展、MCP server、针对某个 API 造的工具。一个许可覆盖全部。',
+    connectionsDesc: '所有连到这个浏览器之外的服务的能力。一份许可全都涵盖。',
     connectionsLocked: '添加和使用外部接入需要许可 ——',
     rowNeedsLicence: '需要许可',
     connectTitle: '接入一个服务',
@@ -423,7 +424,7 @@ export default {
     editServerTitle: '编辑 MCP 服务器',
     keys: '密钥',
     keysDesc:
-      '已安装工具所需的 API key。它们只保存在这个浏览器里，绝不会给到 agent —— 工具只按名字引用密钥，所以 agent 能告诉你缺哪一个，却看不到它的值。',
+      '你装的那些工具需要的 key。它们只存在这个浏览器里，agent 看不到 —— 它只知道 key 的名字，所以能告诉你缺哪一个，却看不到内容。',
     getKey: '去获取 →',
     keyUsedBy: '被这些工具读取：{tools}',
     agentToolPrompt: '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
@@ -505,7 +506,7 @@ export default {
       '当这个服务器不接受网页直接访问时打开它。大多数托管的 MCP 服务器都直接拒绝浏览器；浏览器扩展（localmd Connect）会代替本页去取，不受这条限制。',
     serverViaExtensionMissing: '浏览器扩展未连接 —— 在 localmd Connect 连上之前这个服务器起不来。',
     toolsHelp:
-      '直连的服务器必须允许浏览器 CORS，走浏览器扩展的则不需要。这里是全局配置；知识库还可以自带 .agents/mcp.json（随 git 走，重复目标以 KB 为准，token 建议只放这里不放文件）。工具以 mcp__名称__工具 出现在 agent 工具列表；外部工具的结果按不可信数据处理。',
+      '有些服务器不接受网页直连，那种就走浏览器扩展。这里是全局列表；知识库也可以自带一份 .agents/mcp.json 跟着走（token 建议放这里，别写进那个文件）。服务器返回的内容一律按不可信处理。',
 
     // Git & GitHub
     commitAuthor: 'Commit 作者名',
