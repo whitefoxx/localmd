@@ -14,6 +14,13 @@
  * is not individually verified here.
  */
 
+/**
+ * Output-token ceiling for a profile that does not set one. Lives here rather
+ * than in the agent runtime because the settings form has to be able to say
+ * the number out loud: "Default" in a box tells nobody what they are getting.
+ */
+export const DEFAULT_MAX_TOKENS = 8192
+
 /** Which AI SDK provider package drives a preset. Everything except
  *  'openai-compatible' has its base URL + adaptation baked into the package. */
 export type SdkKind =

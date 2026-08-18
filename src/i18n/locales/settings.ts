@@ -29,7 +29,8 @@ export default {
 
     // Profile editor
     labelOptional: 'Label (optional)',
-    maxTokensOptional: 'Max tokens (optional)',
+    maxTokensOptional: 'Longest reply (optional)',
+    maxTokensHelp: 'How much the model may write in one answer. Leave it empty for {n}.',
     reasoningOptional: 'Thinking effort (optional)',
     reasoning: {
       none: 'Off',
@@ -298,7 +299,8 @@ export default {
 
     // Profile editor
     labelOptional: 'Label（可选）',
-    maxTokensOptional: 'Max tokens（可选）',
+    maxTokensOptional: '单次回复上限（可选）',
+    maxTokensHelp: '模型一次回答最多能写多少。留空就是 {n}。',
     reasoningOptional: '思考强度（可选）',
     reasoning: {
       none: '关闭',

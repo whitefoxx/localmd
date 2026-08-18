@@ -21,6 +21,7 @@ import {
   presetFor,
   needsBaseUrl,
   providerHasImageModel,
+  DEFAULT_MAX_TOKENS,
 } from '@/lib/providers'
 import {
   HOTKEYS,
@@ -404,7 +405,17 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.maxTokensOptional') }}</label>
-                <input v-model.number="editing.maxTokens" type="number" class="input" :placeholder="$t('settings.defaultPlaceholder')" />
+                <!-- The number, not the word: "Default" in an empty box tells
+                     nobody what they are actually getting. -->
+                <input
+                  v-model.number="editing.maxTokens"
+                  type="number"
+                  class="input"
+                  :placeholder="String(DEFAULT_MAX_TOKENS)"
+                />
+                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
+                  {{ $t('settings.maxTokensHelp', { n: DEFAULT_MAX_TOKENS }) }}
+                </p>
               </div>
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.reasoningOptional') }}</label>

@@ -38,7 +38,7 @@ import {
 } from './tools'
 import { toLanguageModel } from './model'
 import { mapLimit, untilAborted } from '@/lib/async'
-import { sdkKindFor } from '@/lib/providers'
+import { sdkKindFor, DEFAULT_MAX_TOKENS } from '@/lib/providers'
 import { withMovingBreakpoint } from '@/lib/promptCache'
 import { trimHistory } from '@/lib/history'
 import { estimateTokens } from '@/lib/tokenMeter'
@@ -65,7 +65,6 @@ const MAX_OVERFLOW_RECOVERIES = 2
  *  `.trace/` path the model can read back. */
 const OVERFLOW_KEEP_MESSAGES = [2, 0]
 const MAX_IMAGES_PER_CALL = 5
-const DEFAULT_MAX_TOKENS = 8192
 
 /**
  * Whether this call must be refused for want of a licence.
