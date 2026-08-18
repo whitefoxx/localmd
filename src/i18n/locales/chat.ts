@@ -60,6 +60,7 @@ export default {
     noModelDesc:
       'The agent runs on a model you provide — add an API key from any provider and it can start working. The key stays in this browser and goes straight to that provider.',
     noModelAction: 'Configure a model',
+    noModelDemo: 'Or try a demo knowledge base',
     stoppedAtLimit: 'Stopped at the step limit — the work may be unfinished.',
     continueRun: 'Continue',
     continueWord: 'Continue where you left off.',
@@ -172,6 +173,7 @@ export default {
     noModelDesc:
       'agent 依赖你自己提供的模型运行 —— 填入任意提供商的 API key 就能开始。密钥只保存在这个浏览器里，并直接发往该提供商。',
     noModelAction: '去配置模型',
+    noModelDemo: '或者先试试示例知识库',
     stoppedAtLimit: '达到单轮步数上限而停下 —— 事情可能没做完。',
     continueRun: '继续',
     continueWord: '接着刚才没做完的继续。',

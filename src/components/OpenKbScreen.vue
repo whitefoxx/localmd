@@ -63,17 +63,11 @@ async function copyAddress(): Promise<void> {
   }
 }
 
-/**
- * Open the in-memory demo KB. The URL is stamped as well as the KB opened, so
- * a reload lands back in the demo and the address can be handed to someone —
- * `?demo` is the same door, and it is the one that gets linked from a post.
- */
+/** Open the in-memory demo KB — see `enterDemo`, which is the same door the
+ *  chat panel offers when no model is configured yet. */
 async function openDemo(): Promise<void> {
-  const url = new URL(location.href)
-  url.searchParams.set('demo', '1')
-  history.replaceState(null, '', url)
-  const { bootstrapDemo } = await import('@/demo/bootstrap')
-  await bootstrapDemo()
+  const { enterDemo } = await import('@/demo/bootstrap')
+  await enterDemo()
 }
 
 /** Drop an entry from the recent list — the folder on disk is untouched. */

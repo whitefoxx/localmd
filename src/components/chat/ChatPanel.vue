@@ -70,6 +70,14 @@ const emptyRows = computed(() => [
   },
 ])
 
+/** Nothing to run the agent with yet — the demo lends one, so it is the only
+ *  place it can be tried before configuring anything. Replaces the open KB;
+ *  enterDemo puts that one away properly first. */
+async function tryDemo(): Promise<void> {
+  const { enterDemo } = await import('@/demo/bootstrap')
+  await enterDemo()
+}
+
 /** Just the site, for the right-hand hint on a tab row. */
 function hostOf(url: string): string {
   try {
@@ -1727,9 +1735,15 @@ watch(
       >
         <div class="text-sm text-fg-1">{{ $t('chat.noModelTitle') }}</div>
         <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('chat.noModelDesc') }}</p>
-        <button class="btn text-xs mt-2" @click="ui.openSettings('models')">
-          {{ $t('chat.noModelAction') }}
-        </button>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <button class="btn text-xs" @click="ui.openSettings('models')">
+            {{ $t('chat.noModelAction') }}
+          </button>
+          <!-- The one way to see the agent work before owning a key: the demo
+               borrows a model. Second, because someone who has a key wants the
+               first button. -->
+          <button class="btn text-xs" @click="tryDemo()">{{ $t('chat.noModelDemo') }}</button>
+        </div>
       </div>
 
       <!-- ChatGPT-style composer: one rounded frame holding the attachment

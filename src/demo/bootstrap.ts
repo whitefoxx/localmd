@@ -16,6 +16,28 @@ import { trialSession, trialProfile } from '@/lib/trial'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
+import { useKbIndexStore } from '@/stores/kbIndex'
+
+/**
+ * Enter the demo from anywhere in the app — the start screen, or a chat panel
+ * with no model configured.
+ *
+ * Stamps the URL as well as opening the KB, because `?demo` is the door: a
+ * reload lands back in the demo, and the address can be handed to someone.
+ * Whatever was open is put away first — flushed, then dropped — since the demo
+ * replaces the KB under the same stores, and a pending write must not land in
+ * a folder the user has already left.
+ */
+export async function enterDemo(): Promise<void> {
+  const url = new URL(location.href)
+  url.searchParams.set('demo', '1')
+  history.replaceState(null, '', url)
+  const files = useFilesStore()
+  await files.flush()
+  files.reset()
+  useKbIndexStore().reset()
+  await bootstrapDemo()
+}
 
 export async function bootstrapDemo(): Promise<void> {
   const manifest = await loadDemoManifest()
