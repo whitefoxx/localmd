@@ -618,11 +618,19 @@ function closeKb(): void {
                 <p class="text-xs leading-relaxed mb-4">
                   {{ $t('layout.scaffoldDesc') }}
                 </p>
+                <!-- Scaffolding writes a handful of files and then opens one,
+                     which is long enough to look like nothing happened. Say so
+                     on the button that was pressed. -->
                 <div class="flex gap-2 justify-center">
                   <button class="btn-primary text-xs" :disabled="scaffolding" @click="doScaffold">
-                    <span class="codicon codicon-sm codicon-rocket mr-1" />{{ $t('layout.scaffoldInit') }}
+                    <span
+                      class="codicon codicon-sm mr-1"
+                      :class="scaffolding ? 'codicon-loading codicon-modifier-spin' : 'codicon-rocket'"
+                    />{{ scaffolding ? $t('layout.scaffoldWorking') : $t('layout.scaffoldInit') }}
                   </button>
-                  <button class="btn text-xs" @click="scaffoldDismissed = true">{{ $t('layout.scaffoldSkip') }}</button>
+                  <button class="btn text-xs" :disabled="scaffolding" @click="scaffoldDismissed = true">
+                    {{ $t('layout.scaffoldSkip') }}
+                  </button>
                 </div>
               </div>
               <div v-else class="text-center">
