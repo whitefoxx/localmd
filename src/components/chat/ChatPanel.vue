@@ -1169,12 +1169,15 @@ watch(
       </div>
     </div>
 
-    <!-- Transcript. Maximized → center the column at a readable width so long
-         lines don't stretch edge to edge. -->
+    <!-- Transcript. Maximized → center each message at a readable width so long
+         lines don't stretch edge to edge. The constraint is on the CHILDREN,
+         never on the scroller: narrowing the scroll container would move the
+         scrollbar (and the wheel's target area) into the middle of the window,
+         so scrolling would only work with the cursor over the column. -->
     <div
       ref="scroller"
       class="flex-1 panel-scroll px-3 py-3 space-y-4 w-full"
-      :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
+      :class="{ '[&>*]:max-w-3xl [&>*]:mx-auto': ui.agentMaximized }"
       @scroll.passive="onTranscriptScroll"
     >
       <!-- Empty panel: a lead in reading-weight text, then the three things
