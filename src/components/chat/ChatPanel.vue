@@ -332,12 +332,12 @@ async function copyBlock(e: MouseEvent, text: string): Promise<void> {
   flashCopy(e.currentTarget as HTMLElement, ok)
 }
 
-/* A thinking block is shown in full while it streams — the thought is the only
- * thing happening, so nothing is hidden — and folds itself away once the stream
- * moves on, leaving the transcript to the reply. Two things override that fold:
- * an explicit toggle (`thinkingChoice`), and any click inside the block WHILE it
- * streamed (`thinkingHeld`) — someone reading or selecting the trail should not
- * have it yanked shut under them. Both are keyed by message+part. */
+/* A thinking block stays folded — while it streams and after — unless the user
+ * opens it (`thinkingChoice`, keyed by message+part). It used to unfold itself
+ * for the duration of the stream, which meant every turn shoved the reply down
+ * the panel behind a wall of thought nobody asked to read, and then yanked it
+ * back. What streams instead is the tail, on the summary's own line (see the
+ * template): the thought is visible as it happens, at the size of one line. */
 function thinkingStreaming(m: UiMessage, i: number): boolean {
   return (
     chat.running &&
@@ -347,15 +347,11 @@ function thinkingStreaming(m: UiMessage, i: number): boolean {
 }
 
 const thinkingChoice = ref<Map<string, boolean>>(new Map())
-const thinkingHeld = ref<Set<string>>(new Set())
 function thinkKey(m: UiMessage, i: number): string {
   return `${m.id}:${i}`
 }
 function thinkingOpen(m: UiMessage, i: number): boolean {
-  const key = thinkKey(m, i)
-  const choice = thinkingChoice.value.get(key)
-  if (choice !== undefined) return choice
-  return thinkingStreaming(m, i) || thinkingHeld.value.has(key)
+  return thinkingChoice.value.get(thinkKey(m, i)) ?? false
 }
 /** The summary's own click, with the native toggle suppressed: `open` is bound
  *  to our state, so the user's choice has to live there to survive a re-render. */
@@ -364,11 +360,13 @@ function toggleThinking(m: UiMessage, i: number): void {
   next.set(thinkKey(m, i), !thinkingOpen(m, i))
   thinkingChoice.value = next
 }
-/** Any click inside a still-streaming block retires its auto-collapse. */
-function holdThinking(m: UiMessage, i: number): void {
-  const key = thinkKey(m, i)
-  if (!thinkingStreaming(m, i) || thinkingHeld.value.has(key)) return
-  thinkingHeld.value = new Set(thinkingHeld.value).add(key)
+
+/** The last stretch of a streaming thought, on one line. Capped because the
+ *  line can only show a fraction of it anyway and re-rendering the whole
+ *  thought on every delta is work nobody sees. */
+const THINK_TAIL_CHARS = 200
+function thinkTail(text: string): string {
+  return text.slice(-THINK_TAIL_CHARS).replace(/\s+/g, ' ')
 }
 
 /* ── @-mention autocomplete ──────────────────────────────────────────────── */
@@ -1337,13 +1335,26 @@ watch(
             </div>
             <details
               v-else-if="part.type === 'thinking'"
-              class="text-xs text-fg-3"
+              class="group text-xs text-fg-3"
               :open="thinkingOpen(m, i)"
-              @click="holdThinking(m, i)"
             >
-              <summary class="cursor-pointer select-none hover:text-fg-2" @click.prevent="toggleThinking(m, i)">
-                <span class="codicon codicon-sm codicon-lightbulb mr-1" />{{ $t('chat.thinking') }}
-                <span v-if="thinkTime(part)" class="ml-1 tabular-nums text-fg-3">· {{ thinkTime(part) }}</span>
+              <summary
+                class="flex items-center gap-1.5 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-fg-2"
+                @click.prevent="toggleThinking(m, i)"
+              >
+                <span
+                  class="codicon codicon-sm codicon-chevron-right shrink-0 transition-transform group-open:rotate-90"
+                />
+                <span class="codicon codicon-sm codicon-lightbulb shrink-0" />
+                <span class="shrink-0">{{ $t('chat.thinking') }}</span>
+                <span v-if="thinkTime(part)" class="shrink-0 tabular-nums">· {{ thinkTime(part) }}</span>
+                <!-- The thought as it arrives, on this line. Right-aligned in a
+                     clipped box so the newest words sit at the edge and the
+                     older ones slide out under the fade. -->
+                <span
+                  v-if="thinkingStreaming(m, i) && !thinkingOpen(m, i) && part.text"
+                  class="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-right italic opacity-70 [mask-image:linear-gradient(to_right,transparent,#000_3rem)]"
+                >{{ thinkTail(part.text) }}</span>
               </summary>
               <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">{{ part.text }}</div>
             </details>

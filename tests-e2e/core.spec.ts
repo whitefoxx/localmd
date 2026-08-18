@@ -171,38 +171,42 @@ test('re-asking a message forks the conversation instead of overwriting it', asy
   await expect(page.getByText('1/2', { exact: true })).toBeVisible()
 })
 
-/** The thinking block, whole while it streams, gone once the reply starts. */
+/** The thinking block: folded throughout, with the thought running along its
+ *  own line while it streams. */
 const thinkingBlock = (page: import('@playwright/test').Page) =>
   page.locator('details:has(summary:has-text("Thinking"))').first()
 
-test('a thinking block streams in full, then folds itself away', async ({ page }) => {
+test('a thinking block streams on one line and never unfolds itself', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const input = page.getByPlaceholder(/Ask or instruct/)
-  await input.fill('think ' + '推理中。'.repeat(300))
-  await input.press('Enter')
-
-  const block = thinkingBlock(page)
-  await expect(block).toHaveAttribute('open', '', { timeout: 10_000 })
-  // No clamp any more: what is written is what is on screen.
-  const clipped = await block.locator('div').first().evaluate((el) => el.scrollHeight > el.clientHeight + 2)
-  expect(clipped).toBe(false)
-
-  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 10_000 })
-  await expect(block).not.toHaveAttribute('open', '')
-})
-
-test('clicking a streaming thinking block keeps it open past the stream', async ({ page }) => {
-  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
-  // Long trail: the click below must land while the stream is still going, and
-  // on a loaded machine (parallel suites) a short one can finish first — the
-  // block folds and the click misses.
   await input.fill('think ' + '推理中。'.repeat(900))
   await input.press('Enter')
 
   const block = thinkingBlock(page)
-  await expect(block).toHaveAttribute('open', '', { timeout: 10_000 })
-  await block.locator('div').first().click() // in the trail, not on the summary
+  await expect(block).toBeVisible({ timeout: 10_000 })
+  // The thought is legible as it happens — on the summary, not as a wall of
+  // text shoving the reply down the panel.
+  await expect(block.locator('summary')).toContainText('推理中', { timeout: 10_000 })
+  await expect(block).not.toHaveAttribute('open', '')
+
+  await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 20_000 })
+  // The stream moved on, and the line went with it: a label and a duration.
+  await expect(block).not.toHaveAttribute('open', '')
+  await expect(block.locator('summary')).not.toContainText('推理中')
+})
+
+test('opening a streaming thinking block keeps it open past the stream', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask or instruct/)
+  // Long trail: the click below must land while the stream is still going, and
+  // on a loaded machine (parallel suites) a short one can finish first.
+  await input.fill('think ' + '推理中。'.repeat(900))
+  await input.press('Enter')
+
+  const block = thinkingBlock(page)
+  await expect(block).toBeVisible({ timeout: 10_000 })
+  await block.locator('summary').click()
+  await expect(block).toHaveAttribute('open', '')
   await expect(page.getByText('Done thinking')).toBeVisible({ timeout: 20_000 })
   await expect(block).toHaveAttribute('open', '')
 })
