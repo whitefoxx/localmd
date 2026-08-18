@@ -24,6 +24,7 @@ import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 import { normalizeHttpToolList, type HttpToolSpec } from '@/lib/httpTools'
 import { defaultInstalledIds, RETIRED_PACKS } from '@/lib/toolCatalog'
 import { normalizeHotkeyOverrides, type HotkeyOverrides } from '@/lib/hotkeys'
+import { DEFAULT_HEALTH_IGNORE } from '@/lib/scanScope'
 import { isE2eMode } from '@/lib/e2e'
 import type { ThemePref } from '@/stores/theme'
 
@@ -106,8 +107,9 @@ export interface SettingsState {
   mcpServers: McpServerConfig[]
   /** User keyboard-shortcut overrides (id → binding); absent = registry default. */
   hotkeys: HotkeyOverrides
-  /** Top-level dirs the KB health check is scoped to; empty = whole KB. */
-  healthDirs: string[]
+  /** Paths the KB health check skips, gitignore-shaped (see lib/scanScope).
+   *  Empty means the whole KB is scanned; absent means the defaults. */
+  healthIgnore: string[]
   /** Installed recommended-catalog entry ids (see lib/toolCatalog.ts). Nothing
    *  is built in: web access included, the agent gets what is listed here. */
   toolEntries: string[]
@@ -175,7 +177,7 @@ const EMPTY: Omit<SettingsState, 'profiles' | 'slots'> = {
   agentMaxTabs: 3,
   mcpServers: [],
   hotkeys: {},
-  healthDirs: [],
+  healthIgnore: [...DEFAULT_HEALTH_IGNORE],
   toolEntries: defaultInstalledIds(),
   httpTools: [],
   toolSecrets: {},
@@ -285,9 +287,11 @@ function extras(obj: Record<string, unknown>): Omit<SettingsState, 'profiles' | 
     agentMaxTabs: clampMaxTabs(obj.agentMaxTabs),
     mcpServers: normalizeMcpServerList(obj.mcpServers, () => newProfileId()),
     hotkeys: normalizeHotkeyOverrides(obj.hotkeys),
-    healthDirs: Array.isArray(obj.healthDirs)
-      ? obj.healthDirs.filter((x): x is string => typeof x === 'string' && !!x)
-      : [],
+    // An empty array is a decision (scan everything) and survives; only an
+    // absent key — a settings file written before this existed — gets defaults.
+    healthIgnore: Array.isArray(obj.healthIgnore)
+      ? obj.healthIgnore.filter((x): x is string => typeof x === 'string' && !!x.trim())
+      : [...DEFAULT_HEALTH_IGNORE],
     toolEntries: adopted.entries,
     httpTools: adopted.tools,
     toolSecrets: toolSecretsFrom(obj.toolSecrets),

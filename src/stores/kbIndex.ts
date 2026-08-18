@@ -13,13 +13,7 @@ import { computeLint, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
-
-/** A page is in the health scope when no dirs are configured (whole KB) or its
- *  path sits under one of them. */
-function inHealthScope(path: string, dirs: string[]): boolean {
-  if (!dirs.length) return true
-  return dirs.some((d) => path === d || path.startsWith(`${d}/`))
-}
+import { isIgnored } from '@/lib/scanScope'
 
 interface CachedPage {
   mtime: number
@@ -247,17 +241,17 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   })
 
   const health = computed<HealthReport>(() => {
-    // Scope reporting to the configured dirs; the link graph itself stays global
-    // so an in-scope page linked only from out-of-scope pages isn't a false orphan.
-    const dirs = useSettingsStore().state.healthDirs
+    // Scope reporting to what is not ignored; the link graph itself stays global
+    // so an in-scope page linked only from an ignored one isn't a false orphan.
+    const ignore = useSettingsStore().state.healthIgnore
     const brokenLinks: HealthReport['brokenLinks'] = []
     for (const [path, page] of pages.value) {
-      if (!inHealthScope(path, dirs)) continue
+      if (isIgnored(path, ignore)) continue
       if (page.broken.length) brokenLinks.push({ path, targets: [...new Set(page.broken)] })
     }
     const orphans: string[] = []
     for (const path of pages.value.keys()) {
-      if (!inHealthScope(path, dirs)) continue
+      if (isIgnored(path, ignore)) continue
       // Index/log pages are entry points, not orphans.
       const stem = path.toLowerCase()
       if (stem.endsWith('/index.md') || stem === 'index.md' || stem.endsWith('/log.md')) continue

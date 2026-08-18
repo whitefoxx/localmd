@@ -20,6 +20,7 @@ export default {
       'Nothing links to them and they link nowhere — unreachable by navigation. Link them from a related page or an index.',
     allClear: 'Nothing found',
     jumpTo: 'Jump to {target} in {path}',
+    editScope: 'What gets scanned (settings)',
   },
   zh: {
     title: '知识库健康度',
@@ -36,5 +37,6 @@ export default {
     orphansDesc: '没有任何页面链向它们，它们也不链向别处——导航无法到达。从相关页面或索引里链接它们。',
     allClear: '没有发现',
     jumpTo: '跳到 {path} 中的 {target}',
+    editScope: '检测范围设置',
   },
 }

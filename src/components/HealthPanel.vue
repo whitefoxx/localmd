@@ -33,6 +33,12 @@ async function open(path: string): Promise<void> {
   await files.openFile(path)
 }
 
+/** Straight to the scan-scope list — the panel's own "why is this here?". */
+function openScope(): void {
+  ui.healthOpen = false
+  ui.openSettings('health')
+}
+
 /** Open the page in edit mode and jump to the broken link's location. */
 async function revealBroken(path: string, target: string): Promise<void> {
   ui.healthOpen = false
@@ -54,6 +60,15 @@ async function revealBroken(path: string, target: string): Promise<void> {
         <div class="flex items-center gap-2 px-4 h-11 border-b border-border shrink-0">
           <span class="codicon codicon-pulse text-accent" />
           <h2 class="font-semibold text-fg-0 flex-1">{{ $t('health.title') }}</h2>
+          <!-- What is being scanned is a setting, and "why is this file not
+               listed / why is that one" is asked here rather than there. -->
+          <button
+            class="text-fg-3 hover:text-fg-0"
+            :title="$t('health.editScope')"
+            @click="openScope()"
+          >
+            <span class="codicon codicon-settings-gear" />
+          </button>
           <button class="text-fg-3 hover:text-fg-0" @click="ui.healthOpen = false">
             <span class="codicon codicon-close" />
           </button>

@@ -87,7 +87,8 @@ describe('normalizeSettings — multi-profile shape', () => {
       agentMaxTabs: 3,
       mcpServers: [],
       hotkeys: {},
-      healthDirs: [],
+      // Absent means the defaults, not "scan nothing extra" (see lib/scanScope).
+      healthIgnore: ['raw/', '.agents/', 'AGENTS.md', 'CLAUDE.md'],
       toolEntries: ['jina', 'parallel'],
       httpTools: [],
       toolSecrets: {},

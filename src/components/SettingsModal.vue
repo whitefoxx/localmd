@@ -8,6 +8,8 @@ import {
   type LlmProfile,
 } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
+import { fuzzyRank } from '@/lib/fuzzy'
+import { DEFAULT_HEALTH_IGNORE } from '@/lib/scanScope'
 import { useUiStore } from '@/stores/ui'
 import { useThemeStore } from '@/stores/theme'
 import { useLicenceStore } from '@/stores/licence'
@@ -96,19 +98,50 @@ const licenceHolder = computed<string | null>(() => {
 })
 
 /* KB health scope — pick which top-level dirs the health check covers. */
-const kbDirs = computed(() => {
-  const set = new Set<string>()
-  for (const p of files.mdFiles) {
-    const i = p.indexOf('/')
-    if (i > 0) set.add(p.slice(0, i))
+/* ── KB health: what the scan ignores ──────────────────────────────────────
+ * A gitignore-shaped denylist (see lib/scanScope), filled from a search over
+ * the knowledge base so nobody has to type a path they can point at. The
+ * ranking is lib/fuzzy — the same one behind ⌘P, so a folder is found here the
+ * way it is found there. */
+const scopeQuery = ref('')
+
+/** Everything ignorable: every file, and every directory that holds one.
+ *  Directories keep their trailing slash — it is what they mean in the list. */
+const scopeCandidates = computed<string[]>(() => {
+  const dirs = new Set<string>()
+  for (const p of files.allFiles) {
+    const parts = p.split('/')
+    for (let i = 1; i < parts.length; i++) dirs.add(`${parts.slice(0, i).join('/')}/`)
   }
-  return [...set].sort()
+  return [...[...dirs].sort(), ...[...files.allFiles].sort()]
 })
-function toggleHealthDir(d: string): void {
-  const list = store.state.healthDirs
-  const i = list.indexOf(d)
-  if (i >= 0) list.splice(i, 1)
-  else list.push(d)
+
+const scopeMatches = computed(() => {
+  const q = scopeQuery.value.trim()
+  if (!q) return []
+  const already = new Set(store.state.healthIgnore)
+  return fuzzyRank(q, scopeCandidates.value, (p) => p)
+    .filter((r) => !already.has(r.item))
+    .slice(0, 8)
+})
+
+function addIgnore(pattern: string): void {
+  const p = pattern.trim()
+  if (!p || store.state.healthIgnore.includes(p)) return
+  store.state.healthIgnore.push(p)
+  scopeQuery.value = ''
+}
+/** Enter takes the best match, or the typed text itself — which is how a
+ *  pattern that matches nothing yet (`*.draft.md`) gets into the list. */
+function submitIgnore(): void {
+  addIgnore(scopeMatches.value[0]?.item ?? scopeQuery.value)
+}
+function removeIgnore(pattern: string): void {
+  const i = store.state.healthIgnore.indexOf(pattern)
+  if (i >= 0) store.state.healthIgnore.splice(i, 1)
+}
+function resetIgnore(): void {
+  store.state.healthIgnore = [...DEFAULT_HEALTH_IGNORE]
 }
 
 /* ── Hotkey rebinding ─────────────────────────────────────────────────── */
@@ -654,39 +687,81 @@ function slotBadges(p: LlmProfile): string[] {
                   {{ $t('settings.healthDesc') }}
                 </p>
               </div>
-              <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+              <!-- Point at what to skip rather than typing it: the KB's own
+                   files and folders, ranked by the ⌘P matcher. -->
+              <div class="relative">
+                <span
+                  class="codicon codicon-sm codicon-search pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-3"
+                />
+                <input
+                  v-model="scopeQuery"
+                  class="input pl-8"
+                  :placeholder="$t('settings.ignorePlaceholder')"
+                  @keydown.enter.prevent="submitIgnore"
+                />
+              </div>
+              <div
+                v-if="scopeQuery.trim()"
+                class="rounded-lg border border-border divide-y divide-border overflow-hidden"
+              >
                 <button
-                  class="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-bg-2 transition-colors"
-                  @click="store.state.healthDirs = []"
+                  v-for="m in scopeMatches"
+                  :key="m.item"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-bg-2 transition-colors"
+                  @click="addIgnore(m.item)"
                 >
                   <span
-                    class="codicon codicon-sm shrink-0"
-                    :class="
-                      !store.state.healthDirs.length
-                        ? 'codicon-pass-filled text-accent'
-                        : 'codicon-circle-large-outline text-fg-3'
-                    "
+                    class="codicon codicon-sm shrink-0 text-fg-3"
+                    :class="m.item.endsWith('/') ? 'codicon-folder' : 'codicon-file'"
                   />
-                  <span class="text-fg-1">{{ $t('settings.allDirs') }}</span>
+                  <span class="flex-1 break-all font-mono text-xs text-fg-1">{{ m.item }}</span>
+                  <span class="codicon codicon-sm codicon-add shrink-0 text-fg-3" />
                 </button>
                 <button
-                  v-for="d in kbDirs"
-                  :key="d"
-                  class="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-bg-2 transition-colors"
-                  @click="toggleHealthDir(d)"
+                  v-if="!scopeMatches.length"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-bg-2 transition-colors"
+                  @click="submitIgnore"
                 >
-                  <span
-                    class="codicon codicon-sm shrink-0"
-                    :class="
-                      store.state.healthDirs.includes(d)
-                        ? 'codicon-pass-filled text-accent'
-                        : 'codicon-circle-large-outline text-fg-3'
-                    "
-                  />
-                  <span class="font-mono text-xs text-fg-1">{{ d }}/</span>
+                  <span class="codicon codicon-sm codicon-add shrink-0 text-fg-3" />
+                  <span class="text-xs text-fg-2">
+                    {{ $t('settings.ignoreAddPattern', { pattern: scopeQuery.trim() }) }}
+                  </span>
                 </button>
               </div>
-              <p v-if="!kbDirs.length" class="text-xs text-fg-3">{{ $t('settings.noSubdirs') }}</p>
+
+              <div>
+                <div class="mb-1 flex items-center justify-between">
+                  <span class="text-xs uppercase tracking-wide text-fg-3">
+                    {{ $t('settings.ignoredHeading', { n: store.state.healthIgnore.length }) }}
+                  </span>
+                  <button class="text-xs text-fg-3 hover:text-fg-1" @click="resetIgnore">
+                    {{ $t('settings.ignoreReset') }}
+                  </button>
+                </div>
+                <p v-if="!store.state.healthIgnore.length" class="text-xs text-fg-3">
+                  {{ $t('settings.ignoreEmpty') }}
+                </p>
+                <div v-else class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                  <div
+                    v-for="p in store.state.healthIgnore"
+                    :key="p"
+                    class="group flex items-center gap-2.5 px-3 py-2"
+                  >
+                    <span
+                      class="codicon codicon-sm shrink-0 text-fg-3"
+                      :class="p.endsWith('/') ? 'codicon-folder' : 'codicon-file'"
+                    />
+                    <span class="flex-1 break-all font-mono text-xs text-fg-1">{{ p }}</span>
+                    <button
+                      class="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-removed group-hover:opacity-100 focus:opacity-100"
+                      :title="$t('settings.ignoreRemove')"
+                      @click="removeIgnore(p)"
+                    >
+                      <span class="codicon codicon-sm codicon-close" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <ToolsSection v-else-if="section === 'tools'" />

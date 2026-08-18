@@ -83,9 +83,13 @@ export default {
     // KB health scope
     healthScope: 'Scan scope',
     healthDesc:
-      'Which directories the KB health check (broken links, orphan pages) scans. Defaults to the whole knowledge base; you can also pick specific top-level dirs — e.g. only wiki/, ignoring the conversation logs under raw/.',
-    allDirs: 'All directories',
-    noSubdirs: 'This knowledge base has no subdirectories yet.',
+      "What the health check (broken links, orphan pages) skips — written the way a .gitignore is. 'raw/' covers a folder and everything in it, 'AGENTS.md' matches that name at any depth, and '*' matches inside one path segment. Everything else is scanned.",
+    ignorePlaceholder: 'Search files and folders to ignore…',
+    ignoreAddPattern: 'Ignore “{pattern}” as a pattern',
+    ignoredHeading: 'Ignored ({n})',
+    ignoreReset: 'Reset to defaults',
+    ignoreEmpty: 'Nothing ignored — the whole knowledge base is scanned.',
+    ignoreRemove: 'Stop ignoring',
 
     // External tools — recommended catalog
     recommended: 'Recommended tools',
@@ -357,9 +361,13 @@ export default {
     // KB health scope
     healthScope: '检测范围',
     healthDesc:
-      'KB 健康检查（断链、孤立页）扫描哪些目录。默认检测整个知识库；也可只选某些顶层目录，比如只查 wiki/、忽略 raw/ 里的对话记录。',
-    allDirs: '全部目录',
-    noSubdirs: '此知识库暂无子目录。',
+      '健康检查（断链、孤立页）跳过哪些内容——写法和 .gitignore 一样：「raw/」覆盖整个目录，「AGENTS.md」匹配任意层级的同名文件，「*」只在单层路径内匹配。其余全部检测。',
+    ignorePlaceholder: '搜索要忽略的文件或目录……',
+    ignoreAddPattern: '把「{pattern}」作为规则加入',
+    ignoredHeading: '已忽略（{n}）',
+    ignoreReset: '恢复默认',
+    ignoreEmpty: '没有忽略任何内容——整个知识库都会被检测。',
+    ignoreRemove: '取消忽略',
 
     // External tools — recommended catalog
     recommended: '推荐工具',
