@@ -13,6 +13,7 @@
     "docs:sync": "node scripts/sync-doc-hashes.ts",
     "shoot:landing": "node scripts/shoot-landing.mjs",
     "shoot:diagram": "node scripts/shoot-diagram.mjs",
+    "shoot:og": "node scripts/shoot-og.mjs",
     "sign-key": "node scripts/sign-key.mjs"
   },
   "dependencies": {

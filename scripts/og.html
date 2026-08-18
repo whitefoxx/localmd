@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+/* The link preview card — what a shared localmd URL looks like in a feed,
+   a chat, or a Product Hunt comment. Rendered by shoot-og.mjs into
+   public/og.png at 1200x630, the size the og:image meta tags declare.
+
+   The words are the message house's one-liner, both sentences, verbatim. An
+   earlier version of this image said "your notes, PDFs, and chats live in a
+   local folder — no account, no upload", which reads fine and is not the
+   sentence every other surface uses. A one-liner only compounds if it is
+   byte-identical everywhere, and this image is the copy most people see
+   before they see any of the others.
+
+   Light, while the app and the gallery cards are dark: this one is not shown
+   next to them, it is shown inside somebody else's timeline, and it has read
+   as a legible white card there since launch. */
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { width:1200px; height:630px; overflow:hidden; }
+body {
+  background:linear-gradient(160deg,#f7f9fc 0%,#eef2f8 55%,#e7edf6 100%);
+  color:#0d1117;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:0 84px; text-align:center;
+}
+.mark { display:flex; align-items:center; gap:22px; margin-bottom:44px; }
+.mark svg { width:96px; height:96px; display:block; }
+.word { font-size:76px; font-weight:700; letter-spacing:-.02em; line-height:1; }
+.word .br { color:#b6c2d2; }
+.word .b { color:#0d1117; }
+.word .i { color:#2f7ff0; }
+h1 { font-size:40px; line-height:1.28; font-weight:700; letter-spacing:-.015em; max-width:980px; }
+.sub { margin-top:20px; font-size:31px; line-height:1.35; color:#41505f; max-width:960px; }
+.foot { margin-top:52px; font-size:22px; color:#8593a4; }
+.foot b { font-weight:400; color:#8593a4; }
+</style></head>
+<body>
+<div class="mark">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+    <rect width="128" height="128" rx="28" fill="#58a6ff"/>
+    <g fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M50 36H36v56h14"/>
+      <path d="M78 36h14v56H78"/>
+    </g>
+    <circle cx="64" cy="64" r="6.5" fill="#fff"/>
+  </svg>
+  <div class="word"><span class="br">[[</span><span class="b">local</span><span class="i">md</span><span class="br">]]</span></div>
+</div>
+<h1>An AI knowledge base that runs in your browser and your local folder.</h1>
+<div class="sub">Open a URL, pick a folder, start thinking — nothing to install.</div>
+<div class="foot">No account&nbsp; ·&nbsp; Nothing to install&nbsp; ·&nbsp; Your files stay in your folder</div>
+</body></html>
