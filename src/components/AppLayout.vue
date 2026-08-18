@@ -362,6 +362,18 @@ function closeKb(): void {
         v-if="!ui.zen"
         class="w-12 shrink-0 bg-bg-1 border-r border-border flex flex-col items-center py-2 gap-1"
       >
+        <!-- The mark, and only the mark: not a button, it goes nowhere. What a
+             logo is worth in a workspace is the one line saying what this is,
+             so that is what it carries — the same sentence the start screen
+             opens with, never a second wording of it. -->
+        <div
+          class="mb-1 flex h-8 w-8 shrink-0 cursor-default select-none items-center justify-center"
+          :title="$t('openKb.headline')"
+        >
+          <img src="/icon.svg" alt="localmd" class="h-[22px] w-[22px] rounded-[6px]" />
+        </div>
+        <div class="mb-1 h-px w-5 shrink-0 bg-border" />
+
         <!-- Top group -->
         <button :class="actBtn" :title="$t('layout.toggleSidebar')" @click="ui.sidebarOpen = !ui.sidebarOpen">
           <span
