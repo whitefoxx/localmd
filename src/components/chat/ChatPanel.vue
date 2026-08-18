@@ -992,7 +992,19 @@ watch(
     <!-- Header -->
     <div class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
       <span class="codicon codicon-sm codicon-sparkle text-accent" />
-      <span class="text-xs uppercase tracking-wide text-fg-3 flex-1">Agent</span>
+      <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
+      <!-- Starting over is the most-reached-for thing in this header, so it
+           sits next to the title with a shape of its own rather than as the
+           third identical icon in the row on the right. -->
+      <button
+        class="flex shrink-0 items-center gap-1 rounded-md border border-border bg-bg-2/60 px-1.5 py-0.5 text-[11px] text-fg-2 transition-colors hover:border-accent/40 hover:bg-bg-2 hover:text-fg-0"
+        :title="$t('chat.newChat')"
+        @click="chat.newSession()"
+      >
+        <span class="codicon codicon-sm codicon-add" />
+        <span>{{ $t('chat.newChatShort') }}</span>
+      </button>
+      <span class="flex-1" />
       <button
         class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
         :title="$t('chat.saveSession')"
@@ -1012,9 +1024,6 @@ watch(
           class="codicon codicon-sm"
           :class="chat.currentFavorite ? 'codicon-star-full' : 'codicon-star-empty'"
         />
-      </button>
-      <button class="text-fg-3 hover:text-fg-0" :title="$t('chat.newChat')" @click="chat.newSession()">
-        <span class="codicon codicon-sm codicon-add" />
       </button>
       <button
         class="text-fg-3 hover:text-fg-0"
