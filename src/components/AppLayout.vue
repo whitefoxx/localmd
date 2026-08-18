@@ -7,7 +7,6 @@ import { useReviewStore } from '@/stores/review'
 import { useGitStore } from '@/stores/git'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
-import { isDemoMode } from '@/lib/demo'
 import * as fs from '@/lib/fs'
 import FileTree from '@/components/FileTree.vue'
 import EditorTabs from '@/components/EditorTabs.vue'
@@ -258,7 +257,9 @@ const themeIcon = computed(
 const kbMenuOpen = ref(false)
 const menuItem =
   'w-full flex items-center gap-2 px-3 py-1.5 text-left text-fg-1 hover:bg-bg-2 hover:text-fg-0'
-const isDemo = isDemoMode()
+// Which KB is open, not what the address says: opening a folder from inside the
+// demo used to leave every demo affordance on screen (see kb.isDemo).
+const isDemo = computed(() => kb.isDemo)
 const saving = ref(false)
 const saveError = ref('')
 

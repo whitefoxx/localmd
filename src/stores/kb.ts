@@ -35,6 +35,24 @@ function isDemoUrl(): boolean {
   return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
 }
 
+/**
+ * Stop the address saying `demo` once a real folder is open.
+ *
+ * `?demo` is a door, not a state: it is what a link hands someone, and the app
+ * used to keep reading it as "you are in the demo" for as long as it sat there.
+ * Open your own folder from inside the demo and the badge, the "save this demo"
+ * item and the demo notice all stayed — and worse, a reload re-seeded the demo
+ * over the folder you had just chosen, because the bootstrap runs off the same
+ * parameter. Which KB is open is the KB store's answer (see `isDemo`), and the
+ * URL has to stop disagreeing with it.
+ */
+function dropDemoParam(): void {
+  if (typeof location === 'undefined' || !isDemoUrl()) return
+  const url = new URL(location.href)
+  url.searchParams.delete('demo')
+  history.replaceState(null, '', url)
+}
+
 export const useKbStore = defineStore('kb', () => {
   const name = ref<string | null>(null)
   const isOpen = ref(false)
@@ -53,6 +71,9 @@ export const useKbStore = defineStore('kb', () => {
    *  pays nothing at all: for them this is false before the first paint and
    *  the landing renders exactly as it did. */
   const restoring = ref(!isE2eMode() && !isDemoUrl() && readLastKb() !== null)
+  /** The open KB is THE demo — not merely memory-backed (E2E is that too), and
+   *  not merely "the URL says so". Only the demo bootstrap sets it. */
+  const isDemo = ref(false)
   const error = ref<string | null>(null)
   /** Another tab holds this KB open — concurrent writes would clobber each
    *  other (autosave, .git/index, sidecars). We warn rather than hard-block. */
@@ -106,7 +127,7 @@ export const useKbStore = defineStore('kb', () => {
    */
   async function openHandle(
     handle: FileSystemDirectoryHandle,
-    opts: { ephemeral?: boolean } = {},
+    opts: { ephemeral?: boolean; demo?: boolean } = {},
   ): Promise<boolean> {
     error.value = null
     if (!(await fs.ensurePermission(handle))) {
@@ -116,6 +137,8 @@ export const useKbStore = defineStore('kb', () => {
     fs.setRoot(handle)
     name.value = handle.name
     isOpen.value = true
+    isDemo.value = opts.demo === true
+    if (!opts.demo) dropDemoParam()
     hydrateReadingPositions(handle.name)
     if (opts.ephemeral ?? isE2eMode()) return true
     await acquireLock(handle.name)
@@ -195,6 +218,7 @@ export const useKbStore = defineStore('kb', () => {
     fs.setRoot(null)
     name.value = null
     isOpen.value = false
+    isDemo.value = false
     // Closing is the user saying they want the start screen. Reopening this
     // folder on the next load would be overruling that.
     writeLastKb(null)
@@ -204,6 +228,7 @@ export const useKbStore = defineStore('kb', () => {
   return {
     name,
     isOpen,
+    isDemo,
     recents,
     recentsKnown,
     restoring,

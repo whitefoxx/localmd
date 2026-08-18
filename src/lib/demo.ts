@@ -45,10 +45,6 @@ export interface DemoManifest {
 /** Where the demo assets are served from, relative to the app root. */
 const DEMO_BASE = 'demo'
 
-export function isDemoMode(): boolean {
-  return typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
-}
-
 export async function loadDemoManifest(): Promise<DemoManifest> {
   const res = await fetch(`${DEMO_BASE}/manifest.json`, { cache: 'no-cache' })
   if (!res.ok) throw new Error(`demo manifest: ${res.status}`)

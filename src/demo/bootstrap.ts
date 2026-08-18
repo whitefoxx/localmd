@@ -22,7 +22,7 @@ export async function bootstrapDemo(): Promise<void> {
   const root = await seedDemoKb(manifest)
 
   const kb = useKbStore()
-  if (!(await kb.openHandle(root, { ephemeral: true }))) return
+  if (!(await kb.openHandle(root, { ephemeral: true, demo: true }))) return
 
   // Same post-open sequence OpenKbScreen runs — opening a handle does not by
   // itself populate the tree, and everything derived from it (search,
