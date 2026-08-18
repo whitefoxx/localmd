@@ -80,19 +80,36 @@ export const useKbStore = defineStore('kb', () => {
   const lockedByOther = ref(false)
 
   let releaseLock: (() => void) | null = null
+  /** Resolves once the browser has actually let go of the lock above. */
+  let lockHeld: Promise<void> | null = null
+
+  /**
+   * Let go of the lock this tab holds — and wait for the browser to have let go.
+   *
+   * `releaseLock()` only settles the promise the lock is held on; the lock
+   * manager releases afterwards, on its own turn. Asking for the same name in
+   * the meantime gets "taken", which is how the app came to tell you that your
+   * own tab was another tab: open a folder, go to the demo (which takes no lock
+   * and so never released this one), come back, and the re-request raced its
+   * own release.
+   */
+  async function releaseHeldLock(): Promise<void> {
+    releaseLock?.()
+    releaseLock = null
+    const done = lockHeld
+    lockHeld = null
+    if (done) await done
+  }
 
   /** Try to take the exclusive Web Lock for this KB; held until close().
    *  Locks auto-release when the tab dies, so stale locks can't happen. */
   async function acquireLock(kbName: string): Promise<void> {
-    releaseLock?.()
-    releaseLock = null
+    await releaseHeldLock()
     lockedByOther.value = false
     if (!('locks' in navigator)) return
     await new Promise<void>((ready) => {
-      void navigator.locks.request(
-        `browser-md:kb:${kbName}`,
-        { ifAvailable: true },
-        (lock) => {
+      lockHeld = navigator.locks
+        .request(`browser-md:kb:${kbName}`, { ifAvailable: true }, (lock) => {
           if (!lock) {
             lockedByOther.value = true
             ready()
@@ -102,8 +119,11 @@ export const useKbStore = defineStore('kb', () => {
           return new Promise<void>((release) => {
             releaseLock = release
           })
-        },
-      )
+        })
+        .then(
+          () => undefined,
+          () => undefined,
+        )
     })
   }
 
@@ -140,7 +160,13 @@ export const useKbStore = defineStore('kb', () => {
     isDemo.value = opts.demo === true
     if (!opts.demo) dropDemoParam()
     hydrateReadingPositions(handle.name)
-    if (opts.ephemeral ?? isE2eMode()) return true
+    if (opts.ephemeral ?? isE2eMode()) {
+      // A memory-backed KB takes no lock — and must not leave the folder we
+      // just walked away from locked by this tab either.
+      await releaseHeldLock()
+      lockedByOther.value = false
+      return true
+    }
     await acquireLock(handle.name)
     writeLastKb(handle.name)
     await saveRecent(handle)
@@ -212,8 +238,7 @@ export const useKbStore = defineStore('kb', () => {
   }
 
   function close(): void {
-    releaseLock?.()
-    releaseLock = null
+    void releaseHeldLock()
     lockedByOther.value = false
     fs.setRoot(null)
     name.value = null

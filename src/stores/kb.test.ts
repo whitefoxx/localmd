@@ -23,6 +23,26 @@ vi.mock('@/lib/viewMemory', () => ({ hydrateReadingPositions: () => {} }))
 
 const handle = { name: 'notes' } as unknown as FileSystemDirectoryHandle
 
+/** A lock manager with the property that matters here: the release happens
+ *  after the callback's promise settles, not when release() is called. */
+function fakeLocks(): { request: (name: string, opts: unknown, cb: (l: unknown) => unknown) => Promise<void> } {
+  const held = new Set<string>()
+  return {
+    async request(name, _opts, cb) {
+      if (held.has(name)) {
+        await cb(null)
+        return
+      }
+      held.add(name)
+      try {
+        await cb({ name })
+      } finally {
+        held.delete(name)
+      }
+    },
+  }
+}
+
 describe('demo is a property of the open KB', () => {
   let href: string
 
@@ -67,5 +87,26 @@ describe('demo is a property of the open KB', () => {
     await kb.openHandle(handle, { ephemeral: true, demo: true })
     kb.close()
     expect(kb.isDemo).toBe(false)
+  })
+
+  it('does not mistake this tab for another one after a trip through the demo', async () => {
+    vi.stubGlobal('navigator', { locks: fakeLocks() })
+    const { useKbStore } = await import('./kb')
+    const kb = useKbStore()
+
+    await kb.openHandle(handle) // a real folder: takes the lock
+    expect(kb.lockedByOther).toBe(false)
+
+    // The demo takes no lock of its own — and must let go of this one.
+    await kb.openHandle({ name: 'localmd-demo' } as unknown as FileSystemDirectoryHandle, {
+      ephemeral: true,
+      demo: true,
+    })
+    expect(kb.lockedByOther).toBe(false)
+
+    // Back to the folder. Asking for a lock whose release is still in flight is
+    // how the warning used to fire against this very tab.
+    await kb.openHandle(handle)
+    expect(kb.lockedByOther).toBe(false)
   })
 })
