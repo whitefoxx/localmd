@@ -6,10 +6,11 @@
  *
  * Voice policy: the picker offers Google voices (network, consistent across
  * platforms); if one fails or we're offline, playback auto-falls-back to a local
- * system voice of the same language, so it keeps working offline.
+ * system voice of the same language, so it keeps working offline. That fallback
+ * is remembered for the rest of the session — see `networkDead`.
  */
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from './settings'
 import {
   splitIntoChunks,
@@ -52,7 +53,21 @@ export const useTtsStore = defineStore('tts', () => {
   // of a superseded/stopped run so a stray onend/onerror can't advance it).
   let chunks: SpeechChunk[] = []
   let docLang: TtsLang = 'en' // whole-input language; fallback for signal-less chunks
-  let fellBack = false
+  /**
+   * A network (Google) voice was handed to the engine and never started, so
+   * every read for the rest of this session goes straight to local voices.
+   *
+   * Session-scoped, not per-read, and that is the whole point. Where Google is
+   * unreachable (mainland China, an offline machine, a captive network) the
+   * fallback used to be re-discovered on every single read: four seconds of
+   * silence, then a local voice starting over the dead one — which the engine
+   * does not reliably silence on cancel(), so you hear BOTH. Once is a hiccup;
+   * once per read is the bug that got reported. An explicit voice change is a
+   * fresh statement of intent, so it clears this.
+   */
+  let networkDead = false
+  /** A network voice has actually spoken here, so the network reaches it. */
+  let networkProven = false
   let gen = 0
   let onFinishCb: (() => void) | null = null
   let queuedUpTo = -1 // highest chunk index handed to the synth's queue
@@ -68,31 +83,49 @@ export const useTtsStore = defineStore('tts', () => {
     }
   }
 
-  /** Arm the silent-hang watchdog for chunk `i` (due to start now): a network
-   *  (Google) voice on a connection that can't reach Google (e.g. mainland
-   *  China — navigator.onLine is TRUE but google.com is blocked) often hangs
-   *  with no onstart and no onerror. After the fallback this is unnecessary:
-   *  restartFrom rebuilds the queue with local voices, which start instantly. */
+  /**
+   * Arm the silent-hang watchdog for chunk `i` (due to start now): a network
+   * (Google) voice on a connection that can't reach Google (e.g. mainland
+   * China — navigator.onLine is TRUE but google.com is blocked) often hangs
+   * with no onstart and no onerror. After the fallback this is unnecessary:
+   * restartFrom rebuilds the queue with local voices, which start instantly.
+   *
+   * The first attempt of a session is given a short leash and every later one a
+   * long leash, because the two are waiting for different things. Before a
+   * network voice has ever spoken here, the question is whether it can reach
+   * Google at all — and every second of that wait is a second in which the
+   * engine may start playing the utterance we are about to talk over. Once one
+   * HAS spoken, a slow start is just a slow start, and cutting it off would
+   * downgrade the voice for the rest of the session over one stutter.
+   */
+  const FIRST_TRY_MS = 1500
+  const PROVEN_MS = 4000
   function armWatchdog(i: number, myGen: number): void {
     clearWatchdog()
-    if (fellBack) return
-    watchdog = setTimeout(() => {
-      watchdog = null
-      if (myGen !== gen || paused.value) return
-      fellBack = true
-      restartFrom(i, myGen)
-    }, 4000)
+    if (networkDead) return
+    watchdog = setTimeout(
+      () => {
+        watchdog = null
+        if (myGen !== gen || paused.value) return
+        networkDead = true
+        restartFrom(i, myGen)
+      },
+      networkProven ? PROVEN_MS : FIRST_TRY_MS,
+    )
   }
 
   /** Cancel everything queued and rebuild from chunk `i`. Used when falling back
    *  to local voices — the queued-ahead utterance still carries the dead network
-   *  voice, so it must be purged along with the current one. */
+   *  voice, so it must be purged along with the current one. The pause before
+   *  re-queueing is not just superstition about cancel()+speak() in one tick:
+   *  it is the engine's chance to actually silence what it was doing before a
+   *  second voice starts on top of it. */
+  const CANCEL_SETTLE_MS = 250
   function restartFrom(i: number, myGen: number): void {
     if (!synth || myGen !== gen) return
     synth.cancel() // queued utterances surface onerror('interrupted') — ignored
     queuedUpTo = i - 1
-    // cancel()+speak() in the same tick can wedge Chrome's synth — settle first.
-    setTimeout(() => queueAhead(i, myGen), 0)
+    setTimeout(() => queueAhead(i, myGen), CANCEL_SETTLE_MS)
   }
 
   /** Hand chunk `i` to the synth's queue. The queue always holds the playing
@@ -109,7 +142,7 @@ export const useTtsStore = defineStore('tts', () => {
     const v = pickVoice(voices.value, {
       name: settings.state.ttsVoice || undefined,
       lang: guessLang(chunk.text, docLang),
-      online: navigator.onLine && !fellBack,
+      online: navigator.onLine && !networkDead,
     })
     if (v) {
       u.voice = v
@@ -119,6 +152,7 @@ export const useTtsStore = defineStore('tts', () => {
     u.onstart = () => {
       if (myGen !== gen) return
       clearWatchdog()
+      if (v && !v.localService) networkProven = true
       chunkText.value = chunk.text // drives highlight-follow in the viewers
       chunkPage.value = chunk.page ?? null
       chunkBlock.value = chunk.block ?? null
@@ -142,8 +176,8 @@ export const useTtsStore = defineStore('tts', () => {
       if (e.error === 'interrupted' || e.error === 'canceled') return
       // A network (Google) voice failed → rebuild from this chunk with local
       // voices (the queued-ahead utterance carries the same dead voice).
-      if (!fellBack && (e.error === 'network' || e.error.startsWith('synthesis'))) {
-        fellBack = true
+      if (!networkDead && (e.error === 'network' || e.error.startsWith('synthesis'))) {
+        networkDead = true
         restartFrom(i, myGen)
         return
       }
@@ -193,7 +227,6 @@ export const useTtsStore = defineStore('tts', () => {
       return
     }
     chunks = cs
-    fellBack = false
     queuedUpTo = -1
     docLang = guessLang(cs.map((c) => c.text).join(' '))
     title.value = label
@@ -208,6 +241,16 @@ export const useTtsStore = defineStore('tts', () => {
       queueAhead(0, myGen)
     }, 0)
   }
+
+  // Picking a voice is a fresh statement of intent — including "try the network
+  // one again", which is why it is the one thing that clears networkDead.
+  watch(
+    () => settings.state.ttsVoice,
+    () => {
+      networkDead = false
+      networkProven = false
+    },
+  )
 
   function pause(): void {
     if (!synth || !playing.value) return
