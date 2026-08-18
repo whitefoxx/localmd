@@ -75,7 +75,7 @@ test('shift+enter hands the query to the agent as an editable draft', async ({ p
   // The palette closes and the text lands in the composer — not sent, so it
   // can still be changed.
   await expect(palette(page)).toBeHidden()
-  await expect(page.getByPlaceholder(/Ask or instruct/)).toHaveValue(
+  await expect(page.getByPlaceholder(/Ask the agent/)).toHaveValue(
     'what did I write about wikilinks',
   )
 })
@@ -100,7 +100,7 @@ test('> runs a command, and shows the key binding for the ones that have it', as
 
 test('@ finds a past conversation by title and reopens it', async ({ page }) => {
   // Give it something to find: one exchange becomes one stored session.
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo wikilink digest')
   await input.press('Enter')
   await expect(page.getByText('wikilink digest').last()).toBeVisible({ timeout: 10_000 })

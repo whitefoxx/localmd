@@ -210,7 +210,7 @@ test('a .docx renders with its structure and is indexed for the agent', async ({
   // declared path is a bare basename while the file actually sits in a
   // subdirectory (tree import lands in targetDir), so this also exercises the
   // path repair: an abbreviated or stale citation path must still land.
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo [[docx1:field-notes.docx]] The pilot ran six weeks [[1:b1-3]].')
   await input.press('Enter')
   const chip = page.locator('a.citation[data-block="b1-3"]')

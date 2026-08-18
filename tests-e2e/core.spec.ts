@@ -26,7 +26,7 @@ test('scaffold initializes the KB and opens the index', async ({ page }) => {
 
 test('chat streams a mock reply', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo 流式测试成功')
   await input.press('Enter')
   await expect(page.getByText('流式测试成功').last()).toBeVisible({ timeout: 10_000 })
@@ -34,7 +34,7 @@ test('chat streams a mock reply', async ({ page }) => {
 
 test('agent write shows up in review and can be approved', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('write wiki/e2e-note.md # E2E 写入测试')
   await input.press('Enter')
   // The review badge appears in the title bar once the tool ran.
@@ -51,7 +51,7 @@ test('agent delete is undoable from the review panel', async ({ page }) => {
   const tree = page.locator('aside')
   await expect(tree.getByText('index.md', { exact: true }).first()).toBeVisible()
 
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('delete wiki/index.md')
   await input.press('Enter')
 
@@ -72,7 +72,7 @@ test('deleting a folder asks first, in the conversation, and honors Reject', asy
   const tree = page.locator('aside')
   await expect(tree.getByText('wiki', { exact: true })).toBeVisible()
 
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('delete wiki')
   await input.press('Enter')
 
@@ -112,7 +112,7 @@ test('switching tabs reveals and selects the file in the tree', async ({ page })
 
 test('artifact tool renders a card that opens the sandboxed viewer', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('artifact 学习指南')
   await input.press('Enter')
   // Clickable card in the transcript.
@@ -128,7 +128,7 @@ test('artifact tool renders a card that opens the sandboxed viewer', async ({ pa
 
 test('plan tool renders the checklist card', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('plan')
   await input.press('Enter')
   // exact: the update_plan tool RESULT also names the open items now, so a
@@ -139,7 +139,7 @@ test('plan tool renders the checklist card', async ({ page }) => {
 
 test('re-asking a message forks the conversation instead of overwriting it', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo alpha')
   await input.press('Enter')
   await expect(page.getByText('alpha', { exact: true })).toBeVisible({ timeout: 10_000 })
@@ -178,7 +178,7 @@ const thinkingBlock = (page: import('@playwright/test').Page) =>
 
 test('a thinking block streams on one line and never unfolds itself', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('think ' + '推理中。'.repeat(900))
   await input.press('Enter')
 
@@ -197,7 +197,7 @@ test('a thinking block streams on one line and never unfolds itself', async ({ p
 
 test('opening a streaming thinking block keeps it open past the stream', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   // Long trail: the click below must land while the stream is still going, and
   // on a loaded machine (parallel suites) a short one can finish first.
   await input.fill('think ' + '推理中。'.repeat(900))
@@ -213,7 +213,7 @@ test('opening a streaming thinking block keeps it open past the stream', async (
 
 test('stop settles the transcript even when the tool ignores it', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('hang 5000')
   await input.press('Enter')
 
@@ -229,7 +229,7 @@ test('stop settles the transcript even when the tool ignores it', async ({ page 
 
 test('scrolling up during a stream detaches auto-follow', async ({ page }) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo ' + '前置内容。'.repeat(80))
   await input.press('Enter')
   await expect(page.getByRole('button', { name: /Send/ })).toBeVisible({ timeout: 10_000 })
@@ -367,7 +367,7 @@ test('a citation quoted in code stays literal, while a real one becomes a chip',
   // used to be rewritten by a pass over the whole text, which cannot tell the
   // two apart and put raw anchor HTML inside the code span.
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const input = page.getByPlaceholder(/Ask or instruct/)
+  const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo write `[[1:b16-3]]` to cite it, as in this claim [[1:b2-8]].')
   await input.press('Enter')
 

@@ -61,7 +61,13 @@ useFileSelectionCapture()
 const emptyRows = computed(() => [
   { icon: 'codicon-search', text: t('chat.emptyRead') },
   { icon: 'codicon-edit', text: t('chat.emptyWrite') },
-  { icon: 'codicon-mention', text: t('chat.emptyInput') },
+  // Browser tabs are only namable when something can actually reach them —
+  // promising them where localmd Connect isn't installed is a lie the user
+  // discovers by typing @ and finding files only.
+  {
+    icon: 'codicon-mention',
+    text: tabsAvailable.value ? t('chat.emptyInputTabs') : t('chat.emptyInput'),
+  },
 ])
 
 /** Just the site, for the right-hand hint on a tab row. */
@@ -1178,12 +1184,14 @@ watch(
       :class="{ '[&>*]:max-w-3xl [&>*]:mx-auto': ui.agentMaximized }"
       @scroll.passive="onTranscriptScroll"
     >
-      <!-- Empty panel: a lead in reading-weight text, then the three things
-           worth knowing as rows. One child of the scroller, so the transcript's
-           own spacing is untouched the moment a message exists. -->
+      <!-- Empty panel: a centred greeting, then the three things worth knowing
+           as rows. One child of the scroller, so the transcript's own spacing is
+           untouched the moment a message exists. -->
       <div v-if="!chat.messages.length">
-        <p class="text-sm text-fg-1 leading-relaxed">{{ $t('chat.emptyLead') }}</p>
-        <ul class="mt-3 space-y-2">
+        <p class="text-center text-base font-medium text-fg-1 leading-relaxed">
+          {{ $t('chat.emptyLead') }}
+        </p>
+        <ul class="mt-4 space-y-2">
           <li
             v-for="row in emptyRows"
             :key="row.icon"
