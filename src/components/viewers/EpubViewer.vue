@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, nextTick } from 'vue'
 import ePub, { EpubCFI, type Book, type Rendition, type NavItem } from 'epubjs'
 import * as fs from '@/lib/fs'
 import { useFilesStore } from '@/stores/files'
@@ -52,7 +52,10 @@ const chapterLabel = ref('')
 const curPage = ref(0)
 const totalPages = ref(0)
 // "← page N" button, shown after a non-sequential jump (citation / TOC / search).
-const backTarget = ref<{ cfi: string; page: number } | null>(null)
+/** Where the reader was before a jump, as a CFI. Only the CFI: the page number
+ *  shown on the button is derived from it (see `backPage`), because a jump can
+ *  happen before the book HAS page numbers. */
+const backTarget = ref<string | null>(null)
 // The bottom page bar shows while the cursor is in the lower part of the page.
 // The move events come from inside the chapter iframe (see the content hook),
 // where clientY is already relative to the visible page (the iframe fills the
@@ -116,7 +119,7 @@ let laidOut = { w: 0, h: 0 }
 // Auto-clears the transient pulse flashCfi() puts on an existing mark.
 let flashTimer = 0
 // Set right before a programmatic jump so 'relocated' can offer a "back" button.
-let jumpFrom: { cfi: string; page: number } | null = null
+let jumpFrom: string | null = null
 
 function destroy(): void {
   if (docPath && rendition) {
@@ -328,7 +331,8 @@ async function load(path: string | null): Promise<void> {
     // Offer a "← page N" button when we landed here via a jump (not sequential
     // paging) that moved more than one page — or before page counts are ready.
     if (jumpFrom) {
-      const far = !totalPages.value || Math.abs(curPage.value - jumpFrom.page) > 1
+      const from = pageOf(jumpFrom)
+      const far = !from || Math.abs(curPage.value - from) > 1
       backTarget.value = far ? jumpFrom : null
       jumpFrom = null
     }
@@ -734,11 +738,33 @@ async function generateLocations(path: string): Promise<void> {
   }
 }
 
-function updatePage(cfi: string | null): void {
-  if (!book || !totalPages.value || !cfi) return
+/** The page a CFI sits on, or 0 while the book has no location index yet.
+ *  Reads `totalPages` so anything derived from it recomputes when the index
+ *  finishes generating. */
+function pageOf(cfi: string): number {
+  if (!book || !totalPages.value) return 0
   const idx = book.locations.locationFromCfi(cfi) as unknown as number
-  curPage.value = (typeof idx === 'number' && idx >= 0 ? idx : 0) + 1
+  return (typeof idx === 'number' && idx >= 0 ? idx : 0) + 1
 }
+
+function updatePage(cfi: string | null): void {
+  if (!cfi) return
+  const page = pageOf(cfi)
+  if (page) curPage.value = page
+}
+
+/**
+ * The page the back button offers to return to — derived from the CFI, never
+ * captured at jump time.
+ *
+ * Generating the location index walks the whole book, so it finishes seconds
+ * after the reader appears; a jump that arrives with the book (clicking an
+ * annotation on the annotations page opens the file AND jumps) therefore
+ * happened while the current page was still 0. Snapshotting that left the
+ * button reading "← 0" for the rest of the session, over a CFI that was right
+ * all along — it jumped back to the correct place while naming the wrong one.
+ */
+const backPage = computed(() => (backTarget.value ? pageOf(backTarget.value) : 0))
 
 function currentCfi(): string | null {
   try {
@@ -750,16 +776,15 @@ function currentCfi(): string | null {
 
 /** Record where we are before a jump, so 'relocated' can offer a back button. */
 function markJumpOrigin(): void {
-  const cfi = currentCfi()
-  if (cfi) jumpFrom = { cfi, page: curPage.value }
+  jumpFrom = currentCfi()
 }
 
 function goBack(): void {
-  const t = backTarget.value
-  if (!t || !rendition) return
+  const cfi = backTarget.value
+  if (!cfi || !rendition) return
   backTarget.value = null
   jumpFrom = null // returning shouldn't arm another back button
-  void rendition.display(t.cfi)
+  void rendition.display(cfi)
 }
 
 /* ───────── in-book search ───────── */
@@ -1176,10 +1201,14 @@ watch(
           <button
             v-if="backTarget"
             class="flex items-center gap-1 text-[11px] text-accent hover:opacity-80"
-            :title="$t('viewers.epub.backToPage', { page: backTarget.page })"
+            :title="
+              backPage ? $t('viewers.epub.backToPage', { page: backPage }) : $t('viewers.epub.backToOrigin')
+            "
             @click="goBack"
           >
-            <span class="codicon codicon-discard !text-[12px]" /> {{ backTarget.page }}
+            <!-- No number until the book has page numbers: the jump still works,
+                 and a made-up page is worse than none. -->
+            <span class="codicon codicon-discard !text-[12px]" /> {{ backPage || '' }}
           </button>
           <span
             class="absolute left-1/2 -translate-x-1/2 text-[11px] text-fg-3 whitespace-nowrap"
