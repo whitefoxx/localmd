@@ -1,0 +1,80 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
+import { useUpdateStore } from './update'
+
+/**
+ * The update prompt's one promise: clicking "Reload now" reloads.
+ *
+ * It used to delegate that to the service-worker client, which reloads on
+ * `controllerchange` — an event a page that was never controlled never gets.
+ * The card then sat on "Reloading…" with both buttons disabled, and the only
+ * way out was the browser's own reload button.
+ */
+describe('update prompt', () => {
+  let reload: ReturnType<typeof vi.fn>
+  let listeners: Record<string, (() => void)[]>
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers()
+    reload = vi.fn()
+    listeners = {}
+    vi.stubGlobal('window', { location: { reload } })
+    vi.stubGlobal('navigator', {
+      serviceWorker: {
+        addEventListener: (type: string, fn: () => void) => {
+          ;(listeners[type] ??= []).push(fn)
+        },
+        removeEventListener: (type: string, fn: () => void) => {
+          listeners[type] = (listeners[type] ?? []).filter((f) => f !== fn)
+        },
+      },
+    })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('reloads as soon as the new worker takes over', async () => {
+    const update = useUpdateStore()
+    update.offer(async () => {})
+    await update.applyNow()
+
+    expect(reload).not.toHaveBeenCalled()
+    listeners.controllerchange?.forEach((fn) => fn())
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    // …and not a second time when the grace timer comes round.
+    vi.advanceTimersByTime(10_000)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('reloads anyway when the takeover never happens', async () => {
+    const update = useUpdateStore()
+    update.offer(async () => {})
+    await update.applyNow()
+
+    // An uncontrolled page is not "using" the registration, so skipWaiting
+    // activates the new worker without ever taking this one over. Nothing
+    // arrives; the reload still has to.
+    vi.advanceTimersByTime(10_000)
+    expect(reload).toHaveBeenCalledTimes(1)
+  })
+
+  it('is still dismissible while it is applying, and dismissing calls it off', async () => {
+    const update = useUpdateStore()
+    update.offer(async () => {})
+    await update.applyNow()
+    expect(update.applying).toBe(true)
+
+    update.dismiss()
+    expect(update.ready).toBe(false)
+    expect(update.applying).toBe(false)
+
+    // Neither clock may yank the page away after the user said no.
+    vi.advanceTimersByTime(10_000)
+    listeners.controllerchange?.forEach((fn) => fn())
+    expect(reload).not.toHaveBeenCalled()
+  })
+})

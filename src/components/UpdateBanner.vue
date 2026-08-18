@@ -30,7 +30,9 @@ const update = useUpdateStore()
             <button class="btn btn-primary text-xs" :disabled="update.applying" @click="update.applyNow()">
               {{ update.applying ? $t('update.applying') : $t('update.apply') }}
             </button>
-            <button class="btn text-xs" :disabled="update.applying" @click="update.dismiss()">
+            <!-- Never disabled, deliberately: this is the way out if the
+                 reload itself goes nowhere. -->
+            <button class="btn text-xs" @click="update.dismiss()">
               {{ $t('update.later') }}
             </button>
           </div>
