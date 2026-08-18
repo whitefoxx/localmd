@@ -105,6 +105,26 @@ function closeTopLayer(): void {
   else if (ui.zen) ui.zen = false
 }
 
+/**
+ * The browser's own right-click menu belongs to the document being read, not to
+ * the app around it.
+ *
+ * Over the file pane it is the reader's menu — copy the passage, look a word
+ * up, save the image — and that is exactly where it stays. Everywhere else it
+ * is a list of things that do not apply (Back, Reload, View page source) drawn
+ * over an interface that has its own controls, and it made the app read like a
+ * web page.
+ *
+ * Editable fields keep it too, deliberately: paste, undo and the spelling
+ * suggestions are only reachable there through this menu, and taking them away
+ * to look more like an app would cost more than it buys.
+ */
+function onContextMenu(e: MouseEvent): void {
+  const el = e.target as Element | null
+  if (el?.closest?.('[data-file-selection], input, textarea, [contenteditable="true"]')) return
+  e.preventDefault()
+}
+
 function onBeforeUnload(): void {
   // Best-effort flush; createWritable commits are async but usually complete.
   void files.flush()
@@ -135,12 +155,14 @@ onMounted(() => {
   window.addEventListener('focus', onFocus)
   // Capture phase: claim hotkeys before the PDF viewer / browser default can.
   window.addEventListener('keydown', onKeydown, true)
+  window.addEventListener('contextmenu', onContextMenu)
   window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', onFocus)
   window.removeEventListener('keydown', onKeydown, true)
+  window.removeEventListener('contextmenu', onContextMenu)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 </script>
