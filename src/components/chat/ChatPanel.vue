@@ -213,15 +213,23 @@ function fmtTokens(n: number): string {
 }
 
 /** Localized tooltip for the per-session token counter. Cache read/write
- *  totals verify that prompt caching is actually landing (reads are billed at
- *  a fraction of fresh input). */
+ *  verify that prompt caching is actually landing (reads are billed at a
+ *  fraction of fresh input).
+ *
+ *  Hits are a SHARE of input, not a count: the number that says whether the
+ *  prefix is stable is "how much of what we sent was already cached", and a
+ *  raw token figure can only answer that against a total the reader has to
+ *  divide by themselves. Providers report input inclusive of cached reads (see
+ *  agent/run.ts), so that total is the right denominator. */
 const usageTitle = computed(() => {
   const u = chat.sessionUsage
   let s = t('chat.tokenUsage', {
     input: u.input.toLocaleString(),
     output: u.output.toLocaleString(),
   })
-  if (u.cacheRead) s += t('chat.tokenCacheSuffix', { cache: u.cacheRead.toLocaleString() })
+  if (u.cacheRead && u.input) {
+    s += t('chat.tokenCacheSuffix', { pct: Math.round((u.cacheRead / u.input) * 100) })
+  }
   if (u.cacheWrite) s += t('chat.tokenCacheWriteSuffix', { cache: u.cacheWrite.toLocaleString() })
   return s
 })
