@@ -3,6 +3,7 @@ import {
   parseWikilinks,
   parseMarkdownLinks,
   extractType,
+  extractTags,
   splitLink,
   splitFrontmatter,
   extractTitle,
@@ -98,6 +99,26 @@ describe('extractType', () => {
   it('returns null without frontmatter or a type field', () => {
     expect(extractType('# no frontmatter')).toBeNull()
     expect(extractType('---\ntitle: x\n---\nbody')).toBeNull()
+  })
+})
+
+describe('extractTags', () => {
+  it('reads the inline forms', () => {
+    expect(extractTags('---\ntags: [ml, "deep learning"]\n---\nbody')).toEqual([
+      'ml',
+      'deep learning',
+    ])
+    expect(extractTags('---\ntags: ml, nlp\n---\nbody')).toEqual(['ml', 'nlp'])
+  })
+
+  it('reads a block list and stops at the next key', () => {
+    expect(extractTags('---\ntags:\n  - ml\n  - nlp\ntitle: x\n---\nbody')).toEqual(['ml', 'nlp'])
+  })
+
+  it('returns nothing without frontmatter or without tags', () => {
+    expect(extractTags('# plain')).toEqual([])
+    expect(extractTags('---\ntitle: x\n---\nbody')).toEqual([])
+    expect(extractTags('---\ntags:\n---\nbody')).toEqual([])
   })
 })
 

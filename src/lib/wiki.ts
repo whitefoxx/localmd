@@ -89,6 +89,38 @@ export function extractType(content: string): string | null {
   return m ? m[1].trim() : null
 }
 
+/**
+ * Frontmatter `tags:` values, in both YAML shapes people actually write:
+ * `tags: [a, b]` / `tags: a, b` on one line, or a `- item` block under it.
+ * Returns them verbatim — case and separators are the caller's business
+ * (the tag-hygiene lint compares near-duplicates on a normalised key).
+ */
+export function extractTags(content: string): string[] {
+  const { yaml } = splitFrontmatter(content)
+  if (!yaml) return []
+  const m = yaml.match(/^tags:[ \t]*(.*)$/m)
+  if (!m) return []
+  const unquote = (s: string): string => s.trim().replace(/^['"]|['"]$/g, '').trim()
+
+  const inline = m[1].trim()
+  if (inline) {
+    return inline
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map(unquote)
+      .filter(Boolean)
+  }
+
+  const out: string[] = []
+  for (const line of yaml.slice(m.index! + m[0].length).replace(/^\n/, '').split('\n')) {
+    const item = line.match(/^[ \t]*-[ \t]*(.+)$/)
+    if (!item) break // first non-item line ends the block
+    const tag = unquote(item[1])
+    if (tag) out.push(tag)
+  }
+  return out
+}
+
 /** Cross-platform basename. */
 export function baseName(p: string): string {
   return p.split('/').pop() ?? p

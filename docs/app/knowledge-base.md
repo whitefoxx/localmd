@@ -52,13 +52,23 @@ you find that useful. It is free-form; there is no fixed list.
 
 ## Checking the health of your knowledge base
 
-The **pulse icon** in the left bar runs a structural check: broken links, pages
-nothing links to, pages that are nearly empty, sections you cannot reach.
+The **pulse icon** in the left bar shows the two things worth clicking on:
+links pointing at a page that does not exist, and pages nothing links to.
 
-It is fast, free, and does not involve the AI at all. Deeper questions — "do any
-of these pages contradict each other?" — do need the assistant to read your
-content, so ask for those directly and it will suggest a scope rather than
-reading everything.
+Ask the assistant for a health check and it runs the same pass in full. On top
+of those two it reports pages that are nearly empty, pages you cannot reach by
+navigating from the index, pages with no frontmatter, files you have added that
+no page has ever mentioned, citations pointing at a document that is no longer
+there, and tags that are the same word spelled two ways (`machine-learning` and
+`Machine Learning`).
+
+All of it is fast, free, and does not involve reading a single page — so it is
+also honest about its limits. It is a list of things you might want to look at,
+not a list of mistakes: an unread PDF you are saving for next month and two
+spellings of a tag are your business, and nothing here is changed for you.
+Deeper questions — "do any of these pages contradict each other?" — do need the
+assistant to read your content, so ask for those directly and it will suggest a
+scope rather than reading everything.
 
 ## Related
 

@@ -599,7 +599,7 @@ const searchFiles = defineTool({
 const kbHealth = defineTool({
   name: 'kb_health',
   description:
-    'Deterministic structural lint of the WHOLE knowledge base — broken wikilinks, orphan and weakly-linked pages, pages unreachable from the index, pages missing frontmatter, and thin / self-linking / placeholder pages. Computed from the content index with NO page reads, so it is cheap and complete: for structural/health checks call this ONCE instead of listing and reading pages. It does NOT check semantics (contradictions, stale claims) — those need reading content and are token-heavy, so report these findings first and confirm scope with the user before scanning content.',
+    'Deterministic structural lint of the WHOLE knowledge base — broken wikilinks, orphan and weakly-linked pages, pages unreachable from the index, pages missing frontmatter, thin / self-linking / placeholder pages, sources no page mentions (unread material), dangling [[pdfN:path]] source declarations, and near-duplicate tags. Computed from the content index with NO page reads, so it is cheap and complete: for structural/health checks call this ONCE instead of listing and reading pages. It does NOT check semantics (contradictions, stale claims) — those need reading content and are token-heavy, so report these findings first and confirm scope with the user before scanning content. Everything it returns is a suggestion, not a defect: report it and let the user decide — never mass-rewrite tags, delete unread sources, or "fix" the KB off the back of this.',
   schema: z.object({}),
   describeCall: () => 'kb health',
   run: async () => {

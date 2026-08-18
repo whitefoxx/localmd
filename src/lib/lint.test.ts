@@ -54,6 +54,105 @@ describe('computeLint', () => {
   })
 })
 
+describe('computeLint — file-aware checks', () => {
+  const FILES = [
+    'wiki/index.md',
+    'raw/papers/read.pdf',
+    'raw/papers/never opened.pdf',
+    'raw/assets/shot.png',
+    'raw/papers/read.pdf.annotations.json',
+    '.trace/pdf-index/read/manifest.json',
+    '.obsidian/workspace.json',
+  ]
+  const kb = new Map<string, LintPage>([
+    [
+      'wiki/index.md',
+      page(
+        FM +
+          'Cites [[pdf1:raw/papers/read.pdf]] and [[pdf2:raw/papers/gone.pdf]].\n' +
+          'Screenshot: ![](raw/assets/shot.png)\n',
+        [],
+      ),
+    ],
+  ])
+
+  it('flags only sources nothing mentions, ignoring dot-dirs, sidecars and notes', () => {
+    // read.pdf is cited, shot.png is embedded as an image; the .trace/ and
+    // .obsidian/ files are plumbing; the .annotations.json is our own sidecar
+    // (visible in the tree on purpose); index.md is a note (orphans own it).
+    expect(computeLint(kb, FILES).unreferencedSources).toEqual(['raw/papers/never opened.pdf'])
+  })
+
+  it('matches a percent-encoded href against the real filename', () => {
+    const encoded = new Map<string, LintPage>([
+      ['wiki/index.md', page(FM + '[paper](raw/papers/never%20opened.pdf)')],
+    ])
+    expect(computeLint(encoded, FILES).unreferencedSources).not.toContain(
+      'raw/papers/never opened.pdf',
+    )
+  })
+
+  it('flags a source declaration with no such file', () => {
+    expect(computeLint(kb, FILES).danglingCitations).toEqual([
+      { path: 'wiki/index.md', targets: ['raw/papers/gone.pdf'] },
+    ])
+  })
+
+  it('does not call a moved-but-unique source dangling', () => {
+    // The declared dir is wrong but the basename is unique — resolveCitePath
+    // repairs it, so moving a file must not light up every page citing it.
+    const moved = new Map<string, LintPage>([
+      ['wiki/a.md', page(FM + '[[pdf1:raw/old/read.pdf]]')],
+    ])
+    expect(computeLint(moved, FILES).danglingCitations).toEqual([])
+  })
+
+  it('returns nothing for the file-aware checks when given no file list', () => {
+    const r = computeLint(kb)
+    expect(r.unreferencedSources).toEqual([])
+    expect(r.danglingCitations).toEqual([])
+  })
+})
+
+describe('computeLint — tag hygiene', () => {
+  const tagged = (tags: string): LintPage => page(`---\ntags: ${tags}\n---\nbody`)
+
+  it('groups spellings that differ only in case, separator, or plural', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', tagged('[machine-learning, note]')],
+      ['wiki/b.md', tagged('[Machine Learning, notes]')],
+      ['wiki/c.md', tagged('[machine_learnings]')],
+    ])
+    const groups = computeLint(kb).similarTags
+    expect(groups).toHaveLength(2)
+    expect(groups[0].variants.map((v) => v.tag).sort()).toEqual([
+      'Machine Learning',
+      'machine-learning',
+      'machine_learnings',
+    ])
+    expect(groups[1].variants.map((v) => v.tag).sort()).toEqual(['note', 'notes'])
+  })
+
+  it('puts the most-used spelling first — the one to standardise on', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', tagged('[Notes]')],
+      ['wiki/b.md', tagged('[note]')],
+      ['wiki/c.md', tagged('[note]')],
+    ])
+    expect(computeLint(kb).similarTags[0].variants).toEqual([
+      { tag: 'note', count: 2 },
+      { tag: 'Notes', count: 1 },
+    ])
+  })
+
+  it('leaves genuinely different tags alone', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', tagged('[ml, machine-learning, 机器学习]')],
+    ])
+    expect(computeLint(kb).similarTags).toEqual([])
+  })
+})
+
 describe('isEntryPage', () => {
   it('matches index/log at any depth', () => {
     expect(isEntryPage('index.md')).toBe(true)

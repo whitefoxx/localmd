@@ -217,9 +217,12 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return [...(inbound.value.get(path) ?? [])].sort()
   }
 
-  /** Deterministic structural lint over the cached page graph (no file reads). */
+  /** Deterministic structural lint over the cached page graph (no file reads).
+   *  The file list comes from the live tree, not the page cache, so a source
+   *  added or moved since the last content read is judged against what is on
+   *  disk now. */
   function lintReport(): LintReport {
-    return computeLint(pages.value)
+    return computeLint(pages.value, useFilesStore().allFiles)
   }
 
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
