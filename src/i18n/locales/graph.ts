@@ -1,12 +1,15 @@
 /**
  * Graph view. Namespace: `graph`.
  *
- * GraphView.vue is a pure d3-force canvas: its only text nodes are file stems
- * (data, not UI copy), and it has no titles, tooltips, legend, or empty state.
- * There are no user-facing strings to externalize; this catalog is a
- * placeholder kept for parity so the namespace resolves.
+ * GraphView.vue is a pure d3-force canvas: its text nodes are file stems
+ * (data, not UI copy), so the only string here is what it says while the layout
+ * is being computed.
  */
 export default {
-  en: {},
-  zh: {},
+  en: {
+    laying: 'Laying out the graph…',
+  },
+  zh: {
+    laying: '正在计算图谱布局……',
+  },
 }
