@@ -9,6 +9,8 @@ export default {
     selection: 'Selection',
 
     pdf: {
+      loading: 'Opening PDF…',
+      loadingSlow: 'Opening PDF — the first one takes longest…',
       restoring: 'Jumping to where you left off…',
       readAloud: 'Read aloud',
       note: 'Note',
@@ -132,6 +134,8 @@ export default {
     selection: '选中内容',
 
     pdf: {
+      loading: '正在打开 PDF…',
+      loadingSlow: '正在打开 PDF —— 第一次打开最慢…',
       restoring: '跳转到上次阅读位置…',
       readAloud: '朗读',
       note: '笔记',

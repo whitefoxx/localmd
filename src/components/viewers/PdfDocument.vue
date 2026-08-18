@@ -60,6 +60,13 @@ const blobUrl = ref<string | null>(null)
 const host = ref<HTMLElement | null>(null)
 /** Shown while we scroll to the remembered page, to mask the page-1 flash. */
 const restoring = ref(false)
+/** False until the engine reports the document open (see markDocReady). Until
+ *  then its own centred spinner is masked and replaced by one corner hint — two
+ *  loading effects stacked on top of each other read as a glitch, and the
+ *  reader only ever needs to be told one thing at a time. */
+const docReady = ref(false)
+/** Loading has run long enough to be worth explaining rather than just spun at. */
+const loadingSlow = ref(false)
 let disposed = false
 
 const config = computed(() => ({
@@ -746,6 +753,9 @@ async function doSave(): Promise<void> {
 
 function handleEvent(api: AnnotationApi, e: AnnotationEvent, saved: Promise<TransferItem[]>): void {
   if (e.type === 'loaded') {
+    // The document is open: whatever the mask was hiding, it is not hiding a
+    // blank viewer any more.
+    markDocReady()
     // The document's own annotations finished loading — layer the user's on top.
     initialLoadDone = true
     void saved.then((items) => {
@@ -1180,7 +1190,10 @@ function onReady(r: PluginRegistry): void {
   void initIndexStatus()
   const plugin = r.getPlugin('annotation') as undefined | { provides?: () => unknown }
   const api = plugin?.provides?.() as AnnotationApi | undefined
-  if (!api) return
+  if (!api) {
+    markDocReady() // nothing left that will tell us; don't mask on a maybe
+    return
+  }
   annotationApi = api
   // Subscribe FIRST (synchronously) — 'loaded' can fire before the read resolves.
   const saved = readSidecar()
@@ -1484,7 +1497,37 @@ watch(sidecarRevision, (rev) => {
 
 /* ── lifecycle ───────────────────────────────────────────────────────────── */
 
+/**
+ * The mask over a document that has not opened yet, and its two clocks.
+ *
+ * What lifts it is the engine telling us the document is loaded (see
+ * handleEvent) — an event, not a look at the DOM. The obvious probe, "has the
+ * viewer laid pages out", cannot be written against this viewer from outside
+ * it: it virtualises, so its scroll container is exactly as tall as the
+ * viewport, and its pages render inside shadow roots we cannot read. A probe
+ * that answers "not yet" forever would leave every PDF behind a spinner.
+ *
+ * The deadline is the safety valve for a document that never loads at all: the
+ * mask hides the engine's own error message, so it must not be able to outlive
+ * the answer by much. The slow clock is the other end — a first open compiles
+ * the wasm engine and can take seconds, which is worth saying rather than
+ * spinning through.
+ */
+const LOAD_DEADLINE_MS = 15_000
+const SLOW_AFTER_MS = 2500
+let slowTimer: number | null = null
+let deadlineTimer: number | null = null
+
+function markDocReady(): void {
+  docReady.value = true
+  if (slowTimer !== null) window.clearTimeout(slowTimer)
+  if (deadlineTimer !== null) window.clearTimeout(deadlineTimer)
+  slowTimer = deadlineTimer = null
+}
+
 onMounted(async () => {
+  slowTimer = window.setTimeout(() => (loadingSlow.value = true), SLOW_AFTER_MS)
+  deadlineTimer = window.setTimeout(markDocReady, LOAD_DEADLINE_MS)
   const buf = await fs.readBinary(props.path)
   if (disposed) return
   blobUrl.value = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
@@ -1492,6 +1535,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   disposed = true
+  if (slowTimer !== null) window.clearTimeout(slowTimer)
+  if (deadlineTimer !== null) window.clearTimeout(deadlineTimer)
   if (msgTimer !== null) window.clearTimeout(msgTimer)
   if (refitTimer !== null) window.clearTimeout(refitTimer)
   paneObserver?.disconnect()
@@ -1519,13 +1564,24 @@ onBeforeUnmount(() => {
         :style="{ width: '100%', height: '100%' }"
         @ready="onReady"
       />
-      <!-- Masks the page-1 flash while we scroll to the remembered page. -->
-      <div
-        v-if="restoring"
-        class="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-bg-1/50 text-sm text-fg-3"
-      >
-        <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
-        {{ $t('viewers.pdf.restoring') }}
+      <!-- One loading effect, in one place: opaque, so the engine's own centred
+           spinner never shows through it, and near the top of the pane, where
+           the eye already is — a corner is somewhere nobody waiting for a
+           document is looking. It also still does what it always did: mask the
+           page-1 flash while we scroll to the remembered page. -->
+      <div v-if="!docReady || restoring" class="absolute inset-0 z-10 bg-bg-1">
+        <div
+          class="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-bg-2 px-3 py-1.5 text-xs text-fg-3 shadow"
+        >
+          <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
+          {{
+            docReady
+              ? $t('viewers.pdf.restoring')
+              : loadingSlow
+                ? $t('viewers.pdf.loadingSlow')
+                : $t('viewers.pdf.loading')
+          }}
+        </div>
       </div>
       <!-- Read aloud + highlight colours live in the PDF toolbar and selection
            popup now (see customizeViewerUi). -->
