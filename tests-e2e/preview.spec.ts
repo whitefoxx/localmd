@@ -175,6 +175,30 @@ test('a CSV renders as a table in preview and stays editable text in edit', asyn
   await expect(page.locator('.cm-content')).toContainText('"Ma, Long",12')
 })
 
+test('frontmatter keeps both its fences, and is not read as markdown', async ({ page }) => {
+  await openWith(page, [
+    [
+      'skill.md',
+      '---\nname: hn-top-stories\ndescription: Fetch the top stories.\n---\n\n# Body\n\nSome **bold** prose.\n',
+    ],
+  ])
+  await openFromTree(page, 'skill.md')
+  await page.getByRole('button', { name: 'Edit' }).click()
+  await expect(page.locator('.cm-editor')).toBeVisible()
+
+  // The editor hides markdown syntax on every line the cursor is not on. A
+  // frontmatter block is not markdown, but markdown's parser reads its closing
+  // fence as a setext heading's underline — so the fence was hidden, and a
+  // skill file looked like it had lost its delimiter.
+  const fences = await page
+    .locator('.cm-content')
+    .evaluate((el) => (el.textContent ?? '').split('---').length - 1)
+  expect(fences).toBe(2)
+  // Markdown BELOW the block is still rendered, syntax and all.
+  await expect(page.locator('.cm-content')).not.toContainText('**bold**')
+  await expect(page.locator('.cm-content')).toContainText('bold')
+})
+
 test('an audio file gets the browser player', async ({ page }) => {
   await openWith(page, [['memo.wav', makeWav()]])
   await openFromTree(page, 'memo.wav')

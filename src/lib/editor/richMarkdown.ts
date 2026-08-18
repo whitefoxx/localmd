@@ -154,6 +154,29 @@ const codeMark = Decoration.mark({ class: 'cm-md-code' })
 const headingLine = (level: number) => Decoration.line({ class: `cm-md-h${level}` })
 const quoteLine = Decoration.line({ class: 'cm-md-quote' })
 
+/**
+ * Where a file's YAML frontmatter ends, or 0 when it has none. Same rule as
+ * `splitFrontmatter` in lib/wiki, so the editor and the rest of the app agree
+ * on what frontmatter is: line one is exactly `---`, and the block ends at the
+ * first later line that is exactly `---`.
+ *
+ * Markdown's parser does not know about frontmatter, and reads that shape as a
+ * thematic break, a paragraph, and a setext underline — which makes the CLOSING
+ * `---` a HeaderMark, hidden like any other markup. It reappeared only when the
+ * cursor landed on its line, so a skill file looked like it had lost its
+ * delimiter: the one thing about frontmatter that must never look broken.
+ * Nothing inside the block is markdown, so nothing inside it is decorated.
+ */
+function frontmatterEnd(state: EditorState): number {
+  const doc = state.doc
+  if (doc.line(1).text !== '---') return 0
+  for (let n = 2; n <= doc.lines; n++) {
+    const line = doc.line(n)
+    if (line.text === '---') return line.to
+  }
+  return 0 // unterminated: not frontmatter, just a document opening with a rule
+}
+
 /** Line numbers the selection touches — these render as plain markdown. */
 function revealedLines(state: EditorState): Set<number> {
   const lines = new Set<number>()
@@ -189,10 +212,12 @@ function blocksIn(state: EditorState): ReturnType<typeof findBlockMath> {
  */
 function blockMathDecorations(state: EditorState): DecorationSet {
   const reveal = revealedLines(state)
+  const fmEnd = frontmatterEnd(state)
   const marks: Range<Decoration>[] = []
   for (const block of blocksIn(state)) {
     const fromLine = block.fromLine + 1 // findBlockMath is 0-based
     const toLine = block.toLine + 1
+    if (fmEnd && state.doc.line(toLine).to <= fmEnd) continue
     let touched = false
     for (let n = fromLine; n <= toLine && !touched; n++) touched = reveal.has(n)
     if (touched) continue
@@ -226,6 +251,7 @@ function blockMathLines(state: EditorState): Set<number> {
 function buildDecorations(view: EditorView, opts: RichMarkdownOptions): DecorationSet {
   const marks: Range<Decoration>[] = []
   const reveal = revealedLines(view.state)
+  const fmEnd = frontmatterEnd(view.state)
   const doc = view.state.doc
   const lineOf = (pos: number) => doc.lineAt(pos).number
   const shown = (pos: number) => reveal.has(lineOf(pos))
@@ -236,6 +262,9 @@ function buildDecorations(view: EditorView, opts: RichMarkdownOptions): Decorati
       from,
       to,
       enter(node) {
+        // Frontmatter is YAML, not markdown (see frontmatterEnd). Skipping the
+        // node skips its children too, which is the whole block.
+        if (fmEnd && node.to <= fmEnd) return false
         const name = node.name
 
         // Headings keep their size even while being edited; only the #s hide.
@@ -356,6 +385,7 @@ function buildDecorations(view: EditorView, opts: RichMarkdownOptions): Decorati
   for (let n = firstVisible.number; n <= lastVisible.number; n++) {
     if (reveal.has(n) || inBlock.has(n)) continue
     const line = doc.line(n)
+    if (fmEnd && line.to <= fmEnd) continue
     math.push(...findInlineMath(line.text, line.from, protectedRanges))
   }
 
