@@ -295,12 +295,13 @@ test('localmd Connect is presented as a permission to grant, not an id to copy',
   // Checking the box probed it and, finding nothing, brought us straight here —
   // no going back and noticing "Setup needed" on the way. What is wrong is stated
   // BEFORE the steps that fix it.
-  await expect(page.getByText(/cannot see localmd Connect on this page/)).toBeVisible()
+  await expect(page.getByText(/Not answering on this page/)).toBeVisible()
   await expect(page.getByText('Set up localmd Connect')).toBeVisible()
-  // The steps name the exact address to add — including the port, which is the
-  // usual reason it fails.
-  const allowStep = page.locator('li', { hasText: 'Web app access' })
-  await expect(allowStep).toContainText(`localhost:${new URL(page.url()).port}`)
+  // The way in is the listing — no address to add by hand, because the extension
+  // ships allowing this app.
+  const store = page.getByRole('link', { name: /Chrome Web Store/ })
+  await expect(store).toBeVisible()
+  await expect(store).toHaveAttribute('href', /chromewebstore\.google\.com\/detail\/localmd-connect/)
   await expect(page.getByRole('button', { name: 'Reload this page' })).toBeVisible()
   // And nothing to copy: the id is the extension's to announce, not ours to pin.
   await expect(page.getByText('Chrome extension ID')).toHaveCount(0)
@@ -311,7 +312,7 @@ test('localmd Connect is presented as a permission to grant, not an id to copy',
   // enable the extension on an open page, press Reconnect, nothing changes.)
   await expect(page.getByRole('button', { name: 'Check again' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Reconnect' })).toHaveCount(0)
-  await expect(page.getByText(/Only reloading can change/)).toBeVisible()
+  await expect(page.getByText(/attaches to a page as it loads/)).toBeVisible()
 
   await page.locator('button:has(.codicon-arrow-left)').click()
   await expect(
@@ -344,10 +345,10 @@ test('a relay on the page is not the same as localmd Connect answering', async (
   await page.locator('button:has(.codicon-arrow-left)').click()
   await page.getByRole('button', { name: /localmd Connect browser extension/ }).click()
 
-  // Still the setup panel — and it names the reason, which is the address, not
-  // the install.
+  // Still the setup panel — and it says the extension is here but silent, which
+  // is a different problem from not having it.
   await expect(page.getByText('Set up localmd Connect')).toBeVisible()
-  await expect(page.getByText(/is not answering it/)).toBeVisible()
+  await expect(page.getByText(/on this page but not answering it/)).toBeVisible()
   await expect(page.getByText(/Connected — localmd Connect is answering/)).toHaveCount(0)
 
   // Here a re-probe CAN succeed — the origin gate is consulted per connection, so

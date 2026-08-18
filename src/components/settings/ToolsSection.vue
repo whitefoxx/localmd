@@ -791,7 +791,6 @@ const relayUp = computed(() => detailServer.value?.status === 'ok')
 
 /** What the user types into the extension's popup — host and port, the form its
  *  own field accepts. The port is part of the identity, per the note above. */
-const pageHost = computed(() => window.location.host)
 
 /** The extension starts listening on pages loaded AFTER the origin is added, so
  *  a reload is the step that finishes setup — not a wait. */
@@ -913,10 +912,9 @@ function removeDetail(): void {
     </div>
 
     <!-- localmd Connect. There is no address and no id to enter — the extension
-         writes its own id into the page when it is willing to talk to us — so
-         this panel is about setup state: production needs nothing (localmd.app
-         is pre-authorized at install), dev origins need the address step, and
-         the "Allow user scripts" toggle is what unlocks func adapters + site
+         writes its own id into the page when it is willing to talk to us, and it
+         ships already allowing this app — so the whole panel is: install it,
+         reload, and one optional toggle that unlocks func adapters and site
          scripts. -->
     <div v-if="detailEntry?.kind === 'extension' && detailIsConnect" class="space-y-2">
       <div v-if="relayUp" class="space-y-1">
@@ -935,17 +933,19 @@ function removeDetail(): void {
           <p class="text-xs text-removed leading-relaxed">{{ $t(relayProblem) }}</p>
         </div>
         <div class="pt-0.5 text-xs text-fg-1">{{ $t('settings.lmdConnect.setupTitle') }}</div>
-        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.lmdConnect.setupIntro') }}</p>
         <ol class="text-xs text-fg-2 leading-relaxed space-y-1 list-decimal pl-4">
-          <li>{{ $t('settings.lmdConnect.step1') }}</li>
-          <li>{{ $t('settings.lmdConnect.stepScripts') }}</li>
           <li>
-            {{ $t('settings.lmdConnect.step2') }}
-            <span class="font-mono text-fg-1">{{ pageHost }}</span>
+            {{ $t('settings.lmdConnect.step1') }}
+            <a
+              v-if="detailEntry?.homepage"
+              :href="detailEntry.homepage"
+              target="_blank"
+              rel="noopener"
+              class="text-accent hover:underline"
+            >{{ $t('settings.lmdConnect.storeLink') }}</a>
           </li>
-          <li>{{ $t('settings.lmdConnect.step3') }}</li>
+          <li>{{ $t('settings.lmdConnect.stepScripts') }}</li>
         </ol>
-        <p class="text-xs text-fg-3 leading-relaxed">{{ $t('settings.lmdConnect.noOriginNote') }}</p>
         <div class="flex items-center gap-1.5 flex-wrap">
           <button class="btn text-xs" @click="reloadPage">{{ $t('settings.lmdConnect.reload') }}</button>
           <!-- Offered only where it can actually succeed. With a relay on the page,

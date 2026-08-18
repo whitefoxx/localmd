@@ -82,7 +82,6 @@ const needsRelaySetup = computed(
     isLocalmdConnectRelayUrl(entryServerUrl.value) &&
     !entryConnected.value,
 )
-const pageHost = computed(() => window.location.host)
 
 function reloadPage(): void {
   window.location.reload()
@@ -174,12 +173,10 @@ async function signIn(): Promise<void> {
       </div>
     </div>
 
-    <!-- An extension: install, allow this site, reload, then re-check. -->
+    <!-- An extension: install, reload, then re-check. -->
     <div v-else-if="request.kind === 'extension'" class="mt-2 space-y-2">
       <p v-if="needsRelaySetup" class="text-xs text-fg-3 leading-relaxed">
-        {{ $t('settings.lmdConnect.step2') }}
-        <span class="font-mono text-fg-1">{{ pageHost }}</span>
-        {{ $t('settings.lmdConnect.step3') }}
+        {{ $t('settings.lmdConnect.step1') }}
       </p>
       <div class="flex items-center gap-2 flex-wrap">
         <a v-if="request.url" :href="request.url" target="_blank" rel="noopener" class="btn text-xs">

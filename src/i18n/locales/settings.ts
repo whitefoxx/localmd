@@ -118,7 +118,6 @@ export default {
     removeEntry: 'Remove',
     presetLockedHint:
       'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here.',
-    installFromStore: 'Install from the Chrome Web Store →',
     serverUrl: 'Server URL',
     signIn: 'Sign in',
     signOut: 'Sign out',
@@ -132,25 +131,17 @@ export default {
       recheck: 'Check again',
       connected: 'Connected — localmd Connect is answering this site.',
       notDetected:
-        'We cannot see localmd Connect on this page — it is not installed or not enabled, or (on a development address) this site is not on its list, or any of that changed after this page was opened. Only reloading can change those: the extension attaches to a page as it loads, and never afterwards.',
+        'Not answering on this page — it may not be installed or enabled, or that changed after the page loaded. The extension attaches to a page as it loads, so reload after installing.',
       extension: 'Extension {id}',
       presentButSilent:
-        'localmd Connect is on this page but is not answering it — so the address below is not the one in its list. Check the port: it counts, and it is the usual culprit.',
+        'It is on this page but not answering it. Reload; if that does not help, check it is enabled here.',
       setupTitle: 'Set up localmd Connect',
-      setupIntro:
-        'On localmd.app the extension works the moment it is installed — nothing to allow, nothing to type. The steps below cover the one toggle worth switching on, and the extra step development addresses need.',
-      step1:
-        'Install localmd Connect from the Chrome Web Store, then come back to this page and reload it.',
+      step1: 'Install it, then reload this page.',
+      storeLink: 'Chrome Web Store →',
       stepScripts:
-        'In its popup, switch on “Allow user scripts”. Marketplace func adapters and site scripts need it; simple (pipeline) adapters work without — tools report runnable: false until it is on.',
-      step2:
-        'Development addresses only: click its toolbar icon → “Web app access” → add this address, exactly as shown (the port is part of it):',
-      noOriginNote:
-        'localmd.app itself needs no origin setup — it is pre-authorized when the extension installs.',
-      step3:
-        'Reload this page. The extension only starts listening on pages opened after you add them, so on a development address this last step is what finishes it.',
+        'Optional: turn on “Allow user scripts” in its popup — only marketplace func adapters and site scripts need it.',
       confirmNote:
-        'Adapters that can post or change things on a real site, and site scripts that inject code, always pause on a confirmation card in the chat before they run. Your standing control is the extension popup, where any site script can be paused or deleted.',
+        'Anything that could change a real site asks first, on a card in the chat. Site scripts can be paused or removed in the extension popup.',
     },
     advanced: 'Advanced',
     advancedDesc: 'Build an integration by hand, if you would rather not have the agent do it.',
@@ -178,7 +169,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect browser extension',
-        desc: 'The companion extension made for localmd: your logged-in Chrome as agent tools — open and read pages, click and type, search, and fetch any URL with your cookies, past the CORS limit that blocks a web page from calling most APIs — plus a marketplace of ~300 site adapters (Twitter, Zhihu, Reddit, YouTube, …) the agent can find and run in one call, and persistent site scripts that fix a page on every visit (hide ads, restyle, enhance). On localmd.app it works the moment it is installed; using it here is part of the paid tier. Anything that posts to a real site or injects code asks you first.',
+        desc: 'Your logged-in Chrome as agent tools: read pages, click and type, search, and open sites you are signed in to — including the many that a web page cannot reach on its own. Plus ~300 ready-made site adapters (Twitter, Zhihu, Reddit, YouTube, …) and site scripts that fix a page on every visit. Using it here is part of the paid tier, and anything that posts to a real site or injects code asks you first.',
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -393,7 +384,6 @@ export default {
     noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
     removeEntry: '移除',
     presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
-    installFromStore: '去 Chrome 应用商店安装 →',
     serverUrl: '服务器 URL',
     signIn: '登录',
     signOut: '退出登录',
@@ -407,24 +397,16 @@ export default {
       recheck: '重新检测',
       connected: '已连接 —— localmd Connect 正在响应本站。',
       notDetected:
-        '本页上看不到 localmd Connect —— 可能是没安装或没启用，（开发地址下）也可能是本站不在它的名单里，或者这些改动发生在本页打开之后。这些都只有刷新才能改变：扩展是在页面加载的那一刻附着上去的，之后就不会了。',
+        '本页上没有响应 —— 可能没安装或没启用，也可能是本页加载之后才变的。扩展是在页面加载那一刻接入的，所以装好后刷新一次。',
       extension: '扩展 {id}',
-      presentButSilent:
-        'localmd Connect 就在本页上，但不响应本页 —— 说明下面这个地址不是它名单里的那个。检查端口：端口算在内，而且十次有九次是它。',
+      presentButSilent: '它在本页上，但不响应。刷新试试；还不行就看看它在这里是否启用。',
       setupTitle: '设置 localmd Connect',
-      setupIntro:
-        '在 localmd.app 上装好即用 —— 不用允许任何东西，也不用填任何东西。下面几步是一个值得打开的开关，以及开发地址需要的额外一步。',
-      step1:
-        '从 Chrome 应用商店安装 localmd Connect，然后回到这个页面刷新一次。',
+      step1: '安装扩展，然后刷新本页。',
+      storeLink: 'Chrome 应用商店 →',
       stepScripts:
-        '在它的弹窗里打开「Allow user scripts」。市场里的 func 适配器和站点脚本需要它；简单的（pipeline）适配器不用 —— 开关没开之前，相关工具会报 runnable: false。',
-      step2:
-        '仅开发地址需要：点它的工具栏图标 →「Web app access」→ 按下面显示的地址原样添加（端口也算在内）：',
-      noOriginNote: 'localmd.app 本身不需要任何地址设置 —— 安装扩展时已预先授权。',
-      step3:
-        '刷新本页。扩展只会监听添加之后才打开的页面，所以在开发地址下这最后一步才是真正生效的一步。',
+        '可选：在它的弹窗里打开「Allow user scripts」—— 只有市场里的 func 适配器和站点脚本需要它。',
       confirmNote:
-        '能在真实网站上发帖或改动内容的适配器，以及注入代码的站点脚本，运行前都会先在聊天里停在一张确认卡片上。你的长期控制权在扩展弹窗里 —— 任何站点脚本都能随时暂停或删除。',
+        '任何可能改动真实网站的操作，都会先在聊天里停在一张确认卡片上。站点脚本可以在扩展弹窗里暂停或删除。',
     },
     advanced: '高级',
     advancedDesc: '手动搭一个集成 —— 如果你不想让 agent 代劳的话。',
@@ -450,7 +432,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect 浏览器扩展',
-        desc: '为 localmd 定制的伴生扩展：把你已登录的 Chrome 变成 agent 的工具 —— 打开并读取网页、点击输入、搜索、带着 cookie 抓取任意 URL（同时绕开让网页无法直连大多数 API 的 CORS 限制）—— 另外还有约 300 个站点适配器的市场（Twitter、知乎、Reddit、YouTube……），agent 一次调用即可查找并运行；以及持久化站点脚本，每次打开页面自动生效（去广告、改样式、增强页面）。在 localmd.app 上装好即用；在这里使用它属于付费部分。任何会向真实网站发内容或注入代码的操作都会先征求你的确认。',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：读网页、点击输入、搜索、打开你已登录的站点 —— 包括很多网页本身够不着的地方。另有约 300 个现成的站点适配器（Twitter、知乎、Reddit、YouTube……），以及每次打开页面自动生效的站点脚本。在这里使用属于付费部分；任何会向真实网站发内容或注入代码的操作都会先问你。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',
