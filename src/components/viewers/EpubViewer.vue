@@ -7,6 +7,7 @@ import { useCitationsStore } from '@/stores/citations'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
 import { useTtsStore } from '@/stores/tts'
+import { READ_ALOUD_ENABLED } from '@/lib/tts'
 import { useUiStore } from '@/stores/ui'
 import { useComposerStore } from '@/stores/composer'
 import { highlightSentence } from '@/composables/useTtsHighlight'
@@ -1101,7 +1102,12 @@ watch(
         >
           <span class="codicon codicon-sm codicon-search" />
         </button>
-        <button class="btn text-xs" :title="$t('viewers.epub.readChapter')" @click="readAloud">
+        <button
+          v-if="READ_ALOUD_ENABLED"
+          class="btn text-xs"
+          :title="$t('viewers.epub.readChapter')"
+          @click="readAloud"
+        >
           <span class="codicon codicon-sm codicon-unmute" />
         </button>
         <button
@@ -1238,6 +1244,7 @@ watch(
         />
         <span class="w-px h-4 bg-border mx-0.5" />
         <button
+          v-if="READ_ALOUD_ENABLED"
           class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
           :title="$t('viewers.epub.readSelection')"
           @click="speakSelection"

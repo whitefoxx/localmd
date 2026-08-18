@@ -39,7 +39,7 @@ import { captureFiles } from '@/lib/capture'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind, isProseText, isTabular } from '@/lib/filetypes'
-import { stripMarkdown } from '@/lib/tts'
+import { stripMarkdown, READ_ALOUD_ENABLED } from '@/lib/tts'
 import { useTtsStore } from '@/stores/tts'
 import { baseName, splitFrontmatter } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
@@ -560,7 +560,7 @@ function closeKb(): void {
               class="absolute top-2 right-3 z-10 flex gap-1"
             >
               <button
-                v-if="isMarkdown || isPlainText"
+                v-if="READ_ALOUD_ENABLED && (isMarkdown || isPlainText)"
                 class="btn text-xs shadow-sm"
                 :title="$t('layout.readAloud')"
                 @mousedown.prevent

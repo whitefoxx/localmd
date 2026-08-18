@@ -38,6 +38,7 @@ import { sidecarRevision, HIGHLIGHT_COLORS, UNDERLINE_COLOR } from '@/lib/annota
 import { useThemeStore } from '@/stores/theme'
 import { pdfPage as pageMemory, rememberPdfPage } from '@/lib/viewMemory'
 import { useTtsStore } from '@/stores/tts'
+import { READ_ALOUD_ENABLED } from '@/lib/tts'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { useComposerStore } from '@/stores/composer'
@@ -1041,7 +1042,16 @@ function customizeViewerUi(r: PluginRegistry): void {
     if (right) {
       right.items = right.items.filter((it) => it.id !== 'comment-button') // → [search]
       right.items.push(
-        { type: 'command-button', id: 'bm-read-aloud-btn', commandId: 'bm:read-aloud', variant: 'icon' },
+        ...(READ_ALOUD_ENABLED
+          ? ([
+              {
+                type: 'command-button',
+                id: 'bm-read-aloud-btn',
+                commandId: 'bm:read-aloud',
+                variant: 'icon',
+              },
+            ] as ToolbarItem[])
+          : []),
         { type: 'command-button', id: 'bm-zen-btn', commandId: 'bm:zen', variant: 'icon' },
         {
           type: 'command-button',
@@ -1073,7 +1083,11 @@ function customizeViewerUi(r: PluginRegistry): void {
     items: [
       ...swatches,
       { type: 'divider', id: 'bm-sel-divider' },
-      { type: 'command-button', id: 'bm-sel-read', commandId: 'bm:read-aloud', variant: 'icon' },
+      ...(READ_ALOUD_ENABLED
+        ? ([
+            { type: 'command-button', id: 'bm-sel-read', commandId: 'bm:read-aloud', variant: 'icon' },
+          ] as SelectionMenuItem[])
+        : []),
       {
         type: 'command-button',
         id: 'bm-sel-underline',
@@ -1100,7 +1114,11 @@ function customizeViewerUi(r: PluginRegistry): void {
     items: [
       ...annoSwatches,
       { type: 'divider', id: 'bm-anno-div1' },
-      { type: 'command-button', id: 'bm-anno-read', commandId: 'bm:read-aloud', variant: 'icon' },
+      ...(READ_ALOUD_ENABLED
+        ? ([
+            { type: 'command-button', id: 'bm-anno-read', commandId: 'bm:read-aloud', variant: 'icon' },
+          ] as SelectionMenuItem[])
+        : []),
       {
         type: 'command-button',
         id: 'bm-anno-underline',

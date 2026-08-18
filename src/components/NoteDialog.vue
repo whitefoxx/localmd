@@ -7,6 +7,7 @@
  * whole mark.
  */
 import { ref, watch, computed, nextTick } from 'vue'
+import { READ_ALOUD_ENABLED } from '@/lib/tts'
 
 type MarkStyle = 'highlight' | 'underline'
 
@@ -147,6 +148,7 @@ function onKey(e: KeyboardEvent): void {
             />
             <span class="w-px h-4 bg-border mx-0.5" />
             <button
+              v-if="READ_ALOUD_ENABLED"
               class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
               :title="$t('note.readSelection')"
               @click="emit('read')"

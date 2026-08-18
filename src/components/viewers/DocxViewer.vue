@@ -19,6 +19,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
 import { useTtsStore } from '@/stores/tts'
+import { READ_ALOUD_ENABLED } from '@/lib/tts'
 import * as fs from '@/lib/fs'
 import { previewScroll } from '@/lib/viewMemory'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
@@ -478,6 +479,7 @@ onBeforeUnmount(() => {
         />
         <span class="w-px h-4 bg-border mx-0.5" />
         <button
+          v-if="READ_ALOUD_ENABLED"
           class="w-6 h-5 rounded flex items-center justify-center text-fg-3 hover:text-fg-1"
           :title="$t('viewers.docx.readSelection')"
           @click="speakSelection"

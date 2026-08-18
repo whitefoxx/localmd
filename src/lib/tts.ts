@@ -3,6 +3,24 @@
  * stores/tts.ts; everything here is side-effect-free and unit-testable.
  */
 
+/**
+ * Read-aloud is hidden.
+ *
+ * On a connection that cannot reach Google's network voices, two voices end up
+ * talking over each other — see `docs/read-aloud-double-voice.md` for the
+ * evidence and what has been ruled out. Narrowing the window made it rarer and
+ * did not close it, and a reader that sometimes speaks twice is worse than one
+ * that does not speak, so every way IN to the feature is hidden: the toolbar
+ * buttons, the selection popups, the note dialog's.
+ *
+ * Nothing is deleted. The controller, the playback bar and the voice picker are
+ * all still wired up and still tested — flipping this to `true` gives the
+ * feature back, and is the only edit needed to do it. The type is widened on
+ * purpose so the flag reads as a switch rather than as a constant the compiler
+ * has already made up its mind about.
+ */
+export const READ_ALOUD_ENABLED: boolean = false
+
 /** Split text into speakable chunks at sentence boundaries, each capped in length
  *  so Chrome's ~15s / long-utterance cutoff never truncates one. Sentences are
  *  spoken one at a time (see the store), which also sidesteps the "speech stops
