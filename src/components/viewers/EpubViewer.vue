@@ -175,6 +175,16 @@ function destroy(): void {
  */
 const HEIGHT_SLACK = 48
 
+/** The size the book should be laid out at inside `el` — its width, and its
+ *  height minus the slack — or null when the pane has no size to lay out
+ *  against (a hidden tab). */
+function fitSize(el: HTMLElement): { w: number; h: number } | null {
+  const w = el.clientWidth
+  const avail = el.clientHeight
+  if (!w || !avail) return null
+  return { w, h: Math.max(120, avail - HEIGHT_SLACK) }
+}
+
 /**
  * Lay the book out for the space it has, but only when that space actually
  * changed shape. Width is exact — columns are as wide as the page, so a
@@ -189,8 +199,10 @@ function refit(el: HTMLElement): void {
   if (!w || !avail) return // hidden tab: nothing to lay out against
   const fits = avail >= laidOut.h && avail - laidOut.h <= HEIGHT_SLACK * 2
   if (w === laidOut.w && fits) return
-  laidOut = { w, h: Math.max(120, avail - HEIGHT_SLACK) }
-  rendition.resize(laidOut.w, laidOut.h)
+  const next = fitSize(el)
+  if (!next) return
+  laidOut = next
+  rendition.resize(next.w, next.h)
 }
 
 async function load(path: string | null): Promise<void> {
@@ -208,9 +220,18 @@ async function load(path: string | null): Promise<void> {
   }
   const buf = await fs.readBinary(path)
   book = ePub(buf)
+  // Lay the book out at the size it will KEEP, before its first page is drawn.
+  // Rendering at 100% and letting the observer apply the slack afterwards meant
+  // every open repaginated ~150ms in — after display() had already landed on a
+  // CFI. A jump to an annotation therefore aimed at one pagination and was read
+  // in another: epub.js re-displays the page START on resize, so the mark the
+  // user clicked ended up mid-page, a page early, or a page late. Sizing up
+  // front makes the observer's first callback a no-op and the jump final.
+  const initial = fitSize(host.value)
+  if (initial) laidOut = initial
   rendition = book.renderTo(host.value, {
-    width: '100%',
-    height: '100%',
+    width: initial ? initial.w : '100%',
+    height: initial ? initial.h : '100%',
     flow: 'paginated',
     spread: 'auto',
     allowScriptedContent: false,

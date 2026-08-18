@@ -117,6 +117,46 @@ async function visibleText(page: Page): Promise<string> {
   })
 }
 
+test('the book is laid out at its final size before its first page is drawn', async ({
+  page,
+}) => {
+  // The reader holds a strip of height back (HEIGHT_SLACK) so a browser bar
+  // cannot repaginate it. Applying that AFTER the first display re-flowed every
+  // book ~150ms into every open — long enough for display(cfi) to have landed,
+  // so a jump to an annotation was read against a pagination that no longer
+  // existed and came up a page short. Sampling from before the reader exists is
+  // the only way to see it: by the time a page is on screen it is over.
+  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-epub-'))
+  const file = path.join(dir, 'long-book.epub')
+  await writeFile(file, await makeEpub())
+
+  await page.goto('/?e2e=1')
+  await expect(page.getByText('This folder is empty')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  await page.locator('input[type="file"]').first().setInputFiles(file)
+  const entry = page.locator('aside').getByText('long-book.epub', { exact: true })
+  await expect(entry).toBeVisible({ timeout: 10_000 })
+  await entry.click()
+
+  const heights = await page.evaluate(async () => {
+    const seen: number[] = []
+    const deadline = Date.now() + 15_000
+    let firstAt = 0
+    while (Date.now() < deadline) {
+      const stage = document.querySelector('.epub-container') as HTMLElement | null
+      const h = stage?.clientHeight ?? 0
+      if (h) {
+        firstAt ||= Date.now()
+        if (seen[seen.length - 1] !== h) seen.push(h)
+        if (Date.now() - firstAt > 1200) break // past the observer's debounce
+      }
+      await new Promise((r) => setTimeout(r, 40))
+    }
+    return seen
+  })
+  expect(heights).toHaveLength(1)
+})
+
 test('a strip of viewport lost to a browser bar does not move the reader', async ({ page }) => {
   await openBook(page)
   const size = page.viewportSize()!
