@@ -114,13 +114,28 @@ export async function trialSession(): Promise<TrialSession> {
   return session
 }
 
+/** Where the trial's chat endpoint lives, as an absolute URL on this origin.
+ *
+ *  Absolute, and not the `/api/trial/v1` the preset table carries, because the
+ *  OpenAI-compatible provider builds each request as
+ *  `new URL(`${baseURL}${path}`)` — with no base to resolve against, a
+ *  site-relative path throws `Invalid URL` before a request is ever made. The
+ *  endpoint is on this origin either way, so saying so costs nothing and the
+ *  SDK stops guessing.
+ *
+ *  This is the one profile in the app whose endpoint is ours, which is exactly
+ *  why it was the one nobody's own API key would have caught. */
+function trialBaseUrl(): string {
+  return new URL('/api/trial/v1', location.origin).href
+}
+
 /** The profile the trial session becomes. `ephemeral` keeps it out of storage. */
 export function trialProfile(session: TrialSession): LlmProfile {
   return {
     id: 'trial',
     label: 'Free trial',
     provider: 'trial',
-    baseUrl: '/api/trial/v1',
+    baseUrl: trialBaseUrl(),
     apiKey: session.token,
     model: session.model,
     ephemeral: true,

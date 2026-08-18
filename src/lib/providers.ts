@@ -113,6 +113,11 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
     // key on the wire is a session token that expires within the hour rather
     // than anything of the user's. The endpoint decides the model; the value
     // here only fills the profile's label.
+    //
+    // The path is recorded here, but the profile that actually reaches the SDK
+    // carries the absolute form — see `trialBaseUrl` in lib/trial.ts, and do
+    // not "simplify" that back to this string: the OpenAI-compatible provider
+    // resolves nothing, and a site-relative base throws before the request.
     id: 'trial',
     label: 'Free trial',
     sdk: 'openai-compatible',
