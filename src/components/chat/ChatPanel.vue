@@ -1912,7 +1912,7 @@ watch(
           </button>
           <span class="text-xs text-fg-3 flex-1 truncate">
             <template v-if="chat.running">
-              <span class="text-accent">{{ $t('chat.agentWorking') }}</span> · {{ $t('chat.steerHint') }}
+              <span class="text-accent agent-working">{{ $t('chat.agentWorking') }}</span> · {{ $t('chat.steerHint') }}
             </template>
             <template v-else>
               {{ settingsStore.primary?.model || $t('chat.notConfigured') }}

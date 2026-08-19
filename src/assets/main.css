@@ -549,6 +549,52 @@
   }
 }
 
+/* The composer's "agent working" line. A turn can sit inside one tool call for
+   a minute with nothing else on screen moving, and a static coloured word reads
+   as a label rather than a state — so the marker is a live one: a dot pulsing
+   like a recording light, and the word breathing with it on the same beat. */
+.agent-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  animation: agent-working-breathe 1.6s ease-in-out infinite;
+}
+.agent-working::before {
+  content: '';
+  width: 0.45em;
+  height: 0.45em;
+  flex: none;
+  border-radius: 9999px;
+  background: rgb(var(--c-accent));
+  animation: agent-working-pulse 1.6s ease-in-out infinite;
+}
+@keyframes agent-working-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+@keyframes agent-working-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(var(--c-accent) / 0.5);
+  }
+  50% {
+    transform: scale(0.75);
+    box-shadow: 0 0 0 4px rgb(var(--c-accent) / 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-working,
+  .agent-working::before {
+    animation: none;
+  }
+}
+
 /* Transient highlight of a cited markdown block. */
 .md-preview .cite-target {
   background-color: rgb(var(--c-accent) / 0.16);
