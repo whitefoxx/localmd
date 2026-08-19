@@ -28,6 +28,11 @@ function results(page: Page) {
   return page.locator('[data-palette] button')
 }
 
+/** Search hits only — the "ask the agent" offer leads the list and is not one. */
+function hits(page: Page) {
+  return page.locator('[data-palette] button:not([data-kind="ask"])')
+}
+
 test('an inexact query still finds the file, and shows which letters matched', async ({ page }) => {
   await openPalette(page)
   // Not a substring of anything: w-k-i-n are scattered through wiki/index.md.
@@ -130,11 +135,26 @@ test('results keep tracking the query when a document matches many times', async
   // The best match leads, and it has to follow the query — this went stale
   // when several rows collided on a key, which is what the bug looked like.
   await palette(page).fill('wiki')
-  await expect(results(page).first()).toContainText('wiki/')
+  await expect(hits(page).first()).toContainText('wiki/')
 
   await palette(page).fill('AGENTS')
-  await expect(results(page).first()).toContainText('AGENTS.md')
+  await expect(hits(page).first()).toContainText('AGENTS.md')
 
   await palette(page).fill('wiki')
-  await expect(results(page).first()).toContainText('wiki/')
+  await expect(hits(page).first()).toContainText('wiki/')
+})
+
+test('the offer to ask leads the list, without taking Enter from the top hit', async ({ page }) => {
+  // Unbounded results used to bury the offer below a scroll — precisely where
+  // someone whose search is not finding it has stopped looking. Leading the
+  // list must not cost search its default action, so the highlight starts on
+  // the first real hit.
+  await openPalette(page)
+  await palette(page).fill('AGENTS')
+  await expect(results(page).first()).toHaveAttribute('data-kind', 'ask')
+  await expect(hits(page).first()).toContainText('AGENTS.md')
+
+  await palette(page).press('Enter')
+  await expect(palette(page)).toBeHidden()
+  await expect(page.locator('main').getByRole('button', { name: 'AGENTS.md' })).toBeVisible()
 })

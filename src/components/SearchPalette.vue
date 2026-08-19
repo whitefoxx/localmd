@@ -187,12 +187,16 @@ const rows = computed<Row[]>(() => {
   if (mode.value === 'command') return commandRows.value
   if (mode.value === 'session') return sessionRows.value
   const found = searchRows.value
-  // The offer to ask instead of search, always last and only with something
-  // to ask about.
+  // The offer to ask instead of search — only with something to ask about,
+  // and FIRST. Search results are unbounded: put the offer after them and it
+  // sits below a scroll, which is exactly where someone whose search is not
+  // finding it has already stopped looking. Being first must NOT make it the
+  // default action, though — see `defaultRow`, which keeps Enter meaning "open
+  // the top hit".
   if (!parsed.value.text) return found
   return [
-    ...found,
     { kind: 'ask', label: parsed.value.text, icon: 'codicon-sparkle', hint: '⇧↵' },
+    ...found,
   ]
 })
 
@@ -220,7 +224,17 @@ function segments(text: string, positions?: number[]): Array<{ text: string; hit
   return out
 }
 
-watch(rows, () => (selected.value = 0))
+/** Where the highlight lands on a fresh result set: the first real result,
+ *  not the "ask the agent" offer that now sits above them. Enter is search's
+ *  key and must keep opening the top hit; asking has ⇧↵ and a click. With
+ *  nothing found, the offer is the only row and rightly takes the highlight —
+ *  which is the moment it is the answer. */
+const defaultRow = computed(() => {
+  const i = rows.value.findIndex((r) => r.kind !== 'ask')
+  return i === -1 ? 0 : i
+})
+
+watch(rows, () => (selected.value = defaultRow.value))
 
 watch(
   () => ui.searchOpen,
@@ -318,6 +332,7 @@ function onKeydown(e: KeyboardEvent): void {
           <button
             v-for="(row, i) in rows"
             :key="`${i}:${row.kind}:${row.label}`"
+            :data-kind="row.kind"
             class="w-full text-left px-4 py-1.5 flex items-center gap-2 text-sm"
             :class="i === selected ? 'bg-bg-2' : 'hover:bg-bg-2/50'"
             @click="pick(row)"

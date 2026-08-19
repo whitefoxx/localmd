@@ -108,6 +108,19 @@ watch(
           <!-- ── Contents ─────────────────────────────────────────────── -->
           <div v-if="!current" class="px-5 py-5">
             <p class="text-sm text-fg-2 leading-relaxed">{{ $t('help.intro') }}</p>
+
+            <!-- The way out of the manual, before it rather than after it.
+                 Someone opens Help because something is wrong; if the manual
+                 does not cover it, the answer must not be at the bottom of a
+                 list they would have to read first to find out it is not
+                 there. -->
+            <p class="mt-3 text-xs text-fg-3 leading-relaxed">
+              {{ $t('help.feedbackIntro') }}
+              <a :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">
+                {{ $t('help.feedbackLink') }}</a
+              >{{ $t('help.feedbackOutro') }}
+            </p>
+
             <div class="mt-4 rounded-lg border border-border divide-y divide-border overflow-hidden">
               <button
                 v-for="t in topics"
@@ -123,15 +136,6 @@ watch(
               </button>
             </div>
 
-            <!-- The way out of the manual. Someone who read a page and still has
-                 the problem needs somewhere to go, and a manual that ends
-                 without one reads as a closed door. -->
-            <p class="mt-5 text-xs text-fg-3 leading-relaxed">
-              {{ $t('help.feedbackIntro') }}
-              <a :href="FEEDBACK_URL" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">
-                {{ $t('help.feedbackLink') }}</a
-              >{{ $t('help.feedbackOutro') }}
-            </p>
           </div>
 
           <!-- ── One topic ────────────────────────────────────────────── -->

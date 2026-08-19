@@ -178,6 +178,14 @@ const isTabularFile = computed(
  *  the escape hatch below, or it would have no visible way back. */
 const isReader = computed(() => kind.value === 'pdf' || kind.value === 'epub')
 
+/** Whether the file view draws its own action row in the top-right corner
+ *  (edit/preview, read-aloud). One computed rather than two copies of the
+ *  condition: zen's exit button has to sit clear of that row, and the two
+ *  drifting apart is exactly how they came to overlap. */
+const hasEditorActions = computed(
+  () => (isMarkdown.value || isPlainText.value || isTabularFile.value) && !!files.currentPath,
+)
+
 /**
  * Zen mode's peek: the cursor near the top of the page brings back the reader's
  * toolbar and the way out. Reading happens in the middle of the screen, so the
@@ -553,11 +561,17 @@ function closeKb(): void {
       <main class="flex-1 min-w-0 bg-bg-0 flex flex-col relative" @mousemove="onZenMove">
         <!-- Zen's way out, drawn with the toolbar it hides beside. Always
              reachable in two moves — cursor to the top, click — because Esc and
-             a shortcut are not discoverable from inside a bare page. -->
+             a shortcut are not discoverable from inside a bare page.
+             It drops below the file view's own action row where there is one:
+             both want the same top-right corner, and markdown/text/table views
+             kept theirs in zen, so the two buttons sat on top of each other. -->
         <button
           v-if="ui.zen && !isReader"
-          class="absolute top-2 right-3 z-30 w-7 h-7 rounded flex items-center justify-center bg-bg-1/90 border border-border text-fg-2 hover:text-fg-0 shadow transition-opacity duration-200"
-          :class="ui.zenPeek ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+          class="absolute right-3 z-30 w-7 h-7 rounded flex items-center justify-center bg-bg-1/90 border border-border text-fg-2 hover:text-fg-0 shadow transition-opacity duration-200"
+          :class="[
+            ui.zenPeek ? 'opacity-100' : 'opacity-0 pointer-events-none',
+            hasEditorActions ? 'top-11' : 'top-2',
+          ]"
           :title="$t('layout.leaveZen')"
           @click="ui.toggleZen()"
         >
@@ -569,7 +583,7 @@ function closeKb(): void {
         <div class="flex-1 min-h-0 relative" data-file-selection>
             <!-- Editor actions (contextual: markdown, plain-text, tables) -->
             <div
-              v-if="(isMarkdown || isPlainText || isTabularFile) && files.currentPath"
+              v-if="hasEditorActions"
               class="absolute top-2 right-3 z-10 flex gap-1"
             >
               <button

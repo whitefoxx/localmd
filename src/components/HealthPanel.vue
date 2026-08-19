@@ -132,10 +132,13 @@ async function revealBroken(path: string, target: string): Promise<void> {
                   <span class="break-all text-xs text-accent group-hover/row:underline">{{ b.path }}</span>
                 </button>
                 <div class="mt-1 flex flex-wrap gap-1 pl-5">
+                  <!-- text-left: a button centres its text, and a long link
+                       target wraps onto two ragged centred lines that read as a
+                       heading rather than as a path. -->
                   <button
                     v-for="t in b.targets"
                     :key="t"
-                    class="rounded bg-removed/10 px-1.5 py-0.5 font-mono text-[11px] text-removed hover:bg-removed/20"
+                    class="rounded bg-removed/10 px-1.5 py-0.5 text-left font-mono text-[11px] text-removed hover:bg-removed/20"
                     :title="$t('health.jumpTo', { target: t, path: b.path })"
                     @click="revealBroken(b.path, t)"
                   >
