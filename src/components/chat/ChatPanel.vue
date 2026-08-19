@@ -1894,7 +1894,14 @@ watch(
               </button>
             </span>
           </template>
-          <span v-if="importing" class="text-xs text-fg-3 px-1 py-0.5">{{ $t('common.saving') }}</span>
+          <!-- Saving sits among the attachment chips, so it says so the way the
+               rest of the app does: the spinner turns, and the word is only the
+               caption on it. A still "Saving…" next to a row that has not
+               changed yet is indistinguishable from one that is stuck. -->
+          <span v-if="importing" class="flex items-center gap-1 text-xs text-fg-3 px-1 py-0.5">
+            <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
+            {{ $t('common.saving') }}
+          </span>
         </div>
 
         <textarea
