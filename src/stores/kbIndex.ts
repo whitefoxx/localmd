@@ -11,6 +11,7 @@ import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { isCitationToken } from '@/lib/citations'
 import { computeLint, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
+import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 import { isIgnored } from '@/lib/scanScope'
@@ -63,37 +64,31 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   const docSections = ref<Map<string, DocSection>>(new Map())
   const refreshing = ref(false)
 
-  /** A refresh was asked for while one was already running, so the running one
-   *  may have read a stale tree. Coalesced rather than dropped — see refresh(). */
-  let restale = false
+  /** Coalesced passes: a request arriving mid-run schedules exactly one more
+   *  instead of being discarded (lib/async owns the mechanics). */
+  const pass = coalesce(runRefresh)
 
   /**
-   * Bring the cache in sync with the tree, coalescing concurrent callers: a
-   * request that arrives mid-run schedules exactly one more pass instead of
-   * being discarded.
+   * Bring the cache in sync with the tree.
    *
-   * Dropping it was a real bug. `mdFiles` comes from the file tree, not from
-   * disk, so a refresh that starts before the tree is populated indexes
-   * nothing — and the call that arrives right after the tree lands (the
-   * backlinks panel reacting to the first opened file) was the one being
-   * thrown away. The panel then showed "no backlinks" for a KB full of them,
-   * with nothing left to trigger another attempt.
+   * Dropping an overlapping request was a real bug. `mdFiles` comes from the
+   * file tree, not from disk, so a refresh that starts before the tree is
+   * populated indexes nothing — and the call that arrives right after the tree
+   * lands (the backlinks panel reacting to the first opened file) was the one
+   * being thrown away. The panel then showed "no backlinks" for a KB full of
+   * them, with nothing left to trigger another attempt.
+   *
+   * `refreshing` is held across the WHOLE cycle rather than per pass: every
+   * caller awaits a run that covers it, so the flag must not blink off between
+   * a pass and the follow-up it scheduled.
    */
   async function refresh(): Promise<void> {
     if (!fs.hasRoot()) return
-    if (refreshing.value) {
-      restale = true
-      return
-    }
     refreshing.value = true
     try {
-      do {
-        restale = false
-        await runRefresh()
-      } while (restale)
+      await pass()
     } finally {
       refreshing.value = false
-      restale = false
     }
   }
 
