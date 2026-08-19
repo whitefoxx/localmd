@@ -31,14 +31,18 @@ describe('scan scope', () => {
     expect(isIgnored('wiki/a.md', ['', '   '])).toBe(false)
   })
 
-  it('the defaults skip the source tree and the convention files', () => {
+  it('the defaults skip sources, scratch, and the root files that are not pages', () => {
     const d = [...DEFAULT_HEALTH_IGNORE]
     expect(isIgnored('raw/papers/paper.pdf', d)).toBe(true)
     expect(isIgnored('.agents/skills/harvest/SKILL.md', d)).toBe(true)
     expect(isIgnored('AGENTS.md', d)).toBe(true)
     expect(isIgnored('CLAUDE.md', d)).toBe(true)
+    // Composer attachments: a scratch area, and cleared away without notice.
+    expect(isIgnored('.tmp/screenshot-1.png', d)).toBe(true)
+    // MEMORY.md states what to remember, not what is known. Nothing links to it
+    // and nothing should, so a check that flags orphans would flag it forever.
+    expect(isIgnored('MEMORY.md', d)).toBe(true)
     // The wiki itself is what the check is for.
     expect(isIgnored('wiki/index.md', d)).toBe(false)
-    expect(isIgnored('MEMORY.md', d)).toBe(false)
   })
 })

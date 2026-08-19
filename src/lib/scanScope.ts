@@ -23,10 +23,22 @@
  * that quietly went missing.
  */
 
-/** What a knowledge base ignores before anyone touches the setting: the source
- *  collection (not wiki pages, and not linked like them), the tool-facing
- *  `.agents/` tree, and the two convention files that live at the root. */
-export const DEFAULT_HEALTH_IGNORE = ['raw/', '.agents/', 'AGENTS.md', 'CLAUDE.md'] as const
+/** What a knowledge base ignores before anyone touches the setting.
+ *
+ *  None of these are wiki pages and none are linked like them, so a structural
+ *  check would report every one of them as an orphan, every time, for as long
+ *  as the knowledge base exists: the source collection (`raw/`), the composer's
+ *  attachment scratch area (`.tmp/`, see lib/capture), the tool-facing
+ *  `.agents/` tree, and the root files that carry conventions or memory rather
+ *  than knowledge. */
+export const DEFAULT_HEALTH_IGNORE = [
+  'raw/',
+  '.tmp/',
+  '.agents/',
+  'AGENTS.md',
+  'CLAUDE.md',
+  'MEMORY.md',
+] as const
 
 /** One path segment as a test. `*` and `?` are the only metacharacters. */
 function segmentTest(seg: string): (s: string) => boolean {
