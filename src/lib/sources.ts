@@ -40,6 +40,12 @@ export function classifyAnchor(a: AnchorInfo): Omit<Source, 'n'> | null {
   if (a.classes.includes('citation') || a.classes.includes('cite-source')) return null
   // Our own injected superscript / footer links.
   if (a.classes.includes('src-cite-ref')) return null
+  // A file path the agent mentioned in passing (`wiki/x.md`), made clickable
+  // by the renderer. It is a shortcut to the file, not a reference the reply
+  // rests on — numbering it would put half of "I wrote A, B and C" into the
+  // Sources list. (It has no href either, so this is belt-and-braces — but the
+  // rule is a decision, not an accident, and the test below pins it.)
+  if (a.classes.includes('file-path')) return null
 
   if (a.classes.includes('wikilink')) {
     // Only a resolved wikilink points at a real KB file; broken ones aren't sources.

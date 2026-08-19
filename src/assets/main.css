@@ -384,6 +384,18 @@
 .md-preview a {
   @apply text-accent hover:underline;
 }
+/* A code span the renderer resolved to a real KB file. It keeps looking like
+   the path it is — the affordance is the pointer and the hover, not a colour
+   change that would make half the code in a reply look like links. */
+.md-preview a.file-path {
+  @apply cursor-pointer no-underline;
+}
+.md-preview a.file-path > code {
+  @apply underline decoration-dotted decoration-accent/40 underline-offset-2;
+}
+.md-preview a.file-path:hover > code {
+  @apply bg-accent/15 decoration-accent decoration-solid;
+}
 .md-preview a.wikilink {
   @apply text-accent hover:underline cursor-pointer;
 }

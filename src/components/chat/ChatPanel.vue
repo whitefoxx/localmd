@@ -633,11 +633,19 @@ const sessionCiteSources = computed(() => {
   return parseCiteSources(all)
 })
 
+/** Exact KB paths, as a set — the agent names files far more often than the
+ *  tree changes, and a per-code-span scan of `allFiles` would be quadratic on
+ *  a long reply. */
+const kbPaths = computed(() => new Set(files.allFiles))
+
 function renderPart(part: MessagePart & { type: 'text' }): string {
   return renderMarkdown(
     part.text,
     { resolve: (t) => files.resolveWikilink(t) },
-    { citeSources: sessionCiteSources.value },
+    {
+      citeSources: sessionCiteSources.value,
+      resolvePath: (t) => (kbPaths.value.has(t) ? t : null),
+    },
   )
 }
 
@@ -951,6 +959,12 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {
     await files.openFile(a.dataset.target)
+    revealEditor()
+    return
+  }
+  // A `path` the agent named, resolved to a real file at render time.
+  if (a.classList.contains('file-path') && a.dataset.path) {
+    await files.openFile(a.dataset.path)
     revealEditor()
     return
   }

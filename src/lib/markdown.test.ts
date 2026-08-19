@@ -139,3 +139,69 @@ describe('math (KaTeX)', () => {
     expect(html).toContain('katex')
   })
 })
+
+describe('file paths in code spans', () => {
+  const KB = new Set(['wiki/projects/copyable-project-ideas.md', 'raw/books/全球通史.pdf'])
+  const withPaths = { resolvePath: (t: string) => (KB.has(t) ? t : null) }
+
+  it('links a code span that names a real file', () => {
+    const html = renderMarkdown(
+      'New file: `wiki/projects/copyable-project-ideas.md`',
+      resolver,
+      withPaths,
+    )
+    expect(html).toContain('class="file-path"')
+    expect(html).toContain('data-path="wiki/projects/copyable-project-ideas.md"')
+    // Still reads as a path: the code span survives inside the anchor.
+    expect(html).toContain('<code>wiki/projects/copyable-project-ideas.md</code>')
+  })
+
+  it('leaves a code span that names no file completely alone', () => {
+    const html = renderMarkdown('Run `npm run build` in `wiki/nope.md`', resolver, withPaths)
+    expect(html).not.toContain('file-path')
+    expect(html).toContain('<code>npm run build</code>')
+    expect(html).toContain('<code>wiki/nope.md</code>')
+  })
+
+  it('does nothing at all without a resolver — a note keeps its code as code', () => {
+    const html = renderMarkdown('`wiki/projects/copyable-project-ideas.md`', resolver)
+    expect(html).not.toContain('file-path')
+    expect(html).toContain('<code>')
+  })
+
+  it('resolves CJK paths, and paths inside prose', () => {
+    const html = renderMarkdown('见 `raw/books/全球通史.pdf` 第一页', resolver, withPaths)
+    expect(html).toContain('data-path="raw/books/全球通史.pdf"')
+  })
+
+  it('matches exactly — no trailing-slash, prefix or extension guessing', () => {
+    for (const near of ['wiki/projects/', 'wiki/projects/copyable-project-ideas', 'copyable-project-ideas.md']) {
+      expect(renderMarkdown(`\`${near}\``, resolver, withPaths)).not.toContain('file-path')
+    }
+  })
+
+  it('ignores surrounding whitespace inside the span', () => {
+    // Marked strips one space at each end; the resolver sees a trimmed path.
+    expect(renderMarkdown('` wiki/projects/copyable-project-ideas.md `', resolver, withPaths)).toContain(
+      'file-path',
+    )
+  })
+
+  it('never linkifies inside a fenced block', () => {
+    const html = renderMarkdown(
+      '```\nwiki/projects/copyable-project-ideas.md\n```',
+      resolver,
+      withPaths,
+    )
+    expect(html).not.toContain('file-path')
+  })
+
+  it('escapes what it puts in the attribute', () => {
+    const evil = 'wiki/"><img src=x>.md'
+    const html = renderMarkdown(`\`${evil}\``, resolver, {
+      resolvePath: (t) => (t === evil ? t : null),
+    })
+    expect(html).toContain('&quot;')
+    expect(html).not.toContain('<img src=x>')
+  })
+})

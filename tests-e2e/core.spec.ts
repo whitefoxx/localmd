@@ -392,3 +392,21 @@ test('a citation quoted in code stays literal, while a real one becomes a chip',
   await expect(page.locator('code', { hasText: '[[1:b16-3]]' })).toBeVisible()
   await expect(page.locator('a.citation[data-block="b16-3"]')).toHaveCount(0)
 })
+
+test('a file path the agent names is clickable, and only when the file exists', async ({ page }) => {
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+  const input = page.getByPlaceholder(/Ask the agent/)
+  // One real path (the scaffold wrote it) and one that names nothing.
+  await input.fill('echo Wrote `wiki/index.md`, not `wiki/ghost.md`')
+  await input.press('Enter')
+
+  const linked = page.locator('a.file-path')
+  await expect(linked).toHaveCount(1, { timeout: 10_000 })
+  await expect(linked).toHaveAttribute('data-path', 'wiki/index.md')
+  // The one that resolves to nothing stays plain code — no broken link, no nag.
+  await expect(page.locator('.md-preview code', { hasText: 'wiki/ghost.md' })).toBeVisible()
+
+  // Clicking opens it in the middle pane, like any other way into a file.
+  await linked.click()
+  await expect(page.locator('main').getByRole('button', { name: 'index.md' })).toBeVisible()
+})

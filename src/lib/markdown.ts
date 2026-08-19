@@ -175,6 +175,33 @@ export interface RenderOptions {
   /** Citation source declarations from surrounding context (e.g. the whole
    *  chat session) for resolving [[N:block]] chips in a partial text. */
   citeSources?: Map<string, CiteSource>
+  /**
+   * Turn `` `some/path.md` `` into a link to that file — given a resolver that
+   * answers with the KB path, or null for anything that is not one.
+   *
+   * Opt-in, and only ever used where a resolver is passed: in a note, a code
+   * span is code, and quietly linkifying the ones that happen to name a file
+   * would be the app editing what the user wrote. In the agent transcript it
+   * is the opposite — "created `wiki/x.md`" is a pointer, and having to find
+   * the file in the tree by hand is the friction.
+   *
+   * Resolution must be EXACT, and the KB is a soft constraint: a path that
+   * names no file stays a plain code span rather than becoming a broken link
+   * or an offer to create something. A file the agent is about to write is
+   * simply not clickable yet, and becomes so once it exists.
+   */
+  resolvePath?: (text: string) => string | null
+}
+
+/** Marked hands `codespan` its text already escaped; resolution needs the
+ *  characters back. Only the five entities marked's own escape produces. */
+function unescapeHtml(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
 }
 
 export function renderMarkdown(
@@ -201,6 +228,14 @@ export function renderMarkdown(
     renderer: {
       code(code: string, infostring: string | undefined) {
         return highlightCode(code, infostring?.trim().split(/\s+/)[0]?.toLowerCase())
+      },
+      codespan(text: string) {
+        const path = opts.resolvePath?.(unescapeHtml(text).trim())
+        if (!path) return `<code>${text}</code>`
+        // The anchor carries the path and the code keeps its own styling, so a
+        // linked path still reads as a path. No href: like a wikilink, this is
+        // resolved by the click handler, not by the browser.
+        return `<a class="file-path" data-path="${escapeHtml(path)}"><code>${text}</code></a>`
       },
       image(href: string, title: string | null, text: string) {
         const alt = ` alt="${escapeHtml(text ?? '')}"`

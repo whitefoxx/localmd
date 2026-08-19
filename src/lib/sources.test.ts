@@ -64,3 +64,20 @@ describe('createSourceCollector', () => {
     ])
   })
 })
+
+describe('classifyAnchor — mentioned file paths', () => {
+  it('does not cite a path the agent merely named', () => {
+    // `wiki/x.md` in a reply is a shortcut to the file, not a reference the
+    // reply rests on: numbering it would put half of "I wrote A, B and C"
+    // into the Sources list.
+    expect(
+      classifyAnchor({
+        classes: ['file-path'],
+        href: null,
+        dataTarget: undefined,
+        dataResolved: undefined,
+        text: 'wiki/projects/ideas.md',
+      }),
+    ).toBeNull()
+  })
+})
