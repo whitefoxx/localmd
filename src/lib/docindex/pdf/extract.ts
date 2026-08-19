@@ -64,6 +64,7 @@ export async function extractPdf(
     const pageLines: Line[][] = []
     const pageBounds: TextBounds[] = []
 
+    let lastYield = performance.now()
     for (let p = 1; p <= doc.numPages; p++) {
       onProgress(p, doc.numPages)
       const page = await doc.getPage(p)
@@ -78,6 +79,13 @@ export async function extractPdf(
       pageLines.push(laid.lines)
       pageBounds.push(laid.bounds)
       page.cleanup()
+      // Yield between pages: extraction shares the main thread with whatever
+      // the user is doing (often the viewer painting this very document), and
+      // an unbroken thousand-page loop starves it for the whole build.
+      if (performance.now() - lastYield > 12) {
+        await new Promise((r) => setTimeout(r, 0))
+        lastYield = performance.now()
+      }
     }
 
     // Body font size = median line font height across the document.

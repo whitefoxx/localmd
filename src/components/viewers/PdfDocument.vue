@@ -1234,7 +1234,6 @@ function onReady(r: PluginRegistry): void {
     !!(citations.pending?.blockId || citations.pending?.annotation)
   if (!willReveal && pendingRestorePage && pendingRestorePage > 1) restoring.value = true
   subscribePageChanges()
-  void initIndexStatus()
   const plugin = r.getPlugin('annotation') as undefined | { provides?: () => unknown }
   const api = plugin?.provides?.() as AnnotationApi | undefined
   if (!api) {
@@ -1570,6 +1569,28 @@ function markDocReady(): void {
   if (slowTimer !== null) window.clearTimeout(slowTimer)
   if (deadlineTimer !== null) window.clearTimeout(deadlineTimer)
   slowTimer = deadlineTimer = null
+  scheduleAutoIndex()
+}
+
+/**
+ * Auto-indexing waits for the document to be open, then for an idle frame:
+ * a first-ever open of a large PDF used to start the whole-document text
+ * extraction while the viewer was still measuring its pages, and the two
+ * fought over the CPU for the length of the build — the reader stared at a
+ * blank viewport the whole time. The index is a background artifact; nothing
+ * about it is owed a slice of the first paint.
+ */
+let indexScheduled = false
+function scheduleAutoIndex(): void {
+  if (indexScheduled) return
+  indexScheduled = true
+  const idle =
+    'requestIdleCallback' in window
+      ? (cb: () => void) => window.requestIdleCallback(cb, { timeout: 8000 })
+      : (cb: () => void) => window.setTimeout(cb, 1500)
+  idle(() => {
+    if (!disposed) void initIndexStatus()
+  })
 }
 
 onMounted(async () => {
