@@ -10,6 +10,7 @@ import { withGitLock } from '@/lib/gitlock'
 import { coalesce } from '@/lib/async'
 import {
   parseGithubRemote,
+  remoteHead,
   push as ghPush,
   pull as ghPull,
   explainGithubError,
@@ -33,8 +34,51 @@ export const useGitStore = defineStore('git', () => {
   const progress = ref('')
   const error = ref('')
   const lastSync = ref('')
+  /** Remote head sha for the current branch, as of the last time we asked.
+   *  null = the remote branch does not exist yet (nothing pushed); undefined =
+   *  we have not asked, or asking failed (offline, no token, private repo). */
+  const remoteOid = ref<string | null | undefined>(undefined)
 
   const dirtyCount = computed(() => changes.value.length)
+
+  /**
+   * The local commits a push would send, newest first.
+   *
+   * Only knowable against the remote, so it is empty until `checkRemote` has
+   * answered — a push button that guesses is worse than one that stays plain.
+   * The walk stops at the remote head; with no remote branch at all, every
+   * commit we know about is unpushed.
+   */
+  const unpushed = computed(() => {
+    if (remoteOid.value === undefined) return []
+    if (remoteOid.value === null) return log.value
+    const i = log.value.findIndex((e) => e.oid === remoteOid.value)
+    // -1 means the remote head is older than our log window: we know there are
+    // unpushed commits but not how many, so claim only what we can see.
+    return i === -1 ? log.value : log.value.slice(0, i)
+  })
+
+  /**
+   * Ask the remote where its branch is. One API call, so it runs when the user
+   * opens the panel and after a commit or a sync — never from `refresh()`,
+   * which now follows every agent write and would turn that into a request per
+   * file. Failure is silent and leaves the panel exactly as it was.
+   */
+  async function checkRemote(): Promise<void> {
+    const settings = useSettingsStore()
+    if (!isRepo.value || !remote.value || !branch.value) {
+      remoteOid.value = undefined
+      return
+    }
+    try {
+      remoteOid.value = await remoteHead(
+        { ...remote.value, token: settings.state.githubToken },
+        branch.value,
+      )
+    } catch {
+      remoteOid.value = undefined
+    }
+  }
 
   /** path → change kind, for tinting file rows in the tree (VS Code style). */
   const statusByPath = computed(() => {
@@ -166,6 +210,7 @@ export const useGitStore = defineStore('git', () => {
       progress.value = ''
     }
     await refresh()
+    void checkRemote()
   }
 
   async function sync(direction: 'push' | 'pull'): Promise<void> {
@@ -206,6 +251,7 @@ export const useGitStore = defineStore('git', () => {
       progress.value = ''
     }
     await refresh()
+    void checkRemote()
   }
 
   return {
@@ -222,6 +268,8 @@ export const useGitStore = defineStore('git', () => {
     dirtyCount,
     statusByPath,
     dirStatus,
+    unpushed,
+    checkRemote,
     refresh,
     init,
     commit,

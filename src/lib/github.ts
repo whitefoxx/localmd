@@ -225,7 +225,12 @@ function bytesToB64(bytes: Uint8Array): string {
   return btoa(bin)
 }
 
-async function remoteHead(ctx: Ctx, branch: string): Promise<string | null> {
+/** The remote branch's head sha, or null when the branch (or the repo) is
+ *  empty. Exported so the git panel can say WHICH commits a push would send —
+ *  the answer is only knowable from the remote, so it costs one API call and
+ *  is asked at panel-open and after a commit, never on the routine refresh
+ *  that follows every write. */
+export async function remoteHead(ctx: Ctx, branch: string): Promise<string | null> {
   try {
     const ref = await api(ctx, 'GET', `/git/ref/${encodeURIComponent(`heads/${branch}`)}`)
     return (ref.object as { sha: string }).sha
