@@ -565,19 +565,21 @@
    a minute with nothing else on screen moving, and a static coloured word reads
    as a label rather than a state — so the marker is a live one: a dot pulsing
    like a recording light, and the word breathing with it on the same beat. */
+/* Stays INLINE. As an inline-flex it took its baseline from its first flex
+   item — an empty dot with no text baseline of its own — which lifted the
+   whole label off the line it shares with the steer hint beside it. */
 .agent-working {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
   animation: agent-working-breathe 1.6s ease-in-out infinite;
 }
 .agent-working::before {
   content: '';
+  display: inline-block;
   width: 0.45em;
   height: 0.45em;
-  flex: none;
+  margin-right: 0.4em;
   border-radius: 9999px;
   background: rgb(var(--c-accent));
+  vertical-align: middle;
   animation: agent-working-pulse 1.6s ease-in-out infinite;
 }
 @keyframes agent-working-breathe {
