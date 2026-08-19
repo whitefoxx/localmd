@@ -106,10 +106,14 @@ function formatArgs(part: ToolPart): string {
   }
 }
 
-/** Copy a tool call's args/result; flashes the clicked button's icon. */
+/** Copy a tool call's args/result; flashes the clicked button's icon.
+ *
+ *  The button is read BEFORE the await: `currentTarget` is only live for the
+ *  duration of the dispatch, and the first await ends that — reading it after
+ *  gives null, and the flash throws instead of confirming anything. */
 async function copyBlock(e: MouseEvent, text: string): Promise<void> {
-  const ok = await copyText(text)
-  flashCopy(e.currentTarget as HTMLElement, ok)
+  const btn = e.currentTarget as HTMLElement
+  flashCopy(btn, await copyText(text))
 }
 
 /* ── thinking blocks ─────────────────────────────────────────────────────── */
@@ -310,9 +314,13 @@ const messageText = computed(() =>
  *  is not the reply still being streamed. */
 const canCopy = computed(() => !!messageText.value && !(chat.running && props.last))
 
+/** Copy the whole message. `currentTarget` is captured before the await for the
+ *  reason `copyBlock` explains — and here the dead flash took the "Copied" hint
+ *  with it, because the throw landed before the emit. */
 async function copyMessage(e: MouseEvent): Promise<void> {
+  const btn = e.currentTarget as HTMLElement
   const ok = await copyText(messageText.value)
-  flashCopy(e.currentTarget as HTMLElement, ok)
+  flashCopy(btn, ok)
   if (ok) emit('copied')
 }
 </script>
