@@ -39,6 +39,7 @@ import {
   type HttpToolSpec,
 } from '@/lib/httpTools'
 import { clipWithRecall, storeToolResult } from '@/lib/toolResults'
+import { syncAfterFsChange } from '@/lib/fileOps'
 import { clipText } from '@/lib/wellFormed'
 import { diffLines, collapseContext, type DiffLine, type HunkLine } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
@@ -165,9 +166,8 @@ async function performWrite(
 ): Promise<void> {
   await fs.writeFile(path, content)
   useReviewStore().recordWrite(path, before, content)
-  const files = useFilesStore()
-  await files.refreshTree()
-  await files.reloadIfClean(path)
+  await syncAfterFsChange()
+  await useFilesStore().reloadIfClean(path)
 }
 
 const MAX_READ_CHARS = 100_000
@@ -442,7 +442,7 @@ const createDirectory = defineTool({
     if (kind === 'dir') return `${target}/ already exists.`
     if (kind === 'file') return `Error: ${target} already exists as a file.`
     await fs.mkdir(target)
-    await useFilesStore().refreshTree()
+    await syncAfterFsChange()
     return `Created directory ${target}/ (empty — git only records it once it holds a file).`
   },
 })
@@ -648,7 +648,7 @@ const saveTranscript = defineTool({
     if (!r) return 'Nothing to save — the conversation is empty.'
     const target = path ?? `${transcriptDirFor(await usesRawLayout())}/${r.name}`
     await fs.writeFile(target, r.content)
-    await useFilesStore().refreshTree()
+    await syncAfterFsChange()
     return `Session saved to ${target}`
   },
 })

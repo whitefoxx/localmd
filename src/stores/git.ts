@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import * as g from '@/lib/git'
 import { withGitLock } from '@/lib/gitlock'
+import { coalesce } from '@/lib/async'
 import {
   parseGithubRemote,
   push as ghPush,
@@ -57,6 +58,48 @@ export const useGitStore = defineStore('git', () => {
     return hasDeleted ? 'deleted' : hasNew ? 'new' : null
   }
 
+  /**
+   * Re-read branch, working-tree changes, log and remote.
+   *
+   * Coalesced, and never dropped. The old guard returned early whenever ANY
+   * operation held `busy`, which discarded exactly the refreshes that matter
+   * most — the one a commit or an agent write fires while something else is
+   * still in flight — and left the tree's U/M/D decorations describing a state
+   * that had already changed, until an unrelated window focus happened to ask
+   * again. That is the "sometimes it syncs, sometimes I have to refresh" of it.
+   *
+   * Exclusion over the repository is withGitLock's job, not a dropped read's.
+   * `busy` stays what it always was, a UI label: this claims it only when
+   * nothing else has, and releases it only if it is still ours, so a status
+   * read can neither mislabel a push nor clear its spinner early.
+   */
+  const refresh = coalesce(async () => {
+    if (!kb.name) return
+    let claimed = false
+    try {
+      isRepo.value = await g.isRepo()
+      if (!isRepo.value) return
+      if (busy.value === null) {
+        busy.value = 'status'
+        claimed = true
+      }
+      await withGitLock(async () => {
+        branch.value = await g.currentBranch()
+        changes.value = await g.changedFiles()
+        log.value = await g.recentLog()
+      })
+      const remotes = await g.listRemotes()
+      const origin = remotes.find((r) => r.name === 'origin') ?? remotes[0]
+      remote.value = origin ? parseGithubRemote(origin.url) : null
+      // NB: don't clear `error` here — sync() runs refresh() as its last step,
+      // and a successful refresh must not wipe the sync failure message.
+    } catch (err) {
+      error.value = (err as Error).message
+    } finally {
+      if (claimed && busy.value === 'status') busy.value = null
+    }
+  })
+
   watch(
     () => kb.name,
     async (name) => {
@@ -79,30 +122,6 @@ export const useGitStore = defineStore('git', () => {
     progress.value = 'Waiting for another git operation to finish…'
   }
 
-  /** Re-read branch/status/log. Cheap after the first run (index cache).
-   *  Locked: statusMatrix writes the index cache back. */
-  async function refresh(): Promise<void> {
-    if (!kb.name || busy.value) return
-    try {
-      isRepo.value = await g.isRepo()
-      if (!isRepo.value) return
-      busy.value = 'status'
-      await withGitLock(async () => {
-        branch.value = await g.currentBranch()
-        changes.value = await g.changedFiles()
-        log.value = await g.recentLog()
-      })
-      const remotes = await g.listRemotes()
-      const origin = remotes.find((r) => r.name === 'origin') ?? remotes[0]
-      remote.value = origin ? parseGithubRemote(origin.url) : null
-      // NB: don't clear `error` here — sync() runs refresh() as its last step,
-      // and a successful refresh must not wipe the sync failure message.
-    } catch (err) {
-      error.value = (err as Error).message
-    } finally {
-      busy.value = null
-    }
-  }
 
   /** Initialize a git repo in the opened KB, then reload state. */
   async function init(): Promise<void> {

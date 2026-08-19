@@ -41,3 +41,52 @@ export async function mapLimit<T, R>(
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
   return results
 }
+
+/**
+ * Wrap an async refresh so it is never dropped and never piles up.
+ *
+ * The naive guard — "already running? return" — silently loses the newest
+ * request, and the newest request is the one that knows about the change that
+ * just happened. A file written while a status read is in flight leaves the UI
+ * describing the state from before it, until something unrelated (a window
+ * focus, another operation) happens to ask again. That is the shape of every
+ * "sometimes it updates, sometimes I have to refresh" report.
+ *
+ * Queueing every call is the other failure: five writes in a turn become five
+ * full re-scans, run back to back.
+ *
+ * Coalescing keeps exactly one pending re-run. Anything arriving during a pass
+ * collapses into a single follow-up that starts when the current one ends, so
+ * the last caller's change is always reflected and a burst costs two passes
+ * rather than one per event. Every caller's promise resolves only once the
+ * work that covers it has finished, so `await refresh()` still means "the view
+ * now includes what I just did".
+ *
+ * A pass that throws does not wedge the next one: refreshing is best-effort,
+ * and a permanently stuck refresher is worse than a missed frame.
+ */
+export function coalesce(run: () => Promise<void>): () => Promise<void> {
+  let active: Promise<void> | null = null
+  let queued = false
+  const cycle = async (): Promise<void> => {
+    do {
+      queued = false
+      try {
+        await run()
+      } catch {
+        /* best-effort: the next pass gets its own chance */
+      }
+      // No await between the loop test and the reset, so a caller cannot slip
+      // in and set `queued` on a cycle that is already finishing.
+    } while (queued)
+    active = null
+  }
+  return () => {
+    if (active) {
+      queued = true
+      return active
+    }
+    active = cycle()
+    return active
+  }
+}

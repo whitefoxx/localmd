@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapLimit, untilAborted } from './async'
+import { mapLimit, untilAborted, coalesce } from './async'
 
 describe('mapLimit', () => {
   it('preserves order and caps concurrency', async () => {
@@ -62,5 +62,80 @@ describe('untilAborted', () => {
 
   it('is a no-op without a signal', async () => {
     expect(await untilAborted(Promise.resolve(42))).toBe(42)
+  })
+})
+
+describe('coalesce', () => {
+  const deferred = () => {
+    let resolve!: () => void
+    const promise = new Promise<void>((r) => (resolve = r))
+    return { promise, resolve }
+  }
+
+  it('runs once when nothing overlaps', async () => {
+    let runs = 0
+    const refresh = coalesce(async () => {
+      runs++
+    })
+    await refresh()
+    await refresh()
+    expect(runs).toBe(2)
+  })
+
+  it('collapses a burst into one follow-up pass', async () => {
+    let runs = 0
+    let gate = deferred()
+    const refresh = coalesce(async () => {
+      runs++
+      await gate.promise
+    })
+    const first = refresh()
+    expect(runs).toBe(1)
+    // Five more arrive while the first pass is still going.
+    const rest = [refresh(), refresh(), refresh(), refresh(), refresh()]
+    expect(runs).toBe(1)
+    const second = deferred()
+    const open = gate
+    gate = second
+    open.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(runs).toBe(2) // one follow-up, not five
+    second.resolve()
+    await Promise.all([first, ...rest])
+    expect(runs).toBe(2)
+  })
+
+  it('resolves a mid-pass caller only after a pass that covers it', async () => {
+    const seen: number[] = []
+    let version = 0
+    let gate = deferred()
+    const refresh = coalesce(async () => {
+      const at = version
+      await gate.promise
+      seen.push(at)
+    })
+    const first = refresh()
+    version = 1 // the change a late caller wants reflected
+    const late = refresh()
+    const next = deferred()
+    const open = gate
+    gate = next
+    open.resolve()
+    await Promise.resolve()
+    next.resolve()
+    await Promise.all([first, late])
+    expect(seen).toEqual([0, 1]) // the follow-up saw the newer state
+  })
+
+  it('does not wedge after a failing pass', async () => {
+    let runs = 0
+    const refresh = coalesce(async () => {
+      runs++
+      if (runs === 1) throw new Error('scan failed')
+    })
+    await expect(refresh()).resolves.toBeUndefined()
+    await refresh()
+    expect(runs).toBe(2)
   })
 })

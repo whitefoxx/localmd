@@ -13,6 +13,25 @@ export function refreshGitStatus(): void {
   if (git.isRepo) void git.refresh()
 }
 
+/**
+ * What the UI owes any filesystem change, wherever it came from: the tree
+ * re-scanned and, in a repo, git status re-read.
+ *
+ * The interactive helpers below have always done both. The agent's writes did
+ * only the first — so a file it created appeared in the tree straight away
+ * while its "new file" tint arrived whenever something else happened to ask
+ * git, which is the half of "sometimes it syncs, sometimes I have to refresh"
+ * that is not about dropped refreshes. One function so a new write path cannot
+ * remember one and forget the other.
+ *
+ * Both halves are coalesced (lib/async), so calling this after every write in
+ * a busy turn costs one visible pass, not one per file.
+ */
+export async function syncAfterFsChange(): Promise<void> {
+  await useFilesStore().refreshTree()
+  refreshGitStatus()
+}
+
 /** Prompt for a name and create a file in the tree's target dir (selected
  *  folder / selected file's parent / KB root). Extensionless names get .md. */
 export async function newFileInteractive(): Promise<void> {

@@ -6,6 +6,7 @@ import { fileStem, dirName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
 import { isAnnotationsPath } from '@/lib/annotations'
 import { readTabs, writeTabs } from '@/lib/tabsMemory'
+import { coalesce } from '@/lib/async'
 import type { TreeNode } from '@/lib/fs'
 
 function isTextual(path: string): boolean {
@@ -148,14 +149,22 @@ export const useFilesStore = defineStore('files', () => {
     return mdFiles.value.includes(withExt) ? withExt : null
   }
 
-  async function refreshTree(): Promise<void> {
+  /**
+   * Re-scan the KB into `tree`.
+   *
+   * Coalesced: a scan walks the WHOLE folder, and a turn that writes five files
+   * used to pay for five of them back to back — the wait the user sees before
+   * the tree catches up. Overlapping calls now share one pass plus a single
+   * follow-up, and awaiting still means "the tree includes what I just wrote".
+   */
+  const refreshTree = coalesce(async () => {
     if (!fs.hasRoot()) return
     tree.value = await fs.readTree()
     if (!expansionSeeded) {
       for (const n of tree.value) if (n.kind === 'dir') expandedDirs.value.add(n.path)
       expansionSeeded = true
     }
-  }
+  })
 
   function currentKbName(): string | null {
     return fs.hasRoot() ? fs.getRoot().name : null

@@ -44,6 +44,7 @@ import { trimHistory } from '@/lib/history'
 import { estimateTokens } from '@/lib/tokenMeter'
 import { isContextOverflow } from '@/lib/providerError'
 import { dropLoneSurrogatesDeep } from '@/lib/wellFormed'
+import { syncAfterFsChange } from '@/lib/fileOps'
 import { STOPPED_RESULT } from '@/lib/present'
 import { needsLicence, lockedToolResult } from '@/lib/licence'
 import { useLicenceStore } from '@/stores/licence'
@@ -584,9 +585,9 @@ function buildGenerateImageTool(
       let out = ''
       try {
         const { path } = await generateKbImage(profile, prompt, { size, signal: opts.signal })
-        // Reflect the new file in the tree, then show the image inline in chat.
-        const { useFilesStore } = await import('@/stores/files')
-        await useFilesStore().refreshTree()
+        // Reflect the new file in the tree and its git status, then show the
+        // image inline in chat.
+        await syncAfterFsChange()
         opts.onEvent({ type: 'image', path })
         ok = true
         out = `Generated image and saved it to ${path}`
