@@ -17,6 +17,7 @@ import TtsBar from '@/components/TtsBar.vue'
 import PricingDialog from '@/components/PricingDialog.vue'
 import UpdateBanner from '@/components/UpdateBanner.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
+import { keepsNativeMenu } from '@/lib/nativeMenu'
 
 const kb = useKbStore()
 const files = useFilesStore()
@@ -106,22 +107,12 @@ function closeTopLayer(): void {
 }
 
 /**
- * The browser's own right-click menu belongs to the document being read, not to
- * the app around it.
- *
- * Over the file pane it is the reader's menu — copy the passage, look a word
- * up, save the image — and that is exactly where it stays. Everywhere else it
- * is a list of things that do not apply (Back, Reload, View page source) drawn
- * over an interface that has its own controls, and it made the app read like a
- * web page.
- *
- * Editable fields keep it too, deliberately: paste, undo and the spelling
- * suggestions are only reachable there through this menu, and taking them away
- * to look more like an app would cost more than it buys.
+ * The browser's own right-click menu belongs to what is being read, not to the
+ * app around it. `keepsNativeMenu` holds the rule and the reasoning; this is
+ * only where it meets the event.
  */
 function onContextMenu(e: MouseEvent): void {
-  const el = e.target as Element | null
-  if (el?.closest?.('[data-file-selection], input, textarea, [contenteditable="true"]')) return
+  if (keepsNativeMenu(e.target as Element | null, window.getSelection())) return
   e.preventDefault()
 }
 
