@@ -17,6 +17,17 @@ describe('mentionQueryAt', () => {
   it('uses the caret position, not the string end', () => {
     expect(mentionQueryAt('@abc tail', 4)).toEqual({ start: 0, query: 'abc' })
   })
+  it('a space straight after @ means the user just wanted the character', () => {
+    expect(mentionQueryAt('@ ', 2)).toBeNull()
+    expect(mentionQueryAt('email me @ home', 15)).toBeNull()
+    expect(mentionQueryAt('@\ttab', 5)).toBeNull()
+  })
+  it('still opens on a bare @, which is how you browse', () => {
+    expect(mentionQueryAt('@', 1)).toEqual({ start: 0, query: '' })
+  })
+  it('keeps spaces that come later — KB paths have them', () => {
+    expect(mentionQueryAt('@my notes/a.md', 14)).toEqual({ start: 0, query: 'my notes/a.md' })
+  })
 })
 
 describe('filterFiles', () => {

@@ -12,9 +12,20 @@ export interface MentionQuery {
   query: string
 }
 
-/** The active @-token containing the caret, or null. An '@' opens a mention
- *  when it sits at the start of the text or after whitespace; the token ends
- *  at the caret and must not contain a newline. */
+/**
+ * The active @-token containing the caret, or null. An '@' opens a mention when
+ * it sits at the start of the text or after whitespace; the token ends at the
+ * caret and must not contain a newline.
+ *
+ * A space DIRECTLY after the '@' closes it again, and that asymmetry is the
+ * whole point. Sometimes '@' is just the character someone wanted to type, and
+ * a menu that will not go away turns an ordinary keystroke into a fight. But
+ * spaces later in the token still belong to it, because a mention is matched
+ * against real KB paths and plenty of those contain spaces ("@my notes/x.md")
+ * — closing on the first space anywhere would make those unmentionable.
+ *
+ * So: `@ ` is a literal @, `@my notes/…` is still a mention.
+ */
 export function mentionQueryAt(text: string, caret: number): MentionQuery | null {
   const upto = text.slice(0, caret)
   const at = upto.lastIndexOf('@')
@@ -22,6 +33,7 @@ export function mentionQueryAt(text: string, caret: number): MentionQuery | null
   if (at > 0 && !/\s/.test(upto[at - 1])) return null
   const query = upto.slice(at + 1)
   if (query.includes('\n')) return null
+  if (/^\s/.test(query)) return null
   return { start: at, query }
 }
 
