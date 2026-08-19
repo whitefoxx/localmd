@@ -44,6 +44,7 @@ import { useUiStore } from '@/stores/ui'
 import { useComposerStore } from '@/stores/composer'
 import { baseName } from '@/lib/wiki'
 import { t } from '@/i18n'
+import { registerPdfKeyScope, takeoverPdfShortcuts, type ShortcutCommandsApi } from '@/lib/pdfKeys'
 
 const props = defineProps<{ path: string }>()
 
@@ -862,6 +863,33 @@ interface CommandsApi {
     action: (ctx: { registry: PluginRegistry; documentId: string }) => void
   }) => void
   execute: (commandId: string, documentId?: string, source?: string) => void
+  /* The shortcut surface lib/pdfKeys takes over (optional: absent on an older
+   * EmbedPDF, in which case the takeover simply does not run). */
+  getAllShortcuts?: () => Map<string, string>
+  getCommandByShortcut?: (shortcut: string) => { id: string } | null | undefined
+  unregisterCommand?: (commandId: string) => void
+}
+
+/** Take EmbedPDF's keyboard shortcuts away from its document-wide listener and
+ *  re-dispatch them under lib/pdfKeys' ownership rules. Without this, one
+ *  mounted PDF tab — visible or not — ate ⌘C (and ⌘F, ⌘P, ArrowLeft…) for the
+ *  whole app: the plugin preventDefaults any combo in its table regardless of
+ *  where the user's selection lives. The full account is in lib/pdfKeys. */
+let disposeKeyScope: (() => void) | null = null
+function takeoverKeyboardShortcuts(r: PluginRegistry): void {
+  const commands = (
+    r.getPlugin('commands') as undefined | { provides?: () => CommandsApi }
+  )?.provides?.()
+  if (!commands?.getAllShortcuts || !commands.getCommandByShortcut || !commands.unregisterCommand)
+    return
+  const table = takeoverPdfShortcuts(commands as ShortcutCommandsApi)
+  disposeKeyScope = registerPdfKeyScope({
+    host: () => host.value,
+    shortcuts: table,
+    // documentId undefined + source 'keyboard': exactly what the library's own
+    // handler passed, so a command cannot tell the difference.
+    execute: (id) => commands.execute(id, undefined, 'keyboard'),
+  })
 }
 
 /** Register our custom icons + commands and reshape the viewer UI: a read-aloud
@@ -1193,6 +1221,7 @@ function onReady(r: PluginRegistry): void {
   viewerRegistry = r
   if (host.value) watchPaneWidth(host.value)
   applyZen() // the shadow root only exists once the viewer has rendered
+  takeoverKeyboardShortcuts(r)
   customizeViewerUi(r)
   watchAnnotationToolbar(r)
   watchLinkSelection(r)
@@ -1553,6 +1582,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   disposed = true
+  disposeKeyScope?.()
+  disposeKeyScope = null
   if (slowTimer !== null) window.clearTimeout(slowTimer)
   if (deadlineTimer !== null) window.clearTimeout(deadlineTimer)
   if (msgTimer !== null) window.clearTimeout(msgTimer)
