@@ -35,6 +35,7 @@ import SheetViewer from '@/components/viewers/SheetViewer.vue'
 import SlidesViewer from '@/components/viewers/SlidesViewer.vue'
 import { isAnnotationsPath } from '@/lib/annotations'
 import { captureFiles } from '@/lib/capture'
+import { syncAfterFsChange } from '@/lib/fileOps'
 import { scaffoldKb } from '@/lib/scaffold'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { fileKind, isProseText, isTabular } from '@/lib/filetypes'
@@ -153,8 +154,7 @@ async function onDrop(e: DragEvent): Promise<void> {
   const dropped = [...(e.dataTransfer?.files ?? [])]
   if (!dropped.length) return
   await captureFiles(dropped)
-  await files.refreshTree()
-  if (git.isRepo) void git.refresh() // new files show as U immediately
+  await syncAfterFsChange() // tree + git status; new files show as U immediately
 }
 
 /** A name only guesses at a file's kind; the bytes decide (see lib/filetypes).

@@ -218,6 +218,18 @@ function removeAttachment(i: number): void {
   if (a) revokeThumb(a.path)
 }
 
+/** Open an attachment where every other file opens — the middle pane — rather
+ *  than in a lightbox of its own. A pasted screenshot is a file in the KB, and
+ *  the file view already knows how to show a picture, a PDF, a spreadsheet or a
+ *  page of text; a viewer built just for the composer would be a second, worse
+ *  answer to a question already settled. `.tmp` is hidden from the tree, so this
+ *  is the only way in — which is exactly why the thumbnail and the chip both
+ *  take the click, and the remove button stops it. */
+function openAttachment(path: string): void {
+  void files.openFile(path)
+  revealEditor()
+}
+
 function baseName(p: string): string {
   return p.slice(p.lastIndexOf('/') + 1)
 }
@@ -1275,7 +1287,7 @@ watch(
               :key="i"
               class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2 hover:text-fg-0"
               :title="a.path"
-              @click="files.openFile(a.path)"
+              @click="openAttachment(a.path)"
             >
               <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
               <span class="truncate max-w-[160px]">{{ baseName(a.path) }}</span>
@@ -1855,14 +1867,15 @@ watch(
             <!-- image → thumbnail preview with a hover remove button -->
             <div
               v-if="a.image && thumbFor(a.path)"
-              class="group relative w-14 h-14 rounded overflow-hidden border border-border bg-bg-2"
+              class="group relative w-14 h-14 rounded overflow-hidden border border-border bg-bg-2 cursor-pointer"
               :title="a.path"
+              @click="openAttachment(a.path)"
             >
               <img :src="thumbFor(a.path)" class="w-full h-full object-cover" alt="" />
               <button
                 class="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-bg-0/80 text-fg-2 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 :title="$t('common.remove')"
-                @click="removeAttachment(i)"
+                @click.stop="removeAttachment(i)"
               >
                 <span class="codicon codicon-close text-[10px]" />
               </button>
@@ -1870,12 +1883,13 @@ watch(
             <!-- non-image (or thumbnail not ready) → text chip -->
             <span
               v-else
-              class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
+              class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2 cursor-pointer hover:text-fg-0"
               :title="a.path"
+              @click="openAttachment(a.path)"
             >
               <span class="codicon codicon-sm" :class="a.image ? 'codicon-device-camera' : 'codicon-file'" />
               <span class="truncate max-w-[140px]">{{ baseName(a.path) }}</span>
-              <button class="text-fg-3 hover:text-fg-0" @click="removeAttachment(i)">
+              <button class="text-fg-3 hover:text-fg-0" @click.stop="removeAttachment(i)">
                 <span class="codicon codicon-sm codicon-close" />
               </button>
             </span>

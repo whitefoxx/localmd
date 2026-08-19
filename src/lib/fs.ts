@@ -18,8 +18,17 @@ export interface TreeNode {
   children?: TreeNode[]
 }
 
-/** Entries hidden from the tree and search. */
-const IGNORED = new Set(['.git', '.trace', '.obsidian', 'node_modules', '.DS_Store'])
+/** Entries hidden from the tree and search.
+ *
+ *  `.tmp` is the composer's scratch area (lib/capture): a pasted screenshot is
+ *  something you hand to the agent, not a page you filed, and listing it would
+ *  put every throwaway into the tree, into search, and into wikilink
+ *  resolution. Hiding it is also what keeps its tabs from being restored on
+ *  reload — `restoreTabs` keeps only paths the tree still knows — which is the
+ *  right answer for a directory whose contents may be cleaned up. None of this
+ *  puts it out of reach: `read_file`, `openFile` and the composer's own chips
+ *  address it by path, and path resolution never filtered dot-directories. */
+const IGNORED = new Set(['.git', '.trace', '.tmp', '.obsidian', 'node_modules', '.DS_Store'])
 
 /** True for entries the UI tree hides. PDF/EPUB annotation sidecars
  *  (`*.annotations.json`) are NOT hidden: they open as a rendered annotations

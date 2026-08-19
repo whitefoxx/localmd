@@ -22,9 +22,17 @@ that is already organized, the app leaves it alone** and the assistant files new
 things according to *your* structure — matching your folder names and your
 naming style.
 
-If a folder has no `raw/`, anything saved automatically (a pasted screenshot, an
-uploaded file) lands in `inbox/` instead. Think of `inbox/` as a doormat, not a
-home: when you get to it, ask the assistant to file it properly.
+Drop a file onto the workspace and it is filed under `raw/` by kind. If the
+folder has no `raw/`, it lands in `inbox/` instead — a doormat, not a home: when
+you get to it, ask the assistant to file it properly.
+
+Attachments are a different gesture. A screenshot you paste into the chat box,
+or a file you attach there, is something you are *handing to* the assistant
+rather than something you are filing — so it goes to a scratch folder called
+`.tmp`. That folder stays out of the file tree, out of search and out of git,
+and its contents may be cleared away. Click an attachment to open it in the
+file view like anything else; if one turns out to be worth keeping, ask the
+assistant to move it somewhere real.
 
 ## Telling the assistant how your folder works
 
