@@ -39,6 +39,7 @@ import {
   type HttpToolSpec,
 } from '@/lib/httpTools'
 import { clipWithRecall, storeToolResult } from '@/lib/toolResults'
+import { clipText } from '@/lib/wellFormed'
 import { diffLines, collapseContext, type DiffLine, type HunkLine } from '@/lib/diff'
 import { loadSkill, listSkills } from '@/lib/skills'
 import { listAppDocsForAgent, appDocForAgent } from '@/lib/appDocs'
@@ -1609,7 +1610,7 @@ function toExternalSpec(
 ): ExternalToolSpec {
   return {
     name: t.qualifiedName,
-    description: `[External MCP: ${t.serverName}] ${t.def.description}`.slice(0, 1024),
+    description: clipText(`[External MCP: ${t.serverName}] ${t.def.description}`, 1024, ''),
     jsonSchema: t.def.inputSchema,
     describeCall: (a) => `${t.serverName}: ${t.def.name}(${JSON.stringify(a).slice(0, 60)})`,
     run: async (args, signal) => {

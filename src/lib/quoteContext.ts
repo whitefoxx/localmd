@@ -14,6 +14,7 @@
  */
 import type { SelectionRef } from '@/stores/composer'
 import type { UiMessage } from '@/stores/chat'
+import { clipText } from '@/lib/wellFormed'
 
 /** The conversation a quote is being sent into. */
 export interface QuoteScope {
@@ -31,7 +32,10 @@ function opening(m: UiMessage | undefined): string {
   for (const p of m?.parts ?? []) {
     if (p.type !== 'text') continue
     const t = p.text.replace(/\s+/g, ' ').trim()
-    if (t) return t.length > 60 ? `${t.slice(0, 60)}…` : t
+    // clipText, not slice: a reply that opens with a table header full of
+    // emoji lands the 60-unit cut inside a surrogate pair, and the half that
+    // survives travels into the user message and 400s the whole session.
+    if (t) return clipText(t, 60)
   }
   return ''
 }

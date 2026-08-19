@@ -27,6 +27,7 @@
  * and `recallPaths` carries the resulting locations back into the stubs.
  */
 import type { ModelMessage } from 'ai'
+import { clipText } from '@/lib/wellFormed'
 
 export interface TrimOptions {
   /** Recent real user turns whose images and reasoning stay untouched. */
@@ -240,7 +241,7 @@ export const COMPACT_KEEP_TURNS = 2
 const TRANSCRIPT_CAP = 60_000
 
 function clip(s: string, n = 200): string {
-  return s.length > n ? `${s.slice(0, n)}…` : s
+  return clipText(s, n)
 }
 
 function partText(part: AnyPart): string {
@@ -279,7 +280,7 @@ export function renderTranscript(history: ModelMessage[]): string {
     return `${roleLabel(m.role)}: ${body}`
   })
   const text = lines.join('\n')
-  return text.length > TRANSCRIPT_CAP ? `${text.slice(0, TRANSCRIPT_CAP)}\n…[remainder truncated]` : text
+  return clipText(text, TRANSCRIPT_CAP, '\n…[remainder truncated]')
 }
 
 export interface Split {

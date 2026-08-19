@@ -6,6 +6,7 @@ import { useComposerStore } from '@/stores/composer'
 import type { QuoteOrigin } from '@/stores/composer'
 import { pdfPage } from '@/lib/viewMemory'
 import { fileKind } from '@/lib/filetypes'
+import { clipText } from '@/lib/wellFormed'
 
 /**
  * While the agent panel is open, mirror the text the user selects — in the open
@@ -51,7 +52,7 @@ export function useFileSelectionCapture(): void {
       for (let p = n.previousElementSibling; p && budget-- > 0; p = p.previousElementSibling) {
         const inner = p.matches('h1,h2,h3,h4,h5,h6') ? [p] : p.querySelectorAll('h1,h2,h3,h4,h5,h6')
         const text = inner[inner.length - 1]?.textContent?.replace(/\s+/g, ' ').trim()
-        if (text) return text.slice(0, 80)
+        if (text) return clipText(text, 80, '')
       }
     }
     return undefined

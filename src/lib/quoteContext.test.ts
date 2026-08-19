@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { describeQuote } from './quoteContext'
+import { hasLoneSurrogate } from './wellFormed'
 import type { QuoteScope } from './quoteContext'
 import type { UiMessage } from '@/stores/chat'
 import type { SelectionRef } from '@/stores/composer'
@@ -91,5 +92,37 @@ describe('describeQuote — reply passages', () => {
     expect(describeQuote(ref({ from: { sessionId: 's1', messageId: 3 } }), scope())).toBe(
       'A passage the user quoted from an earlier reply of yours in this conversation',
     )
+  })
+})
+
+describe('describeQuote — the opening anchor is safe to serialize', () => {
+  /* The reply that broke a session: a markdown table whose header ends
+   * "| ⭐ 分 | 💬 评论 |". The 60-unit anchor cut lands inside 💬 (U+1F4AC),
+   * and the surviving half rode into the user message as `\ud83d`, which
+   * DeepSeek's JSON parser refused for every later turn of that session:
+   * "messages[10].content: unexpected end of hex escape". */
+  const REPLY =
+    '今天（2026-08-19）HN 前 30 热点，按热度排序如下：\n\n| # | 标题 | 看点/领域 | ⭐ 分 | 💬 评论 |\n|---|---|---|---|---|'
+  const messages: UiMessage[] = [
+    { id: 1, role: 'user', parts: [{ type: 'text', text: '总结今天 hn 热点' }] },
+    { id: 2, role: 'assistant', parts: [{ type: 'text', text: REPLY }] },
+  ]
+
+  it('never leaves half a character in the anchor', () => {
+    const out = describeQuote(ref({ from: { sessionId: 's1', messageId: 2 } }), {
+      sessionId: 's1',
+      messages,
+    })
+    expect(out).toContain('that reply began:')
+    expect(hasLoneSurrogate(out)).toBe(false)
+  })
+
+  it('drops the emoji it cannot fit rather than half of it', () => {
+    const out = describeQuote(ref({ from: { sessionId: 's1', messageId: 2 } }), {
+      sessionId: 's1',
+      messages,
+    })
+    expect(out).toContain('⭐ 分 | …”)')
+    expect(out).not.toContain('💬')
   })
 })

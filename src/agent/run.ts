@@ -43,6 +43,7 @@ import { withMovingBreakpoint } from '@/lib/promptCache'
 import { trimHistory } from '@/lib/history'
 import { estimateTokens } from '@/lib/tokenMeter'
 import { isContextOverflow } from '@/lib/providerError'
+import { dropLoneSurrogatesDeep } from '@/lib/wellFormed'
 import { STOPPED_RESULT } from '@/lib/present'
 import { needsLicence, lockedToolResult } from '@/lib/licence'
 import { useLicenceStore } from '@/stores/licence'
@@ -362,7 +363,17 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
     return { steps: done, error: streamError, aborted, stepCount: steps }
   }
 
-  let messages = opts.messages
+  // Last stop before the wire. A lone surrogate — half an emoji left behind by
+  // some fixed-length cut — serializes as `\ud83d` and makes a strict JSON
+  // parser reject the entire request body ("unexpected end of hex escape"),
+  // which is a 400 with no hint that a character is to blame. Prevention lives
+  // at each cut (lib/wellFormed's clipText), but text also arrives from places
+  // we do not own — MCP servers, extracted documents, histories persisted
+  // before any of this existed — so the wire keeps a backstop, and repairing
+  // here means the returned history is clean for good rather than replaying
+  // the same poison every turn. A clean history comes through by identity: the
+  // prompt cache is a prefix of BYTES, and this must not disturb one.
+  let messages = dropLoneSurrogatesDeep(opts.messages)
   let recoveries = 0
   let segment = await runSegment(messages)
 

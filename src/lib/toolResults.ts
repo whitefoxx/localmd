@@ -26,6 +26,7 @@
 import { removeDir, writeFile } from '@/lib/fs'
 import { ensureIgnored } from '@/lib/gitignore'
 import { fnv1a, slugify } from '@/lib/docindex/util'
+import { clipText } from '@/lib/wellFormed'
 
 /** Under `.trace/`, so it is invisible to the tree, to search, and to git. */
 export const TOOL_RESULTS_DIR = '.trace/tool-results'
@@ -95,22 +96,28 @@ const DELEGATE_REMAINDER_CHARS = 20_000
  */
 export function clipWithRecall(text: string, maxChars: number, path: string | null): string {
   if (text.length <= maxChars) return text
-  const head = text.slice(0, maxChars)
+  // A tool result is arbitrary text — emoji included — so the cut may have to
+  // fall one unit short of the budget to keep a surrogate pair whole (see
+  // lib/wellFormed). `kept` rather than `maxChars` is therefore what the recall
+  // offset must name: the two differ by one exactly when it matters, and an
+  // offset that disagrees with the head re-reads or skips half a character.
+  const head = clipText(text, maxChars, '')
+  const kept = head.length
   if (!path) return `${head}\n\n[truncated: ${text.length} chars total]`
-  const rest = text.length - maxChars
+  const rest = text.length - kept
   if (rest > DELEGATE_REMAINDER_CHARS) {
     return (
-      `${head}\n\n[truncated: ${maxChars} of ${text.length} chars. The full result is saved in the ` +
+      `${head}\n\n[truncated: ${kept} of ${text.length} chars. The full result is saved in the ` +
       `knowledge base at ${path} — do not call this tool again. Reading the remaining ${rest} chars ` +
       `directly would crowd your context: prefer run_subagent with a task like "Read ${path} with ` +
       `read_file, following the offset continuations to the end, and report <what you need from it>" ` +
-      `and work from the digest. Only read_file path="${path}" offset=${maxChars} yourself when you ` +
+      `and work from the digest. Only read_file path="${path}" offset=${kept} yourself when you ` +
       `truly need the raw text.]`
     )
   }
   return (
-    `${head}\n\n[truncated: ${maxChars} of ${text.length} chars. The full result is saved in the ` +
-    `knowledge base at ${path} — read the rest with read_file path="${path}" offset=${maxChars}, ` +
+    `${head}\n\n[truncated: ${kept} of ${text.length} chars. The full result is saved in the ` +
+    `knowledge base at ${path} — read the rest with read_file path="${path}" offset=${kept}, ` +
     `rather than calling this tool again.]`
   )
 }
