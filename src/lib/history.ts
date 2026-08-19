@@ -142,6 +142,65 @@ function trimToolResultOutput(output: unknown, maxChars: number, path?: string):
   return output
 }
 
+/* ── one user turn at a time ─────────────────────────────────────────────── */
+
+/** A user message's content as parts, so two of them can be concatenated
+ *  whatever shape each arrived in (plain text, or text plus inline images).
+ *  Empty text drops out rather than becoming an empty part — this path is only
+ *  reached when the other side carries an image, so the result is never bare. */
+function asUserParts(content: unknown): AnyPart[] {
+  const parts =
+    typeof content === 'string' ? [{ type: 'text', text: content }] : ((content ?? []) as AnyPart[])
+  return parts.filter((p) => p.type !== 'text' || String(p.text ?? '') !== '')
+}
+
+function mergeUserPair(a: ModelMessage, b: ModelMessage): ModelMessage {
+  if (typeof a.content === 'string' && typeof b.content === 'string') {
+    return { ...a, content: `${a.content}\n\n${b.content}` } as ModelMessage
+  }
+  return {
+    ...a,
+    content: [...asUserParts(a.content), ...asUserParts(b.content)],
+  } as unknown as ModelMessage
+}
+
+/**
+ * Collapse runs of adjacent user messages into one.
+ *
+ * A turn commits its user message to the wire history BEFORE the request goes
+ * out, so that an interrupted turn — a reload mid-stream, a provider error —
+ * still replays what was asked. That part is right: losing the question is
+ * worse than any alternative. What is not right is what the NEXT send did with
+ * it, appending a second user message behind the first with no reply between
+ * them, then a third. Providers that require alternating roles (Anthropic,
+ * DeepSeek's reasoners) refuse such a history outright, so a single failed
+ * turn turned into a session that could never send again, and every retry made
+ * it worse — the failure amplifier behind a dead session, not its cause.
+ *
+ * Merging keeps every word the user said, in order, and reads as what actually
+ * happened: several things said before the assistant got one in. Applied where
+ * a history is ASSEMBLED (the send path, and a branch rebuilt from the
+ * messages' own slices) rather than stored on the messages, so each message
+ * keeps an honest record of its own contribution and re-merges identically.
+ *
+ * Returns the same array when nothing is adjacent — the overwhelming case, and
+ * the prompt cache is a prefix of bytes.
+ */
+export function mergeUserRuns(history: ModelMessage[]): ModelMessage[] {
+  let changed = false
+  const out: ModelMessage[] = []
+  for (const m of history) {
+    const prev = out[out.length - 1]
+    if (m.role === 'user' && prev?.role === 'user') {
+      out[out.length - 1] = mergeUserPair(prev, m)
+      changed = true
+      continue
+    }
+    out.push(m)
+  }
+  return changed ? out : history
+}
+
 export function trimHistory(history: ModelMessage[], opts: TrimOptions = {}): ModelMessage[] {
   const { keepTurns, toolKeepTurns, maxChars, recallPaths } = { ...DEFAULTS, ...opts }
   // Two windows: tool traffic survives toolKeepTurns (tight — the last turn),

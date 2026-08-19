@@ -16,6 +16,7 @@ import { extractMentions } from '@/lib/mentions'
 import {
   trimHistory,
   trimCandidates,
+  mergeUserRuns,
   splitForCompaction,
   renderTranscript,
   compactedPrefix,
@@ -358,7 +359,12 @@ export const useChatStore = defineStore('chat', () => {
    *  thresholds, exactly as it would for a conversation of that length. */
   function branchTo(session: OpenSession, leafId: number | null): void {
     session.leafId = leafId
-    session.history = rebuildWire(branchPath(session.uiMessages, leafId))
+    // Each message contributes its own slice, so a branch whose tail was an
+    // unanswered turn re-assembles the same adjacent user messages the send
+    // path merges — normalize here too rather than storing the merge.
+    session.history = mergeUserRuns(
+      rebuildWire(branchPath(session.uiMessages, leafId)) as ModelMessage[],
+    )
     // A different conversation, rebuilt at full fidelity: nothing the provider
     // measured about the old one describes it.
     session.tokenAnchor = undefined
@@ -1064,10 +1070,10 @@ export const useChatStore = defineStore('chat', () => {
 
       if (providerKind === 'mock') {
         // E2E test provider: deterministic scripted turns, no network.
-        const hist: ModelMessage[] = [
+        const hist: ModelMessage[] = mergeUserRuns([
           ...(session.history as ModelMessage[]),
           { role: 'user', content: content as string },
-        ]
+        ])
         session.history = hist
         const result = await runMockTurn({
           system: `${system.stable}\n\n${system.dynamic}`,
@@ -1138,7 +1144,11 @@ export const useChatStore = defineStore('chat', () => {
         }
         // Commit the user turn to the wire history BEFORE running, so an
         // interrupted turn (reload mid-stream) still replays it next time.
-        hist = [...hist, { role: 'user', content } as ModelMessage]
+        // mergeUserRuns is what keeps that safe: when the previous turn died
+        // before answering, its user message is still the tail here, and two
+        // user messages in a row are a history several providers refuse
+        // outright — one failed turn would otherwise end the session for good.
+        hist = mergeUserRuns([...hist, { role: 'user', content } as ModelMessage])
         session.history = hist
         void persist(session)
 

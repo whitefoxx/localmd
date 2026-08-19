@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   trimHistory,
   trimCandidates,
+  mergeUserRuns,
   serializeForSizing,
   splitForCompaction,
   renderTranscript,
@@ -266,5 +267,62 @@ describe('compaction helpers', () => {
     const p = compactedPrefix('摘要内容')
     expect(p.user).toContain('摘要内容')
     expect(p.assistant.length).toBeGreaterThan(0)
+  })
+})
+
+describe('mergeUserRuns', () => {
+  const user = (text: string): ModelMessage => ({ role: 'user', content: text })
+  const bot = (text: string): ModelMessage => ({ role: 'assistant', content: text })
+
+  it('leaves an alternating history alone, by identity', () => {
+    const h = [user('q1'), bot('a1'), user('q2')]
+    expect(mergeUserRuns(h)).toBe(h)
+  })
+
+  it('merges the run a failed turn left behind', () => {
+    // q2 died with a provider error, so it stayed in the history unanswered;
+    // "go on" twice used to append two more user messages behind it.
+    const out = mergeUserRuns([user('q1'), bot('a1'), user('q2'), user('go on'), user('go on')])
+    expect(out.map((m) => m.role)).toEqual(['user', 'assistant', 'user'])
+    expect(out[2].content).toBe('q2\n\ngo on\n\ngo on')
+  })
+
+  it('never lets two user messages end up adjacent', () => {
+    const out = mergeUserRuns([user('a'), user('b'), bot('r'), user('c'), user('d')])
+    for (let i = 1; i < out.length; i++) {
+      expect(out[i].role === 'user' && out[i - 1].role === 'user').toBe(false)
+    }
+  })
+
+  it('concatenates parts when either side carries images', () => {
+    const withImage: ModelMessage = {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'look at this' },
+        { type: 'image', image: 'data:...' },
+      ],
+    }
+    const out = mergeUserRuns([withImage, user('and now?')])
+    expect(out).toHaveLength(1)
+    expect(out[0].content).toEqual([
+      { type: 'text', text: 'look at this' },
+      { type: 'image', image: 'data:...' },
+      { type: 'text', text: 'and now?' },
+    ])
+  })
+
+  it('is idempotent — re-merging a merged history changes nothing', () => {
+    const once = mergeUserRuns([user('q'), user('go on')])
+    expect(mergeUserRuns(once)).toBe(once)
+  })
+
+  it('does not touch tool messages between assistant turns', () => {
+    const h: ModelMessage[] = [
+      user('q'),
+      { role: 'assistant', content: [{ type: 'tool-call', toolCallId: '1', toolName: 't', input: {} }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: '1', toolName: 't', output: { type: 'text', value: 'r' } }] },
+      bot('done'),
+    ]
+    expect(mergeUserRuns(h)).toBe(h)
   })
 })
