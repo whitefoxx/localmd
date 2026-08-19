@@ -587,7 +587,19 @@ export const useChatStore = defineStore('chat', () => {
     if (t) await persist(t)
   }
 
-  async function persist(session: OpenSession): Promise<void> {
+  /**
+   * Write a session to IDB, and (by default) re-read the history list so the
+   * overlay shows current titles and ordering.
+   *
+   * `listOnly: false` skips that re-read. It exists for the throttled saves a
+   * running turn makes once a second: `listSessions` fetches and deserializes
+   * EVERY stored session in the KB, which is main-thread work proportional to
+   * how much the user has ever chatted, on the same thread that has to answer
+   * clicks while the agent streams. The list is not stale for long either way —
+   * the turn ends with a full persist, and nothing but `updatedAt` moved
+   * meanwhile.
+   */
+  async function persist(session: OpenSession, refreshList = true): Promise<void> {
     if (!session.uiMessages.length) return
     session.updatedAt = Date.now()
     // Shadow the live checklist into the record (undefined drops the key, so a
@@ -611,7 +623,7 @@ export const useChatStore = defineStore('chat', () => {
     delete snapshot.system
     delete snapshot.tokenAnchor
     await idb.saveSession(snapshot)
-    if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
+    if (refreshList && kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }
 
   /** Star/unstar a session. Works whether it's an open tab, a detached running
@@ -1055,7 +1067,7 @@ export const useChatStore = defineStore('chat', () => {
       const t = Date.now()
       if (t - lastStreamPersist > 1000) {
         lastStreamPersist = t
-        void persist(session)
+        void persist(session, false)
       }
     }
 

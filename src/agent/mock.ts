@@ -4,6 +4,9 @@
  *
  *   echo <text>              stream <text> back (chunked)
  *   think <text>             stream <text> as a thinking trail, then reply
+ *   think xN <text>          …with <text> repeated N times, no pacing delay
+ *                            (a long thought, at a rate a real provider
+ *                            reaches — for responsiveness probes)
  *   hang [ms]                a tool call that ignores the abort signal (stop tests)
  *   write <path> <content>   run the real write_file tool, then confirm
  *   delete <path>            run the real delete_path tool (recursive)
@@ -84,9 +87,16 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
     reply = `Done: ${result}`
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('think ')) {
-    for (const chunk of script.slice('think '.length).match(/.{1,8}/gs) ?? []) {
+    const body = script.slice('think '.length)
+    // `think x400 …` repeats the trail to reach a length a real reasoning model
+    // produces, and drops the pacing delay so the probe runs in seconds instead
+    // of minutes. Every chunk still lands in its own task, which is what the
+    // per-delta cost is measured against.
+    const rep = /^x(\d+)\s+([\s\S]+)$/.exec(body)
+    const thought = rep ? (rep[2] + ' ').repeat(Number(rep[1])) : body
+    for (const chunk of thought.match(/.{1,8}/gs) ?? []) {
       opts.onEvent({ type: 'thinking', delta: chunk })
-      await sleep(20)
+      await sleep(rep ? 0 : 20)
     }
     reply = 'Done thinking'
     await streamText(reply, opts.onEvent)
