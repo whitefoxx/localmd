@@ -1307,7 +1307,15 @@ function removeDetail(): void {
          the pricing line is legible from the page itself: what sits here costs
          nothing, everything below reaches an outside service and is paid. -->
     <div>
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.bundledGroup') }}</span>
+      <!-- Free / paid as a pill rather than a clause: the whole point of the
+           two groups is the price line between them, and it was set in the
+           same grey as everything around it. -->
+      <span class="flex items-center gap-2">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.bundledGroup') }}</span>
+        <span class="rounded-full bg-added/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-added">
+          {{ $t('settings.priceFree') }}
+        </span>
+      </span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.bundledDesc') }}</p>
       <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
         <label
@@ -1336,7 +1344,12 @@ function removeDetail(): void {
          tier as one visible surface. When locked the group stays fully visible
          with one hint, because a paid feature that hides just looks missing. -->
     <div>
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectionsGroup') }}</span>
+      <span class="flex items-center gap-2">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectionsGroup') }}</span>
+        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+          {{ $t('settings.pricePaid') }}
+        </span>
+      </span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectionsDesc') }}</p>
       <p v-if="licence.restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
         {{ $t('settings.connectionsLocked') }}
@@ -1361,10 +1374,18 @@ function removeDetail(): void {
           <span class="min-w-0">
             <span class="flex items-center gap-1.5 flex-wrap">
               <span class="text-sm text-fg-1">{{ $t(`settings.catalog.${e.id}.title`) }}</span>
-              <span
+              <!-- "Setup needed" is where the fix is, so it is the way there.
+                   Inside the row's <label> a plain badge was a bigger target
+                   for the checkbox: aiming at the one thing that names the
+                   problem UNINSTALLED the extension. As a button with the
+                   click stopped, it opens the page that can fix it instead. -->
+              <button
                 v-if="e.kind === 'extension' && tools.isInstalled(e.id) && entryServer(e)?.status !== 'ok'"
-                class="text-2xs rounded px-1 py-0.5 bg-removed/15 text-removed"
-              >{{ $t('settings.lmdConnect.setupNeeded') }}</span>
+                type="button"
+                class="text-2xs rounded px-1 py-0.5 bg-removed/15 text-removed hover:bg-removed/25 hover:underline"
+                :title="$t('settings.lmdConnect.setupOpen')"
+                @click.stop.prevent="open({ name: 'entry', id: e.id })"
+              >{{ $t('settings.lmdConnect.setupNeeded') }}</button>
             </span>
             <span class="block mt-0.5 text-xs text-fg-3 leading-relaxed">
               {{ $t(`settings.catalog.${e.id}.desc`) }}
@@ -1451,7 +1472,15 @@ function removeDetail(): void {
     <!-- ▸ Advanced — the manual versions of the two doors above. Folded, and
          each opens its own page, so main stays a list. -->
     <div>
-      <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
+      <!-- Both doors below are licence-gated (disabled, above), so the group
+           wears the same Paid pill as Connections. Without it the pricing line
+           read as "everything under Connections", and these sat outside it. -->
+      <span class="flex items-center gap-2">
+        <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
+        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+          {{ $t('settings.pricePaid') }}
+        </span>
+      </span>
       <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.advancedDesc') }}</p>
       <!-- Locked at the door, not at save: letting someone fill in a whole
            form before telling them it needs a licence would be worse than

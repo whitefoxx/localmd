@@ -44,7 +44,7 @@ export default {
       'How long the model thinks before it answers. Less is faster and cheaper; more is worth it for multi-step work. Left at Default the provider decides, and a model that cannot think ignores it.',
     defaultPlaceholder: 'Default',
     profileHelp:
-      'Pick a provider, then paste its API key and the model name — that is all. The key is kept in this browser and sent straight to that provider, never through us. A model running on your own machine (Ollama and the like) works too. If a connection does not work, the chat area says so.',
+      'Pick a provider, paste its API key and the model name. The key stays in this browser and goes straight to that provider. A model on your own machine works too.',
 
     // Models list
     profilesHeading: 'Model profiles',
@@ -55,9 +55,9 @@ export default {
     slot: { primary: 'Primary', vision: 'Vision', image: 'Image generation' },
     notConfigured: 'Not set',
     visionHelp:
-      'Claude models read pictures on their own, so this can stay empty. With another provider: if your main model already reads pictures, point this at the same one; if it does not, point it at one that does and the agent will use it whenever something needs looking at.',
+      'Leave empty if your primary model already reads pictures — most do. If it does not, point this at one that does and the agent will use it whenever something needs looking at.',
     imageHelp:
-      'Optional. Set it and the agent can make pictures and save them into your knowledge base. Works with OpenAI, Google, xAI and services compatible with them — enter the image model name.',
+      'Optional. Set it and the agent can make pictures and save them into your knowledge base.',
 
     // Agent behavior
     writeMode: 'Write mode',
@@ -89,16 +89,19 @@ export default {
     ignorePlaceholder: 'Search files and folders to ignore…',
     ignoreAddPattern: 'Ignore “{pattern}” as a pattern',
     ignoredHeading: 'Ignored ({n})',
+    ignoredRow: 'Skipped by the health check: {pattern}',
     ignoreReset: 'Reset to defaults',
     ignoreEmpty: 'Nothing ignored — the whole knowledge base is scanned.',
     ignoreRemove: 'Stop ignoring',
 
     // External tools — recommended catalog
     recommended: 'Recommended tools',
-    bundledGroup: 'Bundled tools — free',
+    bundledGroup: 'Bundled tools',
+    priceFree: 'Free',
+    pricePaid: 'Paid',
     bundledDesc:
       'These ship with the app and cost nothing, ever. Today that is web search and page reading; the set can grow.',
-    connectionsGroup: 'Connections — paid',
+    connectionsGroup: 'Connections',
     connectionsDesc:
       'Anything that reaches a service outside this browser. One licence covers all of it.',
     connectionsLocked: 'Adding and using connections needs a licence —',
@@ -129,6 +132,7 @@ export default {
     checkFailed: 'Still not connected.',
     lmdConnect: {
       setupNeeded: 'Setup needed',
+      setupOpen: 'Open setup for this extension',
       reload: 'Reload this page',
       recheck: 'Check again',
       connected: 'Connected — localmd Connect is answering this site.',
@@ -246,6 +250,9 @@ export default {
       'Some servers refuse to answer a web page directly; those work through the browser extension instead. This is the global list — a knowledge base can also carry its own in .agents/mcp.json, which travels with it (keep tokens here, not in that file). Whatever a server returns is treated as untrusted.',
 
     // Git & GitHub
+    gitHeading: 'Version history for your folder',
+    gitDesc:
+      'Optional. Turn the folder into a git repository and every change becomes a point you can go back to — the app commits from the git panel, and nothing is sent anywhere by doing so. Add a GitHub token as well and the same panel can push and pull, which is how a knowledge base moves between machines, or gets a backup that is not this browser.',
     commitAuthor: 'Commit author name',
     commitAuthorPlaceholder: '(defaults to the repo git config)',
     commitEmail: 'Commit email',
@@ -315,7 +322,7 @@ export default {
       '模型回答前思考多久。想得少更快也更便宜；多步骤的活儿值得想久一点。留在「默认」就由厂商决定，不会思考的模型会忽略它。',
     defaultPlaceholder: '默认',
     profileHelp:
-      '选好厂商，填上 API key 和模型名就行。key 只存在这个浏览器里，直接发给该厂商，不经过我们。跑在你自己机器上的模型（Ollama 之类）也可以。连不上时聊天区会提示。',
+      '选好厂商，填上 API key 和模型名。key 只存在这个浏览器里，直接发给该厂商。跑在你自己机器上的模型也可以。',
 
     // Models list
     profilesHeading: '模型 Profiles',
@@ -326,9 +333,8 @@ export default {
     slot: { primary: '主模型', vision: '视觉理解', image: '图像生成' },
     notConfigured: '未配置',
     visionHelp:
-      'Claude 系列自己就能看图，这里可以留空。用别的厂商时：主模型本来就能看图，就指向它自己；不能看图，就指向一个能看图的模型，需要看图时 agent 会去用它。',
-    imageHelp:
-      '可选。配好之后 agent 就能生成图片并存进知识库。支持 OpenAI、Google、xAI 以及与它们兼容的服务——填上对应的图像模型名即可。',
+      '主模型本来就能看图就留空 —— 多数都能。不能看图的话，指向一个能看图的模型，需要看图时 agent 会去用它。',
+    imageHelp: '可选。配好之后 agent 就能生成图片并存进知识库。',
 
     // Agent behavior
     writeMode: '写入模式',
@@ -360,15 +366,18 @@ export default {
     ignorePlaceholder: '搜索要忽略的文件或目录……',
     ignoreAddPattern: '把「{pattern}」作为规则加入',
     ignoredHeading: '已忽略（{n}）',
+    ignoredRow: '健康检查会跳过：{pattern}',
     ignoreReset: '恢复默认',
     ignoreEmpty: '没有忽略任何内容——整个知识库都会被检测。',
     ignoreRemove: '取消忽略',
 
     // External tools — recommended catalog
     recommended: '推荐工具',
-    bundledGroup: '自带工具 —— 免费',
+    bundledGroup: '自带工具',
+    priceFree: '免费',
+    pricePaid: '付费',
     bundledDesc: '随应用附带，永远不收费。目前是网页搜索和读网页；这个集合以后会变多。',
-    connectionsGroup: '外部接入 —— 付费',
+    connectionsGroup: '外部接入',
     connectionsDesc: '所有连到这个浏览器之外的服务的能力。一份许可全都涵盖。',
     connectionsLocked: '添加和使用外部接入需要许可 ——',
     rowNeedsLicence: '需要许可',
@@ -396,6 +405,7 @@ export default {
     checkFailed: '仍未连上。',
     lmdConnect: {
       setupNeeded: '需要设置',
+      setupOpen: '打开这个扩展的设置页',
       reload: '刷新本页',
       recheck: '重新检测',
       connected: '已连接 —— localmd Connect 正在响应本站。',
@@ -509,6 +519,9 @@ export default {
       '有些服务器不接受网页直连，那种就走浏览器扩展。这里是全局列表；知识库也可以自带一份 .agents/mcp.json 跟着走（token 建议放这里，别写进那个文件）。服务器返回的内容一律按不可信处理。',
 
     // Git & GitHub
+    gitHeading: '给文件夹留一份历史',
+    gitDesc:
+      '可选。把文件夹变成一个 git 仓库，每次改动就成了一个可以回去的点 —— 提交在 git 面板里做，这一步不会把任何东西发到外面。再填一个 GitHub token，同一个面板就能 push 和 pull，知识库靠这个在多台机器之间流转，也靠这个拿到一份不在浏览器里的备份。',
     commitAuthor: 'Commit 作者名',
     commitAuthorPlaceholder: '（默认读仓库 git config）',
     commitEmail: 'Commit 邮箱',

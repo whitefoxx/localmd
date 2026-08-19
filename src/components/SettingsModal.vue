@@ -363,6 +363,11 @@ function slotBadges(p: LlmProfile): string[] {
           <div class="flex-1 min-h-0 overflow-y-auto panel-scroll px-6 py-5">
             <!-- ▸ Profile editor (lives inside the Models pane) -->
             <div v-if="editing" class="space-y-4 max-w-md">
+              <!-- What this form is for, before the form. At the bottom it was
+                   read after the fields it explains, or not at all. -->
+              <p class="text-xs text-fg-3 leading-relaxed">
+                {{ $t('settings.profileHelp') }}
+              </p>
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Provider</label>
                 <select v-model="editing.provider" class="input" @change="applyProviderPreset">
@@ -427,10 +432,6 @@ function slotBadges(p: LlmProfile): string[] {
                 </select>
                 <p class="text-xs text-fg-3 leading-relaxed mt-1">{{ $t('settings.reasoningHelp') }}</p>
               </div>
-
-              <p class="text-xs text-fg-3 leading-relaxed">
-                {{ $t('settings.profileHelp') }}
-              </p>
 
               <div class="flex gap-2 pt-1">
                 <button class="btn-primary text-xs" :disabled="!profileValid" @click="saveProfile">
@@ -753,16 +754,22 @@ function slotBadges(p: LlmProfile): string[] {
                   {{ $t('settings.ignoreEmpty') }}
                 </p>
                 <div v-else class="rounded-lg border border-border divide-y divide-border overflow-hidden">
+                  <!-- This list is the SKIPPED one, and it sat one panel below
+                       a list of add-me suggestions drawn with the same file and
+                       folder icons — identical rows meaning opposite things.
+                       The crossed-out eye and the struck-through path say which
+                       list this is without reading the heading. -->
                   <div
                     v-for="p in store.state.healthIgnore"
                     :key="p"
                     class="group flex items-center gap-2.5 px-3 py-2"
+                    :title="$t('settings.ignoredRow', { pattern: p })"
                   >
+                    <span class="codicon codicon-sm codicon-eye-closed shrink-0 text-fg-3" />
                     <span
-                      class="codicon codicon-sm shrink-0 text-fg-3"
-                      :class="p.endsWith('/') ? 'codicon-folder' : 'codicon-file'"
-                    />
-                    <span class="flex-1 break-all font-mono text-xs text-fg-1">{{ p }}</span>
+                      class="flex-1 break-all font-mono text-xs text-fg-3 line-through decoration-fg-3/50"
+                      >{{ p }}</span
+                    >
                     <button
                       class="shrink-0 text-fg-3 opacity-0 transition-opacity hover:text-removed group-hover:opacity-100 focus:opacity-100"
                       :title="$t('settings.ignoreRemove')"
@@ -779,6 +786,12 @@ function slotBadges(p: LlmProfile): string[] {
 
             <!-- ▸ Git & GitHub -->
             <div v-else-if="section === 'git'" class="space-y-4 max-w-md">
+              <!-- The pane opened onto three unexplained fields. Say what the
+                   whole thing is for before asking for a name and a token. -->
+              <div>
+                <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.gitHeading') }}</span>
+                <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.gitDesc') }}</p>
+              </div>
               <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.commitAuthor') }}</label>
                 <input v-model="store.state.gitName" class="input" :placeholder="$t('settings.commitAuthorPlaceholder')" />
