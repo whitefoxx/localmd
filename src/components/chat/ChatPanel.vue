@@ -1009,70 +1009,79 @@ watch(
 
 <template>
   <div class="h-full flex flex-col bg-bg-1 relative">
-    <!-- Header -->
-    <div class="flex items-center gap-2 px-3 h-9 border-b border-border shrink-0">
-      <span class="codicon codicon-sm codicon-sparkle text-accent" />
-      <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
-      <!-- Starting over is the most-reached-for thing in this header, so it
-           sits next to the title with a shape of its own rather than as the
-           third identical icon in the row on the right. -->
-      <button
-        class="flex shrink-0 items-center gap-1 rounded-md border border-border bg-bg-2/60 px-1.5 py-0.5 text-[11px] text-fg-2 transition-colors hover:border-accent/40 hover:bg-bg-2 hover:text-fg-0"
-        :title="$t('chat.newChat')"
-        @click="chat.newSession()"
+    <!-- Header. Maximized, the panel is the whole window and everything else in
+         it (transcript, composer) already narrows to max-w-3xl — a header still
+         pinned to the window edges left the title and the buttons a screen
+         apart, framing a column they do not belong to. The rule stays full
+         width; only the row inside it narrows. -->
+    <div class="border-b border-border shrink-0">
+      <div
+        class="flex items-center gap-2 px-3 h-9"
+        :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
       >
-        <span class="codicon codicon-sm codicon-add" />
-        <span>{{ $t('chat.newChatShort') }}</span>
-      </button>
-      <span class="flex-1" />
-      <button
-        class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
-        :title="$t('chat.saveSession')"
-        :disabled="!chat.messages.length"
-        @click="saveSession"
-      >
-        <span class="codicon codicon-sm codicon-download" />
-      </button>
-      <button
-        class="disabled:opacity-40 disabled:hover:!text-fg-3"
-        :class="chat.currentFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-fg-3 hover:text-fg-0'"
-        :title="chat.currentFavorite ? $t('chat.unfavoriteSession') : $t('chat.favoriteSession')"
-        :disabled="!chat.messages.length"
-        @click="chat.currentSessionId && chat.toggleFavorite(chat.currentSessionId)"
-      >
-        <span
-          class="codicon codicon-sm"
-          :class="chat.currentFavorite ? 'codicon-star-full' : 'codicon-star-empty'"
-        />
-      </button>
-      <button
-        class="text-fg-3 hover:text-fg-0"
-        :class="{ '!text-accent': chat.historyOpen }"
-        :title="$t('chat.history')"
-        @click="chat.historyOpen = !chat.historyOpen"
-      >
-        <span class="codicon codicon-sm codicon-history" />
-      </button>
-      <button
-        class="text-fg-3 hover:text-fg-0"
-        :title="ui.agentMaximized ? $t('chat.restorePanel') : $t('chat.maximizePanel')"
-        @click="ui.agentMaximized = !ui.agentMaximized"
-      >
-        <span
-          class="codicon codicon-sm"
-          :class="ui.agentMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'"
-        />
-      </button>
-      <!-- Double chevron » = collapse the panel away (codicons has no native
-           double-chevron, so two chevrons overlap). -->
-      <button
-        class="text-fg-3 hover:text-fg-0 inline-flex items-center"
-        :title="$t('chat.collapsePanel')"
-        @click="emit('close')"
-      >
-        <span class="codicon codicon-sm codicon-chevron-right" />
-        <span class="codicon codicon-sm codicon-chevron-right -ml-[9px]" />
-      </button>
+        <span class="codicon codicon-sm codicon-sparkle text-accent" />
+        <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
+        <!-- Starting over is the most-reached-for thing in this header, so it
+             sits next to the title with a shape of its own rather than as the
+             third identical icon in the row on the right. -->
+        <button
+          class="flex shrink-0 items-center gap-1 rounded-md border border-border bg-bg-2/60 px-1.5 py-0.5 text-[11px] text-fg-2 transition-colors hover:border-accent/40 hover:bg-bg-2 hover:text-fg-0"
+          :title="$t('chat.newChat')"
+          @click="chat.newSession()"
+        >
+          <span class="codicon codicon-sm codicon-add" />
+          <span>{{ $t('chat.newChatShort') }}</span>
+        </button>
+        <span class="flex-1" />
+        <button
+          class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
+          :title="$t('chat.saveSession')"
+          :disabled="!chat.messages.length"
+          @click="saveSession"
+        >
+          <span class="codicon codicon-sm codicon-download" />
+        </button>
+        <button
+          class="disabled:opacity-40 disabled:hover:!text-fg-3"
+          :class="chat.currentFavorite ? 'text-yellow-500 hover:text-yellow-400' : 'text-fg-3 hover:text-fg-0'"
+          :title="chat.currentFavorite ? $t('chat.unfavoriteSession') : $t('chat.favoriteSession')"
+          :disabled="!chat.messages.length"
+          @click="chat.currentSessionId && chat.toggleFavorite(chat.currentSessionId)"
+        >
+          <span
+            class="codicon codicon-sm"
+            :class="chat.currentFavorite ? 'codicon-star-full' : 'codicon-star-empty'"
+          />
+        </button>
+        <button
+          class="text-fg-3 hover:text-fg-0"
+          :class="{ '!text-accent': chat.historyOpen }"
+          :title="$t('chat.history')"
+          @click="chat.historyOpen = !chat.historyOpen"
+        >
+          <span class="codicon codicon-sm codicon-history" />
+        </button>
+        <button
+          class="text-fg-3 hover:text-fg-0"
+          :title="ui.agentMaximized ? $t('chat.restorePanel') : $t('chat.maximizePanel')"
+          @click="ui.agentMaximized = !ui.agentMaximized"
+        >
+          <span
+            class="codicon codicon-sm"
+            :class="ui.agentMaximized ? 'codicon-screen-normal' : 'codicon-screen-full'"
+          />
+        </button>
+        <!-- Double chevron » = collapse the panel away (codicons has no native
+             double-chevron, so two chevrons overlap). -->
+        <button
+          class="text-fg-3 hover:text-fg-0 inline-flex items-center"
+          :title="$t('chat.collapsePanel')"
+          @click="emit('close')"
+        >
+          <span class="codicon codicon-sm codicon-chevron-right" />
+          <span class="codicon codicon-sm codicon-chevron-right -ml-[9px]" />
+        </button>
+      </div>
     </div>
 
     <!-- Session-saved toast -->
@@ -1085,26 +1094,28 @@ watch(
 
     <!-- Session tabs (concurrent chats). Tabs shrink evenly to fit the panel
          width (VS Code style) so the close button never scrolls out of view. -->
-    <div v-if="chat.tabs.length > 1" class="flex items-stretch h-8 border-b border-border bg-bg-1 shrink-0">
-      <button
-        v-for="t in chat.tabs"
-        :key="t.id"
-        class="group flex items-center gap-1 px-2 text-xs border-r border-border whitespace-nowrap flex-1 min-w-0 max-w-[150px] overflow-hidden"
-        :class="t.id === chat.currentSessionId ? 'bg-bg-0 text-fg-0' : 'text-fg-2 hover:bg-bg-2/50'"
-        :title="t.title"
-        @click="chat.activateTab(t.id)"
-      >
-        <span
-          v-if="t.running"
-          class="codicon codicon-sm codicon-loading codicon-modifier-spin text-accent shrink-0"
-        />
-        <span class="truncate flex-1 min-w-0 text-left">{{ t.title }}</span>
-        <span
-          class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
-          :class="{ '!opacity-100': t.id === chat.currentSessionId }"
-          @click.stop="chat.closeTab(t.id)"
-        />
-      </button>
+    <div v-if="chat.tabs.length > 1" class="border-b border-border bg-bg-1 shrink-0">
+      <div class="flex items-stretch h-8" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
+        <button
+          v-for="t in chat.tabs"
+          :key="t.id"
+          class="group flex items-center gap-1 px-2 text-xs border-r border-border whitespace-nowrap flex-1 min-w-0 max-w-[150px] overflow-hidden"
+          :class="t.id === chat.currentSessionId ? 'bg-bg-0 text-fg-0' : 'text-fg-2 hover:bg-bg-2/50'"
+          :title="t.title"
+          @click="chat.activateTab(t.id)"
+        >
+          <span
+            v-if="t.running"
+            class="codicon codicon-sm codicon-loading codicon-modifier-spin text-accent shrink-0"
+          />
+          <span class="truncate flex-1 min-w-0 text-left">{{ t.title }}</span>
+          <span
+            class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
+            :class="{ '!opacity-100': t.id === chat.currentSessionId }"
+            @click.stop="chat.closeTab(t.id)"
+          />
+        </button>
+      </div>
     </div>
     <div
       v-if="chat.limitMsg"
