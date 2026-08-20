@@ -338,7 +338,7 @@
  {
   "id": "b2-1",
   "page": 2,
-  "kind": "boilerplate",
+  "kind": "text",
   "level": 0,
   "text": "16 110th Annual Report | 2023",
   "rects": [
@@ -576,7 +576,7 @@
   "id": "b2-16",
   "page": 2,
   "kind": "heading",
-  "level": 2,
+  "level": 1,
   "text": "Monitoring Financial Vulnerabilities",
   "rects": [
    {
@@ -1422,7 +1422,7 @@
   "id": "b3-6",
   "page": 3,
   "kind": "heading",
-  "level": 3,
+  "level": 2,
   "text": "Asset Valuation Pressures",
   "rects": [
    {
@@ -1568,7 +1568,7 @@
  {
   "id": "b4-1",
   "page": 4,
-  "kind": "boilerplate",
+  "kind": "text",
   "level": 0,
   "text": "18 110th Annual Report | 2023",
   "rects": [
@@ -2700,7 +2700,7 @@
   "id": "b4-70",
   "page": 4,
   "kind": "heading",
-  "level": 3,
+  "level": 2,
   "text": "Borrowing by Households and",
   "rects": [
    {
@@ -2715,7 +2715,7 @@
   "id": "b4-71",
   "page": 4,
   "kind": "heading",
-  "level": 3,
+  "level": 2,
   "text": "Businesses",
   "rects": [
    {
@@ -3359,7 +3359,7 @@
  {
   "id": "b6-1",
   "page": 6,
-  "kind": "boilerplate",
+  "kind": "text",
   "level": 0,
   "text": "20 110th Annual Report | 2023",
   "rects": [
@@ -3471,7 +3471,7 @@
   "id": "b6-4",
   "page": 6,
   "kind": "heading",
-  "level": 3,
+  "level": 2,
   "text": "Leverage in the Financial System",
   "rects": [
    {

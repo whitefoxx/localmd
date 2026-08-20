@@ -40,10 +40,13 @@ describe('indexState', () => {
     expect(await stateFor({ version: INDEX_VERSION + 1 })).toBe('incompatible')
   })
 
-  it('reads a manifest without builder as builder 1 — pre-split indexes stay current', async () => {
-    // Every index on disk today lacks the field; the split itself must not
-    // flip them all to "outdated" when nothing about their content changed.
-    expect(await stateFor({ version: INDEX_VERSION })).toBe('current')
+  it('reads a manifest without builder as builder 1', async () => {
+    // Pre-split indexes lack the field. While BUILDER was 1 they read as
+    // current (the split itself changed no output); the first real algorithm
+    // change made them genuinely outdated — usable, rebuild offered.
+    expect(await stateFor({ version: INDEX_VERSION })).toBe(
+      BUILDER > 1 ? 'outdated' : 'current',
+    )
   })
 
   it('is outdated below the current builder, current at or above it', async () => {

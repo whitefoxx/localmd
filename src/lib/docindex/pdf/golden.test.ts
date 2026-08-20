@@ -9,10 +9,15 @@
  * event, not a fixup:
  *   1. bump BUILDER in ./types.ts (existing indexes become "outdated" —
  *      usable, rebuild offered, never forced);
- *   2. satisfy yourself that inheritIds carries every published id of the
- *      OLD golden onto the new output — the inheritance part of this file
- *      checks exactly that, against the previous golden;
+ *   2. archive the outgoing golden:
+ *        cp __fixtures__/fed-report-p21-26.blocks.json \
+ *           __fixtures__/archive/builder-<old>.blocks.json
+ *      (a test below REQUIRES an archive per past builder, and replays
+ *      inheritance from every archive onto the current output — the id
+ *      invariant across the whole builder history, kept automatically);
  *   3. regenerate: UPDATE_GOLDEN=1 npx vitest run src/lib/docindex/pdf/golden.test.ts
+ *   4. read the diff of the regenerated golden — that diff IS the algorithm
+ *      change; if it surprises you, stop.
  * Never regenerate to make a red test green without steps 1 and 2.
  */
 import { describe, it, expect } from 'vitest'
@@ -28,7 +33,7 @@ const env: Record<string, string | undefined> =
     ?.env ?? {}
 import { assembleBlocks, layoutPage, type Line, type RawItem, type TextBounds } from './layout'
 import { inheritIds, overlap, type PriorEntry } from './inherit'
-import type { PdfBlock } from './types'
+import { BUILDER, type PdfBlock } from './types'
 
 const dir = fileURLToPath(new URL('./__fixtures__/', import.meta.url))
 
@@ -84,6 +89,42 @@ describe('golden: the published pipeline output is a contract', () => {
     expect(blocks.length).toBeGreaterThan(50)
     expect(blocks.filter((b) => b.kind === 'heading').length).toBeGreaterThan(3)
     expect(blocks.some((b) => b.text.length > 300)).toBe(true)
+  })
+})
+
+describe('golden: every builder ever shipped keeps its ids resolving', () => {
+  // The archive holds the golden of each past builder. Replaying inheritance
+  // from each onto the current pipeline output proves the invariant across
+  // the WHOLE history, not just one step: an id published by builder 1 still
+  // resolves after builders 2, 3, … — however the grouping moved.
+  it('has an archived golden for every past builder', () => {
+    for (let n = 1; n < BUILDER; n++) {
+      expect(
+        () => readFileSync(`${dir}archive/builder-${n}.blocks.json`, 'utf8'),
+        `archive/builder-${n}.blocks.json missing — see the file header ritual`,
+      ).not.toThrow()
+    }
+  })
+
+  it('inherits every archived id onto the current output', () => {
+    const current = pipeline().blocks
+    for (let n = 1; n < BUILDER; n++) {
+      const archived = JSON.parse(
+        readFileSync(`${dir}archive/builder-${n}.blocks.json`, 'utf8'),
+      ) as { id: string; page: number; rects: { x: number; y: number; w: number; h: number }[] }[]
+      const prior: Record<string, PriorEntry> = {}
+      for (const b of archived) prior[b.id] = { page: b.page, rects: b.rects }
+      const r = inheritIds(current, prior)
+      for (const b of archived) {
+        const now = r.locations[b.id]
+        expect(now, `builder-${n} id ${b.id} vanished`).toBeDefined()
+        expect(now.page, `builder-${n} id ${b.id} changed page`).toBe(b.page)
+        expect(
+          overlap(now.rects, b.rects),
+          `builder-${n} id ${b.id} moved off its passage`,
+        ).toBeGreaterThan(0)
+      }
+    }
   })
 })
 

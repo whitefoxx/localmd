@@ -19,6 +19,8 @@ import {
   splitAtWideGaps,
   separateFloaters,
   typicalPitch,
+  numberingDepth,
+  assembleBlocks,
 } from './layout'
 
 const PAGE_H = 800
@@ -270,5 +272,90 @@ describe('groupBlocks — leading-relative paragraphs', () => {
       line({ yTop: 122 }),
     ]
     expect(groupBlocks(lines, justified)).toHaveLength(2)
+  })
+})
+
+describe('numberingDepth', () => {
+  it('reads decimal, appendix, roman and letter numbering', () => {
+    expect(numberingDepth('3 Results')).toBe(1)
+    expect(numberingDepth('3.2 Data')).toBe(2)
+    expect(numberingDepth('3.2.1. Cleaning')).toBe(3)
+    expect(numberingDepth('A.2 Proofs')).toBe(2)
+    expect(numberingDepth('IV. Discussion')).toBe(1)
+    expect(numberingDepth('B) Ablations')).toBe(1)
+  })
+  it('rejects numbers not followed by a word — axis labels, formulas', () => {
+    expect(numberingDepth('1 +')).toBeNull()
+    expect(numberingDepth('0.9 0.1 0.7')).toBeNull()
+    expect(numberingDepth('plain prose')).toBeNull()
+  })
+})
+
+describe('assembleBlocks — relative heading levels', () => {
+  /** One page of lines at given font sizes; text decides the rest. */
+  function page(specs: { text: string; h: number; y: number }[]) {
+    return specs.map((s) => ({
+      x0: 50,
+      x1: 50 + s.text.length * 5,
+      yTop: s.y,
+      fontH: s.h,
+      text: s.text,
+    }))
+  }
+  const SIZE = [
+    { w: 600, h: 800 },
+    { w: 600, h: 800 },
+  ]
+
+  it('ranks heading styles by size instead of an absolute threshold', () => {
+    // Body 10pt, section headings 11pt — 1.1×, under the OLD 1.18 floor,
+    // which was exactly the measured paper that degraded to page-files.
+    const p = (n: number) =>
+      page([
+        { text: `Section ${'ABC'[n]} opening`, h: 11, y: 100 },
+        ...Array.from({ length: 20 }, (_, i) => ({
+          text: `body prose line ${i} on page ${n} with ordinary words`,
+          h: 10,
+          y: 140 + i * 30,
+        })),
+      ])
+    const blocks = assembleBlocks([p(1), p(2)], [boundsOf(p(1)), boundsOf(p(2))], SIZE)
+    const heads = blocks.filter((b) => b.kind === 'heading')
+    expect(heads).toHaveLength(2)
+    expect(heads.every((b) => b.level === 1)).toBe(true)
+  })
+
+  it('lets explicit numbering override the style rank', () => {
+    const p = page([
+      { text: 'Huge Chapter Title', h: 18, y: 60 },
+      { text: '2.1.3 Deep subsection', h: 18, y: 120 },
+      ...Array.from({ length: 20 }, (_, i) => ({
+        text: `body prose line ${i} with ordinary words in it`,
+        h: 10,
+        y: 160 + i * 30,
+      })),
+    ])
+    const blocks = assembleBlocks([p], [boundsOf(p)], [SIZE[0]])
+    const byText = (t: string) => blocks.find((b) => b.text.startsWith(t))!
+    expect(byText('Huge Chapter').level).toBe(1)
+    expect(byText('2.1.3').level).toBe(3)
+  })
+
+  it('degenerate metrics: believes only numbering when "headings" flood the page', () => {
+    // Nearly half the lines report an outsized font while the median sits on
+    // the small ones — the four-lectures failure.
+    const p = (n: number) =>
+      page([
+        { text: `${n}.1 Real section`, h: 3.5, y: 100 },
+        ...Array.from({ length: 12 }, (_, i) => ({
+          text: `fragment ${i}`,
+          h: i < 5 ? 3.5 : 1.5,
+          y: 140 + i * 30,
+        })),
+      ])
+    const blocks = assembleBlocks([p(1), p(2)], [boundsOf(p(1)), boundsOf(p(2))], SIZE)
+    const heads = blocks.filter((b) => b.kind === 'heading')
+    expect(heads.map((b) => b.text)).toEqual(['1.1 Real section', '2.1 Real section'])
+    expect(heads[0].level).toBe(2)
   })
 })

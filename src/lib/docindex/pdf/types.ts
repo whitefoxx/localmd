@@ -24,7 +24,11 @@
  * reader must PARSE them → that is an INDEX_VERSION conversation.
  */
 export const INDEX_VERSION = 11
-export const BUILDER = 1
+/** 2: boilerplate marking (running headers/footers/folios), relative heading
+ *  levels + numbering depth, degenerate-metrics guard, spread-based section
+ *  boundaries. Bumping this requires archiving the previous golden — see
+ *  golden.test.ts, which enforces both the archive and id inheritance. */
+export const BUILDER = 2
 
 /** A rectangle on a page, normalized to 0..1 with a top-left origin. */
 export interface NormRect {
@@ -34,13 +38,18 @@ export interface NormRect {
   h: number
 }
 
-/** A citeable unit of the document — one paragraph or one heading. */
+/** A citeable unit of the document — one paragraph or one heading.
+ *  `boilerplate` is recurring page furniture (running headers/footers,
+ *  folios): it keeps its id and its locations.json entry — an existing
+ *  citation to it still resolves — but is not rendered into sections and
+ *  never shapes the structure. */
 export interface PdfBlock {
-  /** Stable id, e.g. `b14-3` — the 3rd block on (1-based) page 14. */
+  /** Stable id, e.g. `b14-3` — a NAME, not a position: rebuilds inherit it
+   *  (see ./inherit), so ordinals may have gaps and skip reading order. */
   id: string
   /** 1-based page number. */
   page: number
-  kind: 'heading' | 'text'
+  kind: 'heading' | 'text' | 'boilerplate'
   /** Heading level (1 = major, 2 = minor); 0 for body text. */
   level: number
   text: string

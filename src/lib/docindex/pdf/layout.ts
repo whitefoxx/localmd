@@ -19,6 +19,7 @@
  */
 
 import type { NormRect, PdfBlock } from './types'
+import { markBoilerplate } from './boilerplate'
 
 /** The slice of pdf.js's TextItem the layout needs. */
 export interface RawItem {
@@ -340,13 +341,48 @@ export function groupBlocks(lines: Line[], bounds: TextBounds): Line[][] {
   return blocks
 }
 
+/** A heading candidate must reach this share of the body size. Measured: a
+ *  paper whose section headings are 10pt over a 9pt body (1.11×) sat below
+ *  the old 1.18 floor and the document degraded to one-file-per-page. */
+const CANDIDATE_FLOOR = 1.08
+
+/** When size-based candidates exceed this share of all blocks, the metrics
+ *  are junk (a 1989 tech report reports line heights of 3.5 vs 1.5 and half
+ *  the document outsizes the "body"); only explicit numbering is believed. */
+const DEGENERATE_SHARE = 0.25
+
+/**
+ * Explicit hierarchy read off the text: "3.2.1 Title" → 3, "A.2 Title" → 2,
+ * "IV. Title" / "A. Title" → 1. Null when the text does not open with a
+ * numbering that is followed by an actual word — "3 q1" axis labels and
+ * "1 +" formula fragments stay out.
+ */
+export function numberingDepth(text: string): number | null {
+  if (/^\d{1,3}(\.\d{1,3})*[.)]?\s+\S*[A-Za-z]/.test(text)) {
+    return /^\d{1,3}(\.\d{1,3})*/.exec(text)![0].split('.').length
+  }
+  if (/^[A-Z](\.\d{1,3})+[.)]?\s+\S*[A-Za-z]/.test(text)) {
+    return /^[A-Z](\.\d{1,3})+/.exec(text)![0].split('.').length
+  }
+  if (/^[IVXLCDM]{1,6}[.)]\s+\S*[A-Za-z]/.test(text)) return 1
+  if (/^[A-Z][.)]\s+\S*[A-Za-z]/.test(text)) return 1
+  return null
+}
+
 /**
  * Turn every page's laid-out lines into the document's citeable blocks —
- * paragraph grouping, heading classification (size relative to the body
- * median, learned from the whole document), positional ids, normalized rects.
- * Pure on purpose: this is the step that decides what every published block
- * id names, so it must be testable without a PDF engine (the golden fixture
- * test replays real extracted pages through it).
+ * paragraph grouping, boilerplate marking, heading classification,
+ * positional ids, normalized rects. Pure on purpose: this is the step that
+ * decides what every published block id names, so it must be testable
+ * without a PDF engine (the golden fixture test replays real extracted
+ * pages through it).
+ *
+ * Heading levels are RELATIVE, not thresholds: candidates (big enough,
+ * short enough) are bucketed by font size and the buckets ranked — the
+ * largest recurring heading style is level 1 whatever its absolute ratio to
+ * the body. Explicit numbering overrides the style rank ("3.2.1" is depth 3
+ * no matter how it is set). When the size signal is degenerate
+ * (DEGENERATE_SHARE), only numbered candidates survive.
  */
 export function assembleBlocks(
   pageLines: Line[][],
@@ -360,26 +396,66 @@ export function assembleBlocks(
     .sort((a, b) => a - b)
   const bodySize = allHeights[Math.floor(allHeights.length / 2)] || 10
 
+  // Pass 1: geometry and text, everything provisionally body text.
   const blocks: PdfBlock[] = []
+  const maxHs: number[] = []
   for (let p = 0; p < pageLines.length; p++) {
     const size = pageSizes[p]
     let n = 0
     for (const group of groupBlocks(pageLines[p], pageBounds[p])) {
       n += 1
-      const text = joinLines(group)
-      const maxH = Math.max(...group.map((l) => l.fontH))
-      const isHeading = maxH >= bodySize * 1.18 && text.length <= 120 && group.length <= 3
       blocks.push({
         id: `b${p + 1}-${n}`,
         page: p + 1,
-        kind: isHeading ? 'heading' : 'text',
-        level: isHeading ? (maxH >= bodySize * 1.45 ? 1 : 2) : 0,
-        text,
+        kind: 'text',
+        level: 0,
+        text: joinLines(group),
         rects: group.map((l): NormRect => normRect(l, size)),
       })
+      maxHs.push(Math.max(...group.map((l) => l.fontH)))
     }
   }
-  return blocks
+
+  // Pass 2: page furniture out first, so a large-set running header can
+  // neither become a heading nor vote in the style ranking.
+  const marked = markBoilerplate(blocks, pageLines.length)
+
+  // Pass 3: headings among what remains.
+  const candidate = (b: PdfBlock, i: number): boolean =>
+    marked[i].kind === 'text' &&
+    maxHs[i] >= bodySize * CANDIDATE_FLOOR &&
+    b.text.length <= 120 &&
+    b.rects.length <= 3 &&
+    !/[,;:]$/.test(b.text)
+  const candidates = marked.map(candidate)
+  const candidateCount = candidates.filter(Boolean).length
+
+  const degenerate = candidateCount > DEGENERATE_SHARE * marked.length
+  if (degenerate) {
+    // Size means nothing here; believe only explicit numbering, strictly.
+    return marked.map((b, i) => {
+      if (marked[i].kind !== 'text') return b
+      const depth = numberingDepth(b.text)
+      const ok =
+        depth !== null && b.text.length <= 80 && b.rects.length <= 2 && !/[.,;:]$/.test(b.text)
+      return ok ? { ...b, kind: 'heading' as const, level: Math.min(depth!, 6) } : b
+    })
+  }
+
+  // Style ranking: distinct candidate sizes (rounded to 0.5), largest first.
+  const sizes = [
+    ...new Set(marked.map((_, i) => (candidates[i] ? Math.round(maxHs[i] * 2) / 2 : null))),
+  ]
+    .filter((s): s is number => s !== null)
+    .sort((a, b) => b - a)
+  const styleLevel = new Map(sizes.map((s, i) => [s, Math.min(i + 1, 6)]))
+
+  return marked.map((b, i) => {
+    if (!candidates[i]) return b
+    const level =
+      numberingDepth(b.text) ?? styleLevel.get(Math.round(maxHs[i] * 2) / 2) ?? 6
+    return { ...b, kind: 'heading' as const, level: Math.min(level, 6) }
+  })
 }
 
 function normRect(l: Line, size: { w: number; h: number }): NormRect {

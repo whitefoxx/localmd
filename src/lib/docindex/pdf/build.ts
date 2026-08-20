@@ -82,8 +82,8 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
   return manifest
 }
 
-/** Choose how to split the document into section files. */
-function pickStructure(
+/** Choose how to split the document into section files. Exported for tests. */
+export function pickStructure(
   blocks: PdfBlock[],
   outline: BuildInput['outline'],
   pageCount: number,
@@ -94,11 +94,19 @@ function pickStructure(
       boundaries: outline.flat.map((e) => ({ page: e.page, title: e.title, level: e.level })),
     }
   }
-  const majorHeadings = blocks.filter((b) => b.kind === 'heading' && b.level === 1)
-  if (new Set(majorHeadings.map((b) => b.page)).size >= 2) {
-    return {
-      structure: 'headings',
-      boundaries: majorHeadings.map((b) => ({ page: b.page, title: b.text, level: 1 })),
+  // Headings: split on the SHALLOWEST level that actually spreads across the
+  // document. Hardcoding level 1 lost real structure — a paper's only L1 is
+  // its title (one page), while its section headings rank L2; the sections
+  // are the boundaries worth having. A level whose heading count outruns the
+  // page count is noise, not structure.
+  const headings = blocks.filter((b) => b.kind === 'heading')
+  for (let level = 1; level <= 3; level++) {
+    const hs = headings.filter((b) => b.level === level)
+    if (new Set(hs.map((b) => b.page)).size >= 2 && hs.length <= pageCount * 1.5) {
+      return {
+        structure: 'headings',
+        boundaries: hs.map((b) => ({ page: b.page, title: b.text, level })),
+      }
     }
   }
   return {
@@ -146,9 +154,13 @@ function buildSections(boundaries: Boundary[], pageCount: number): SectionMeta[]
   }))
 }
 
-/** Render one section file: a `#` title then every block, each tagged `[[id]]`. */
+/** Render one section file: a `#` title then every block, each tagged `[[id]]`.
+ *  Boilerplate blocks are not rendered — their ids stay resolvable through
+ *  locations.json, but running headers and folios earn no tokens. */
 function renderSection(sec: SectionMeta, blocks: PdfBlock[], source: string): string {
-  const own = blocks.filter((b) => b.page >= sec.startPage && b.page <= sec.endPage)
+  const own = blocks.filter(
+    (b) => b.page >= sec.startPage && b.page <= sec.endPage && b.kind !== 'boilerplate',
+  )
   const out: string[] = [
     `<!-- section ${pad(sec.index)} · pages ${sec.startPage}–${sec.endPage} · ${source} -->`,
   ]
