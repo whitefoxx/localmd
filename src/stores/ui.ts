@@ -93,6 +93,21 @@ export const useUiStore = defineStore('ui', () => {
    *  at 430, and a hard-coded offset that clears it on one phone hides the
    *  floating agent button behind it on another. */
   const narrowNoticeHeight = ref(0)
+  /**
+   * Whether the EPUB reader's table of contents panel is open.
+   *
+   * It lives here rather than in the reader because the reader does not live
+   * long enough to hold it: `EpubViewer` is mounted with `v-else-if`, so
+   * looking at any other file destroys the component and coming back builds a
+   * new one with a fresh `ref(false)`. Reading position already survived that
+   * trip through `lib/viewMemory`; an open panel is not a position, it is one
+   * of this app's panel flags, and they all live here.
+   *
+   * Deliberately one flag for the reader rather than one per book: it says how
+   * you like to read, not where you are in a particular book.
+   */
+  const epubTocOpen = ref(false)
+
   const searchOpen = ref(false)
   const healthOpen = ref(false)
   const settingsOpen = ref(false)
@@ -190,6 +205,7 @@ export const useUiStore = defineStore('ui', () => {
     zenPeek,
     toggleZen,
     searchOpen,
+    epubTocOpen,
     healthOpen,
     settingsOpen,
     pricingOpen,

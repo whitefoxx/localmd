@@ -43,7 +43,6 @@ const indexState = ref<'none' | 'indexing' | 'indexed'>('none')
 const indexDetail = ref('')
 // Older-algorithm index: usable as is; the badge offers a rebuild.
 const indexOutdated = ref(false)
-const tocOpen = ref(false)
 const fontPct = ref(110)
 const selCfi = ref<string | null>(null)
 const popup = ref<{ x: number; y: number; cfi: string; existing: boolean } | null>(null)
@@ -799,7 +798,7 @@ function goBack(): void {
 function toggleSearch(): void {
   searchOpen.value = !searchOpen.value
   if (searchOpen.value) {
-    tocOpen.value = false
+    ui.epubTocOpen = false
     void nextTick(() => searchInput.value?.focus())
   } else {
     // Return focus to the book so arrow paging works again.
@@ -1083,10 +1082,10 @@ watch(
       <!-- Left: TOC + font zoom -->
       <button
         class="btn text-xs"
-        :class="{ '!text-accent': tocOpen }"
+        :class="{ '!text-accent': ui.epubTocOpen }"
         :disabled="!toc.length"
         :title="toc.length ? $t('viewers.epub.toc') : $t('viewers.epub.noNav')"
-        @click="tocOpen = !tocOpen; searchOpen && (searchOpen = false)"
+        @click="ui.epubTocOpen = !ui.epubTocOpen; searchOpen && (searchOpen = false)"
       >
         <span class="codicon codicon-sm codicon-list-tree" />
       </button>
@@ -1180,7 +1179,7 @@ watch(
       </div>
 
       <!-- Table of contents -->
-      <div v-else-if="tocOpen && toc.length" class="w-72 shrink-0 border-r border-border bg-bg-1 panel-scroll py-2">
+      <div v-else-if="ui.epubTocOpen && toc.length" class="w-72 shrink-0 border-r border-border bg-bg-1 panel-scroll py-2">
         <button
           v-for="(entry, i) in toc"
           :key="i"

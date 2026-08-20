@@ -117,6 +117,33 @@ async function visibleText(page: Page): Promise<string> {
   })
 }
 
+/**
+ * The reader is mounted with `v-else-if`, so looking at any other file destroys
+ * it and coming back builds a new one. Reading position already survived that
+ * (lib/viewMemory); the table of contents did not, because an open panel is
+ * state the component owned and nothing outlived it.
+ */
+test('the table of contents survives a trip to another file', async ({ page }) => {
+  await openBook(page)
+  // Located by icon, not by title: the title is translated, and the button
+  // carries no text of its own.
+  const tocButton = page.locator('button:has(.codicon-list-tree)')
+  const tocPanel = page.locator('.w-72').filter({ hasText: 'Chapter 2' })
+
+  await expect(tocButton).toBeEnabled({ timeout: 15_000 })
+  await tocButton.click()
+  await expect(tocPanel).toBeVisible()
+
+  // Away to a markdown file the scaffold wrote, then back to the book.
+  await page.locator('aside').getByText('AGENTS.md', { exact: true }).click()
+  await expect(page.locator('iframe').first()).toBeHidden()
+  // Two matches: the open-files list and the tree. Either reopens the book.
+  await page.locator('aside').getByText('long-book.epub', { exact: true }).first().click()
+  await expect(page.locator('iframe').first()).toBeVisible({ timeout: 15_000 })
+
+  await expect(tocPanel).toBeVisible()
+})
+
 test('the book is laid out at its final size before its first page is drawn', async ({
   page,
 }) => {
