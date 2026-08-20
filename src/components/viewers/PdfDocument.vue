@@ -1553,13 +1553,20 @@ watch(sidecarRevision, (rev) => {
  * viewport, and its pages render inside shadow roots we cannot read. A probe
  * that answers "not yet" forever would leave every PDF behind a spinner.
  *
- * The deadline is the safety valve for a document that never loads at all: the
- * mask hides the engine's own error message, so it must not be able to outlive
- * the answer by much. The slow clock is the other end — a first open compiles
- * the wasm engine and can take seconds, which is worth saying rather than
- * spinning through.
+ * The deadline is the safety valve for a document that never loads at all:
+ * the mask hides the engine's own error message, so it must not be able to
+ * outlive the answer by much. It is armed twice: a long watchdog over the
+ * file read (storage is the step we control least — a cloud placeholder can
+ * take arbitrarily long or never return), then, once the engine actually has
+ * the bytes, a budget that grows with the document — a fixed 15s is generous
+ * for an article and tight for a 300MB scan. The slow clock is the other
+ * end — a first open compiles the wasm engine and can take seconds, which is
+ * worth saying rather than spinning through.
  */
 const LOAD_DEADLINE_MS = 15_000
+const DEADLINE_PER_MB_MS = 200
+const DEADLINE_MAX_MS = 60_000
+const READ_DEADLINE_MS = 60_000
 const SLOW_AFTER_MS = 2500
 let slowTimer: number | null = null
 let deadlineTimer: number | null = null
@@ -1595,9 +1602,21 @@ function scheduleAutoIndex(): void {
 
 onMounted(async () => {
   slowTimer = window.setTimeout(() => (loadingSlow.value = true), SLOW_AFTER_MS)
-  deadlineTimer = window.setTimeout(markDocReady, LOAD_DEADLINE_MS)
-  const buf = await fs.readBinary(props.path)
+  deadlineTimer = window.setTimeout(markDocReady, READ_DEADLINE_MS)
+  let buf: ArrayBuffer
+  try {
+    buf = await fs.readBinary(props.path)
+  } catch (err) {
+    console.error(`Failed to read PDF ${props.path}`, err)
+    markDocReady() // no engine is coming to explain; at least stop spinning
+    return
+  }
   if (disposed) return
+  if (deadlineTimer !== null) window.clearTimeout(deadlineTimer)
+  deadlineTimer = window.setTimeout(
+    markDocReady,
+    Math.min(LOAD_DEADLINE_MS + (buf.byteLength / 1_000_000) * DEADLINE_PER_MB_MS, DEADLINE_MAX_MS),
+  )
   blobUrl.value = URL.createObjectURL(new Blob([buf], { type: 'application/pdf' }))
 })
 
