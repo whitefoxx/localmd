@@ -4,9 +4,14 @@
  * list, with NO file reads and NO LLM. This is the cheap counterpart to an
  * agent reading every page: it catches broken links, orphans, unreachable
  * pages, missing frontmatter, thin/self-linking/placeholder pages, sources
- * nothing has read, dangling source declarations, and near-duplicate tags — so
- * the agent only spends tokens on the genuinely semantic checks
- * (contradictions).
+ * nothing has read, dangling source declarations, pages their own sources have
+ * moved on from, and near-duplicate tags — so the agent only spends tokens on
+ * the genuinely semantic checks (contradictions).
+ *
+ * Modification times are the one input this file cannot derive: the caller
+ * hands them in already gathered (page mtimes are in its cache anyway, source
+ * mtimes it stats for the handful of files pages actually cite). Passing none
+ * is a supported state — every other check still runs.
  *
  * Everything here reports; nothing here fixes or blocks. The KB is a soft
  * constraint — a user is free to keep an unread PDF and two spellings of a tag,
@@ -22,6 +27,9 @@ export interface LintPage {
   outgoing: string[]
   /** Link targets that resolve to no file. */
   broken: string[]
+  /** When the page file was last written. Only the staleness check reads it,
+   *  and only when the cited source's mtime is known too. */
+  mtime?: number
 }
 
 export interface LintReport {
@@ -42,6 +50,9 @@ export interface LintReport {
   unreferencedSources: string[]
   /** `[[pdfN:path]]` declarations pointing at a file that isn't in the KB. */
   danglingCitations: { path: string; targets: string[] }[]
+  /** Pages written before a source they cite was last modified — the page may
+   *  no longer say what the source says. */
+  stalePages: { path: string; sources: string[] }[]
   /** Tags that differ only in case, separator, or a trailing `s`. */
   similarTags: { variants: { tag: string; count: number }[] }[]
 }
@@ -71,6 +82,34 @@ function tagKey(tag: string): string {
   return k.endsWith('s') ? k.slice(0, -1) : k
 }
 
+/**
+ * The `[[pdfN:path]]` sources a page declares, each paired with the real file
+ * it resolves to (null when nothing in the KB can be it). One implementation
+ * for both citation checks: a declaration that resolves to nothing is dangling,
+ * and one that resolves to a file newer than the page is stale.
+ */
+function citedSources(
+  body: string,
+  files: readonly string[],
+): { declared: string; resolved: string | null }[] {
+  return [...parseCiteSources(body).values()].map((s) => ({
+    declared: s.path,
+    resolved: resolveCitePath(s.path, files as string[]),
+  }))
+}
+
+/**
+ * How much newer than a page a source must be before the gap means anything.
+ *
+ * An mtime is not a content change: a git checkout, a folder copy, or a cloud
+ * client re-downloading a file stamps everything with the moment it landed, and
+ * within such a batch the order of a page and its source is arbitrary. A minute
+ * is far longer than any of those take to write a file and far shorter than the
+ * gap this check exists to find — a source revised days after the page that
+ * summarises it.
+ */
+const CLOCK_SLACK_MS = 60_000
+
 /** index.md / log.md at any depth are structural entry points, not content. */
 export function isEntryPage(path: string): boolean {
   const p = path.toLowerCase()
@@ -86,6 +125,7 @@ export function isEntryPage(path: string): boolean {
 export function computeLint(
   pages: ReadonlyMap<string, LintPage>,
   files: readonly string[] = [],
+  sourceMtimes: ReadonlyMap<string, number> = new Map(),
 ): LintReport {
   // Inbound map (self-links excluded).
   const inbound = new Map<string, Set<string>>()
@@ -106,6 +146,7 @@ export function computeLint(
   const selfLinks: string[] = []
   const placeholders: string[] = []
   const danglingCitations: LintReport['danglingCitations'] = []
+  const stalePages: LintReport['stalePages'] = []
   /** normalised key → original spelling → how many pages used it. */
   const tagsByKey = new Map<string, Map<string, number>>()
 
@@ -127,11 +168,32 @@ export function computeLint(
     // A declared citation path is a claim, not a fact — resolveCitePath accepts
     // a unique basename match so moving a file (the user's right) doesn't turn
     // every page that cites it red. Only what it can't place at all is dangling.
+    //
+    // The same declarations answer the other half: a page claims to have read
+    // what it cites, so a source revised after the page was last written is the
+    // one drift this file can prove without reading a word. Deliberately NOT
+    // extended to pages that merely name a file (what `unreferencedSources`
+    // matches on) — naming a source is not claiming to have compiled it, and a
+    // check that cannot say why it fired does not belong here.
     if (files.length) {
-      const missing = [...parseCiteSources(body).values()]
-        .map((s) => s.path)
-        .filter((p) => resolveCitePath(p, files as string[]) === null)
+      const missing: string[] = []
+      const outrun: string[] = []
+      for (const { declared, resolved } of citedSources(body, files)) {
+        if (resolved === null) {
+          missing.push(declared)
+          continue
+        }
+        const sourceMtime = sourceMtimes.get(resolved)
+        if (
+          page.mtime !== undefined &&
+          sourceMtime !== undefined &&
+          sourceMtime - page.mtime > CLOCK_SLACK_MS
+        ) {
+          outrun.push(resolved)
+        }
+      }
       if (missing.length) danglingCitations.push({ path, targets: [...new Set(missing)] })
+      if (outrun.length) stalePages.push({ path, sources: [...new Set(outrun)] })
     }
 
     if (isEntryPage(path)) continue // skip page-quality checks for index/log
@@ -205,6 +267,7 @@ export function computeLint(
   placeholders.sort(byPath)
   unreferencedSources.sort(byPath)
   danglingCitations.sort((a, b) => byPath(a.path, b.path))
+  stalePages.sort((a, b) => byPath(a.path, b.path))
   similarTags.sort((a, b) => byPath(a.variants[0].tag, b.variants[0].tag))
 
   return {
@@ -219,8 +282,28 @@ export function computeLint(
     placeholders,
     unreferencedSources,
     danglingCitations,
+    stalePages,
     similarTags,
   }
+}
+
+/**
+ * Every file the KB's pages declare as a source, resolved and de-duplicated —
+ * the caller's shopping list for `sourceMtimes`. Usually a handful of
+ * documents, which is the point: statting only what something actually cites
+ * keeps the staleness check off the critical path of a KB with a large `data/`
+ * folder, where statting every source candidate would not.
+ */
+export function declaredSourcePaths(
+  pages: ReadonlyMap<string, LintPage>,
+  files: readonly string[],
+): string[] {
+  const out = new Set<string>()
+  for (const page of pages.values()) {
+    const { body } = splitFrontmatter(page.content)
+    for (const { resolved } of citedSources(body, files)) if (resolved) out.add(resolved)
+  }
+  return [...out]
 }
 
 /** Per-category cap in the rendered report — counts stay exact, long path
@@ -246,6 +329,7 @@ export function formatLintReport(r: LintReport): string {
     `${r.noFrontmatter.length} no-frontmatter · ${r.thin.length} thin · ` +
     `${r.unreferencedSources.length} unread sources · ` +
     `${r.danglingCitations.length} with dangling citations · ` +
+    `${r.stalePages.length} behind their sources · ` +
     `${r.similarTags.length} tag collisions`
 
   const broken = r.brokenLinks.length
@@ -259,6 +343,12 @@ export function formatLintReport(r: LintReport): string {
   const dangling = r.danglingCitations.length
     ? `\n\nDangling source declarations ([[pdfN:path]] with no such file):\n` +
       capped(r.danglingCitations.map((d) => `${d.path} → ${d.targets.join(', ')}`))
+    : ''
+  const stale = r.stalePages.length
+    ? `\n\nPages older than a source they cite (the source was revised after the page ` +
+      `was last written — re-read the source before trusting the page, and never ` +
+      `rewrite a page from memory to "fix" this):\n` +
+      capped(r.stalePages.map((p) => `${p.path} → ${p.sources.join(', ')}`))
     : ''
   const tags = r.similarTags.length
     ? `\n\nNear-duplicate tags (same tag, different spellings — most-used first):\n` +
@@ -276,10 +366,12 @@ export function formatLintReport(r: LintReport): string {
     list('Placeholder links ([[…]])', r.placeholders) +
     list('Sources no page mentions (unread material)', r.unreferencedSources) +
     dangling +
+    stale +
     tags
 
   const tail =
-    `\n\nThis is STRUCTURAL only. Semantic checks (contradictions, stale claims) require ` +
+    `\n\nThis is STRUCTURAL only. Semantic checks (contradictions, claims that no longer ` +
+    `match what the source now says) require ` +
     `reading page content and are token-heavy — report the above first, then ask the user ` +
     `before scanning content (and let them narrow the scope).`
 

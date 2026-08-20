@@ -73,8 +73,15 @@ Ask the assistant for a health check and it runs the same pass in full. On top
 of those two it reports pages that are nearly empty, pages you cannot reach by
 navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
-there, and tags that are the same word spelled two ways (`machine-learning` and
+there, pages you wrote before a document they cite was last changed, and tags
+that are the same word spelled two ways (`machine-learning` and
 `Machine Learning`).
+
+That last one is worth a word of caution, because it compares timestamps rather
+than meaning: a file that was only re-saved, re-downloaded by a sync client, or
+freshly checked out looks exactly like one that was rewritten. Read the page
+against the document before changing anything — and never let the assistant
+rewrite a page from memory to make the warning go away.
 
 All of it is fast, free, and does not involve reading a single page — so it is
 also honest about its limits. It is a list of things you might want to look at,

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { computeLint, formatLintReport, isEntryPage, type LintPage } from './lint'
+import {
+  computeLint,
+  declaredSourcePaths,
+  formatLintReport,
+  isEntryPage,
+  type LintPage,
+} from './lint'
 
 function page(content: string, outgoing: string[] = [], broken: string[] = []): LintPage {
   return { content, outgoing, broken }
@@ -114,6 +120,64 @@ describe('computeLint — file-aware checks', () => {
   })
 })
 
+describe('computeLint — pages their sources moved on from', () => {
+  const FILES = ['wiki/a.md', 'wiki/b.md', 'raw/papers/read.pdf']
+  const DAY = 86_400_000
+  const cites = (mtime: number): LintPage => ({
+    ...page(FM + 'Cites [[pdf1:raw/papers/read.pdf]].'),
+    mtime,
+  })
+  const sourceAt = (mtime: number): Map<string, number> =>
+    new Map([['raw/papers/read.pdf', mtime]])
+
+  it('flags a page whose cited source was revised after it', () => {
+    const kb = new Map<string, LintPage>([['wiki/a.md', cites(0)]])
+    expect(computeLint(kb, FILES, sourceAt(DAY)).stalePages).toEqual([
+      { path: 'wiki/a.md', sources: ['raw/papers/read.pdf'] },
+    ])
+  })
+
+  it('says nothing when the page is the newer of the two', () => {
+    const kb = new Map<string, LintPage>([['wiki/a.md', cites(DAY)]])
+    expect(computeLint(kb, FILES, sourceAt(0)).stalePages).toEqual([])
+  })
+
+  /** A checkout or a sync stamps a whole folder at once, and the order within
+   *  the batch is arbitrary — treating that as drift would fire on every fresh
+   *  clone, which is the fastest way to teach someone to ignore a check. */
+  it('ignores a gap small enough to be one checkout writing both files', () => {
+    const kb = new Map<string, LintPage>([['wiki/a.md', cites(0)]])
+    expect(computeLint(kb, FILES, sourceAt(5_000)).stalePages).toEqual([])
+  })
+
+  /** Naming a file is not claiming to have read it — only a declaration is. */
+  it('does not flag a page that merely mentions the source', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', { ...page(FM + 'See raw/papers/read.pdf for more.'), mtime: 0 }],
+    ])
+    expect(computeLint(kb, FILES, sourceAt(DAY)).stalePages).toEqual([])
+  })
+
+  it('stays quiet when either mtime is missing', () => {
+    const noPageMtime = new Map<string, LintPage>([
+      ['wiki/a.md', page(FM + 'Cites [[pdf1:raw/papers/read.pdf]].')],
+    ])
+    expect(computeLint(noPageMtime, FILES, sourceAt(DAY)).stalePages).toEqual([])
+    const kb = new Map<string, LintPage>([['wiki/a.md', cites(0)]])
+    expect(computeLint(kb, FILES).stalePages).toEqual([])
+  })
+
+  /** The caller stats what this returns, so a source it forgets can never be
+   *  compared — and a dangling declaration must not become a stat attempt. */
+  it('lists the resolved sources a caller has to stat, and only those', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', cites(0)],
+      ['wiki/b.md', page(FM + 'Cites [[pdf1:read.pdf]] and [[pdf2:raw/papers/gone.pdf]].')],
+    ])
+    expect(declaredSourcePaths(kb, FILES)).toEqual(['raw/papers/read.pdf'])
+  })
+})
+
 describe('computeLint — tag hygiene', () => {
   const tagged = (tags: string): LintPage => page(`---\ntags: ${tags}\n---\nbody`)
 
@@ -168,6 +232,23 @@ describe('formatLintReport', () => {
     expect(out).toContain('KB structural health — 6 pages')
     expect(out).toContain('Broken wikilinks')
     expect(out).toMatch(/confirm scope with the user|ask the user/i)
+  })
+
+  /** The rendered line is the only place the agent learns what to do with a
+   *  stale page — and "rewrite it from memory" is the one wrong answer, since
+   *  that replaces stale content with invented content. */
+  it('tells the agent to re-read the source rather than rewrite the page', () => {
+    const files = ['wiki/a.md', 'raw/papers/read.pdf']
+    const kb = new Map<string, LintPage>([
+      [
+        'wiki/a.md',
+        { ...page(FM + 'Cites [[pdf1:raw/papers/read.pdf]].'), mtime: 0 },
+      ],
+    ])
+    const out = formatLintReport(computeLint(kb, files, new Map([['raw/papers/read.pdf', 86_400_000]])))
+    expect(out).toContain('1 behind their sources')
+    expect(out).toContain('wiki/a.md → raw/papers/read.pdf')
+    expect(out).toMatch(/never rewrite a page from memory/i)
   })
 
   it('reports a clean KB', () => {

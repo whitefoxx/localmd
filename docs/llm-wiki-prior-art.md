@@ -75,6 +75,12 @@ obvious, and nothing is rewritten.
 
 ### ⏸ Volatility and a freshness score (nvk C14/C15, `wiki-structure.md`)
 
+> **Partly superseded 2026-08-20.** The "minimal honest version" this entry
+> describes is now shipped: `stalePages` reports a page whose declared source
+> was modified after the page was, and `danglingCitations` already covered the
+> other half. The composite score below remains deferred, and for the reason
+> given — what shipped is two facts, not a number.
+
 Pages carry `volatility: hot|warm|cold` plus a `verified:` date; freshness is a
 0–100 composite of source age, verification recency, compilation recency and
 source-chain integrity, with the decay curve scaled by tier and the threshold
@@ -87,6 +93,21 @@ currently ask for. If we revisit, the minimal honest version is two
 deterministic facts, not a score: *this page cites sources that no longer
 exist* (already shipped as `danglingCitations`), and *this page is older than
 the sources it cites*. Both are computable from mtimes and the existing graph.
+
+That second fact is what shipped, and two calls in it are worth recording:
+
+- **The relation is the declaration, not the mention.** Staleness follows
+  `[[pdfN:path]]` only — a page citing a document claims to have read it,
+  whereas naming a file in passing claims nothing. `unreferencedSources` can
+  afford to match on any mention because its finding ("nothing has ever named
+  this file") cannot be a false alarm; this one cannot.
+- **A minute of slack, because an mtime is not a content change.** A checkout,
+  a folder copy, or a sync client re-downloading a file stamps a whole tree at
+  once, and the order of a page and its source inside that batch is arbitrary.
+  Firing on a fresh clone is the fastest way to teach someone to ignore a
+  check. Their refusal to auto-fix is kept: the rendered finding tells the
+  agent to re-read the source and explicitly forbids rewriting the page from
+  memory.
 
 ### ⏸ On-disk `_index.md` navigation layer + derived-index protocol (nvk)
 

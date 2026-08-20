@@ -203,6 +203,10 @@ agent pipeline (docs/token-optimization.md has the full log):
   path a user would rather than only the store beneath it. This is not
   ceremony: shaping real API responses caught a placeholder-regex bug that a
   fully green suite did not. Restore any real settings you mutate while testing.
+  One trap when the KB under test is the **demo**: it lives in memory, so any
+  source edit you make while that tab is open triggers HMR, re-seeds it, and
+  silently throws away the KB state you set up to test. Finish the browser pass
+  before touching `src/` again.
 - Every UI string goes through `t('ns.key')` with both `en` and `zh` entries
   (tests enforce catalog parity and key existence).
 - Commit in stages, one concern per commit; ask before committing.

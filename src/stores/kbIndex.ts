@@ -9,7 +9,7 @@ import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
 import { isCitationToken } from '@/lib/citations'
-import { computeLint, type LintReport } from '@/lib/lint'
+import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
@@ -62,6 +62,10 @@ const MAX_HITS = 100
 export const useKbIndexStore = defineStore('kbIndex', () => {
   const pages = ref<Map<string, CachedPage>>(new Map())
   const docSections = ref<Map<string, DocSection>>(new Map())
+  /** Source file → mtime, for the sources pages actually cite. Kept next to
+   *  the page cache because the staleness check compares the two, and the page
+   *  half is already here — the index is mtime-keyed to begin with. */
+  const sourceMtimes = ref<Map<string, number>>(new Map())
   const refreshing = ref(false)
 
   /** Coalesced passes: a request arriving mid-run schedules exactly one more
@@ -136,7 +140,22 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       changed = true
     }
     if (changed) pages.value = next
+    await refreshSourceMtimes(next)
     await refreshDocSections()
+  }
+
+  /** Stat the sources pages declare with `[[pdfN:path]]`. Only those: a page
+   *  citing a document is claiming to have read it, which is what makes "the
+   *  document changed after the page did" worth saying, and it keeps this to a
+   *  handful of stats rather than one per file in the KB. */
+  async function refreshSourceMtimes(current: Map<string, CachedPage>): Promise<void> {
+    const files = useFilesStore()
+    const next = new Map<string, number>()
+    for (const path of declaredSourcePaths(current, files.allFiles)) {
+      const mtime = await fs.statMtime(path)
+      if (mtime !== null) next.set(path, mtime)
+    }
+    sourceMtimes.value = next
   }
 
   /** Cache the section files of every PDF/EPUB/DOCX index, so document content
@@ -211,7 +230,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    *  added or moved since the last content read is judged against what is on
    *  disk now. */
   function lintReport(): LintReport {
-    return computeLint(pages.value, useFilesStore().allFiles)
+    return computeLint(pages.value, useFilesStore().allFiles, sourceMtimes.value)
   }
 
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
@@ -325,6 +344,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   function reset(): void {
     pages.value = new Map()
     docSections.value = new Map()
+    sourceMtimes.value = new Map()
   }
 
   return { pages, refreshing, refresh, backlinks, lintReport, types, graph, health, search, findBlockSources, reset }
