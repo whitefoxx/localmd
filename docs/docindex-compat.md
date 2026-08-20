@@ -95,9 +95,29 @@ the inheritance chain).
 
 ## Measurements (2026-08, PageIndex example corpus)
 
-Current pipeline over nine real PDFs — the baseline for future algorithm
-work. `branch` is `pickStructure`'s choice; section chars are per-section
-extracted text.
+### Builder 2 (boilerplate + relative levels + spread boundaries)
+
+What the first algorithm bump changed, same corpus, re-measured:
+
+| document | branch | sections | notes |
+|---|---|---:|---|
+| earthmover | pages → **headings** | 12 → 8 | the fix target: 1.11× section headings now rank; real structure |
+| four-lectures | headings → headings | 53 junk → **4** | degenerate-metrics guard + numbering-only fallback |
+| fed-2023-truncated | headings → headings | 12 → 7 | chapter-grain boundaries (max section grew to 55k — rebalance target) |
+| q1-fy25-earnings | pages → pages | 22 → 22 | tables; per-page honestly right |
+| all outline docs | outline → outline | unchanged | zero regression (43/132/268/8/16 sections identical) |
+
+Golden diff at the bump: identical block set (233), identical ids (0
+lost / 0 gained), 3 running headers re-kinded boilerplate, heading levels
+went from a 2-step absolute split to ranked 1/2/3. The demo index was
+regenerated THROUGH inheritance (buildDemoIndex seeds the published
+locations.json before rebuilding) — all 1357 published ids carried, demo
+note citations verified clicking through in the browser.
+
+### Builder 1 baseline
+
+The original pipeline over nine real PDFs — kept for comparison. `branch`
+is `pickStructure`'s choice; section chars are per-section extracted text.
 
 | document | pages | blocks | outline | L1-heading pages | branch | sections | section chars (min/med/max) |
 |---|---:|---:|---:|---:|---|---:|---|
@@ -111,16 +131,20 @@ extracted text.
 | reg-BI proposed rule | 408 | 10,430 | 162 | 0 | outline | 132 | 1.5k / 5.2k / 27.0k |
 | PRML | 758 | 20,914 | 285 | 53 | outline | 268 | 1.0k / 4.8k / 59.5k |
 
-What the numbers already say, for whoever does the algorithm pass:
+What these numbers said, and what became of it (builder 2 addressed the
+first two; the third is the open target):
 
-- the `pages` fallback is real, not hypothetical — papers without an embedded
-  outline (earthmover, q1-earnings) land there and get one file per page;
-- heading detection over-fires on some layouts (four-lectures: an L1 heading
-  on all 53 pages) and under-fires on others (both SEC releases: 0 L1 pages
-  despite obvious structure);
-- big documents produce sections near the 100k read cap (fed-full 80.5k max)
-  — the section-rebalancing idea (PageIndex's merge/expand cost model, minus
-  the LLM) has a measured target.
+- the `pages` fallback was real — papers without an embedded outline
+  (earthmover, q1-earnings) landed there → fixed for prose docs by relative
+  levels + spread boundaries; tables (q1) stay per-page, correctly;
+- heading detection over-fired on degenerate metrics (four-lectures: an "L1"
+  on all 53 pages — line heights of 3.5 vs 1.5 with the median between
+  them) and under-fired on close ratios (earthmover: 1.11× headings under
+  the old 1.18 floor) → degenerate guard + CANDIDATE_FLOOR 1.08 + ranking;
+- big documents still produce sections near the 100k read cap (fed-full
+  80.5k, now 55k in the truncated cut too) — the section-rebalancing idea
+  (PageIndex's merge/expand cost model, minus the LLM) remains the next
+  measured target.
 
 The harness lives in the session scratchpad (`measure.ts`, esbuild-bundled,
 pdfjs-dist legacy under Node); it hand-mirrors `pickStructure`/`buildSections`
