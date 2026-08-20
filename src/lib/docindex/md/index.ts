@@ -8,7 +8,10 @@ import { indexDirFor, pad, readFreshManifest, sha256Hex, slugify, writeAll } fro
 import { parseMarkdownDoc, type MdBlock, type MdSection } from './parse'
 import { extractTitle, baseName } from '@/lib/wiki'
 
+/** READ CONTRACT — see pdf/types.ts for the INDEX_VERSION/BUILDER split. */
 export const INDEX_VERSION = 1
+/** Algorithm revision — a rebuild suggestion, never an invalidation. */
+export const BUILDER = 1
 
 export interface MdSectionMeta {
   index: number
@@ -19,6 +22,8 @@ export interface MdSectionMeta {
 
 export interface MdIndexManifest {
   version: number
+  /** Algorithm revision that produced this index (absent = 1, pre-split). */
+  builder?: number
   /** KB-relative path of the markdown source. */
   source: string
   title: string
@@ -34,13 +39,19 @@ export interface MdParseResult {
   cached: boolean
 }
 
-export async function indexMarkdown(source: string): Promise<MdParseResult> {
+export async function indexMarkdown(
+  source: string,
+  opts: { force?: boolean } = {},
+): Promise<MdParseResult> {
   const indexDir = indexDirFor('md', source)
   const content = await fs.readFile(source)
   const contentHash = await sha256Hex(new TextEncoder().encode(content).buffer as ArrayBuffer)
 
-  const fresh = await readFreshManifest<MdIndexManifest>(indexDir, INDEX_VERSION, contentHash)
-  if (fresh) return { indexDir, manifest: fresh, cached: true }
+  // Older-builder indexes stay fresh — only an explicit `force` rebuilds.
+  if (!opts.force) {
+    const fresh = await readFreshManifest<MdIndexManifest>(indexDir, INDEX_VERSION, contentHash)
+    if (fresh) return { indexDir, manifest: fresh, cached: true }
+  }
 
   const title = extractTitle(content) ?? baseName(source).replace(/\.md$/i, '')
   const sections = parseMarkdownDoc(content, title)
@@ -60,6 +71,7 @@ export async function indexMarkdown(source: string): Promise<MdParseResult> {
 
   const manifest: MdIndexManifest = {
     version: INDEX_VERSION,
+    builder: BUILDER,
     source,
     title,
     blockCount: sections.reduce((n, s) => n + s.blocks.length, 0),

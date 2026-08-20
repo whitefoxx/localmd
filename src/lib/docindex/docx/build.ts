@@ -4,7 +4,7 @@
  * Mirrors the EPUB index so the agent navigates every document the same way.
  */
 import { pad, slugify, writeAll } from '../util'
-import { INDEX_VERSION, type DocxBlock, type DocxIndexManifest, type DocxSectionMeta } from './types'
+import { BUILDER, INDEX_VERSION, type DocxBlock, type DocxIndexManifest, type DocxSectionMeta } from './types'
 
 interface BuildInput {
   /** KB-relative path of the index directory to write into. */
@@ -36,6 +36,7 @@ export async function buildIndex(input: BuildInput): Promise<DocxIndexManifest> 
 
   const manifest: DocxIndexManifest = {
     version: INDEX_VERSION,
+    builder: BUILDER,
     source,
     title,
     blockCount: blocks.length,

@@ -17,13 +17,17 @@ export interface DocxParseResult {
 export async function parseDocx(
   source: string,
   onProgress: (current: number, total: number) => void = () => {},
+  opts: { force?: boolean } = {},
 ): Promise<DocxParseResult> {
   const indexDir = indexDirFor('docx', source)
   const bytes = await fs.readBinary(source)
   const contentHash = await sha256Hex(bytes)
 
-  const fresh = await readFreshManifest<DocxIndexManifest>(indexDir, INDEX_VERSION, contentHash)
-  if (fresh) return { indexDir, manifest: fresh, cached: true }
+  // Older-builder indexes stay fresh — only an explicit `force` rebuilds.
+  if (!opts.force) {
+    const fresh = await readFreshManifest<DocxIndexManifest>(indexDir, INDEX_VERSION, contentHash)
+    if (fresh) return { indexDir, manifest: fresh, cached: true }
+  }
 
   const fallbackTitle = (source.split('/').pop() ?? source).replace(/\.docx?$/i, '')
   const extracted = await extractDocx(bytes, fallbackTitle, onProgress)

@@ -1,0 +1,4175 @@
+[
+ {
+  "id": "b1-1",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "15",
+  "rects": [
+   {
+    "x": 0.8726,
+    "y": 0.0463,
+    "w": 0.0176,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b1-2",
+  "page": 1,
+  "kind": "heading",
+  "level": 1,
+  "text": "3 Financial Stability",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1058,
+    "w": 0.3654,
+    "h": 0.0302
+   }
+  ]
+ },
+ {
+  "id": "b1-3",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "The Federal Reserve monitors financial system risks and engages at home and abroad to help ensure that the system supports a healthy economy for U.S. households, communities, and businesses.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1934,
+    "w": 0.6725,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2135,
+    "w": 0.6531,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2337,
+    "w": 0.0867,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-4",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "In order to maintain a resilient financial system, the Federal Reserve monitors the potential buildup of risks to financial stability; uses such analyses to inform Federal Reserve responses, including the design of stress-test scenarios and decisions regarding other policy tools, such as the countercyclical capital buffer; works with other domestic agencies directly and through the Financial Stability Oversight Council (FSOC); and engages with the global community in monitoring, supervision, and regulation efforts that mitigate the risks and consequences of financial instability domestically and abroad.1",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.274,
+    "w": 0.6508,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2942,
+    "w": 0.6773,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3143,
+    "w": 0.6826,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3345,
+    "w": 0.6698,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3546,
+    "w": 0.7011,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3748,
+    "w": 0.7019,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.394,
+    "w": 0.1864,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-5",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "This section discusses key financial stability activities undertaken by the Federal Reserve over 2023, which include the following:",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.4353,
+    "w": 0.6718,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4554,
+    "w": 0.2434,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-6",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "1. monitoring vulnerabilities that affect financial stability (see figure 3.1 for a summary of key vul-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.4811,
+    "w": 0.697,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-7",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "nerabilities);",
+  "rects": [
+   {
+    "x": 0.1696,
+    "y": 0.5013,
+    "w": 0.0884,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-8",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "2. promoting a perspective on the supervision and regulation of large, complex financial institu-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.527,
+    "w": 0.6817,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-9",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "tions that accounts for the potential spillovers from distress at such institutions to the financial",
+  "rects": [
+   {
+    "x": 0.1696,
+    "y": 0.5471,
+    "w": 0.6815,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-10",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "system and broader economy; and",
+  "rects": [
+   {
+    "x": 0.1696,
+    "y": 0.5673,
+    "w": 0.2458,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-11",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "3. engaging in domestic and international cooperation and coordination.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.593,
+    "w": 0.5171,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-12",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "Periodically, Federal Reserve Board staff assess potential vulnerabilities relevant for financial system stability. These monitoring efforts promote financial stability by informing broader policy discussions and stimulating additional research.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6333,
+    "w": 0.6626,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6535,
+    "w": 0.6786,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6736,
+    "w": 0.346,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-13",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "Some of these activities are also discussed elsewhere in this annual report. A broader set of economic and financial developments are discussed in section 2, “Monetary Policy and Economic Developments,” with the discussion that follows concerning surveillance of economic and financial developments focused on financial stability. The full range of activities associated with supervision of systemically important financial institutions and designated financial market utilities is discussed in section 4, “Supervision and Regulation.”",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7139,
+    "w": 0.6975,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7341,
+    "w": 0.6699,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7543,
+    "w": 0.702,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7744,
+    "w": 0.7033,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7946,
+    "w": 0.6657,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.8147,
+    "w": 0.3626,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b1-14",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "1 For more information on how the Federal Reserve promotes a stable financial system, see the section “Promoting Finan-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.874,
+    "w": 0.6974,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b1-15",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "cial System Stability” in The Fed Explained: What the Central Bank Does, available on the Board’s website at https://",
+  "rects": [
+   {
+    "x": 0.1582,
+    "y": 0.8857,
+    "w": 0.6622,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b1-16",
+  "page": 1,
+  "kind": "text",
+  "level": 0,
+  "text": "www.federalreserve.gov/aboutthefed/files/the-fed-explained.pdf#page=50.",
+  "rects": [
+   {
+    "x": 0.1582,
+    "y": 0.897,
+    "w": 0.428,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b2-1",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "16 110th Annual Report | 2023",
+  "rects": [
+   {
+    "x": 0.1076,
+    "y": 0.0463,
+    "w": 0.2212,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b2-2",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Figure 3.1. The Federal Reserve assesses four key vulnerabilities in monitoring financial stability",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.1181,
+    "w": 0.6358,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b2-3",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Each quarter, Federal Reserve Board staff assess a set of four vulnerabilities relevant for financial system stability. These monitoring efforts promote financial stability by informing broader policy discussions and stimulating additional research.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.1509,
+    "w": 0.6549,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.1622,
+    "w": 0.6704,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.1735,
+    "w": 0.0535,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b2-4",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Borrowing by businesses",
+  "rects": [
+   {
+    "x": 0.3426,
+    "y": 0.2507,
+    "w": 0.1449,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-5",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Asset valuations",
+  "rects": [
+   {
+    "x": 0.1954,
+    "y": 0.2608,
+    "w": 0.102,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-6",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Why it matters:",
+  "rects": [
+   {
+    "x": 0.1997,
+    "y": 0.3043,
+    "w": 0.095,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-7",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Overvalued assets",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.3402,
+    "w": 0.0976,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-8",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "are a vulnerability",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.3528,
+    "w": 0.0955,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-9",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "because the",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.3655,
+    "w": 0.0661,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-10",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "unwinding of high",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.3781,
+    "w": 0.095,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-11",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "prices can be",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.3907,
+    "w": 0.0725,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-12",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "destabilizing.",
+  "rects": [
+   {
+    "x": 0.1928,
+    "y": 0.4033,
+    "w": 0.0704,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-13",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "the assets they own",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.416,
+    "w": 0.1061,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-14",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "fall in value.",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.4286,
+    "w": 0.065,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-15",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "adverse shocks.",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.4412,
+    "w": 0.0855,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-16",
+  "page": 2,
+  "kind": "heading",
+  "level": 1,
+  "text": "Monitoring Financial Vulnerabilities",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.515,
+    "w": 0.4124,
+    "h": 0.0202
+   }
+  ]
+ },
+ {
+  "id": "b2-17",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "This section describes the Federal Reserve’s monitoring of vulnerabilities in the financial system",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.5546,
+    "w": 0.6869,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-18",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "during 2023.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.5748,
+    "w": 0.0926,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-19",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Financial institutions are linked together through a complex set of relationships, and their resil-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6151,
+    "w": 0.6759,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-20",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "ience depends on the economic condition of households and businesses. In turn, the condition of",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6353,
+    "w": 0.6975,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-21",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "households and businesses hinges on the strength of financial institutions’ balance sheets, as",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6554,
+    "w": 0.6791,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-22",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "the nonfinancial sector obtains funding through the financial sector. The Federal Reserve’s meas-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6756,
+    "w": 0.6911,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-23",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "ures to monitor risks to financial stability are designed to better understand these complex link-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6957,
+    "w": 0.6824,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-24",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "ages and have been an important part of the Federal Reserve’s efforts to achieve overall eco-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7159,
+    "w": 0.6663,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-25",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "nomic stability.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7361,
+    "w": 0.1062,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-26",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "A stable financial system, when hit by adverse events, or “shocks,” is able to continue meeting",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7764,
+    "w": 0.677,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-27",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "demands for financial services from households and businesses, such as credit provision and pay-",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7965,
+    "w": 0.7033,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-28",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "ment services. By contrast, in an unstable system, these same shocks are likely to have much",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8167,
+    "w": 0.6747,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-29",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "larger effects, disrupting the flow of credit and leading to declines in employment and economic",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8368,
+    "w": 0.6814,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-30",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "activity.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.857,
+    "w": 0.0524,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-31",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Leverage in the",
+  "rects": [
+   {
+    "x": 0.5334,
+    "y": 0.2507,
+    "w": 0.0952,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-32",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "and households",
+  "rects": [
+   {
+    "x": 0.3704,
+    "y": 0.2659,
+    "w": 0.0932,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-33",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "financial sector",
+  "rects": [
+   {
+    "x": 0.5341,
+    "y": 0.2659,
+    "w": 0.098,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-34",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Funding risk",
+  "rects": [
+   {
+    "x": 0.7125,
+    "y": 0.2608,
+    "w": 0.0771,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-35",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Why it matters:",
+  "rects": [
+   {
+    "x": 0.3677,
+    "y": 0.3043,
+    "w": 0.095,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-36",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Why it matters:",
+  "rects": [
+   {
+    "x": 0.5356,
+    "y": 0.3043,
+    "w": 0.095,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-37",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Why it matters:",
+  "rects": [
+   {
+    "x": 0.7036,
+    "y": 0.3043,
+    "w": 0.095,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b2-38",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Excessive borrowing",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.3402,
+    "w": 0.1066,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-39",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Excessive leverage",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.3402,
+    "w": 0.0981,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-40",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "Funding risks expose",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.3402,
+    "w": 0.1118,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-41",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "by businesses and",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.3528,
+    "w": 0.0998,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-42",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "within the financial",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.3528,
+    "w": 0.1015,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-43",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "the financial system",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.3528,
+    "w": 0.1075,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-44",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "households leaves",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.3655,
+    "w": 0.099,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-45",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "sector increases the",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.3655,
+    "w": 0.1078,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-46",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "to the possibility",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.3655,
+    "w": 0.0885,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-47",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "them vulnerable to",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.3781,
+    "w": 0.1008,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-48",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "risk that financial",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.3781,
+    "w": 0.0925,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-49",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "that investors will",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.3781,
+    "w": 0.0925,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-50",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "distress if their",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.3907,
+    "w": 0.079,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-51",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "institutions will not",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.3907,
+    "w": 0.1007,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-52",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "“run” by quickly",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.3907,
+    "w": 0.0838,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-53",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "incomes decline or",
+  "rects": [
+   {
+    "x": 0.363,
+    "y": 0.4033,
+    "w": 0.1018,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-54",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "have the ability to",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.4033,
+    "w": 0.0955,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-55",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "withdrawing their",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.4033,
+    "w": 0.0907,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-56",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "absorb even modest",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.416,
+    "w": 0.1092,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-57",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "funds from a",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.416,
+    "w": 0.0682,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-58",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "losses when hit by",
+  "rects": [
+   {
+    "x": 0.5277,
+    "y": 0.4286,
+    "w": 0.0983,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-59",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "particular institution",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.4286,
+    "w": 0.1076,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b2-60",
+  "page": 2,
+  "kind": "text",
+  "level": 0,
+  "text": "or sector.",
+  "rects": [
+   {
+    "x": 0.6948,
+    "y": 0.4412,
+    "w": 0.0497,
+    "h": 0.0114
+   }
+  ]
+ },
+ {
+  "id": "b3-1",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Financial Stability 17",
+  "rects": [
+   {
+    "x": 0.7389,
+    "y": 0.0463,
+    "w": 0.1513,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b3-2",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Consistent with this view of financial stability, the Federal Reserve Board’s monitoring framework distinguishes between shocks to and vulnerabilities of the financial system. Shocks, such as sudden changes to financial or economic conditions, are inherently hard to predict. Vulnerabilities tend to build up over time and are the aspects of the financial system that are most expected to cause widespread problems in times of stress.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1102,
+    "w": 0.6873,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1304,
+    "w": 0.6621,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1505,
+    "w": 0.6951,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1707,
+    "w": 0.6875,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1909,
+    "w": 0.3352,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-3",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Accordingly, the Federal Reserve maintains a flexible, forward-looking financial stability monitoring program focused on assessing how the level and configuration of those vulnerabilities affect the financial system’s resilience to a wide range of potential adverse shocks.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.2312,
+    "w": 0.693,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2513,
+    "w": 0.6859,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2715,
+    "w": 0.5223,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-4",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Each quarter, Federal Reserve Board staff assess a set of vulnerabilities relevant for financial stability, including, but not limited to, asset valuation pressures, borrowing by households and businesses, leverage in the financial sector, and funding risk. These monitoring efforts inform discussions concerning policies to promote financial stability, such as supervision and regulatory policies as well as monetary policy. They also inform Federal Reserve interactions with broader monitoring efforts, such as those by the FSOC and the Financial Stability Board (FSB).",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.3118,
+    "w": 0.6975,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.332,
+    "w": 0.6837,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3521,
+    "w": 0.6905,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3723,
+    "w": 0.704,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3924,
+    "w": 0.695,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4126,
+    "w": 0.5316,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-5",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Since 2018, the Federal Reserve Board has also published its Financial Stability Report, which summarizes the Board’s framework for assessing the resilience of the U.S. financial system and presents the Board’s current assessment of financial system vulnerabilities.2 It aims to promote public understanding about Federal Reserve views on this topic and thereby increase transparency and accountability. The report complements the annual report of the FSOC, which is chaired by the Secretary of the Treasury and includes the Federal Reserve Chair and other financial regulators.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.4529,
+    "w": 0.6727,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4731,
+    "w": 0.6866,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4923,
+    "w": 0.6875,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5134,
+    "w": 0.7013,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5335,
+    "w": 0.7015,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5537,
+    "w": 0.6822,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-6",
+  "page": 3,
+  "kind": "heading",
+  "level": 2,
+  "text": "Asset Valuation Pressures",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.5909,
+    "w": 0.2295,
+    "h": 0.0151
+   }
+  ]
+ },
+ {
+  "id": "b3-7",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Overvalued assets are a vulnerability because the unwinding of high prices can be destabilizing, especially if the assets are widely held and the values are supported by excessive leverage, maturity transformation, or risk opacity. Moreover, stretched asset valuations may be an indicator of a broader buildup in risk-taking. Because it is very difficult to judge whether an asset price is overvalued relative to fundamentals, the Federal Reserve’s analysis of asset valuation pressures typically tracks a broad range of measures, including price volatility, underwriting standards, and investor flows.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.6192,
+    "w": 0.6837,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6394,
+    "w": 0.7035,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6595,
+    "w": 0.6823,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6797,
+    "w": 0.6852,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6998,
+    "w": 0.6919,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.72,
+    "w": 0.6575,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7402,
+    "w": 0.1027,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-8",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "The economy remained strong over the year, and the economic outlook centered on continued growth. Against this backdrop, valuation pressures across different sectors remained notable.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.7805,
+    "w": 0.6676,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.8006,
+    "w": 0.6689,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b3-9",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "2 See Board of Governors of the Federal Reserve System, Financial Stability Report (Washington: Board of Governors,",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8627,
+    "w": 0.6688,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b3-10",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "April 2024), https://www.federalreserve.gov/publications/files/financial-stability-report-20240419.pdf; and Board of",
+  "rects": [
+   {
+    "x": 0.1582,
+    "y": 0.8743,
+    "w": 0.6654,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b3-11",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "Governors of the Federal Reserve System, Financial Stability Report (Washington: Board of Governors, October 2023),",
+  "rects": [
+   {
+    "x": 0.1582,
+    "y": 0.8857,
+    "w": 0.6699,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b3-12",
+  "page": 3,
+  "kind": "text",
+  "level": 0,
+  "text": "https://www.federalreserve.gov/publications/files/financial-stability-report-20231020.pdf.",
+  "rects": [
+   {
+    "x": 0.1582,
+    "y": 0.897,
+    "w": 0.5171,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-1",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "18 110th Annual Report | 2023",
+  "rects": [
+   {
+    "x": 0.1076,
+    "y": 0.0463,
+    "w": 0.2212,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b4-2",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Equity prices were still high relative to earnFigure 3.2. Aggregate forward price-to-earnings ratio of S&P 500 firms, 1989–2023",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.1102,
+    "w": 0.3097,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1565,
+    "y": 0.1181,
+    "w": 0.3117,
+    "h": 0.0113
+   },
+   {
+    "x": 0.1565,
+    "y": 0.1307,
+    "w": 0.2337,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b4-3",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Ratio",
+  "rects": [
+   {
+    "x": 0.4224,
+    "y": 0.1746,
+    "w": 0.0247,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-4",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "30",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.182,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-5",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Monthly",
+  "rects": [
+   {
+    "x": 0.1765,
+    "y": 0.1901,
+    "w": 0.0329,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-6",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "24",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.2133,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-7",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "21",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.2289,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-8",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Median",
+  "rects": [
+   {
+    "x": 0.1831,
+    "y": 0.2515,
+    "w": 0.0312,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-9",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "12",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.2758,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-10",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "9",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.2914,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-11",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "1993 1998 2003 2008 2013 2018 2023 6",
+  "rects": [
+   {
+    "x": 0.1887,
+    "y": 0.307,
+    "w": 0.2815,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-12",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Note: Based on expected earnings for 12 months ahead. The median value is 15.6.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.3386,
+    "w": 0.2822,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.3499,
+    "w": 0.1925,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-13",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Source: Federal Reserve Board staff calculations usingRefinitiv, Institutional Brokers’ Estimate System esti-",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.3676,
+    "w": 0.3129,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-14",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "mates.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.3902,
+    "w": 0.0397,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-15",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Figure 3.3. Corporate bond spreads to similar-maturity Treasury securities, 1997–2023",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.4504,
+    "w": 0.2512,
+    "h": 0.0113
+   },
+   {
+    "x": 0.1565,
+    "y": 0.463,
+    "w": 0.2359,
+    "h": 0.0113
+   },
+   {
+    "x": 0.1565,
+    "y": 0.4756,
+    "w": 0.0778,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b4-16",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Percentage points 12 11 109",
+  "rects": [
+   {
+    "x": 0.1797,
+    "y": 0.5194,
+    "w": 0.0895,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.5269,
+    "w": 0.0134,
+    "h": 0.0101
+   },
+   {
+    "x": 0.157,
+    "y": 0.5373,
+    "w": 0.0128,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1569,
+    "y": 0.5478,
+    "w": 0.013,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-17",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "8 7 65",
+  "rects": [
+   {
+    "x": 0.1632,
+    "y": 0.5686,
+    "w": 0.0067,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1632,
+    "y": 0.579,
+    "w": 0.0067,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1632,
+    "y": 0.5894,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-18",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "4 3 21",
+  "rects": [
+   {
+    "x": 0.1632,
+    "y": 0.6103,
+    "w": 0.0067,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1632,
+    "y": 0.6207,
+    "w": 0.0067,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1632,
+    "y": 0.6311,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-19",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "0",
+  "rects": [
+   {
+    "x": 0.1632,
+    "y": 0.6519,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-20",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Note: The triple-B series reflects the option-adjusted spread of the ICE Bank of America Merrill Lynch (BofAML) triple-B U.S. Corporate Index (C0A4), and the high-yield series reflects the option-adjusted spread of the ICE BofAML U.S. High Yield Index (H0A0).",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.6835,
+    "w": 0.2976,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.6948,
+    "w": 0.2714,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7061,
+    "w": 0.3105,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7175,
+    "w": 0.3091,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7288,
+    "w": 0.2587,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-21",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Source: ICE Data Indices, LLC, used with permission.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.7465,
+    "w": 0.3028,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-22",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "households and nonfinancial businesses are hit by negative shocks to incomes or asset values,",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8183,
+    "w": 0.6854,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-23",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "they may be forced to curtail spending, which could then amplify the effects of financial shocks.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8384,
+    "w": 0.6818,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-24",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "ings (figure 3.2). In addition, real estate prices",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.1304,
+    "w": 0.3318,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-25",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "continued to be high relative to fundamentals.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.1505,
+    "w": 0.3287,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-26",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Spreads on corporate bonds and loans ended",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.1707,
+    "w": 0.3267,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-27",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "27",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.1977,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-28",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "2023 at levels below those seen over most of",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.1909,
+    "w": 0.3286,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-29",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "2022 and 2023 and similar to the levels seen",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.211,
+    "w": 0.3305,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-30",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "in the late 2010s (figure 3.3).",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.2312,
+    "w": 0.2133,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-31",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "18",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.2445,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-32",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Dec.",
+  "rects": [
+   {
+    "x": 0.4275,
+    "y": 0.2513,
+    "w": 0.0189,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-33",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "15",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.2602,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-34",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Valuation pressures in the residential real",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.2715,
+    "w": 0.2979,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-35",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "estate sector remained elevated by historical",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.2917,
+    "w": 0.321,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-36",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "standards. Despite high borrowing costs and",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.3118,
+    "w": 0.3192,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-37",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "tightening of lending standards, various house",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.332,
+    "w": 0.3295,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-38",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "price indexes showed increases over the year.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.3521,
+    "w": 0.3275,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-39",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "The price-to-rent ratio remained at the upper",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.3723,
+    "w": 0.3147,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-40",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "end of its historical distribution, supported by",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.3924,
+    "w": 0.3238,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-41",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "a tight inventory of homes for sale.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4126,
+    "w": 0.2493,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-42",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Commercial real estate (CRE) prices remained",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4529,
+    "w": 0.3293,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-43",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "high relative to fundamentals despite the con-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4731,
+    "w": 0.3271,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-44",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "tinued decline in prices in most segments.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4932,
+    "w": 0.3039,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-45",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Percentage points",
+  "rects": [
+   {
+    "x": 0.3575,
+    "y": 0.5194,
+    "w": 0.0895,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-46",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Amid low transaction volumes, transaction-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5134,
+    "w": 0.305,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-47",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "24",
+  "rects": [
+   {
+    "x": 0.4573,
+    "y": 0.5269,
+    "w": 0.013,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-48",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Monthly",
+  "rects": [
+   {
+    "x": 0.1993,
+    "y": 0.535,
+    "w": 0.0346,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-49",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "22",
+  "rects": [
+   {
+    "x": 0.4568,
+    "y": 0.5373,
+    "w": 0.0135,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-50",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "based prices may not fully reflect the deterio-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5335,
+    "w": 0.3214,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-51",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Triple-B(left scale)",
+  "rects": [
+   {
+    "x": 0.3588,
+    "y": 0.5524,
+    "w": 0.0467,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-52",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "2018",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.5478,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-53",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "ration in CRE markets, because rather than",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5537,
+    "w": 0.3083,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-54",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "16",
+  "rects": [
+   {
+    "x": 0.4573,
+    "y": 0.5686,
+    "w": 0.0129,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-55",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "High-yield",
+  "rects": [
+   {
+    "x": 0.3585,
+    "y": 0.5754,
+    "w": 0.0435,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-56",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "14",
+  "rects": [
+   {
+    "x": 0.4574,
+    "y": 0.579,
+    "w": 0.0129,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-57",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "realizing losses, owners could decide not to",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5739,
+    "w": 0.3118,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-58",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "(right scale)",
+  "rects": [
+   {
+    "x": 0.3585,
+    "y": 0.586,
+    "w": 0.0516,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b4-59",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "1210",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.5894,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-60",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "put their properties on the market and instead",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.594,
+    "w": 0.3311,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-61",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "8",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.6103,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-62",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Dec. 6",
+  "rects": [
+   {
+    "x": 0.4265,
+    "y": 0.617,
+    "w": 0.0437,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-63",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "choose to wait for more favorable conditions.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6142,
+    "w": 0.3214,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-64",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "42",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.6311,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-65",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Finally, farmland prices continued to increase,",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6343,
+    "w": 0.3268,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-66",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "0",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.6519,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-67",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "supported by high commodity prices and lim-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6545,
+    "w": 0.3181,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-68",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "1998 2003 2008 2013 2018 2023",
+  "rects": [
+   {
+    "x": 0.1927,
+    "y": 0.6633,
+    "w": 0.2502,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b4-69",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "ited farmland inventories.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6746,
+    "w": 0.1819,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-70",
+  "page": 4,
+  "kind": "heading",
+  "level": 2,
+  "text": "Borrowing by Households and",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7118,
+    "w": 0.2585,
+    "h": 0.0151
+   }
+  ]
+ },
+ {
+  "id": "b4-71",
+  "page": 4,
+  "kind": "heading",
+  "level": 2,
+  "text": "Businesses",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7295,
+    "w": 0.0994,
+    "h": 0.0151
+   }
+  ]
+ },
+ {
+  "id": "b4-72",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "Excessive borrowing by households and busi-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7578,
+    "w": 0.3208,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-73",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "nesses has been an important contributor to",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.778,
+    "w": 0.3197,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b4-74",
+  "page": 4,
+  "kind": "text",
+  "level": 0,
+  "text": "past financial crises. When highly indebted",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7981,
+    "w": 0.3052,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-1",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Financial Stability 19",
+  "rects": [
+   {
+    "x": 0.7389,
+    "y": 0.0463,
+    "w": 0.1513,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b5-2",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "In turn, financial stress among households and businesses can lead to mounting losses at financial institutions, creating an adverse feedback loop in which weaknesses among households, nonfinancial businesses, and financial institutions cause further declines in income and accelerate financial losses, potentially leading to financial instability and a sharp contraction in economic activity.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1102,
+    "w": 0.6923,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1304,
+    "w": 0.698,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1505,
+    "w": 0.6795,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1707,
+    "w": 0.6708,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1909,
+    "w": 0.0524,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-3",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "A commonly used measure of the financial",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.2312,
+    "w": 0.3036,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-4",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Figure 3.4. Private nonfinancial-sector position of households and businesses is the ratio of the combined total debt of nonfinancial businesses and households relative to",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.2384,
+    "w": 0.2516,
+    "h": 0.0113
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2513,
+    "w": 0.3258,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2715,
+    "w": 0.3143,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2917,
+    "w": 0.3055,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-5",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "2.0",
+  "rects": [
+   {
+    "x": 0.8255,
+    "y": 0.3023,
+    "w": 0.0165,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-6",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "gross domestic product (GDP). Total debt declined over the year, even as nominal GDP continued to grow in 2023, leaving the creditto-GDP ratio close to its lowest level in 20 years (figure 3.4). This development suggests that, in the aggregate, households and businesses do not appear to have borrowed excessively.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.3118,
+    "w": 0.2925,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.332,
+    "w": 0.3164,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3521,
+    "w": 0.3222,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3723,
+    "w": 0.2747,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3924,
+    "w": 0.3157,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4126,
+    "w": 0.3192,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4328,
+    "w": 0.3132,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.4529,
+    "w": 0.0837,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-7",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Separate examination of business and household borrowing yields some additional insights. The gross leverage of large businesses—the ratio of debt to assets for all publicly traded nonfinancial firms—declined slightly but remained elevated by historical standards. Net leverage—the ratio of debt less cash to assets—showed a similar trend. The ability of public firms to service their debt, as measured by the interest coverage ratio, remained high by historical standards, in part reflecting solid earnings. The adverse effect of rising interest rates on the ability of businesses to service their debt continued to be muted, as corporate bonds—which account for the majority of the debt of public firms—generally have fixed interest rates. Although businesses with floating-rate obligations experienced significant increases in interest expenses, earnings were sufficiently strong for most firms to handle these higher interest payments without stress.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.4932,
+    "w": 0.3274,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5134,
+    "w": 0.2686,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5335,
+    "w": 0.2581,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5537,
+    "w": 0.3303,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.5739,
+    "w": 0.3113,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.594,
+    "w": 0.3034,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6142,
+    "w": 0.3015,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6343,
+    "w": 0.3238,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6545,
+    "w": 0.6463,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6746,
+    "w": 0.7022,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.6948,
+    "w": 0.6863,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.715,
+    "w": 0.6517,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7351,
+    "w": 0.7014,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7553,
+    "w": 0.6551,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.7754,
+    "w": 0.2389,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-8",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Business credit quality declined slightly in 2023. The volume of downgrades exceeded the volume of upgrades, and default rates slightly increased. Nevertheless, both remained low by historical standards. Direct lending to nonfinancial businesses by private credit funds and other private",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.8157,
+    "w": 0.6985,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.8359,
+    "w": 0.6779,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.8561,
+    "w": 0.6639,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b5-9",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "credit-to-GDP ratio, 1985–2023",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.251,
+    "w": 0.2076,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b5-10",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Ratio",
+  "rects": [
+   {
+    "x": 0.791,
+    "y": 0.2949,
+    "w": 0.0247,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-11",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Quarterly",
+  "rects": [
+   {
+    "x": 0.5851,
+    "y": 0.3105,
+    "w": 0.0376,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b5-12",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "1.7",
+  "rects": [
+   {
+    "x": 0.8255,
+    "y": 0.3336,
+    "w": 0.0165,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-13",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Q4",
+  "rects": [
+   {
+    "x": 0.8,
+    "y": 0.3459,
+    "w": 0.0123,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b5-14",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "1.4",
+  "rects": [
+   {
+    "x": 0.8255,
+    "y": 0.3648,
+    "w": 0.0165,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-15",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "1.1",
+  "rects": [
+   {
+    "x": 0.8255,
+    "y": 0.3961,
+    "w": 0.0165,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-16",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "0.8",
+  "rects": [
+   {
+    "x": 0.8255,
+    "y": 0.4273,
+    "w": 0.0165,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-17",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "1988 1995 2002 2009 2016 2023",
+  "rects": [
+   {
+    "x": 0.5477,
+    "y": 0.4387,
+    "w": 0.2697,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-18",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Note: The shaded bars with top caps indicate periods",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.4665,
+    "w": 0.3054,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-19",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "of business recession as defined by the National",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.4778,
+    "w": 0.2791,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-20",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Bureau of Economic Research: July 1990 toMarch 1991, March 2001 to November 2001,",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.4891,
+    "w": 0.2634,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-21",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "December 2007 to June 2009, and February 2020 to",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5118,
+    "w": 0.3052,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-22",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "April 2020. GDP is gross domestic product.",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5232,
+    "w": 0.2481,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-23",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Source: Federal Reserve Board staff calculations",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5408,
+    "w": 0.2784,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-24",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "based on Bureau of Economic Analysis, national",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5521,
+    "w": 0.2743,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-25",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "income and product accounts, and Federal Reserve",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5635,
+    "w": 0.2927,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-26",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "Board, Statistical Release Z.1, “Financial Accounts of",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5748,
+    "w": 0.3047,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b5-27",
+  "page": 5,
+  "kind": "text",
+  "level": 0,
+  "text": "the United States.”",
+  "rects": [
+   {
+    "x": 0.5283,
+    "y": 0.5861,
+    "w": 0.1088,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-1",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "20 110th Annual Report | 2023",
+  "rects": [
+   {
+    "x": 0.1076,
+    "y": 0.0463,
+    "w": 0.2212,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b6-2",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "investors grew rapidly. While risks associated with private credit from investor redemption and leverage appeared limited, the sector remains opaque, making it difficult to assess vulnerabilities.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1102,
+    "w": 0.6688,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1304,
+    "w": 0.6999,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-3",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "In the household sector, household debt relative to GDP declined in 2023. Mortgage debt accounts for roughly two-thirds of total household debt, with new mortgage extensions skewed toward prime borrowers in recent years. Most of the remaining one-third of household debt is consumer credit, which consists primarily of student loans, auto loans, and credit card debt. Although the strength of households’ balance sheets held up through 2023, credit card and auto delinquency rates increased slightly. This increase was likely due to the unwinding of pandemic support programs rather than a significant deterioration in lending standards, which remain conservative. Student loan delinquencies were held down by pandemic-related debt relief. Although the extended pandemic forbearance has ended, the new forgiveness plan of a 12-month “on ramp” to repayment and the new Saving on a Valuable Education plan could temper rising future delinquencies.",
+  "rects": [
+   {
+    "x": 0.1467,
+    "y": 0.1707,
+    "w": 0.6378,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.1909,
+    "w": 0.6714,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.211,
+    "w": 0.6627,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2312,
+    "w": 0.6562,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2513,
+    "w": 0.6905,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2715,
+    "w": 0.6762,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.2917,
+    "w": 0.6835,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3118,
+    "w": 0.6797,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.332,
+    "w": 0.6583,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3521,
+    "w": 0.6849,
+    "h": 0.0126
+   },
+   {
+    "x": 0.1467,
+    "y": 0.3723,
+    "w": 0.1034,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-4",
+  "page": 6,
+  "kind": "heading",
+  "level": 2,
+  "text": "Leverage in the Financial System",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4095,
+    "w": 0.2906,
+    "h": 0.0151
+   }
+  ]
+ },
+ {
+  "id": "b6-5",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Figure 3.5. Common equity tier 1 ratio of banks, 2001–23",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.4198,
+    "w": 0.2698,
+    "h": 0.0113
+   },
+   {
+    "x": 0.1565,
+    "y": 0.4324,
+    "w": 0.1075,
+    "h": 0.0113
+   }
+  ]
+ },
+ {
+  "id": "b6-6",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Quarterly",
+  "rects": [
+   {
+    "x": 0.1854,
+    "y": 0.4919,
+    "w": 0.0376,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b6-7",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "12",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.5016,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-8",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "10",
+  "rects": [
+   {
+    "x": 0.4569,
+    "y": 0.5195,
+    "w": 0.0134,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-9",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "8",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.5373,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-10",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "G-SIBs",
+  "rects": [
+   {
+    "x": 0.3076,
+    "y": 0.5559,
+    "w": 0.0287,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b6-11",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Other BHCs",
+  "rects": [
+   {
+    "x": 0.3076,
+    "y": 0.5782,
+    "w": 0.0481,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b6-12",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "2002 2005 2008 2011 2014 2017 2020 2023",
+  "rects": [
+   {
+    "x": 0.1738,
+    "y": 0.6201,
+    "w": 0.2678,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-13",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Note: The data are seasonally adjusted by Federal Reserve Board staff. Before 2014:Q1, the numerator of the common equity tier 1 ratio is tier 1 common capital for advanced-approaches bank holding companies (BHCs) and intermediate holding companies (IHCs) (before 2015:Q1, for non-advanced-approaches BHCs). Afterward, the numerator is common equitytier 1 capital. The denominator is risk-weighted",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.6479,
+    "w": 0.2856,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.6592,
+    "w": 0.3021,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.6706,
+    "w": 0.288,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.6819,
+    "w": 0.3057,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.6932,
+    "w": 0.279,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7046,
+    "w": 0.3082,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7159,
+    "w": 0.2886,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-14",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "assets. G-SIBs are global systemically important U.S. banks. Large non–G-SIBs are BHCs and IHCs with greater than $100 billion in total assets that are not G-SIBs. The shaded bars with top caps indicate periods of business recession as defined by the National Bureau of Economic Research: March 2001 to November 2001, December 2007 to June 2009, and February 2020 to April 2020.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.7386,
+    "w": 0.3045,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7499,
+    "w": 0.2833,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7613,
+    "w": 0.2989,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7726,
+    "w": 0.2702,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7839,
+    "w": 0.2741,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.7953,
+    "w": 0.3008,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.8066,
+    "w": 0.2923,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.818,
+    "w": 0.1921,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-15",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Source: Federal Reserve Board, Form FR Y-9C, Consolidated Financial Statements for Holding Companies.",
+  "rects": [
+   {
+    "x": 0.1565,
+    "y": 0.8356,
+    "w": 0.3126,
+    "h": 0.0101
+   },
+   {
+    "x": 0.1565,
+    "y": 0.8469,
+    "w": 0.294,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-16",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "The banking sector remained sound and resil-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4378,
+    "w": 0.3254,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-17",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "ient overall in 2023. Bank runs at Silicon",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.458,
+    "w": 0.2929,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-18",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Percent of risk-weighted assetsQ4 14",
+  "rects": [
+   {
+    "x": 0.3001,
+    "y": 0.4763,
+    "w": 0.1702,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-19",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Valley Bank (SVB) and other banks in",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4781,
+    "w": 0.2636,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-20",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "March 2023 showed that the interaction of",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.4983,
+    "w": 0.3065,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-21",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "fair value losses on bank balance sheets and",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5184,
+    "w": 0.3244,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-22",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "fragile funding structures could amplify a",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5386,
+    "w": 0.2902,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-23",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "6",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.5552,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-24",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "shock. The use of a systemic risk exception",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5587,
+    "w": 0.3124,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-25",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Large non–G-SIBs",
+  "rects": [
+   {
+    "x": 0.3076,
+    "y": 0.5671,
+    "w": 0.0741,
+    "h": 0.0088
+   }
+  ]
+ },
+ {
+  "id": "b6-26",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "4",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.5731,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-27",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "and the Bank Term Funding Program (BTFP)",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5789,
+    "w": 0.3074,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-28",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "2",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.5909,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-29",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "helped mitigate these vulnerabilities and",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.5991,
+    "w": 0.2899,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-30",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "0",
+  "rects": [
+   {
+    "x": 0.4636,
+    "y": 0.6088,
+    "w": 0.0067,
+    "h": 0.0101
+   }
+  ]
+ },
+ {
+  "id": "b6-31",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "stopped the contagion from bank runs at SVB",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6192,
+    "w": 0.3258,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-32",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "in March 2023. Common equity tier 1 ratios—",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6394,
+    "w": 0.3303,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-33",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "regulatory risk-based measures of bank",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6595,
+    "w": 0.2822,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-34",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "capital adequacy—at the largest banks were",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6797,
+    "w": 0.3173,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-35",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "near or above the top quartile of their range",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.6998,
+    "w": 0.3123,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-36",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "throughout the past decade (figure 3.5). None-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.72,
+    "w": 0.3316,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-37",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "theless, fair value losses on fixed-income",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7402,
+    "w": 0.2946,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-38",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "assets remain sizable at some banks, and",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7603,
+    "w": 0.3031,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-39",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "there is the potential for weakening loan per-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.7805,
+    "w": 0.3186,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-40",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "formance associated with CRE lending to",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.8006,
+    "w": 0.2924,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-41",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "emerge at some lenders. The largest banks",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.8208,
+    "w": 0.3113,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-42",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "appear most resilient to these potential risks.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.8409,
+    "w": 0.3271,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-43",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "Some smaller banks with less diversified port-",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.8611,
+    "w": 0.3297,
+    "h": 0.0126
+   }
+  ]
+ },
+ {
+  "id": "b6-44",
+  "page": 6,
+  "kind": "text",
+  "level": 0,
+  "text": "folios may face greater challenges.",
+  "rects": [
+   {
+    "x": 0.5185,
+    "y": 0.8813,
+    "w": 0.2487,
+    "h": 0.0126
+   }
+  ]
+ }
+]

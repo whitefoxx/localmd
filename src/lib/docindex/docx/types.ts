@@ -3,8 +3,14 @@
  * trace-app format to stay compatible with — this one is ours.
  */
 
-/** Bump when the parser output format changes — invalidates cached indexes. */
+/** READ CONTRACT — see pdf/types.ts for the INDEX_VERSION/BUILDER split. */
 export const INDEX_VERSION = 1
+/** Algorithm revision — a rebuild suggestion, never an invalidation.
+ *  Before bumping this for the FIRST time: DOCX has no id inheritance yet
+ *  (pdf/inherit.ts is geometry-based; DOCX ids would need text matching).
+ *  A rebuild that renumbers published block ids re-points every existing
+ *  citation — build the inheritance first, then bump. */
+export const BUILDER = 1
 
 /** A citeable unit of the document — one paragraph, heading, list item, or table. */
 export interface DocxBlock {
@@ -26,6 +32,8 @@ export interface DocxSectionMeta {
 
 export interface DocxIndexManifest {
   version: number
+  /** Algorithm revision that produced this index (absent = 1, pre-split). */
+  builder?: number
   /** Source DOCX path, relative to the KB root. */
   source: string
   title: string

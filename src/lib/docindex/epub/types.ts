@@ -1,9 +1,17 @@
 /**
- * Shared types for the EPUB index — format-compatible with trace-app.
+ * Shared types for the EPUB index. The on-disk layout is the format existing
+ * KBs already hold (inherited from trace-app, INDEX_VERSION 3) and is kept
+ * stable for the notes that cite into it.
  */
 
-/** Bump when the parser output format changes — invalidates cached indexes. */
+/** READ CONTRACT — see pdf/types.ts for the INDEX_VERSION/BUILDER split. */
 export const INDEX_VERSION = 3
+/** Algorithm revision — a rebuild suggestion, never an invalidation.
+ *  Before bumping this for the FIRST time: EPUB has no id inheritance yet
+ *  (pdf/inherit.ts is geometry-based; EPUB ids would need spine + text
+ *  matching). A rebuild that renumbers published block ids re-points every
+ *  existing citation — build the inheritance first, then bump. */
+export const BUILDER = 1
 
 /** A citeable unit of the document — one paragraph, heading, or code block. */
 export interface EpubBlock {
@@ -37,6 +45,8 @@ export interface SectionMeta {
 
 export interface EpubIndexManifest {
   version: number
+  /** Algorithm revision that produced this index (absent = 1, pre-split). */
+  builder?: number
   /** Source EPUB path, relative to the KB root. */
   source: string
   title: string

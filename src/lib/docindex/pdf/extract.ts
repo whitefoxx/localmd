@@ -13,15 +13,8 @@
 import * as pdfjs from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { installJsShims, jsShimSource, jsShimsNeeded } from '@/lib/polyfills'
-import type { NormRect, OutlineNode, PdfBlock } from './types'
-import {
-  layoutPage,
-  groupBlocks,
-  joinLines,
-  type Line,
-  type RawItem,
-  type TextBounds,
-} from './layout'
+import type { OutlineNode, PdfBlock } from './types'
+import { assembleBlocks, layoutPage, type Line, type RawItem, type TextBounds } from './layout'
 
 installJsShims()
 pdfjs.GlobalWorkerOptions.workerSrc = shimmedWorkerUrl()
@@ -88,32 +81,7 @@ export async function extractPdf(
       }
     }
 
-    // Body font size = median line font height across the document.
-    const allHeights = pageLines
-      .flat()
-      .map((l) => l.fontH)
-      .sort((a, b) => a - b)
-    const bodySize = allHeights[Math.floor(allHeights.length / 2)] || 10
-
-    const blocks: PdfBlock[] = []
-    for (let p = 0; p < pageLines.length; p++) {
-      const size = pageSizes[p]
-      let n = 0
-      for (const group of groupBlocks(pageLines[p], pageBounds[p])) {
-        n += 1
-        const text = joinLines(group)
-        const maxH = Math.max(...group.map((l) => l.fontH))
-        const isHeading = maxH >= bodySize * 1.18 && text.length <= 120 && group.length <= 3
-        blocks.push({
-          id: `b${p + 1}-${n}`,
-          page: p + 1,
-          kind: isHeading ? 'heading' : 'text',
-          level: isHeading ? (maxH >= bodySize * 1.45 ? 1 : 2) : 0,
-          text,
-          rects: group.map((l): NormRect => normRect(l, size)),
-        })
-      }
-    }
+    const blocks: PdfBlock[] = assembleBlocks(pageLines, pageBounds, pageSizes)
 
     const outline = await readOutline(doc)
     let title = fallbackTitle
@@ -128,15 +96,6 @@ export async function extractPdf(
     return { title, pageCount: doc.numPages, pageSizes, blocks, outline }
   } finally {
     await loadingTask.destroy()
-  }
-}
-
-function normRect(l: Line, size: { w: number; h: number }): NormRect {
-  return {
-    x: l.x0 / size.w,
-    y: l.yTop / size.h,
-    w: (l.x1 - l.x0) / size.w,
-    h: l.fontH / size.h,
   }
 }
 

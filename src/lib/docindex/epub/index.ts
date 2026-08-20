@@ -18,13 +18,17 @@ export interface EpubParseResult {
 export async function parseEpub(
   source: string,
   onProgress: (section: number, total: number) => void = () => {},
+  opts: { force?: boolean } = {},
 ): Promise<EpubParseResult> {
   const indexDir = indexDirFor('epub', source)
   const bytes = await fs.readBinary(source)
   const contentHash = await sha256Hex(bytes)
 
-  const fresh = await readFreshManifest<EpubIndexManifest>(indexDir, INDEX_VERSION, contentHash)
-  if (fresh) return { indexDir, manifest: fresh, cached: true }
+  // Older-builder indexes stay fresh — only an explicit `force` rebuilds.
+  if (!opts.force) {
+    const fresh = await readFreshManifest<EpubIndexManifest>(indexDir, INDEX_VERSION, contentHash)
+    if (fresh) return { indexDir, manifest: fresh, cached: true }
+  }
 
   const book = ePub(bytes)
   try {

@@ -2,11 +2,29 @@
  * Shared types for the PDF index — a parsed, location-aware representation of
  * a PDF that an AI agent can browse like a small codebase, and that the app
  * can use to map a cited block back to coordinates in the PDF.
- * Format-compatible with trace-app (INDEX_VERSION matched).
+ * The on-disk layout is the format existing KBs already hold (inherited from
+ * trace-app, INDEX_VERSION 11) — user notes cite block ids from that era, so
+ * the format is kept stable for them, not for another app.
  */
 
-/** Bump when the parser output format changes — invalidates cached indexes. */
+/**
+ * Two revision numbers with two different jobs — never conflate them:
+ *
+ * - INDEX_VERSION is the READ CONTRACT. Bump it ONLY when existing readers
+ *   could no longer make sense of the files (directory layout, meaning of a
+ *   field). A bump strands every index on disk, so it needs a migration
+ *   story — it is expected to never move again.
+ * - BUILDER is the ALGORITHM revision. Bump it whenever extraction or
+ *   sectioning improves enough that a rebuild is worth *suggesting*. It
+ *   never invalidates anything: an older-builder index stays fully usable
+ *   and the app only offers a rebuild — the user chooses. A manifest
+ *   without a `builder` field predates the split and reads as builder 1.
+ *
+ * Rule of thumb: changed what the files SAY → bump BUILDER; changed how a
+ * reader must PARSE them → that is an INDEX_VERSION conversation.
+ */
 export const INDEX_VERSION = 11
+export const BUILDER = 1
 
 /** A rectangle on a page, normalized to 0..1 with a top-left origin. */
 export interface NormRect {
@@ -54,6 +72,8 @@ export interface SectionMeta {
 
 export interface PdfIndexManifest {
   version: number
+  /** Algorithm revision that produced this index (absent = 1, pre-split). */
+  builder?: number
   /** Source PDF path, relative to the KB root. */
   source: string
   title: string

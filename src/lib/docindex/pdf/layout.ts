@@ -18,6 +18,8 @@
  * one, and it is still open.
  */
 
+import type { NormRect, PdfBlock } from './types'
+
 /** The slice of pdf.js's TextItem the layout needs. */
 export interface RawItem {
   str: string
@@ -336,6 +338,57 @@ export function groupBlocks(lines: Line[], bounds: TextBounds): Line[][] {
   }
   push()
   return blocks
+}
+
+/**
+ * Turn every page's laid-out lines into the document's citeable blocks —
+ * paragraph grouping, heading classification (size relative to the body
+ * median, learned from the whole document), positional ids, normalized rects.
+ * Pure on purpose: this is the step that decides what every published block
+ * id names, so it must be testable without a PDF engine (the golden fixture
+ * test replays real extracted pages through it).
+ */
+export function assembleBlocks(
+  pageLines: Line[][],
+  pageBounds: TextBounds[],
+  pageSizes: { w: number; h: number }[],
+): PdfBlock[] {
+  // Body font size = median line font height across the document.
+  const allHeights = pageLines
+    .flat()
+    .map((l) => l.fontH)
+    .sort((a, b) => a - b)
+  const bodySize = allHeights[Math.floor(allHeights.length / 2)] || 10
+
+  const blocks: PdfBlock[] = []
+  for (let p = 0; p < pageLines.length; p++) {
+    const size = pageSizes[p]
+    let n = 0
+    for (const group of groupBlocks(pageLines[p], pageBounds[p])) {
+      n += 1
+      const text = joinLines(group)
+      const maxH = Math.max(...group.map((l) => l.fontH))
+      const isHeading = maxH >= bodySize * 1.18 && text.length <= 120 && group.length <= 3
+      blocks.push({
+        id: `b${p + 1}-${n}`,
+        page: p + 1,
+        kind: isHeading ? 'heading' : 'text',
+        level: isHeading ? (maxH >= bodySize * 1.45 ? 1 : 2) : 0,
+        text,
+        rects: group.map((l): NormRect => normRect(l, size)),
+      })
+    }
+  }
+  return blocks
+}
+
+function normRect(l: Line, size: { w: number; h: number }): NormRect {
+  return {
+    x: l.x0 / size.w,
+    y: l.yTop / size.h,
+    w: (l.x1 - l.x0) / size.w,
+    h: l.fontH / size.h,
+  }
 }
 
 /** CJK codepoint (incl. fullwidth punctuation) — line joins need no space. */

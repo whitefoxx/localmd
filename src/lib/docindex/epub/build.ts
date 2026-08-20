@@ -6,6 +6,7 @@
 import { pad, slugify, writeAll } from '../util'
 import type { SpineItemInfo } from './extract'
 import {
+  BUILDER,
   INDEX_VERSION,
   type EpubBlock,
   type EpubIndexManifest,
@@ -71,6 +72,7 @@ export async function buildIndex(input: BuildInput): Promise<EpubIndexManifest> 
 
   const manifest: EpubIndexManifest = {
     version: INDEX_VERSION,
+    builder: BUILDER,
     source,
     title,
     author,

@@ -6,6 +6,7 @@
  */
 import { pad, slugify, writeAll } from '../util'
 import {
+  BUILDER,
   INDEX_VERSION,
   type OutlineNode,
   type PdfBlock,
@@ -23,6 +24,9 @@ interface BuildInput {
   pageCount: number
   pageSizes: { w: number; h: number }[]
   blocks: PdfBlock[]
+  /** Full id→place map from inheritIds — prior ids carried forward plus the
+   *  current blocks. Absent (tests, first principles) → derived from blocks. */
+  locations?: Record<string, { page: number; rects: PdfBlock['rects'] }>
   outline: { tree: OutlineNode[]; flat: { title: string; level: number; page: number }[] }
 }
 
@@ -51,8 +55,10 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
   })
   files.push({ path: '_README.md', content: renderReadme(title, source) })
 
-  const locations: Record<string, { page: number; rects: PdfBlock['rects'] }> = {}
-  for (const b of blocks) locations[b.id] = { page: b.page, rects: b.rects }
+  const locations = input.locations ?? {}
+  if (!input.locations) {
+    for (const b of blocks) locations[b.id] = { page: b.page, rects: b.rects }
+  }
   files.push({
     path: 'locations.json',
     content: JSON.stringify({ version: 1, pageSizes, blocks: locations }),
@@ -60,6 +66,7 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
 
   const manifest: PdfIndexManifest = {
     version: INDEX_VERSION,
+    builder: BUILDER,
     source,
     title,
     pageCount,

@@ -613,14 +613,18 @@ const kbHealth = defineTool({
 const indexDocument = defineTool({
   name: 'index_document',
   description:
-    'Generate (or refresh) the structured AI index for a PDF, EPUB, Word (.docx), or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a fresh index already exists.',
+    'Generate (or refresh) the structured AI index for a PDF, EPUB, Word (.docx), or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a usable index already exists — including one built by an older algorithm revision, which keeps working and is never rebuilt without being asked. Pass rebuild: true ONLY when the user has explicitly chosen to re-index.',
   schema: z.object({
     path: z.string().describe('KB-relative source path, e.g. "raw/papers/x.pdf"'),
+    rebuild: z
+      .boolean()
+      .optional()
+      .describe('Rebuild with the current algorithm even though a usable index exists — requires the user having asked for it'),
   }),
-  describeCall: (a) => `index ${a.path}`,
-  run: async ({ path }) => {
+  describeCall: (a) => `${a.rebuild ? 'reindex' : 'index'} ${a.path}`,
+  run: async ({ path, rebuild }) => {
     const { indexDocument: run } = await import('@/lib/docindex')
-    const s = await run(path)
+    const s = await run(path, undefined, { rebuild })
     return (
       `${s.cached ? 'Index already fresh' : 'Index generated'} at ${s.indexDir}/ — ` +
       `"${s.title}", ${s.sectionCount} sections, ${s.blockCount} blocks. ` +
