@@ -1,8 +1,8 @@
-# PDFs are slow on localmd.app but not in dev (fixed, not yet confirmed live)
+# PDFs are slow on localmd.app but not in dev (fixed)
 
 > 2026-08-20. Reported as "线上 PDF 半天加载不出来" with a console warning
-> about `unload` — which was a red herring. Written up before the fix has been
-> seen working on the deployed site; the last section says what is still owed.
+> about `unload` — which was a red herring. The fix is confirmed on the
+> deployed site; what remains unverified is named at the end.
 
 ## Symptom
 
@@ -71,17 +71,35 @@ const c = await caches.open((await caches.keys())[0])
 Precache goes from ~9.1MB to ~14.7MB. That cost is paid once, in the
 background, instead of 5.6MB before every PDF.
 
-## Still owed
+## Confirmed live
 
-The fix is verified at the artifact level only: a build now lists both files in
-`sw.js`. It has **not** been seen working on localmd.app, because the site is
-still serving `eb32fea` — Vercel had not built the newer commits at the time of
-writing. Confirm after a deploy: open a PDF, then check that the two assets are
-in Cache Storage with the snippet above, and that a second visit opens a PDF
-with the network throttled or offline.
+After the deploy, on localmd.app, with the new service worker activated:
 
-Note also what this does not fix: the *first ever* visit still has to fetch the
-engine once. It removes the repeat cost and makes the reader work offline.
+```js
+const c = await caches.open((await caches.keys())[0])
+;(await c.keys()).map(r => r.url).filter(u => /wasm|\.mjs/.test(u))
+// → ['…/assets/pdfium-RAgkpwfK.wasm', '…/assets/pdf.worker.min-DEtVeC4l.mjs']
+```
+
+`registration.active.state === 'activated'`, nothing left `waiting`, and
+`caches.match()` hits the wasm — so the precache route serves both off disk.
+
+Getting there produced one more trap worth writing down. Immediately after the
+deploy the snippet still returned `[]`, which looked like the fix had failed. It
+had not: **a hard reload bypasses the service worker for the page's own requests
+but does not update the registration.** The browser had fetched the new bundle
+straight from the network while the old worker — and its old precache — stayed
+exactly as they were, and no update check had run because the tab never
+navigated normally. `await registration.update()` installed the new worker, the
+cache went 201 → 234 entries mid-install, and the app's own update prompt
+appeared. Accepting it activated the new worker and settled at 203.
+
+Still unverified, and only the reporter can do it: opening a PDF with the proxy
+off — the condition that produced the original report — and opening one offline.
+
+Note what this does not fix either way: the *first ever* visit still has to
+fetch the engine once. It removes the repeat cost and makes the reader work
+offline.
 
 ## Lessons
 
@@ -99,3 +117,7 @@ engine once. It removes the repeat cost and makes the reader work offline.
   performance finding should record the environment it was measured in.
 - A config comment describing intent is not evidence the intent is met. This
   one was wrong for months and read as reassuring.
+- **A hard reload is not a service-worker update.** It bypasses the worker for
+  the page's requests, so the new bundle arrives while the old worker and its
+  old cache stay put — which reads exactly like "the fix did not ship". Check
+  `getRegistrations()` before believing a cache is stale.
