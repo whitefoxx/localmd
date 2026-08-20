@@ -71,6 +71,32 @@ are what stop a page becoming an island, and they power the graph view.
 Pages can also carry a `type:` at the top (`concept`, `source`, `person`, …) if
 you find that useful. It is free-form; there is no fixed list.
 
+## The log — what is not a page
+
+Some of what comes out of reading is not a page. Two notes end up disagreeing.
+A number sits there with no source behind it. A question stays open.
+
+Those go in **`log.md`**, as dated entries naming the pages involved:
+
+```
+## 2026-03-01 — [[chain-of-thought]] and [[prompting]] disagree on the threshold
+One says 10B parameters, the other 100B. Unresolved.
+```
+
+The assistant offers to write one when a scan turns something up, instead of
+mentioning it once in a conversation you will close. It will not quietly edit
+one of the pages to make the disagreement go away — which side is right is
+yours to say.
+
+A new folder gets a log with nothing in it, which is the normal state of a new
+knowledge base; delete the file if you would rather not keep one, and nothing
+will put it back. In a folder that already has its own way of doing this, the
+assistant follows that instead.
+
+The date earns its keep: the health check below can tell you an entry is worth
+re-reading because the pages it names have been edited since you wrote it. It
+never decides an entry is settled — only that something moved under it.
+
 ## Checking the health of your knowledge base
 
 The **pulse icon** in the left bar shows the two things worth clicking on:
@@ -80,9 +106,9 @@ Ask the assistant for a health check and it runs the same pass in full. On top
 of those two it reports pages that are nearly empty, pages you cannot reach by
 navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
-there, pages you wrote before a document they cite was last changed, and tags
-that are the same word spelled two ways (`machine-learning` and
-`Machine Learning`).
+there, pages you wrote before a document they cite was last changed, log entries
+whose pages have been edited since, and tags that are the same word spelled two
+ways (`machine-learning` and `Machine Learning`).
 
 That last one is worth a word of caution, because it compares timestamps rather
 than meaning: a file that was only re-saved, re-downloaded by a sync client, or

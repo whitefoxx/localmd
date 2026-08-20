@@ -179,7 +179,23 @@ to build our layout around them.
 - Match the frontmatter the KB's other pages carry (\`type:\`, tags, dates)
   instead of inventing a convention for the pages you happen to write.
 
-## 5. Link it in
+## 5. Say what did not fit
+
+Some of what a source gives you is not a page: it contradicts something already
+written, or it leaves a claim without a citation. Do not quietly pick a winner,
+and do not leave it in this conversation where it dies with the tab. Offer to
+add a dated entry to the KB's log page (\`log.md\`, or wherever this KB keeps
+one — create one only if the user wants it), naming the pages involved with
+\`[[wikilinks]]\` so it can be found again:
+
+\`\`\`
+## 2026-03-01 — [[chain-of-thought]] and [[prompting]] disagree on the threshold
+One says 10B parameters, the other 100B. Unresolved; the newer paper is [[pdf2:…]].
+\`\`\`
+
+Which side is right is the user's call, not yours.
+
+## 6. Link it in
 
 A page nothing points at is an orphan the moment you write it. Link each new
 page from the entry page — or from whatever index its neighbours are listed in

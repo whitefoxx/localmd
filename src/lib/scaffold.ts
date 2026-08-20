@@ -1,7 +1,7 @@
 /**
  * First-run scaffolding: turn an empty folder into a working knowledge base
- * (the trace-app "LLM Wiki" layout) — raw/ intake dirs, a wiki index,
- * a tool-neutral AGENTS.md schema, and the two starter skills.
+ * (the trace-app "LLM Wiki" layout) — raw/ intake dirs, a wiki index and log,
+ * a tool-neutral AGENTS.md schema, and the starter skills.
  */
 import * as fs from '@/lib/fs'
 
@@ -16,6 +16,7 @@ raw/    ← Immutable source files (articles, books, images, data). Read-only, d
 raw/conversations/ ← Saved conversation records (type: chat), just plain md files (store them wherever you like). When harvesting, distill the conclusions from the discussion into the wiki
 wiki/   ← Markdown pages maintained by the LLM. Link them to each other with [[wikilinks]]
 wiki/index.md ← Entry page; every new page must be reachable from here
+wiki/log.md ← Synthesis log: dated entries for what is NOT a page — contradictions between pages, claims still missing a source. Name the pages involved with [[wikilinks]]. Optional; delete it if you don't want one
 .agents/skills/ ← Reusable workflows (SKILL.md)
 MEMORY.md ← Persistent memory across sessions (user preferences, project state, important decisions). Optional: the user can write it themselves, or have the agent record/update it; never auto-summarize on your own
 \`\`\`
@@ -26,6 +27,7 @@ MEMORY.md ← Persistent memory across sessions (user preferences, project state
 - Each wiki page focuses on a single topic; prefer many small linked pages over one catch-all page
 - Cite your sources: annotate conclusions drawn from a PDF/EPUB with a [[N:block-id]] reference
 - Read the original file before changing it; keep edits minimal
+- When two pages disagree, record it in wiki/log.md under a dated \`## YYYY-MM-DD\` heading rather than picking a winner — which side is right is the user's call
 `
 
 const INDEX_MD = `# Index
@@ -41,6 +43,24 @@ Welcome! This is the entry page for your knowledge base.
 ## Pages
 
 (None yet — after ingesting, the agent will link new pages here)
+
+## Log
+
+[[log]] — what came up that isn't a page: disagreements between pages, claims still missing a source
+`
+
+const LOG_MD = `# Log
+
+Dated entries for the things that are not a page of their own: two pages that
+disagree, a claim still missing a source, a question left open. The agent adds
+them as it works; you decide what to do about them.
+
+Name the pages involved with [[wikilinks]] so an entry can be found from both
+ends, and keep the \`## YYYY-MM-DD\` heading — that date is what lets a health
+check tell you an entry is worth re-reading because its pages have moved on.
+
+An empty log is the normal state of a new knowledge base. Delete this file if
+you would rather not keep one.
 `
 
 const SKILL_INGEST = `---
@@ -102,6 +122,7 @@ const FILES: Array<[string, string]> = [
   ['.gitignore', GITIGNORE],
   ['AGENTS.md', AGENTS_MD],
   ['wiki/index.md', INDEX_MD],
+  ['wiki/log.md', LOG_MD],
   ['.agents/skills/ingest/SKILL.md', SKILL_INGEST],
   ['.agents/skills/lint/SKILL.md', SKILL_LINT],
   ['.agents/skills/harvest/SKILL.md', SKILL_HARVEST],

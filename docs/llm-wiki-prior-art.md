@@ -141,6 +141,31 @@ no knowledge-level queue to attach it to (our `ReviewPanel` is a file-diff
 review — a different thing that can coexist). If we ever build one, it ships
 with the sweep, not after it.
 
+> **Answered differently 2026-08-20.** A finding that is not a page now has a
+> durable home — but as a *page*, not a queue: `log.md`, Karpathy's third page
+> kind, holding dated entries that name the pages involved. The choice is the
+> same one that decided the `_index.md` entry below: a queue is bookkeeping
+> infrastructure written into someone's folder, whereas a log is a note like
+> any other, which they can read in any editor, hand-edit, or delete without
+> anything breaking. It also needs no new storage — it is markdown in the wiki,
+> and the link graph already sees it.
+>
+> The commitment above is kept in the only form a deterministic check can
+> honour: `staleLogEntries` reports an entry whose named pages have been edited
+> since its date, which is the sweep's cheap half — "this question has had
+> something move under it". It never closes an entry. Closing one is a
+> judgement about content, and their own conclusion applies to it too: the
+> failure mode of an automatic resolution is replacing an unresolved
+> contradiction with a confident wrong answer.
+>
+> Two details that took a decision:
+>
+> - **Any named page moving is enough**, not all of them. A disagreement
+>   between two pages is settled by changing either one.
+> - **The date is taken to the END of its day.** Writing an entry about two
+>   pages usually happens on a day those pages were also touched, so midnight
+>   would make every entry report itself the moment it was written.
+
 ### ⏸ Two-step ingest (nashsu)
 
 Split ingest into two LLM calls: analysis (entities, concepts, contradictions,
