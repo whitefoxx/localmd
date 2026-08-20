@@ -64,10 +64,20 @@ _Avoid_: capability slot (fine in prose, but "slot" is canonical), channel, role
 
 **Doc-index**:
 The extracted structure of a single document (PDF/EPUB/DOCX/MD), stored under
-`.trace/<kind>-index/`. The PDF/EPUB layouts are byte-compatible with trace-app;
-`docx-index` is ours (trace-app has none). This is the per-document artifact —
+`.trace/<kind>-index/`. The PDF/EPUB on-disk formats were inherited from
+trace-app (now discontinued) and are kept stable for the KBs and citations
+that already exist, not for another app. This is the per-document artifact —
 never call it just "the index".
 _Avoid_: bare "index", parse, extraction.
+
+**Builder** (algorithm revision):
+The `builder` field in a doc-index manifest — which revision of the indexing
+algorithm produced it. Distinct from INDEX_VERSION (the read contract): an
+older builder means "a rebuild would give you better output", never "this
+index is unusable". Rebuilds are offered (the Update index badge), never
+imposed.
+_Avoid_: version (that word is taken by the read contract), stale (that is a
+content-hash mismatch — the source bytes changed).
 
 **Source**:
 A document a note cites, declared in a note with `[[pdf1:raw/papers/x.pdf]]`. The digit
@@ -77,8 +87,12 @@ not reinterpret.)
 _Avoid_: citation ordinal, reference number, footnote number.
 
 **Block id**:
-A location within a source, written `b<section>-<block>` (e.g. `b14-3`). An inline
-citation `[[1:b14-3]]` points at block `b14-3` of source number 1.
+A location within a source, written `b<unit>-<n>` (e.g. `b14-3`) — the unit is
+the page for PDF, the spine item for EPUB, the section for MD, and always 1
+for DOCX. The ordinal is a NAME, not a position: once published, an id always
+resolves to the same passage — rebuilds inherit ids (pdf/inherit.ts) rather
+than renumber, so `<n>` may have gaps and need not follow reading order. An
+inline citation `[[1:b14-3]]` points at block `b14-3` of source number 1.
 _Avoid_: anchor, offset, position.
 
 ## Indexes (three unrelated things)

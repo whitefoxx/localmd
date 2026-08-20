@@ -23,6 +23,22 @@ This takes a moment for a long book. Afterwards:
 The index is rebuildable, so it is skipped when pushing to GitHub — no huge
 repositories.
 
+## When the app improves its indexing
+
+The app's indexing gets better over time. When it has since you indexed a
+document, nothing changes on its own: the existing index keeps working exactly
+as it is, and a small **Update index** button appears in the document's viewer.
+Rebuilding is always your choice — click it when you want the improvements, or
+ignore it indefinitely.
+
+Either way, **citations in your notes keep working**. A rebuild recognizes the
+passages it already gave names to and keeps calling them by those names, so a
+citation written last month still lands on the same paragraph after any number
+of rebuilds. The one thing it cannot survive is the document itself being
+replaced with different content — a citation into the old file's pages has
+nothing to point at in the new one (the health check in `knowledge-base` flags
+notes whose source moved on).
+
 ## Reading with nothing else on screen
 
 The button in a PDF or EPUB toolbar that opens out into four corners is **zen
