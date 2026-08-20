@@ -155,7 +155,7 @@ const viewImageSchema = z.object({
 
 /** Runs one agent turn; returns the updated conversation history. */
 export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
-  const model = toLanguageModel(opts.profile)
+  const model = await toLanguageModel(opts.profile)
   // Per-call: each execute adds the SDK's own abortSignal, which is the turn's
   // signal — a tool must be cancellable, not merely started by a live turn.
   const ctx: ToolCtx = { sessionId: opts.sessionId, emit: opts.onEvent, signal: opts.signal }

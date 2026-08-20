@@ -32,7 +32,7 @@ export async function generateKbImage(
   opts: { size?: string; signal?: AbortSignal } = {},
 ): Promise<{ path: string }> {
   const { images } = await aiGenerateImage({
-    model: toImageModel(profile),
+    model: await toImageModel(profile),
     prompt,
     ...(opts.size ? { size: opts.size as `${number}x${number}` } : {}),
     abortSignal: opts.signal,

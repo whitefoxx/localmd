@@ -16,7 +16,7 @@ export async function summarize(
   signal?: AbortSignal,
 ): Promise<string> {
   const { text } = await generateText({
-    model: toLanguageModel(profile),
+    model: await toLanguageModel(profile),
     maxOutputTokens: 3000, // headroom for reasoning-model thinking
     reasoning: profile.reasoning,
     messages: [{ role: 'user', content: `${PROMPT}\n\n<conversation-history>\n${transcript}\n</conversation-history>` }],
@@ -37,7 +37,7 @@ export async function generateTitle(
   const prompt = `Write a short title for the conversation below, no more than 6 words. Output only the title itself, with no quotes or trailing period.\n\nUser: ${userText.slice(0, 500)}\nAssistant: ${assistantText.slice(0, 500)}`
   try {
     const { text } = await generateText({
-      model: toLanguageModel(profile),
+      model: await toLanguageModel(profile),
       maxOutputTokens: 500, // reasoning models spend tokens thinking before answering
       reasoning: profile.reasoning,
       messages: [{ role: 'user', content: prompt }],

@@ -104,7 +104,7 @@ export async function visionDescribe(
   const q = question || 'Describe the contents of these images in detail.'
   const timeout = AbortSignal.timeout(VISION_TIMEOUT_MS)
   const { text } = await generateText({
-    model: toLanguageModel(profile),
+    model: await toLanguageModel(profile),
     maxOutputTokens: 1500,
     reasoning: profile.reasoning,
     messages: [

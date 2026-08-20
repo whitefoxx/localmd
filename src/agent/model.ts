@@ -8,14 +8,17 @@
  * Everything runs in the browser: unlike the native @anthropic-ai/sdk (which
  * blocks browser use), the AI SDK providers are plain fetch builders. Anthropic
  * needs the direct-browser-access CORS header, passed here explicitly.
+ *
+ * The provider packages are imported ON DEMAND, which is why both functions are
+ * async. Statically importing all seven put every one of them in the main
+ * chunk — 394KB that a user with a single configured provider downloads before
+ * the app paints, to use one of them. A dynamic import is fetched once, cached
+ * by the module registry from then on, and precached by the service worker, so
+ * the cost lands on the first model call of a fresh visit and never again.
+ * (The 'prompt' update policy is what keeps that safe across a deploy: the page
+ * goes on being served by the precache it was loaded against, so a lazy chunk
+ * cannot 404 out from under a running session.)
  */
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { createOpenAI } from '@ai-sdk/openai'
-import { createDeepSeek } from '@ai-sdk/deepseek'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { createXai } from '@ai-sdk/xai'
-import { createGroq } from '@ai-sdk/groq'
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import type { LanguageModel, ImageModel } from 'ai'
 import { sdkKindFor } from '@/lib/providers'
 import type { LlmProfile } from '@/stores/settings'
@@ -23,29 +26,43 @@ import type { LlmProfile } from '@/stores/settings'
 /** Header that opts an Anthropic API key into browser (CORS) access. */
 const ANTHROPIC_BROWSER_HEADERS = { 'anthropic-dangerous-direct-browser-access': 'true' }
 
-export function toLanguageModel(profile: LlmProfile): LanguageModel {
+export async function toLanguageModel(profile: LlmProfile): Promise<LanguageModel> {
   const { apiKey, model } = profile
   switch (sdkKindFor(profile.provider)) {
-    case 'anthropic':
+    case 'anthropic': {
+      const { createAnthropic } = await import('@ai-sdk/anthropic')
       return createAnthropic({ apiKey, headers: ANTHROPIC_BROWSER_HEADERS })(model)
-    case 'openai':
+    }
+    case 'openai': {
       // Chat Completions endpoint — broadest compatibility, streams tool calls.
+      const { createOpenAI } = await import('@ai-sdk/openai')
       return createOpenAI({ apiKey })(model)
-    case 'deepseek':
+    }
+    case 'deepseek': {
+      const { createDeepSeek } = await import('@ai-sdk/deepseek')
       return createDeepSeek({ apiKey })(model)
-    case 'google':
+    }
+    case 'google': {
+      const { createGoogleGenerativeAI } = await import('@ai-sdk/google')
       return createGoogleGenerativeAI({ apiKey })(model)
-    case 'xai':
+    }
+    case 'xai': {
+      const { createXai } = await import('@ai-sdk/xai')
       return createXai({ apiKey })(model)
-    case 'groq':
+    }
+    case 'groq': {
+      const { createGroq } = await import('@ai-sdk/groq')
       return createGroq({ apiKey })(model)
-    default:
+    }
+    default: {
       // Qwen/GLM/Kimi/MiniMax/Custom — base URL from the profile (preset table).
+      const { createOpenAICompatible } = await import('@ai-sdk/openai-compatible')
       return createOpenAICompatible({
         name: profile.provider || 'custom',
         baseURL: profile.baseUrl,
         apiKey,
       })(model)
+    }
   }
 }
 
@@ -53,21 +70,29 @@ export function toLanguageModel(profile: LlmProfile): LanguageModel {
  *  one (see providerHasImageModel). OpenAI/Google/xAI use their native image
  *  model; every OpenAI-compatible endpoint (GLM CogView, Qwen, Custom) uses the
  *  openai-compatible `/images/generations` image model. Throws otherwise. */
-export function toImageModel(profile: LlmProfile): ImageModel {
+export async function toImageModel(profile: LlmProfile): Promise<ImageModel> {
   const { apiKey, model } = profile
   switch (sdkKindFor(profile.provider)) {
-    case 'openai':
+    case 'openai': {
+      const { createOpenAI } = await import('@ai-sdk/openai')
       return createOpenAI({ apiKey }).image(model)
-    case 'google':
+    }
+    case 'google': {
+      const { createGoogleGenerativeAI } = await import('@ai-sdk/google')
       return createGoogleGenerativeAI({ apiKey }).image(model)
-    case 'xai':
+    }
+    case 'xai': {
+      const { createXai } = await import('@ai-sdk/xai')
       return createXai({ apiKey }).image(model)
-    case 'openai-compatible':
+    }
+    case 'openai-compatible': {
+      const { createOpenAICompatible } = await import('@ai-sdk/openai-compatible')
       return createOpenAICompatible({
         name: profile.provider || 'custom',
         baseURL: profile.baseUrl,
         apiKey,
       }).imageModel(model)
+    }
     default:
       throw new Error(`provider ${profile.provider} does not support image generation`)
   }
