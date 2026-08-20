@@ -25,12 +25,19 @@ naming style.
 Drop a file onto the workspace and it is filed under `raw/` by kind. If the
 folder has no `raw/`, it lands in `inbox/` instead — a doormat, not a home.
 
-Filing is not reading, though. When you want the material turned into pages,
-type **`/ingest`** — or use the button above an empty message box. The assistant
-picks up everything you have added that no page mentions yet, reads each source
-(indexing PDFs and EPUBs as it goes), writes it into your pages, and tells you
-what it did and what it left behind. It never changes the sources themselves,
-and running it again only picks up what is new.
+Filing is not reading, though. After a drop, a line appears above the message
+box — *3 filed, not read yet* — with a button that starts the reading and an ×
+that means not now. Nothing happens until you pick one, and dismissing it costs
+you nothing: the material is filed either way, and the assistant can still find
+it whenever you come back to it.
+
+That is deliberate. Reading a stack of sources spends model time and writes new
+pages into your folder, and neither is something to start because a file
+touched the window. You can also type **`/ingest`** whenever you like. Either
+way the assistant picks up everything you have added that no page mentions yet,
+reads each source (indexing PDFs and EPUBs as it goes), writes it into your
+pages, and tells you what it did and what it left behind. It never changes the
+sources themselves, and running it again only picks up what is new.
 
 Attachments are a different gesture. A screenshot you paste into the chat box,
 or a file you attach there, is something you are *handing to* the assistant

@@ -95,6 +95,19 @@ export const useFilesStore = defineStore('files', () => {
   let loadedMtime: number | null = null
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null
 
+  /**
+   * Source files that landed in the KB this session and have not been read yet
+   * — a drop onto the workspace or a file-tree Import, never a composer
+   * attachment (those are handed to the agent, not filed).
+   *
+   * The app files a drop and stops there on purpose: filing material and
+   * compiling it into pages are two acts, and the second one costs tokens and
+   * rewrites the user's notes, so it is offered and never performed on its own.
+   * This list is what the offer is made of — transient, UI-only, and gone the
+   * moment it is taken up, dismissed, or another folder is opened.
+   */
+  const captured = ref<string[]>([])
+
   const allFiles = computed(() => fs.collectFiles(tree.value))
   const mdFiles = computed(() => allFiles.value.filter((p) => p.endsWith('.md')))
 
@@ -466,8 +479,19 @@ export const useFilesStore = defineStore('files', () => {
     await refreshTree()
   }
 
+  /** Record what just landed. Appends, so two drops in a row read as one
+   *  backlog rather than the second erasing the first. */
+  function noteCaptured(paths: string[]): void {
+    if (paths.length) captured.value = [...captured.value, ...paths]
+  }
+
+  function clearCaptured(): void {
+    captured.value = []
+  }
+
   function reset(): void {
     tabsReady = false // off until the next restoreTabs, so we don't persist [] over saved tabs
+    captured.value = []
     tree.value = []
     openTabs.value = []
     clearSelection()
@@ -478,6 +502,9 @@ export const useFilesStore = defineStore('files', () => {
 
   return {
     tree,
+    captured,
+    noteCaptured,
+    clearCaptured,
     currentPath,
     openTabs,
     closeTab,
