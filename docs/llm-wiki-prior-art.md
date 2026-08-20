@@ -184,6 +184,15 @@ worker; on our single-threaded browser main loop that is not optional.
 
 ### ⏸ Separating "what this KB is for" from "how it is arranged"
 
+> **Answered as a section, not a file, 2026-08-20.** The scaffolded AGENTS.md
+> now opens with an empty `## Purpose` telling the user what belongs there and
+> that leaving it blank is fine; the ingest skill uses a stated purpose to
+> decide what is worth extracting from a source and is told not to invent one
+> when there is none. A separate `purpose.md` was the part not taken: it buys
+> nothing here — AGENTS.md is already injected verbatim every session — and it
+> costs a second file in someone's folder, which is the objection this entry
+> raised against itself.
+
 nashsu adds `purpose.md` (goals and research scope, consulted during ingest and
 query); nvk adds `schema.md`, explicitly a *topic guide* rather than a database
 schema, with adoption states (`missing` → `proposed` → `advisory` → `strict`)

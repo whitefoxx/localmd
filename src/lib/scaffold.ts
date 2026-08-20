@@ -9,6 +9,15 @@ const AGENTS_MD = `# Knowledge base guide (AGENTS.md)
 
 This is a personal knowledge base maintained by an LLM. Agents working here follow the conventions below.
 
+## Purpose
+
+<!-- What is this knowledge base FOR? One or two lines in your own words: the
+     questions you want it to answer, what you are reading towards, what you do
+     NOT care about. This is the one part an agent cannot read off the folder,
+     and it is what decides which parts of a source are worth writing down.
+     Leave it blank and the agent will not invent one. Delete the section if
+     you would rather not have it. -->
+
 ## Structure
 
 \`\`\`

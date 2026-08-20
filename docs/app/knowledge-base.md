@@ -57,6 +57,14 @@ You do not have to write it. Ask the assistant to look at your folder and write
 one, and it will describe what you *actually* have rather than prescribing
 anything.
 
+There is one part it cannot write for you, and it is worth two lines of your
+own: **what this knowledge base is for.** The questions you want it to answer,
+what you are reading towards, what you do not care about. A folder tells the
+assistant where a page goes; only you can say which parts of a paper are worth
+keeping — the same paper read for its method and read for its results makes
+different notes. A new folder's `AGENTS.md` has an empty **Purpose** section
+waiting for that. Leave it blank and nothing is invented in its place.
+
 ## Nothing is enforced
 
 Every convention here — layout, page structure, linking — is a suggestion the

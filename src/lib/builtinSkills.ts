@@ -145,12 +145,19 @@ Two things it cannot tell you, so ask rather than guess:
 
 An empty backlog with nothing named is a normal outcome: say so and stop.
 
-## 2. Learn where things go before writing anything
+## 2. Learn where things go — and what this KB is for
 
 The KB's own structure decides where a page lands. If this KB has an AGENTS.md,
 its content is already in your instructions — follow it. Otherwise call
 \`list_files\` and read the layout off the tree: which folder holds authored
 notes, how pages are named, whether there is an entry page.
+
+Layout is not intent. If the KB states a PURPOSE — what it is for, what it is
+reading towards, what it does not care about — let that decide which parts of a
+source are worth writing down; a paper read for its method and the same paper
+read for its results produce different pages. If it states none, do not invent
+one and do not ask mid-run: summarise what the source actually says, and you
+may offer once at the end to write down what this KB seems to be for.
 
 Never impose the \`raw/\` + \`wiki/\` layout on a KB that does not use it. A KB
 without that tree lands new files in \`inbox/\`; your job is to compile them into
