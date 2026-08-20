@@ -62,11 +62,35 @@ export async function writeAll(
   await ensureIgnored('.trace').catch(() => {
     /* the index is still worth writing if the .gitignore cannot be touched */
   })
+  // A rebuild must survive being killed at ANY point — the user closes the
+  // tab whenever they like — without ever presenting a manifest that lies or
+  // losing the old locations.json (the block-id record that lets the next
+  // build carry ids forward). Hence this order, and never a clear-then-write:
+  //   1. overwrite/add the new build's files (each write is atomic; the old
+  //      manifest still vouches for a complete old index throughout),
+  //   2. write manifest.json alone — the one write that flips the directory
+  //      to "the new index, complete",
+  //   3. only then delete files the new build no longer produces (a stale
+  //      sections/*.md that toc.md stopped linking would still turn up in
+  //      search_files). A crash here leaves orphans, never a broken index —
+  //      and the next successful rebuild sweeps them.
+  const before = fs
+    .collectFiles(await fs.readTreeFrom(indexDir).catch(() => []))
+    .map((p) => p.slice(indexDir.length + 1))
+  const manifest = files.filter((f) => f.path === 'manifest.json')
+  const rest = files.filter((f) => f.path !== 'manifest.json')
   const CHUNK = 24
-  for (let i = 0; i < files.length; i += CHUNK) {
+  for (let i = 0; i < rest.length; i += CHUNK) {
     await Promise.all(
-      files.slice(i, i + CHUNK).map((f) => fs.writeFile(`${indexDir}/${f.path}`, f.content)),
+      rest.slice(i, i + CHUNK).map((f) => fs.writeFile(`${indexDir}/${f.path}`, f.content)),
     )
+  }
+  for (const f of manifest) await fs.writeFile(`${indexDir}/${f.path}`, f.content)
+  const produced = new Set(files.map((f) => f.path))
+  for (const stale of before.filter((p) => !produced.has(p))) {
+    await fs.removeFile(`${indexDir}/${stale}`).catch(() => {
+      /* cleanup is best-effort; an orphan is harmless and swept next time */
+    })
   }
 }
 

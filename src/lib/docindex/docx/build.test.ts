@@ -8,6 +8,9 @@ vi.mock('@/lib/fs', () => ({
     written.set(path, content)
     return Promise.resolve()
   },
+  readTreeFrom: () => Promise.reject(new DOMException('no dir', 'NotFoundError')),
+  collectFiles: (nodes: { path: string }[]) => nodes.map((n) => n.path),
+  removeFile: () => Promise.resolve(),
 }))
 beforeEach(() => written.clear())
 

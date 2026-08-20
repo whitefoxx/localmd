@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { pad, slugify, fnv1a, indexDirFor } from './util'
 
 describe('pad', () => {
@@ -38,5 +38,69 @@ describe('indexDirFor', () => {
     expect(indexDirFor('epub', 'raw/books/被讨厌的勇气.epub')).toBe(
       '.trace/epub-index/被讨厌的勇气-c7f57e57',
     )
+  })
+})
+
+describe('writeAll — rebuild survives being killed at any point', () => {
+  // The order is the contract: overwrite-in-place first (the old manifest
+  // keeps vouching for a complete old index), manifest.json alone after every
+  // other write (the flip to "new index, complete"), stale-file deletion
+  // strictly after the manifest (a crash may leave orphans, never a lie —
+  // and never a moment where locations.json does not exist).
+  async function run(files: { path: string; content: string }[], existing: string[] = []) {
+    const ops: string[] = []
+    vi.doMock('@/lib/gitignore', () => ({ ensureIgnored: () => Promise.resolve() }))
+    vi.doMock('@/lib/fs', () => ({
+      readTreeFrom: (dir: string) =>
+        existing.length
+          ? Promise.resolve(existing.map((p) => ({ kind: 'file', path: `${dir}/${p}` })))
+          : Promise.reject(new DOMException('no dir', 'NotFoundError')),
+      collectFiles: (nodes: { kind: string; path: string }[]) => nodes.map((n) => n.path),
+      writeFile: (p: string) => {
+        ops.push(`write ${p}`)
+        return Promise.resolve()
+      },
+      removeFile: (p: string) => {
+        ops.push(`rm ${p}`)
+        return Promise.resolve()
+      },
+    }))
+    vi.resetModules()
+    const { writeAll } = await import('./util')
+    await writeAll('dir', files)
+    vi.doUnmock('@/lib/fs')
+    vi.doUnmock('@/lib/gitignore')
+    vi.resetModules()
+    return ops
+  }
+
+  it('writes manifest.json after every other write, regardless of list order', async () => {
+    const files = [
+      { path: 'manifest.json', content: '{}' },
+      ...Array.from({ length: 30 }, (_, i) => ({ path: `sections/${i}.md`, content: '' })),
+    ]
+    const ops = await run(files)
+    expect(ops[ops.length - 1]).toBe('write dir/manifest.json')
+    expect(ops.filter((o) => o === 'write dir/manifest.json')).toHaveLength(1)
+  })
+
+  it('deletes files the new build no longer produces — after the manifest', async () => {
+    const ops = await run(
+      [
+        { path: 'toc.md', content: '' },
+        { path: 'manifest.json', content: '{}' },
+      ],
+      ['toc.md', 'manifest.json', 'sections/001-old.md'],
+    )
+    expect(ops).toEqual([
+      'write dir/toc.md',
+      'write dir/manifest.json',
+      'rm dir/sections/001-old.md',
+    ])
+  })
+
+  it('handles the first build, when the directory does not exist yet', async () => {
+    const ops = await run([{ path: 'manifest.json', content: '{}' }])
+    expect(ops).toEqual(['write dir/manifest.json'])
   })
 })
