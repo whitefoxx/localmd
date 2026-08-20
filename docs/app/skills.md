@@ -72,9 +72,12 @@ A skill that records "this API reports duration in seconds, not minutes" or
 They live in your folder, so they go with it through git. Share a knowledge base
 and you share the ways of working that go with it.
 
-The app also ships a few built-in skills for things about the app rather than
-your notes — connecting a new service is one. You never have to install those,
-and a skill of your own with the same name takes priority.
+The app also ships a few built-in skills you never have to install. Some are
+about the app rather than your notes — connecting a new service is one. One is
+about your notes: type **`/ingest`** and the assistant works through the
+material you have added that no page covers yet and writes it up, following
+whatever structure your folder already uses. A skill of your own with the same
+name takes priority over any of them.
 
 ## Related
 

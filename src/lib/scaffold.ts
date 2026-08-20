@@ -50,10 +50,12 @@ description: Process not-yet-ingested source files under raw/, generate or updat
 
 # Ingest workflow
 
-1. List the source files under raw/ and compare against wiki/ to find the ones not yet processed.
-2. Read them one by one (use the index for PDF/EPUB), creating or updating a wiki page for each source, following the conventions in AGENTS.md.
-3. Link new pages into wiki/index.md with [[wikilinks]].
+1. Find what is not yet processed: call kb_health and read \`unreferencedSources\` — the files no page mentions. Do not list raw/ and diff it by hand.
+2. Read them one by one (index_document first for PDF/EPUB/DOCX, then the index's sections), creating or updating a wiki page for each source, following the conventions in AGENTS.md.
+3. Link new pages into wiki/index.md with [[wikilinks]], and cite what you claim with [[pdfN:path]] + [[N:block-id]].
 4. Report: what you processed, and what you skipped (and why).
+
+This file is this KB's own copy — edit it and the app's built-in /ingest steps aside.
 `
 
 const SKILL_LINT = `---

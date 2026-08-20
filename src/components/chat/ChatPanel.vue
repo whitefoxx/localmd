@@ -1073,7 +1073,7 @@ watch(
       </div>
     </div>
 
-    <!-- Presets: KB skills when present, built-in prompts otherwise -->
+    <!-- Presets: the folder's own skills when it has any, the app's otherwise -->
     <div
       v-if="!chat.messages.length"
       class="relative px-3 pb-2 flex items-center gap-2 shrink-0 flex-wrap w-full"
@@ -1120,10 +1120,10 @@ watch(
         </template>
       </template>
       <template v-else>
-        <button
-          class="btn text-xs"
-          @click="preset('Ingest the un-processed sources under raw/: read each one, then create or update wiki pages for them following the KB schema. Link new pages from the index.')"
-        >
+        <!-- The app's own /ingest, not a prompt spelled out here: a folder with
+             no skills of its own is exactly the case that used to get a
+             hardcoded paragraph about `raw/` — a directory it does not have. -->
+        <button class="btn text-xs" @click="preset('/ingest ')">
           {{ $t('chat.presetIngest') }}
         </button>
         <button

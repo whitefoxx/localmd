@@ -23,8 +23,14 @@ things according to *your* structure — matching your folder names and your
 naming style.
 
 Drop a file onto the workspace and it is filed under `raw/` by kind. If the
-folder has no `raw/`, it lands in `inbox/` instead — a doormat, not a home: when
-you get to it, ask the assistant to file it properly.
+folder has no `raw/`, it lands in `inbox/` instead — a doormat, not a home.
+
+Filing is not reading, though. When you want the material turned into pages,
+type **`/ingest`** — or use the button above an empty message box. The assistant
+picks up everything you have added that no page mentions yet, reads each source
+(indexing PDFs and EPUBs as it goes), writes it into your pages, and tells you
+what it did and what it left behind. It never changes the sources themselves,
+and running it again only picks up what is new.
 
 Attachments are a different gesture. A screenshot you paste into the chat box,
 or a file you attach there, is something you are *handing to* the assistant

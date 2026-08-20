@@ -2,11 +2,18 @@
  * Skills the app ships, available in every KB without scaffolding anything into
  * the user's folder.
  *
- * These exist for workflows that are about the APP rather than about a
- * particular knowledge base — connecting a service is the first. Putting the
- * playbook here rather than in the system prompt is the whole point: it is long,
- * and it is needed by roughly one turn in a hundred. `use_skill` fetches it when
- * that turn arrives and it costs nothing the rest of the time.
+ * Two kinds live here. Some are about the APP — connecting a service is the
+ * first, and it is plumbing the agent reaches for rather than something a user
+ * goes looking for. Others are the knowledge base's own core operations, and
+ * `ingest` is one: compiling sources into pages is what this app is for, yet
+ * until it shipped here it existed only as a file scaffolded into brand-new
+ * folders — so the case that distinguishes us, an existing folder the user just
+ * opened, was the one case that did not have it.
+ *
+ * Putting a playbook here rather than in the system prompt is the whole point:
+ * it is long, and it is needed by a small share of turns. `use_skill` fetches it
+ * when that turn arrives and only the one-line description is paid for on the
+ * rest.
  *
  * A KB skill of the same name wins, so a user can always override ours.
  */
@@ -112,7 +119,87 @@ Prove it works: call one of the new tools and show the user a real result. A
 setup that was never run is not finished.
 `
 
+const INGEST = `# Ingest
+
+Compile source material into this knowledge base: read what has arrived, write
+what it means into pages, leave the sources untouched. The work is incremental
+— each run picks up what earlier runs did not — so running it again is always
+safe.
+
+Sources are read-only. Never edit, move, rename or delete one to make an ingest
+tidier; if a file is in the wrong place, say so and let the user move it.
+
+## 1. Find what has not been compiled yet
+
+Call \`kb_health\` and read \`unreferencedSources\`: files that no page in this KB
+mentions at all. That is the compilation backlog, computed from the content
+index without reading a single page — cheap and complete. Do NOT list
+directories and diff them against the wiki by hand.
+
+Two things it cannot tell you, so ask rather than guess:
+
+- It reports "no page names this file", not "no page understood it". A source
+  named once in passing counts as read and will not appear in the backlog.
+- When the user pointed at something specific — an @-mention, "the three PDFs I
+  just dropped" — that is the job, and the backlog is not.
+
+An empty backlog with nothing named is a normal outcome: say so and stop.
+
+## 2. Learn where things go before writing anything
+
+The KB's own structure decides where a page lands. If this KB has an AGENTS.md,
+its content is already in your instructions — follow it. Otherwise call
+\`list_files\` and read the layout off the tree: which folder holds authored
+notes, how pages are named, whether there is an entry page.
+
+Never impose the \`raw/\` + \`wiki/\` layout on a KB that does not use it. A KB
+without that tree lands new files in \`inbox/\`; your job is to compile them into
+the user's own structure and leave \`inbox/\` empty of the ones you handled, not
+to build our layout around them.
+
+## 3. Read each source properly
+
+- PDF, EPUB and DOCX go through \`index_document\` first (skip it when \`.trace/\`
+  already has an index), then read the index's \`_README.md\`, \`toc.md\`, and the
+  sections that matter. Never try to read the binary directly.
+- Everything else: \`read_file\`.
+- When a source would flood this conversation and \`run_subagent\` is available,
+  delegate the reading and work from its answer.
+
+## 4. Write the pages
+
+- Prefer deepening an existing page over adding a new one. Three papers on one
+  topic should leave that topic understood, not three summaries side by side.
+- One topic per page; connect pages with \`[[wikilinks]]\`.
+- Cite as you go: declare a document once as \`[[pdf1:path/to/file.pdf]]\`, then
+  attach \`[[1:block-id]]\` to the claims that came from it. A reader who cannot
+  jump back to the passage cannot check you.
+- Name the source in the page that came out of it — that is also what makes the
+  next run's backlog correct.
+- Match the frontmatter the KB's other pages carry (\`type:\`, tags, dates)
+  instead of inventing a convention for the pages you happen to write.
+
+## 5. Link it in
+
+A page nothing points at is an orphan the moment you write it. Link each new
+page from the entry page — or from whatever index its neighbours are listed in
+— in the same run that creates it.
+
+## Finally
+
+Report three things: what you compiled and where each page went, what you
+skipped and why, and what is left in the backlog. If the backlog is long, do a
+few, report, and ask before spending the rest — twenty sources is a token-heavy
+run the user should get to agree to first.
+`
+
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
+  {
+    name: 'ingest',
+    description:
+      "Compile source material this KB has not covered yet into pages, following the KB's own structure — use when the user asks to ingest, process, file, or write up sources they have added.",
+    body: INGEST,
+  },
   {
     name: 'connect-a-service',
     description:
