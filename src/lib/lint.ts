@@ -17,7 +17,7 @@
  * constraint — a user is free to keep an unread PDF and two spellings of a tag,
  * and a check that cannot say why it fired does not belong.
  */
-import { splitFrontmatter, extractTags } from '@/lib/wiki'
+import { splitFrontmatter, extractTags, parseWikilinks } from '@/lib/wiki'
 import { parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { isAnnotationsPath } from '@/lib/annotations'
 
@@ -53,6 +53,9 @@ export interface LintReport {
   /** Pages written before a source they cite was last modified — the page may
    *  no longer say what the source says. */
   stalePages: { path: string; sources: string[] }[]
+  /** Dated log entries whose subject pages have been edited since — whatever
+   *  the entry recorded may already have been dealt with. */
+  staleLogEntries: { path: string; entry: string; pages: string[] }[]
   /** Tags that differ only in case, separator, or a trailing `s`. */
   similarTags: { variants: { tag: string; count: number }[] }[]
 }
@@ -110,10 +113,85 @@ function citedSources(
  */
 const CLOCK_SLACK_MS = 60_000
 
+/**
+ * A knowledge base's synthesis log — `log.md` at any depth.
+ *
+ * Karpathy's third page kind, after entity pages and concept overviews, and
+ * the one the app had no word for: `isEntryPage` already kept it out of the
+ * page-quality checks, but nothing wrote one, described one, or read one back.
+ * It is where a finding that is not itself a page goes — "these two pages
+ * disagree", "this claim needs a source" — so that a contradiction found
+ * during a scan outlives the message it was mentioned in.
+ *
+ * Optional, like everything else here. A KB without one is not missing
+ * anything; a KB whose log is freeform prose simply reports nothing below.
+ */
+export function isLogPage(path: string): boolean {
+  const p = path.toLowerCase()
+  return p === 'log.md' || p.endsWith('/log.md')
+}
+
 /** index.md / log.md at any depth are structural entry points, not content. */
 export function isEntryPage(path: string): boolean {
   const p = path.toLowerCase()
-  return p === 'index.md' || p === 'log.md' || p.endsWith('/index.md') || p.endsWith('/log.md')
+  return p === 'index.md' || p.endsWith('/index.md') || isLogPage(path)
+}
+
+/** A `##`/`###` heading that opens with an ISO date. Everything after the date
+ *  is the entry's own words and is kept verbatim for the report. */
+const LOG_HEADING_RE = /^#{2,3}[ \t]+(\d{4})-(\d{2})-(\d{2})(.*)$/
+
+/**
+ * The dated entries of a log page, each with the moment after which a change
+ * to its subject pages means something, and the wikilink targets it names.
+ *
+ * The date is taken to the END of its day. A day-granular date cannot say more
+ * than "that day", and the alternative — midnight — would make every entry
+ * report itself, since writing an entry about two pages usually happens on a
+ * day those pages were also touched.
+ */
+export function parseLogEntries(
+  content: string,
+): { title: string; after: number; targets: string[] }[] {
+  const entries: { title: string; after: number; targets: string[] }[] = []
+  let current: { title: string; after: number; lines: string[] } | null = null
+  const flush = (): void => {
+    if (!current) return
+    entries.push({
+      title: current.title,
+      after: current.after,
+      targets: parseWikilinks(current.lines.join('\n')).map((l) => l.target),
+    })
+  }
+  for (const line of content.split('\n')) {
+    const m = LOG_HEADING_RE.exec(line)
+    if (m) {
+      flush()
+      const day = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+      current = {
+        title: line.replace(/^#+[ \t]+/, '').trim(),
+        after: day + 24 * 60 * 60 * 1000,
+        lines: [line],
+      }
+    } else if (current) {
+      current.lines.push(line)
+    }
+  }
+  flush()
+  return entries
+}
+
+/** Pair a wikilink target as written with the resolved page path it produced.
+ *  The log's `outgoing` was resolved from these very links, so matching on the
+ *  stem recovers the mapping without re-implementing link resolution — and a
+ *  target that resolves to nothing is `brokenLinks`' business, not ours. */
+function matchLinkTarget(target: string, outgoing: readonly string[]): string | undefined {
+  const want = target.toLowerCase().replace(/\.md$/, '')
+  if (!want) return undefined
+  return outgoing.find((p) => {
+    const stem = p.toLowerCase().replace(/\.md$/, '')
+    return stem === want || stem.endsWith(`/${want}`)
+  })
 }
 
 /**
@@ -147,6 +225,7 @@ export function computeLint(
   const placeholders: string[] = []
   const danglingCitations: LintReport['danglingCitations'] = []
   const stalePages: LintReport['stalePages'] = []
+  const staleLogEntries: LintReport['staleLogEntries'] = []
   /** normalised key → original spelling → how many pages used it. */
   const tagsByKey = new Map<string, Map<string, number>>()
 
@@ -194,6 +273,28 @@ export function computeLint(
       }
       if (missing.length) danglingCitations.push({ path, targets: [...new Set(missing)] })
       if (outrun.length) stalePages.push({ path, sources: [...new Set(outrun)] })
+    }
+
+    // A log entry records something that was true when it was written. Once
+    // ANY page it names has been edited since, the entry is a question worth
+    // re-asking — a contradiction between two pages is settled by changing
+    // either one — and that is the cheap half of a review queue's sweep, which
+    // this deliberately stops short of: closing an entry needs a judgement
+    // about content, and a check that guesses at meaning does not belong here.
+    if (isLogPage(path)) {
+      for (const entry of parseLogEntries(body)) {
+        const moved = [
+          ...new Set(
+            entry.targets
+              .map((t) => matchLinkTarget(t, page.outgoing))
+              .filter((p): p is string => !!p),
+          ),
+        ].filter((p) => {
+          const m = pages.get(p)?.mtime
+          return m !== undefined && m > entry.after
+        })
+        if (moved.length) staleLogEntries.push({ path, entry: entry.title, pages: moved.sort() })
+      }
     }
 
     if (isEntryPage(path)) continue // skip page-quality checks for index/log
@@ -268,6 +369,8 @@ export function computeLint(
   unreferencedSources.sort(byPath)
   danglingCitations.sort((a, b) => byPath(a.path, b.path))
   stalePages.sort((a, b) => byPath(a.path, b.path))
+  // Entry order within a log is the author's; only the pages are sorted.
+  staleLogEntries.sort((a, b) => byPath(a.path, b.path))
   similarTags.sort((a, b) => byPath(a.variants[0].tag, b.variants[0].tag))
 
   return {
@@ -283,6 +386,7 @@ export function computeLint(
     unreferencedSources,
     danglingCitations,
     stalePages,
+    staleLogEntries,
     similarTags,
   }
 }
@@ -330,6 +434,7 @@ export function formatLintReport(r: LintReport): string {
     `${r.unreferencedSources.length} unread sources · ` +
     `${r.danglingCitations.length} with dangling citations · ` +
     `${r.stalePages.length} behind their sources · ` +
+    `${r.staleLogEntries.length} to recheck in the log · ` +
     `${r.similarTags.length} tag collisions`
 
   const broken = r.brokenLinks.length
@@ -350,6 +455,12 @@ export function formatLintReport(r: LintReport): string {
       `rewrite a page from memory to "fix" this):\n` +
       capped(r.stalePages.map((p) => `${p.path} → ${p.sources.join(', ')}`))
     : ''
+  const logEntries = r.staleLogEntries.length
+    ? `\n\nLog entries whose pages have been edited since (whatever the entry ` +
+      `recorded may already have been dealt with — re-read the pages before saying so, ` +
+      `and close an entry only when the user agrees it is closed):\n` +
+      capped(r.staleLogEntries.map((e) => `${e.path} · ${e.entry} → ${e.pages.join(', ')}`))
+    : ''
   const tags = r.similarTags.length
     ? `\n\nNear-duplicate tags (same tag, different spellings — most-used first):\n` +
       capped(r.similarTags.map((g) => g.variants.map((v) => `${v.tag} (${v.count})`).join(' · ')))
@@ -367,13 +478,18 @@ export function formatLintReport(r: LintReport): string {
     list('Sources no page mentions (unread material)', r.unreferencedSources) +
     dangling +
     stale +
+    logEntries +
     tags
 
   const tail =
     `\n\nThis is STRUCTURAL only. Semantic checks (contradictions, claims that no longer ` +
     `match what the source now says) require ` +
     `reading page content and are token-heavy — report the above first, then ask the user ` +
-    `before scanning content (and let them narrow the scope).`
+    `before scanning content (and let them narrow the scope). What such a scan finds is ` +
+    `not a page: offer to record it as a dated entry in the KB's log page (log.md, ` +
+    `creating one only if the user wants it), naming the pages involved with [[wikilinks]], ` +
+    `so the finding outlives this conversation. Never edit a page to make a contradiction ` +
+    `go away without the user choosing which side is right.`
 
   return summary + (body || '\n\nNo structural issues found.') + tail
 }

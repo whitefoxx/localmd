@@ -1,5 +1,13 @@
 # Large PDFs are slow on first open (fixed)
 
+> **Scope note, 2026-08-20.** Everything below was measured against the dev
+> server, where every asset is a localhost round trip. It is still accurate for
+> what it covers — boot contention and deadlines — but it cannot say anything
+> about asset delivery, and a *second*, production-only cause of slow PDFs was
+> found the same day: the PDF engine was missing from the service-worker
+> precache. See `pdf-blank-on-localmd.md`. Do not read "fixed" here as "PDFs
+> are fast everywhere".
+
 **Status: fixed** across three commits (2026-08-20): index deferral + an
 extraction loop that yields (1a880bb), lazy mounting of background PDF tabs,
 and the size-scaled load deadline. What remains is engine-internal: a

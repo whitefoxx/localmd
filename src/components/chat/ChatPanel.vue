@@ -481,7 +481,15 @@ function toggleSkillMenu(): void {
 
 function runSkill(name: string): void {
   skillMenuOpen.value = false
-  preset(`/${name} `)
+  presetCommand(name)
+}
+
+/** Taking up the offer retires it: the nudge is about material nobody has
+ *  looked at, and the moment /ingest is in the composer someone has. Whether
+ *  the run then covers every file is kb_health's question, not this row's. */
+function ingestCaptured(): void {
+  files.clearCaptured()
+  presetCommand('ingest')
 }
 
 /* ── sending ─────────────────────────────────────────────────────────────── */
@@ -724,6 +732,21 @@ function onKeydown(e: KeyboardEvent): void {
 
 function preset(text: string): void {
   input.value = text
+}
+
+/**
+ * Put a /command in the composer without discarding what is already typed.
+ *
+ * A slash command only expands when it starts the message, so it cannot simply
+ * be appended — but everything AFTER it is handed to the skill as this run's
+ * input, so putting the draft there keeps the words on screen and gives them a
+ * meaning. Replacing outright was safe while the only slash affordances sat
+ * above an empty conversation; the captured-material row appears mid-thread,
+ * where the text it would overwrite is someone's unsent message.
+ */
+function presetCommand(name: string): void {
+  const draft = input.value.trim()
+  input.value = draft ? `/${name} ${draft}` : `/${name} `
 }
 
 // Keep the transcript pinned to the bottom while streaming — but ONLY while
@@ -1085,7 +1108,7 @@ watch(
           :key="s.name"
           class="btn text-xs"
           :title="s.description"
-          @click="preset(`/${s.name} `)"
+          @click="presetCommand(s.name)"
         >
           /{{ s.name }}
         </button>
@@ -1123,7 +1146,7 @@ watch(
         <!-- The app's own /ingest, not a prompt spelled out here: a folder with
              no skills of its own is exactly the case that used to get a
              hardcoded paragraph about `raw/` — a directory it does not have. -->
-        <button class="btn text-xs" @click="preset('/ingest ')">
+        <button class="btn text-xs" @click="presetCommand('ingest')">
           {{ $t('chat.presetIngest') }}
         </button>
         <button
@@ -1133,6 +1156,32 @@ watch(
           {{ $t('chat.presetLint') }}
         </button>
       </template>
+    </div>
+
+    <!-- Material landed but nobody has read it. Filing a drop and compiling it
+         into pages are two acts on purpose — the second costs tokens and
+         rewrites the user's notes — so this offers the second and never runs
+         it. Shown whatever the conversation's state: material arrives while
+         you are mid-thread more often than not. -->
+    <div
+      v-if="files.captured.length"
+      class="px-3 pb-2 flex items-center gap-2 shrink-0 text-xs text-fg-3"
+      :class="{ 'max-w-3xl mx-auto w-full': ui.agentMaximized }"
+    >
+      <span class="codicon codicon-sm codicon-inbox shrink-0" />
+      <span class="truncate" :title="files.captured.join('\n')">
+        {{ $t('chat.captured', { n: files.captured.length }) }}
+      </span>
+      <button class="btn text-xs ml-auto shrink-0" @click="ingestCaptured">
+        {{ $t('chat.presetIngest') }}
+      </button>
+      <button
+        class="text-fg-3 hover:text-fg-1 shrink-0"
+        :title="$t('chat.capturedDismiss')"
+        @click="files.clearCaptured()"
+      >
+        <span class="codicon codicon-sm codicon-close" />
+      </button>
     </div>
 
     <!-- Input -->

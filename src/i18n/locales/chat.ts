@@ -39,6 +39,10 @@ export default {
     // — they are addressed to the model, not to the reader.
     presetIngest: 'Ingest',
     presetLint: 'Lint',
+    // Count-agnostic on purpose: there is no plural machinery here, and
+    // "1 filed" has to read as well as "12 filed".
+    captured: '{n} filed, not read yet',
+    capturedDismiss: 'Dismiss',
     params: 'Arguments',
     result: 'Result',
     toolFailed: 'failed',
@@ -152,6 +156,8 @@ export default {
     allSkills: '全部技能',
     presetIngest: '归档新材料',
     presetLint: '体检',
+    captured: '已归档 {n} 个，还没读',
+    capturedDismiss: '知道了',
     params: '参数',
     result: '结果',
     toolFailed: '失败',

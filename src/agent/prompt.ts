@@ -212,7 +212,7 @@ Browser access: NONE this session — no browser extension is connected and no w
     // No AGENTS.md — likely a pre-existing folder the user migrated in. The
     // agent learns the layout instead of prescribing ours, and may offer once
     // to write it down so future sessions inherit the understanding.
-    prompt += `\n\nThis knowledge base has no AGENTS.md instructions file. Infer its conventions from the tree itself and follow them. Once you have a feel for the layout (or when the user asks how to organize things), you may offer ONCE to write an AGENTS.md that documents the user's OWN structure — their folder names, what belongs where, naming habits — so future sessions follow it. If they agree, describe what actually exists; include improvement ideas only as clearly-optional suggestions, and don't prescribe the default raw/ + wiki/ layout unless the KB already uses it.`
+    prompt += `\n\nThis knowledge base has no AGENTS.md instructions file. Infer its conventions from the tree itself and follow them. Once you have a feel for the layout (or when the user asks how to organize things), you may offer ONCE to write an AGENTS.md that documents the user's OWN structure — their folder names, what belongs where, naming habits — and, if they volunteer it, what the knowledge base is FOR: intent is the one part you cannot read off a tree, and it is what decides which parts of a source are worth keeping. If they agree, describe what actually exists; include improvement ideas only as clearly-optional suggestions, and don't prescribe the default raw/ + wiki/ layout unless the KB already uses it.`
   }
 
   // Durable, cross-session memory — the user's persistent notes and preferences.

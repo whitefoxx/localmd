@@ -2,6 +2,8 @@ import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import { readFile, readdir } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 /**
  * Dev-only sink for the demo KB's document index.
@@ -46,6 +48,58 @@ function demoIndexWriter(): Plugin {
   }
 }
 
+/**
+ * Refuse to finish a build whose service worker does not precache the PDF
+ * engine.
+ *
+ * This guards a bug that shipped and stayed invisible for months: the engine's
+ * 4.6MB `pdfium.wasm` and 1.25MB `pdf.worker.min.mjs` were the only large
+ * assets missing from the precache, because the glob listed `js` and matches
+ * neither extension. Nothing threw — a PDF just re-downloaded 5.9MB on every
+ * visit while the rest of the app came from disk, so it looked fine on
+ * localhost and terrible on a slow link.
+ *
+ * A check belongs here rather than in a unit test because the defect only
+ * exists in the built artifact: the source is identical either way. It also
+ * covers the next version of the same mistake — `maximumFileSizeToCacheInBytes`
+ * outgrown by a newer engine would drop the wasm again, just as quietly.
+ */
+function assertEnginePrecached(): Plugin {
+  let outDir = ''
+  return {
+    name: 'localmd-assert-engine-precached',
+    apply: 'build',
+    enforce: 'post',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+    },
+    async closeBundle() {
+      const dist = outDir
+      let sw: string
+      try {
+        sw = await readFile(resolve(dist, 'sw.js'), 'utf8')
+      } catch {
+        return // no service worker in this build (e.g. PWA disabled) — nothing to assert
+      }
+      const assets = await readdir(resolve(dist, 'assets'))
+      const engine = assets.filter((f) => f.endsWith('.wasm') || f.endsWith('.mjs'))
+      if (!engine.length) {
+        throw new Error(
+          'assertEnginePrecached: no .wasm/.mjs emitted — the PDF engine did not make it into the build at all.',
+        )
+      }
+      const missing = engine.filter((f) => !sw.includes(f))
+      if (missing.length) {
+        throw new Error(
+          `assertEnginePrecached: ${missing.join(', ')} emitted but absent from the precache manifest. ` +
+            'Every visit will re-download them before a PDF can render. Check workbox.globPatterns ' +
+            '(does it cover this extension?) and maximumFileSizeToCacheInBytes (has the file outgrown it?).',
+        )
+      }
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     demoIndexWriter(),
@@ -80,12 +134,25 @@ export default defineConfig({
         // landing diagram. Bare `**/*.png` would additionally drag in the
         // 350KB og image, which sits at the root and no visitor ever loads —
         // only crawlers fetch it, and never from the service worker.
-        globPatterns: ['**/*.{js,css,html,svg,jpg,woff,woff2,ttf}', 'assets/*.png'],
-        // pdf.js worker and CodeMirror language chunks are large but should
-        // still be precached for offline use.
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        //
+        // `mjs` and `wasm` are load-bearing, and their absence was a bug that
+        // shipped: the PDF engine is a 4.6MB `pdfium.wasm` plus a 1.25MB
+        // `pdf.worker.min.mjs`, and `**/*.{js,…}` matches neither extension —
+        // `*.js` does not match `.mjs`. They were the only two large assets in
+        // the app left out of the precache, so every visit re-fetched 5.9MB
+        // before a PDF could render while the other ~200 files came from disk.
+        // Nothing errored; it was just slow, and only on a real network, which
+        // is why it never appeared in dev. See docs/pdf-blank-on-localmd.md.
+        globPatterns: ['**/*.{js,mjs,wasm,css,html,svg,jpg,woff,woff2,ttf}', 'assets/*.png'],
+        // Sized for the pdfium wasm (4.6MB today) with room to grow, plus the
+        // pdf.js worker and the CodeMirror language chunks. Raising this is not
+        // the safeguard — assertEnginePrecached() is; a limit outgrown by the
+        // next engine release would silently drop the wasm again.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
+    // After VitePWA: it writes sw.js in its own closeBundle, and this reads it.
+    assertEnginePrecached(),
   ],
   resolve: {
     alias: {

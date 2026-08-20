@@ -141,6 +141,31 @@ no knowledge-level queue to attach it to (our `ReviewPanel` is a file-diff
 review — a different thing that can coexist). If we ever build one, it ships
 with the sweep, not after it.
 
+> **Answered differently 2026-08-20.** A finding that is not a page now has a
+> durable home — but as a *page*, not a queue: `log.md`, Karpathy's third page
+> kind, holding dated entries that name the pages involved. The choice is the
+> same one that decided the `_index.md` entry below: a queue is bookkeeping
+> infrastructure written into someone's folder, whereas a log is a note like
+> any other, which they can read in any editor, hand-edit, or delete without
+> anything breaking. It also needs no new storage — it is markdown in the wiki,
+> and the link graph already sees it.
+>
+> The commitment above is kept in the only form a deterministic check can
+> honour: `staleLogEntries` reports an entry whose named pages have been edited
+> since its date, which is the sweep's cheap half — "this question has had
+> something move under it". It never closes an entry. Closing one is a
+> judgement about content, and their own conclusion applies to it too: the
+> failure mode of an automatic resolution is replacing an unresolved
+> contradiction with a confident wrong answer.
+>
+> Two details that took a decision:
+>
+> - **Any named page moving is enough**, not all of them. A disagreement
+>   between two pages is settled by changing either one.
+> - **The date is taken to the END of its day.** Writing an entry about two
+>   pages usually happens on a day those pages were also touched, so midnight
+>   would make every entry report itself the moment it was written.
+
 ### ⏸ Two-step ingest (nashsu)
 
 Split ingest into two LLM calls: analysis (entities, concepts, contradictions,
@@ -158,6 +183,15 @@ connection / knowledge gap → research this" actions off the result. Our
 worker; on our single-threaded browser main loop that is not optional.
 
 ### ⏸ Separating "what this KB is for" from "how it is arranged"
+
+> **Answered as a section, not a file, 2026-08-20.** The scaffolded AGENTS.md
+> now opens with an empty `## Purpose` telling the user what belongs there and
+> that leaving it blank is fine; the ingest skill uses a stated purpose to
+> decide what is worth extracting from a source and is told not to invent one
+> when there is none. A separate `purpose.md` was the part not taken: it buys
+> nothing here — AGENTS.md is already injected verbatim every session — and it
+> costs a second file in someone's folder, which is the objection this entry
+> raised against itself.
 
 nashsu adds `purpose.md` (goals and research scope, consulted during ingest and
 query); nvk adds `schema.md`, explicitly a *topic guide* rather than a database

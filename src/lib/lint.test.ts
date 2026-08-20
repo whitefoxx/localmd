@@ -4,6 +4,8 @@ import {
   declaredSourcePaths,
   formatLintReport,
   isEntryPage,
+  isLogPage,
+  parseLogEntries,
   type LintPage,
 } from './lint'
 
@@ -226,6 +228,80 @@ describe('isEntryPage', () => {
   })
 })
 
+describe('the synthesis log', () => {
+  const DAY = 86_400_000
+  const MAR_1 = Date.UTC(2026, 2, 1)
+  /** Anything after the END of the entry's day counts as movement — see
+   *  `parseLogEntries` on why midnight would make every entry report itself. */
+  const AFTER_MAR_1 = MAR_1 + DAY + 1
+  const SAME_DAY = MAR_1 + 3600_000
+
+  const LOG =
+    '# Log\n\n' +
+    '## 2026-03-01 — [[a]] and [[b]] disagree about the threshold\n' +
+    'One says 10B, the other says 100B.\n\n' +
+    '## 2026-03-01 — [[c]] needs a source\n' +
+    'No citation for the headline number.\n'
+
+  const kb = (aMtime: number, cMtime: number): Map<string, LintPage> =>
+    new Map<string, LintPage>([
+      ['wiki/log.md', { content: LOG, outgoing: ['wiki/a.md', 'wiki/b.md', 'wiki/c.md'], broken: [] }],
+      ['wiki/a.md', { ...page(FM + 'a\n'.repeat(12)), mtime: aMtime }],
+      ['wiki/b.md', { ...page(FM + 'b\n'.repeat(12)), mtime: MAR_1 }],
+      ['wiki/c.md', { ...page(FM + 'c\n'.repeat(12)), mtime: cMtime }],
+    ])
+
+  it('recognizes a log at any depth', () => {
+    expect(isLogPage('log.md')).toBe(true)
+    expect(isLogPage('wiki/LOG.md')).toBe(true)
+    expect(isLogPage('wiki/changelog.md')).toBe(false)
+    expect(isEntryPage('wiki/log.md')).toBe(true)
+  })
+
+  it('reads dated entries and the pages each one names', () => {
+    const entries = parseLogEntries(LOG)
+    expect(entries.map((e) => e.targets)).toEqual([['a', 'b'], ['c']])
+    expect(entries[0].title).toBe('2026-03-01 — [[a]] and [[b]] disagree about the threshold')
+    // End of the entry's day, not its midnight.
+    expect(entries[0].after).toBe(MAR_1 + DAY)
+  })
+
+  it('ignores headings that are not dated', () => {
+    expect(parseLogEntries('## Open questions\n[[a]]\n')).toEqual([])
+  })
+
+  /** Settling a disagreement means editing one side, not both. */
+  it('flags an entry when any page it names has moved since', () => {
+    const r = computeLint(kb(AFTER_MAR_1, MAR_1))
+    expect(r.staleLogEntries).toEqual([
+      {
+        path: 'wiki/log.md',
+        entry: '2026-03-01 — [[a]] and [[b]] disagree about the threshold',
+        pages: ['wiki/a.md'],
+      },
+    ])
+  })
+
+  /** Writing an entry about two pages usually happens on a day those pages
+   *  were touched — an entry that reports itself the moment it is written is
+   *  a check nobody would keep on. */
+  it('does not flag an entry over an edit on its own day', () => {
+    expect(computeLint(kb(SAME_DAY, SAME_DAY)).staleLogEntries).toEqual([])
+  })
+
+  it('says nothing about a log whose pages have not moved', () => {
+    expect(computeLint(kb(MAR_1, MAR_1)).staleLogEntries).toEqual([])
+  })
+
+  it('leaves an unparseable log alone rather than guessing', () => {
+    const freeform = new Map<string, LintPage>([
+      ['wiki/log.md', { content: '# Log\n\nJust prose about [[a]].\n', outgoing: ['wiki/a.md'], broken: [] }],
+      ['wiki/a.md', { ...page(FM + 'a\n'.repeat(12)), mtime: AFTER_MAR_1 }],
+    ])
+    expect(computeLint(freeform).staleLogEntries).toEqual([])
+  })
+})
+
 describe('formatLintReport', () => {
   it('summarizes and always appends the semantic-check reminder', () => {
     const out = formatLintReport(computeLint(KB))
@@ -249,6 +325,32 @@ describe('formatLintReport', () => {
     expect(out).toContain('1 behind their sources')
     expect(out).toContain('wiki/a.md → raw/papers/read.pdf')
     expect(out).toMatch(/never rewrite a page from memory/i)
+  })
+
+  /** The rendered line is where the agent learns the limit of this finding:
+   *  something moved, which is not the same as the entry being settled. */
+  it('offers a log entry for rechecking without declaring it closed', () => {
+    const DAY = 86_400_000
+    const kb = new Map<string, LintPage>([
+      [
+        'wiki/log.md',
+        {
+          content: '## 2026-03-01 — [[a]] and [[b]] disagree\nunresolved\n',
+          outgoing: ['wiki/a.md', 'wiki/b.md'],
+          broken: [],
+        },
+      ],
+      ['wiki/a.md', { ...page(FM + 'a\n'.repeat(12)), mtime: Date.UTC(2026, 2, 9) }],
+      ['wiki/b.md', { ...page(FM + 'b\n'.repeat(12)), mtime: Date.UTC(2026, 2, 1) + DAY }],
+    ])
+    const out = formatLintReport(computeLint(kb))
+    expect(out).toContain('1 to recheck in the log')
+    expect(out).toContain('wiki/log.md · 2026-03-01 — [[a]] and [[b]] disagree → wiki/a.md')
+    expect(out).toMatch(/close an entry only when the user agrees/i)
+    // b was edited exactly at the boundary, not past it, so the entry names
+    // only a. (b appears elsewhere in the report as an orphan — hence the
+    // assertion is on the entry's own line, not on the whole document.)
+    expect(out).not.toContain('disagree → wiki/a.md, wiki/b.md')
   })
 
   it('reports a clean KB', () => {

@@ -27,6 +27,16 @@ The `[[target]]` link syntax between notes. A property of the markdown, distinct
 the `wiki/` directory — do not let the shared word "wiki" blur them.
 _Avoid_: internal link, backlink (a backlink is the reverse direction only).
 
+**Log** (synthesis log):
+`log.md` — the page holding dated entries for what is *not* a page of its own:
+two notes that disagree, a claim still missing a source, a question left open. The
+third page kind in the LLM Wiki pattern, after entity pages and concept overviews.
+Structural, not content: `isEntryPage` keeps it out of the page-quality checks, and
+its `## YYYY-MM-DD` headings are what lets `computeLint` say an entry's pages have
+moved on since. Optional in every KB — a folder without one is not missing anything.
+_Avoid_: journal, changelog, review queue (we deliberately did not build one — see
+docs/llm-wiki-prior-art.md), inbox (that is the neutral landing dir, lib/capture).
+
 ## Sessions
 
 **Session** (会话):

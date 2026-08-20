@@ -104,7 +104,9 @@ async function onImport(e: Event): Promise<void> {
   const list = el.files ? Array.from(el.files) : []
   el.value = ''
   if (!list.length) return
-  for (const f of list) await importFileInto(f, files.targetDir)
+  const written: string[] = []
+  for (const f of list) written.push(await importFileInto(f, files.targetDir))
+  files.noteCaptured(written)
   await files.refreshTree()
   refreshGitStatus()
 }

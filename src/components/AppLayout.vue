@@ -153,7 +153,7 @@ async function onDrop(e: DragEvent): Promise<void> {
   dragging.value = false
   const dropped = [...(e.dataTransfer?.files ?? [])]
   if (!dropped.length) return
-  await captureFiles(dropped)
+  files.noteCaptured(await captureFiles(dropped))
   await syncAfterFsChange() // tree + git status; new files show as U immediately
 }
 
