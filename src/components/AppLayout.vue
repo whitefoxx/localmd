@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -24,7 +24,26 @@ import BacklinksPanel from '@/components/BacklinksPanel.vue'
 import OpenFilesPanel from '@/components/OpenFilesPanel.vue'
 import ImageViewer from '@/components/viewers/ImageViewer.vue'
 import PdfViewer from '@/components/viewers/PdfViewer.vue'
-import EpubViewer from '@/components/viewers/EpubViewer.vue'
+/**
+ * The EPUB reader is loaded on demand, not because it is rarely used but
+ * because of what it drags: epub.js is the one heavy third-party library a
+ * viewer imports directly, and a static import put it in the main chunk, so
+ * every visitor downloaded a book reader whether or not they ever opened a
+ * book. (It is also why epub.js's deprecated `unload` listener showed up in
+ * the console of people reading a PDF.)
+ *
+ * Safe here and NOT for `PdfViewer`, which is the asymmetry to keep in mind:
+ * this one is already `v-else-if`-mounted, so making it async genuinely defers
+ * the fetch. PdfViewer is rendered with `v-show` on purpose — it stays mounted
+ * so switching to another file and back does not tear down and reload an open
+ * document — and an async component under `v-show` would resolve on first
+ * paint anyway, buying a second request and nothing else.
+ *
+ * The cost is a chunk fetch on the first EPUB open of a fresh visit; the
+ * service worker precaches it, so it is once, and opening a book already
+ * involves reading and parsing the file.
+ */
+const EpubViewer = defineAsyncComponent(() => import('@/components/viewers/EpubViewer.vue'))
 import DocxViewer from '@/components/viewers/DocxViewer.vue'
 import ArtifactViewer from '@/components/viewers/ArtifactViewer.vue'
 import AnnotationsViewer from '@/components/viewers/AnnotationsViewer.vue'
