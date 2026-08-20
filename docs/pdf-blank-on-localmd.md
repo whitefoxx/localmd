@@ -2,7 +2,7 @@
 
 > 2026-08-20. Reported as "线上 PDF 半天加载不出来" with a console warning
 > about `unload` — which was a red herring. The fix is confirmed on the
-> deployed site; what remains unverified is named at the end.
+> deployed site, including in the condition that produced the report.
 
 ## Symptom
 
@@ -94,8 +94,9 @@ navigated normally. `await registration.update()` installed the new worker, the
 cache went 201 → 234 entries mid-install, and the app's own update prompt
 appeared. Accepting it activated the new worker and settled at 203.
 
-Still unverified, and only the reporter can do it: opening a PDF with the proxy
-off — the condition that produced the original report — and opening one offline.
+Both remaining checks were made by the reporter afterwards and passed: a PDF
+opens normally with the proxy off — the condition that produced the original
+report — and offline.
 
 Note what this does not fix either way: the *first ever* visit still has to
 fetch the engine once. It removes the repeat cost and makes the reader work
