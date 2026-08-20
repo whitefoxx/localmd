@@ -31,7 +31,7 @@ import {
 import NoteDialog from '@/components/NoteDialog.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
-import { hasIndex, indexDocument } from '@/lib/docindex'
+import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
 import { loadPdfLocations, loadPdfSpeechSegments } from '@/lib/docindex/pdf'
 import { useCitationsStore, type AnnotationTarget, type PendingJump } from '@/stores/citations'
 import { sidecarRevision, HIGHLIGHT_COLORS, UNDERLINE_COLOR } from '@/lib/annotations'
@@ -1252,9 +1252,12 @@ function onReady(r: PluginRegistry): void {
 type IndexState = 'idle' | 'parsing' | 'done' | 'error'
 const indexState = ref<IndexState>('idle')
 const indexMsg = ref('')
+// An index from an older algorithm revision: fully usable, rebuild offered
+// via a small badge — never rebuilt uninvited.
+const indexOutdated = ref(false)
 let msgTimer: number | null = null
 
-async function runIndex(auto = false): Promise<void> {
+async function runIndex(auto = false, rebuild = false): Promise<void> {
   if (indexState.value === 'parsing') return
   if (msgTimer !== null) {
     window.clearTimeout(msgTimer)
@@ -1263,10 +1266,15 @@ async function runIndex(auto = false): Promise<void> {
   indexState.value = 'parsing'
   indexMsg.value = auto ? '' : t('viewers.pdf.indexStarting')
   try {
-    const result = await indexDocument(props.path, (c, total) => {
-      indexMsg.value = t('viewers.pdf.indexExtracting', { c, t: total })
-    })
+    const result = await indexDocument(
+      props.path,
+      (c, total) => {
+        indexMsg.value = t('viewers.pdf.indexExtracting', { c, t: total })
+      },
+      { rebuild },
+    )
     indexState.value = 'done'
+    if (!result.cached) indexOutdated.value = false
     if (auto && result.cached) {
       indexMsg.value = ''
     } else {
@@ -1284,6 +1292,7 @@ async function runIndex(auto = false): Promise<void> {
 async function initIndexStatus(): Promise<void> {
   if (await hasIndex(props.path)) {
     indexState.value = 'done'
+    indexOutdated.value = (await queryIndexState(props.path)) === 'outdated'
   } else {
     void runIndex(true)
   }
@@ -1674,6 +1683,32 @@ onBeforeUnmount(() => {
       </div>
       <!-- Read aloud + highlight colours live in the PDF toolbar and selection
            popup now (see customizeViewerUi). -->
+      <!-- Index status: rebuild progress/result, and the older-algorithm
+           badge. The badge is an offer — the index works as it is; only a
+           click rebuilds (block ids are inherited, citations survive). -->
+      <!-- top-14: just below the engine's toolbar row, whose right side holds
+           its own icons — the badge must not sit on top of them. -->
+      <div
+        v-if="docReady && (indexMsg || indexOutdated)"
+        class="absolute top-14 right-4 z-10 flex items-center gap-2"
+      >
+        <div
+          v-if="indexMsg"
+          class="px-2 py-1 rounded border border-border bg-bg-2 text-xs shadow-sm"
+          :class="indexState === 'error' ? 'text-removed' : 'text-fg-3'"
+        >
+          {{ indexMsg }}
+        </div>
+        <button
+          v-if="indexOutdated && indexState !== 'parsing'"
+          class="btn text-xs shadow-sm"
+          :title="$t('viewers.index.updateHint')"
+          @click="runIndex(false, true)"
+        >
+          <span class="codicon codicon-sm codicon-refresh" />
+          {{ $t('viewers.index.updateAvailable') }}
+        </button>
+      </div>
     </div>
 
     <NoteDialog

@@ -13,7 +13,7 @@ import { useComposerStore } from '@/stores/composer'
 import { highlightSentence } from '@/composables/useTtsHighlight'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { resolveHotkey } from '@/lib/hotkeys'
-import { hasIndex, indexDocument } from '@/lib/docindex'
+import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
 import { loadEpubLocations } from '@/lib/docindex/epub'
 import { epubLocation, epubLocations, rememberEpubLocation, rememberEpubLocations } from '@/lib/viewMemory'
 import {
@@ -41,6 +41,8 @@ const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const indexState = ref<'none' | 'indexing' | 'indexed'>('none')
 const indexDetail = ref('')
+// Older-algorithm index: usable as is; the badge offers a rebuild.
+const indexOutdated = ref(false)
 const tocOpen = ref(false)
 const fontPct = ref(110)
 const selCfi = ref<string | null>(null)
@@ -215,8 +217,12 @@ async function load(path: string | null): Promise<void> {
   toc.value = []
   if (!path || !host.value) return
   indexDetail.value = ''
+  indexOutdated.value = false
   if (await hasIndex(path)) {
     indexState.value = 'indexed'
+    void queryIndexState(path).then((s) => {
+      if (path === docPath) indexOutdated.value = s === 'outdated'
+    })
   } else {
     // Auto-index on first open, matching the PDF viewer.
     indexState.value = 'none'
@@ -918,14 +924,19 @@ async function maybeJump(): Promise<void> {
   citations.clear()
 }
 
-async function runIndex(): Promise<void> {
+async function runIndex(rebuild = false): Promise<void> {
   if (!docPath || indexState.value === 'indexing') return
   indexState.value = 'indexing'
   try {
-    const s = await indexDocument(docPath, (c, t) => {
-      indexDetail.value = `${c}/${t}`
-    })
+    const s = await indexDocument(
+      docPath,
+      (c, t) => {
+        indexDetail.value = `${c}/${t}`
+      },
+      { rebuild },
+    )
     indexState.value = 'indexed'
+    if (!s.cached) indexOutdated.value = false
     indexDetail.value = `${s.blockCount} blocks`
   } catch (err) {
     indexState.value = 'none'
@@ -1094,6 +1105,15 @@ watch(
 
       <!-- Right: search · read-aloud · view-annotations -->
       <div class="ml-auto flex items-center gap-2">
+        <button
+          v-if="indexOutdated && indexState !== 'indexing'"
+          class="btn text-xs"
+          :title="$t('viewers.index.updateHint')"
+          @click="runIndex(true)"
+        >
+          <span class="codicon codicon-sm codicon-refresh" />
+          {{ $t('viewers.index.updateAvailable') }}
+        </button>
         <button
           class="btn text-xs"
           :class="{ '!text-accent': searchOpen }"

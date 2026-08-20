@@ -23,7 +23,7 @@ import { READ_ALOUD_ENABLED } from '@/lib/tts'
 import * as fs from '@/lib/fs'
 import { previewScroll } from '@/lib/viewMemory'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
-import { hasIndex, indexDocument } from '@/lib/docindex'
+import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
 import {
   HIGHLIGHT_COLORS,
   UNDERLINE_COLOR,
@@ -56,6 +56,8 @@ const legacy = ref(false)
 const ready = ref(false)
 const indexMsg = ref('')
 const indexFailed = ref(false)
+// Older-algorithm index: usable as is; the badge offers a rebuild.
+const indexOutdated = ref(false)
 
 /** The path currently rendered — scroll memory and jumps key off it. */
 let shownPath: string | null = null
@@ -131,6 +133,7 @@ function resetState(): void {
   ready.value = false
   indexMsg.value = ''
   indexFailed.value = false
+  indexOutdated.value = false
   popup.value = null
   noteEditor.value = null
   if (body.value) body.value.innerHTML = ''
@@ -194,12 +197,28 @@ function restoreScroll(path: string): void {
  * the user to wonder why the agent can't see the file.
  */
 async function autoIndex(path: string, token: number): Promise<void> {
-  if (await hasIndex(path)) return
+  if (await hasIndex(path)) {
+    const state = await queryIndexState(path)
+    if (token === loadToken) indexOutdated.value = state === 'outdated'
+    return
+  }
   if (token !== loadToken) return
+  await runIndex(path, token, false)
+}
+
+/** The badge's click — rebuild the current document's index. */
+function rebuildIndex(): void {
+  const path = files.currentPath
+  if (path) void runIndex(path, loadToken, true)
+}
+
+/** Index (or, on the badge's click, rebuild) with progress in the pill. */
+async function runIndex(path: string, token: number, rebuild: boolean): Promise<void> {
   indexMsg.value = t('viewers.docx.indexing')
   try {
-    const summary = await indexDocument(path)
+    const summary = await indexDocument(path, undefined, { rebuild })
     if (token !== loadToken) return
+    if (!summary.cached) indexOutdated.value = false
     indexMsg.value = t('viewers.docx.indexed', { n: summary.blockCount })
     msgTimer = window.setTimeout(() => (indexMsg.value = ''), 4000)
   } catch (err) {
@@ -419,6 +438,15 @@ onBeforeUnmount(() => {
       >
         {{ indexMsg }}
       </div>
+      <button
+        v-if="indexOutdated"
+        class="btn text-xs shadow-sm"
+        :title="$t('viewers.index.updateHint')"
+        @click="rebuildIndex"
+      >
+        <span class="codicon codicon-sm codicon-refresh" />
+        {{ $t('viewers.index.updateAvailable') }}
+      </button>
       <button
         v-if="ready"
         class="btn text-xs shadow-sm"

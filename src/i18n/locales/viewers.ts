@@ -7,6 +7,11 @@ export default {
     zen: 'Zen mode — hide everything but the page (Esc leaves)',
     // Shared across readers.
     selection: 'Selection',
+    index: {
+      updateAvailable: 'Update index',
+      updateHint:
+        'The AI index was built by an older version of the app. It still works as it is — click to rebuild with the current one. Citations in your notes keep working either way.',
+    },
 
     pdf: {
       loading: 'Opening PDF…',
@@ -132,6 +137,11 @@ export default {
   zh: {
     zen: '禅模式 —— 只留下页面（Esc 退出）',
     selection: '选中内容',
+    index: {
+      updateAvailable: '更新索引',
+      updateHint:
+        'AI 索引由旧版本生成。不更新也能正常使用——点击用当前版本重建。无论是否重建，笔记里已有的引用都不受影响。',
+    },
 
     pdf: {
       loading: '正在打开 PDF…',
