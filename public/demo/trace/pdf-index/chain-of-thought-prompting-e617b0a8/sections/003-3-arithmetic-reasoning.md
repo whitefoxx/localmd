@@ -35,7 +35,7 @@
 
 [[b3-17]] In empirical experiments, we will observe the utility of chain-of-thought prompting for arithmetic reasoning (Section 3), commonsense reasoning (Section 4), and symbolic reasoning (Section 5).
 
-### [[b3-18]] 3 Arithmetic Reasoning
+## [[b3-18]] 3 Arithmetic Reasoning
 
 [[b3-19]] We begin by considering math word problems of the form in Figure 1, which measure the arithmetic reasoning ability of language models. Though simple for humans, arithmetic reasoning is a task where language models often struggle (Hendrycks et al., 2021; Patel et al., 2021, inter alia). Strikingly, chainof-thought prompting when used with the 540B parameter language model performs comparably with task-specific finetuned models on several tasks, even achieving new state of the art on the challenging GSM8K benchmark (Cobbe et al., 2021).
 

@@ -1,11 +1,12 @@
 {
   "version": 11,
+  "builder": 2,
   "source": "raw/papers/chain-of-thought-prompting.pdf",
   "title": "chain-of-thought-prompting",
   "pageCount": 43,
   "blockCount": 1357,
   "contentHash": "7d9f878c23b460e4566aa4ec9201b1abfb3b8faefb2b1356e411cb90fef72a12",
-  "parsedAt": "2026-08-12T13:10:00.884Z",
+  "parsedAt": "2026-08-20T13:08:18.213Z",
   "structure": "outline",
   "sections": [
     {

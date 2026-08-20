@@ -1,7 +1,7 @@
 <!-- section 001 · pages 1–1 · raw/papers/chain-of-thought-prompting.pdf -->
 # [[b1-1]] Chain-of-Thought Prompting Elicits Reasoning
 
-## [[b1-2]] in Large Language Models
+### [[b1-2]] in Large Language Models
 
 [[b1-3]] Jason Wei
 

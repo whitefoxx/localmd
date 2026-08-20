@@ -18,7 +18,7 @@
  */
 import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
-import { indexDocument } from '@/lib/docindex'
+import { indexDocument, indexDirFor } from '@/lib/docindex'
 
 /** The demo's source document, at its KB-relative path. The path is part of
  *  the index directory name (it is hashed into it), so it must match what
@@ -36,10 +36,25 @@ export async function buildDemoIndex(): Promise<void> {
   if (!res.ok) throw new Error(`demo asset: ${res.status}`)
   await fs.writeFile(SOURCE, await res.blob())
 
+  // Seed the PUBLISHED index's id record first, so the rebuild INHERITS
+  // block ids instead of renumbering — the demo notes cite these ids, and a
+  // renumbering would silently re-point every citation chip they contain.
+  const indexDir = indexDirFor('pdf', SOURCE)
+  for (const f of ['manifest.json', 'locations.json']) {
+    const prev = await fetch(`demo/trace/${indexDir.replace(/^\.trace\//, '')}/${f}`)
+    if (prev.ok) await fs.writeFile(`${indexDir}/${f}`, await prev.text())
+  }
+
   log('indexing (this runs the real pdf.js extractor)…')
-  const summary = await indexDocument(SOURCE, (page, total) => {
-    if (page % 10 === 0 || page === total) log(`page ${page}/${total}`)
-  })
+  const summary = await indexDocument(
+    SOURCE,
+    (page, total) => {
+      if (page % 10 === 0 || page === total) log(`page ${page}/${total}`)
+    },
+    // Always a real rebuild: the point of this tool is regeneration, and the
+    // seeded prior index would otherwise satisfy the freshness check.
+    { rebuild: true },
+  )
   log(`indexed: ${summary.blockCount} blocks in ${summary.sectionCount} sections`)
 
   const paths = fs.collectFiles(await fs.readTreeFrom(summary.indexDir))
