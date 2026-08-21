@@ -5,10 +5,45 @@
  * on; only the active one is shown (v-show). Switching back to a tab is a
  * visibility toggle — no reload, page position kept, annotations stay live.
  */
-import { computed, reactive, watch } from 'vue'
+import { computed, defineAsyncComponent, h, reactive, watch } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { fileKind } from '@/lib/filetypes'
-import PdfDocument from './PdfDocument.vue'
+import { t } from '@/i18n'
+
+/**
+ * The reader is fetched on first use. It is the heaviest thing in the app —
+ * the pdfium-backed engine plus pdf.js came to ~1.5MB of the main chunk — and
+ * this container is the single door to it, so deferring it here costs a
+ * knowledge base that never opens a PDF nothing at all.
+ *
+ * Safe precisely because of the `seen` set below: a <PdfDocument> is only ever
+ * created for a PDF that has been on screen, so the import fires on the same
+ * gesture that already pays to read and parse a file. Nothing about the
+ * keep-alive behaviour changes — once mounted it stays mounted, and the chunk
+ * is in the module registry (and the service worker's precache) from then on.
+ *
+ * The loading state is the document's own mask minus the document: the chunk
+ * arriving and the file being read are one wait to the reader, so they must
+ * not look like two. Vue's default 200ms delay before showing it means a
+ * cached chunk produces no flash.
+ */
+const PdfDocument = defineAsyncComponent({
+  loader: () => import('./PdfDocument.vue'),
+  loadingComponent: () =>
+    h('div', { class: 'absolute inset-0 z-10 bg-bg-1' }, [
+      h(
+        'div',
+        {
+          class:
+            'absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full border border-border bg-bg-2 px-3 py-1.5 text-xs text-fg-3 shadow',
+        },
+        [
+          h('span', { class: 'codicon codicon-sm codicon-loading codicon-modifier-spin' }),
+          t('viewers.pdf.loading'),
+        ],
+      ),
+    ]),
+})
 
 const files = useFilesStore()
 
