@@ -18,6 +18,49 @@ import { ref } from 'vue'
 /** How long to wait for the new worker to take over before reloading anyway. */
 const TAKEOVER_GRACE_MS = 2500
 
+/** How often an open tab asks whether a newer build exists. */
+const CHECK_EVERY_MS = 30 * 60 * 1000
+/** Floor between checks, so flicking between tabs is not a poll. */
+const CHECK_COOLDOWN_MS = 60 * 1000
+
+/**
+ * Keep asking whether a newer build has shipped.
+ *
+ * The registration is checked when the page loads and then, by default, never
+ * again — so a tab that was already open when a deploy landed goes on serving
+ * the build it started with for as long as it stays open. Nothing looks broken;
+ * the fix you just shipped is simply not there, and the natural reaction (a
+ * hard reload) makes it *more* confusing rather than less: a hard reload
+ * bypasses the worker for the page's own requests, so the new bundle appears
+ * while the old precache is still being replaced underneath it.
+ *
+ * Two triggers, because the useful moments are different. Coming back to the
+ * tab is when a person would notice anything at all; the timer covers a tab
+ * left in the foreground for hours. Both go through the same cooldown, so
+ * switching between tabs cannot turn into a poll, and neither fires while the
+ * tab is hidden or the machine is offline — an update check that cannot
+ * succeed is just a request nobody asked for.
+ *
+ * What it does NOT do is apply anything: finding a build and taking it are
+ * separate decisions, and the second one belongs to whoever is mid-sentence
+ * (see the module comment above, and main.ts for the one case with nothing to
+ * lose).
+ */
+export function watchForUpdates(registration: ServiceWorkerRegistration): void {
+  let last = 0
+  const check = (): void => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return
+    const now = Date.now()
+    if (now - last < CHECK_COOLDOWN_MS) return
+    last = now
+    // A failed check is not an error worth surfacing — offline, a flaky
+    // network, a deploy mid-flight. The next trigger tries again.
+    void registration.update().catch(() => {})
+  }
+  document.addEventListener('visibilitychange', check)
+  window.setInterval(check, CHECK_EVERY_MS)
+}
+
 export const useUpdateStore = defineStore('update', () => {
   /** A build is waiting and the user has not dealt with it yet. */
   const ready = ref(false)

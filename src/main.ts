@@ -5,7 +5,7 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App.vue'
 import { i18n } from './i18n'
 import { useKbStore } from './stores/kb'
-import { useUpdateStore } from './stores/update'
+import { useUpdateStore, watchForUpdates } from './stores/update'
 import './assets/main.css'
 
 createApp(App).use(createPinia()).use(i18n).mount('#app')
@@ -19,6 +19,11 @@ createApp(App).use(createPinia()).use(i18n).mount('#app')
 // A no-op is deliberately not enough either — the offer has to reach the user.
 const updateSW = registerSW({
   immediate: true,
+  // Registration checks for a new build once, at load. An open tab has to keep
+  // asking, or a deploy stays invisible to it for as long as it stays open.
+  onRegisteredSW(_url, registration) {
+    if (registration) watchForUpdates(registration)
+  },
   onNeedRefresh() {
     const update = useUpdateStore()
     update.offer(updateSW)

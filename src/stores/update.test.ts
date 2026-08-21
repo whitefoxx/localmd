@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useUpdateStore } from './update'
+import { useUpdateStore, watchForUpdates } from './update'
 
 /**
  * The update prompt's one promise: clicking "Reload now" reloads.
@@ -76,5 +76,86 @@ describe('update prompt', () => {
     vi.advanceTimersByTime(10_000)
     listeners.controllerchange?.forEach((fn) => fn())
     expect(reload).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Looking for a new build is mostly a set of rules about when NOT to ask, and
+ * each of them is a request someone would otherwise pay for.
+ */
+describe('watching for a newer build', () => {
+  let update: ReturnType<typeof vi.fn>
+  let handlers: Record<string, (() => void)[]>
+  let registration: ServiceWorkerRegistration
+
+  const fire = (type: string): void => (handlers[type] ?? []).forEach((f) => f())
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    handlers = {}
+    update = vi.fn().mockResolvedValue(undefined)
+    registration = { update } as unknown as ServiceWorkerRegistration
+    vi.stubGlobal('document', {
+      visibilityState: 'visible',
+      addEventListener: (type: string, fn: () => void) => {
+        ;(handlers[type] ??= []).push(fn)
+      },
+    })
+    vi.stubGlobal('navigator', { onLine: true })
+    vi.stubGlobal('window', { setInterval: setInterval })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('asks when the tab comes back to the foreground', () => {
+    watchForUpdates(registration)
+    fire('visibilitychange')
+    expect(update).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks on its own for a tab left open', () => {
+    watchForUpdates(registration)
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(update).toHaveBeenCalledTimes(1)
+  })
+
+  /** Flicking between tabs is not a reason to talk to the server. */
+  it('does not turn tab switching into a poll', () => {
+    watchForUpdates(registration)
+    fire('visibilitychange')
+    fire('visibilitychange')
+    fire('visibilitychange')
+    expect(update).toHaveBeenCalledTimes(1)
+
+    vi.advanceTimersByTime(61 * 1000)
+    fire('visibilitychange')
+    expect(update).toHaveBeenCalledTimes(2)
+  })
+
+  it('stays quiet while the tab is hidden', () => {
+    watchForUpdates(registration)
+    ;(document as unknown as { visibilityState: string }).visibilityState = 'hidden'
+    fire('visibilitychange')
+    vi.advanceTimersByTime(30 * 60 * 1000)
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('stays quiet while offline', () => {
+    watchForUpdates(registration)
+    ;(navigator as unknown as { onLine: boolean }).onLine = false
+    fire('visibilitychange')
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  /** A check that fails is a check that happens again later, not an error. */
+  it('survives a failed check', async () => {
+    update.mockRejectedValueOnce(new Error('offline'))
+    watchForUpdates(registration)
+    expect(() => fire('visibilitychange')).not.toThrow()
+    await vi.advanceTimersByTimeAsync(61 * 1000)
+    fire('visibilitychange')
+    expect(update).toHaveBeenCalledTimes(2)
   })
 })
