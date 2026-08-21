@@ -41,6 +41,9 @@ export const useGitStore = defineStore('git', () => {
 
   const dirtyCount = computed(() => changes.value.length)
 
+  /** Set by refreshQuietly, consumed by the next status read (see refresh). */
+  let quietNext = false
+
   /**
    * The local commits a push would send, newest first.
    *
@@ -116,14 +119,21 @@ export const useGitStore = defineStore('git', () => {
    * `busy` stays what it always was, a UI label: this claims it only when
    * nothing else has, and releases it only if it is still ours, so a status
    * read can neither mislabel a push nor clear its spinner early.
+   *
+   * A read nobody asked for claims no label at all — see refreshQuietly.
    */
   const refresh = coalesce(async () => {
     if (!kb.name) return
+    // Consumed at the top of every cycle, so the flag can only ever silence
+    // the pass it was set for: a loud caller queued behind a quiet pass gets
+    // its own labelled cycle, and vice versa.
+    const quiet = quietNext
+    quietNext = false
     let claimed = false
     try {
       isRepo.value = await g.isRepo()
       if (!isRepo.value) return
-      if (busy.value === null) {
+      if (!quiet && busy.value === null) {
         busy.value = 'status'
         claimed = true
       }
@@ -254,7 +264,27 @@ export const useGitStore = defineStore('git', () => {
     void checkRemote()
   }
 
+  /**
+   * Reconcile with the repository without saying so.
+   *
+   * Coming back to the tab fires a status read, because the folder is the
+   * user's and a terminal commit while they were away is a real thing to catch
+   * up on. But `busy` is a claim on the user's attention, not a fact about the
+   * process: it spins the icon and, worse, disables Commit and Push, so every
+   * return from another tab flickered the git panel as though the app were
+   * doing something on their behalf. It was only looking.
+   *
+   * Same work, same coalescing, no label. Anything the read actually finds
+   * still shows up where it belongs — the branch, the dirty count, the tree's
+   * own U/M/D marks — which is the signal that was ever worth having.
+   */
+  function refreshQuietly(): Promise<void> {
+    quietNext = true
+    return refresh()
+  }
+
   return {
+    refreshQuietly,
     isRepo,
     branch,
     changes,

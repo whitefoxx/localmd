@@ -33,7 +33,9 @@ watch(() => files.currentPath, () => tts.stop())
 
 function onFocus(): void {
   void files.refreshOnFocus()
-  void git.refresh() // terminal commits/edits while the app was unfocused
+  // Terminal commits/edits while the app was unfocused — worth catching up on,
+  // not worth a spinner and a disabled Commit button on every return.
+  void git.refreshQuietly()
   // A tool server that was down, or an extension that was mid-reload, often
   // came back while the user was away. Only failing rows are re-probed — and
   // only with a KB open, so the landing screen still connects to nothing.
