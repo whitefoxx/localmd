@@ -33,6 +33,10 @@ watch(() => files.currentPath, () => tts.stop())
 
 function onFocus(): void {
   void files.refreshOnFocus()
+  // Coming back to the tab is when the concurrent-folder bar gets read, so it
+  // is also when it has to be true: a second tab that has since been closed
+  // takes the bar with it (kb.recheckOtherTab).
+  void kb.recheckOtherTab()
   // Terminal commits/edits while the app was unfocused — worth catching up on,
   // not worth a spinner and a disabled Commit button on every return.
   void git.refreshQuietly()

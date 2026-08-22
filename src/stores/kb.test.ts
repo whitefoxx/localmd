@@ -35,8 +35,12 @@ interface FakeOpts {
  *  moment while a tab reloads" and "another tab has it". */
 function fakeLocks(): {
   request: (name: string, opts: FakeOpts, cb: (l: unknown) => unknown) => Promise<void>
+  query: () => Promise<{ held: { name: string }[]; pending: { name: string }[] }>
   /** Take a lock from outside the store, as a second tab would. */
   grab: (name: string) => () => void
+  /** Drop a lock without waking anyone queued for it — a wake-up that never
+   *  arrives is exactly the state the bar must not be trusted in. */
+  vanish: (name: string) => void
 } {
   const held = new Set<string>()
   const queues = new Map<string, (() => void)[]>()
@@ -80,9 +84,18 @@ function fakeLocks(): {
       }
       return run(name, cb)
     },
+    async query() {
+      return {
+        held: [...held].map((name) => ({ name })),
+        pending: [...queues].flatMap(([name, q]) => q.map(() => ({ name }))),
+      }
+    },
     grab(name) {
       held.add(name)
       return () => release(name)
+    },
+    vanish(name) {
+      held.delete(name)
     },
   }
 }
@@ -169,6 +182,49 @@ describe('demo is a property of the open KB', () => {
     letGo()
     await vi.advanceTimersByTimeAsync(0)
     expect(kb.lockedByOther).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('takes the bar down on the way back in when nobody holds the folder', async () => {
+    // The queued request normally clears this by itself. When that wake-up
+    // never arrives, coming back to the tab is the moment the bar is read —
+    // and the moment it has to be true.
+    vi.useFakeTimers()
+    const locks = fakeLocks()
+    vi.stubGlobal('navigator', { locks })
+    locks.grab('browser-md:kb:notes')
+
+    const { useKbStore } = await import('./kb')
+    const kb = useKbStore()
+    await kb.openHandle(handle)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(kb.lockedByOther).toBe(true)
+
+    await kb.recheckOtherTab()
+    expect(kb.lockedByOther).toBe(true) // still held: the bar is right
+
+    locks.vanish('browser-md:kb:notes') // that tab went away, silently
+    await kb.recheckOtherTab()
+    expect(kb.lockedByOther).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('leaves the bar alone when it cannot find out', async () => {
+    vi.useFakeTimers()
+    const locks = fakeLocks()
+    vi.stubGlobal('navigator', {
+      locks: { ...locks, query: () => Promise.reject(new Error('nope')) },
+    })
+    locks.grab('browser-md:kb:notes')
+
+    const { useKbStore } = await import('./kb')
+    const kb = useKbStore()
+    await kb.openHandle(handle)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(kb.lockedByOther).toBe(true)
+
+    await kb.recheckOtherTab()
+    expect(kb.lockedByOther).toBe(true) // not knowing is not "nobody is there"
     vi.useRealTimers()
   })
 

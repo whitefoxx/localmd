@@ -168,6 +168,32 @@ export const useKbStore = defineStore('kb', () => {
       )
   }
 
+  /**
+   * Is the folder still somebody else's?
+   *
+   * The queued request above normally takes the warning back the instant the
+   * other tab lets go, with nobody doing anything. This is the belt to that
+   * braces, and it runs at the moment that matters: when this tab comes back
+   * to the front, which is when someone is actually reading the bar. If no one
+   * holds the lock by then, the bar comes down — our own queued request is
+   * about to take it anyway.
+   *
+   * Not knowing is not the same as knowing nobody is there: no `query`, a
+   * throw, or a KB swapped underneath us all leave the bar exactly as it is.
+   */
+  async function recheckOtherTab(): Promise<void> {
+    if (!lockedByOther.value || !name.value) return
+    const kbName = name.value
+    try {
+      const q = await navigator.locks?.query?.()
+      if (!q) return
+      if (q.held?.some((l) => l.name === `browser-md:kb:${kbName}`)) return
+      if (name.value === kbName) lockedByOther.value = false
+    } catch {
+      /* an unanswered question is not an answer */
+    }
+  }
+
   async function refreshRecents(): Promise<void> {
     try {
       recents.value = await listRecents()
@@ -300,6 +326,7 @@ export const useKbStore = defineStore('kb', () => {
     restoring,
     error,
     lockedByOther,
+    recheckOtherTab,
     refreshRecents,
     forgetRecent,
     pickAndOpen,
