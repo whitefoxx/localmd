@@ -7,6 +7,8 @@ import { useReviewStore } from '@/stores/review'
 import { useGitStore } from '@/stores/git'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
+import { useSettingsStore } from '@/stores/settings'
+import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import * as fs from '@/lib/fs'
 import FileTree from '@/components/FileTree.vue'
 import EditorTabs from '@/components/EditorTabs.vue'
@@ -76,6 +78,13 @@ const theme = useThemeStore()
 const review = useReviewStore()
 const git = useGitStore()
 const ui = useUiStore()
+const settings = useSettingsStore()
+
+/** The Search shortcut as currently bound — shown on the empty editor, where
+ *  "open a file" is the only thing anyone is trying to do. */
+const searchHotkey = computed(() =>
+  formatBinding(activeBindings(HOTKEY_BY_ID.search, settings.state.hotkeys)[0]),
+)
 
 function openGit(): void {
   git.panelOpen = true
@@ -679,9 +688,22 @@ function closeKb(): void {
                   </button>
                 </div>
               </div>
-              <div v-else class="text-center">
-                <span class="codicon codicon-lg codicon-markdown block mb-2" />
-                {{ $t('layout.selectFile') }}
+              <!-- A flex column rather than a `block` on the icon: codicon.css
+                   sets `display: inline-block` at a specificity a utility class
+                   cannot reach, so the icon sat on the text's line instead of
+                   above it, off by its own baseline nudge. -->
+              <div v-else class="flex flex-col items-center gap-2 text-center">
+                <span class="codicon codicon-lg codicon-markdown" />
+                <div>{{ $t('layout.selectFile') }}</div>
+                <!-- The shortcut as it is bound right now, not as it shipped —
+                     it is rebindable in Settings, and a hint naming a key that
+                     does nothing is worse than no hint. -->
+                <div class="text-xs text-fg-3">
+                  {{ $t('layout.selectFileHint') }}
+                  <kbd
+                    class="mx-0.5 rounded border border-border bg-bg-2 px-1 py-0.5 font-sans text-[11px] text-fg-2"
+                  >{{ searchHotkey }}</kbd>
+                </div>
               </div>
             </div>
           </div>
