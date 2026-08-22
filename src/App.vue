@@ -80,8 +80,8 @@ function onKeydown(e: KeyboardEvent): void {
 }
 
 /** Esc closes the top-most open layer, one per press: help → search → settings
- *  → git → review → health → chat history → graph → restore maximized agent →
- *  leave zen. Zen is last because it is the quietest layer: anything else on
+ *  → git → review → health → chat history → chat search → graph → restore
+ *  maximized agent → leave zen. Zen is last because it is the quietest layer: anything else on
  *  screen was opened on top of it and goes first.
  *  (SearchPalette also handles Esc itself while its input has focus — this is
  *  the fallback.)
@@ -103,6 +103,10 @@ function closeTopLayer(): void {
   else if (review.panelOpen) review.panelOpen = false
   else if (ui.healthOpen) ui.healthOpen = false
   else if (chat.historyOpen) chat.historyOpen = false
+  // A filter typed into the maximized panel's rail is a layer of its own: the
+  // list is hiding rows until it is cleared, and clearing it is what Esc means
+  // to someone with the caret still in that box.
+  else if (chat.historyQuery) chat.historyQuery = ''
   else if (ui.graphOpen) ui.graphOpen = false
   else if (ui.agentMaximized) ui.agentMaximized = false
   else if (ui.zen) ui.zen = false

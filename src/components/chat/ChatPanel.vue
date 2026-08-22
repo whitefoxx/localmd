@@ -25,8 +25,12 @@ import { BUILTIN_DIR } from '@/lib/skills'
 import { fileKind } from '@/lib/filetypes'
 import * as fs from '@/lib/fs'
 import MessageRow from './MessageRow.vue'
+import SessionList from './SessionList.vue'
+import SessionSearch from './SessionSearch.vue'
+import SessionTabs from './SessionTabs.vue'
 import type { MessagePart } from '@/stores/chat'
 import { baseName, openAttachment, runClock, snippet, stopClock } from './shared'
+import { openInEditor } from '@/lib/openInEditor'
 import { t } from '@/i18n'
 
 const emit = defineEmits<{ openSettings: []; close: [] }>()
@@ -42,6 +46,120 @@ const mcp = useMcpStore()
 
 // Stage text selected in the open file as removable context chips (agent-open).
 useFileSelectionCapture()
+
+/**
+ * Maximized, the panel is the whole window, and a whole window is not a wider
+ * side panel — it is an app, and an app of this shape has a rail: a way into a
+ * new conversation, the ones already had, and the doors out. Docked there is no
+ * room for a second column, so the rail is absent and the header keeps the New
+ * and history buttons it has always had.
+ *
+ * Narrow screens stay single-column at any size: 264px of rail out of 390 is
+ * not a layout, it is a conversation squeezed into the margin.
+ */
+const railShown = computed(() => ui.agentMaximized && !ui.isNarrow)
+
+/** The rail's foot: the two doors the covered activity bar took away. Computed
+ *  rather than a constant so switching the interface language re-labels them. */
+const railEntries = computed(() => [
+  {
+    icon: 'codicon-settings-gear',
+    label: t('common.settings'),
+    run: () => emit('openSettings'),
+  },
+  {
+    icon: 'codicon-question',
+    label: t('help.title'),
+    run: () => ui.openHelp('working-with-the-agent'),
+  },
+])
+
+/** The rail's two top rows and its foot rows are one shape: a full-width row
+ *  that lights up under the cursor, and nothing until it does. Edge to edge
+ *  like the session rows between them — an inset highlight would make these
+ *  look like buttons that had been dropped into the column rather than rows of
+ *  it — and the same px-3 as everything else in the rail, so one line of icons
+ *  runs down it. */
+const railRow =
+  'w-full flex items-center gap-2 px-3 py-1.5 text-sm text-fg-1 transition-colors hover:bg-bg-2 hover:text-fg-0'
+
+/** The rail's search row opens into a box, and closes again when it is left
+ *  empty — so an abandoned search never sits there filtering a list you have
+ *  moved on from. Esc blurs the box, which is what makes one press both clear
+ *  and dismiss: the app's own Esc chain empties the query, and the blur that
+ *  follows finds it empty. */
+const searchOpen = ref(false)
+
+function collapseSearch(): void {
+  if (!chat.historyQuery) searchOpen.value = false
+}
+
+/** The list as filtered, by title. Titles are what the list shows, so they are
+ *  what it searches — a match on hidden text would look like a bug. */
+const shownSessions = computed(() => {
+  const q = chat.historyQuery.trim().toLowerCase()
+  return q ? chat.sessions.filter((s) => s.title.toLowerCase().includes(q)) : chat.sessions
+})
+
+/**
+ * The row the search box's Enter opens, and the arrows move.
+ *
+ * It lives here rather than in either component because it is the one fact the
+ * box and the list have to agree on, and they are siblings. Kept at the top of
+ * whatever the filter currently leaves — typing narrows the list, so the row
+ * you were on is rarely the row you now mean.
+ */
+const historySel = ref(0)
+
+function moveHistorySel(delta: number): void {
+  const n = shownSessions.value.length
+  if (n) historySel.value = Math.min(n - 1, Math.max(0, historySel.value + delta))
+}
+
+function openSelectedSession(): void {
+  const s = shownSessions.value[historySel.value]
+  if (s) void chat.openSession(s.id)
+}
+
+watch(
+  () => chat.historyQuery,
+  () => (historySel.value = 0),
+)
+// Deleting a session shortens the list under the selection; never leave it
+// pointing past the end.
+watch(
+  () => shownSessions.value.length,
+  (n) => {
+    if (historySel.value >= n) historySel.value = Math.max(0, n - 1)
+  },
+)
+
+/** The conversation on screen, named in the right-hand column's header — the
+ *  rail says which row is lit, the header says what you are reading. */
+const currentTitle = computed(
+  () => chat.tabs.find((t) => t.id === chat.currentSessionId)?.title ?? '',
+)
+
+/**
+ * The rail IS the history, so the overlay never opens over it. Held as a
+ * watcher rather than only a `v-if` because the flag is reachable from outside
+ * this component (the command palette opens history directly), and a flag left
+ * true behind a hidden overlay costs the user an Esc press that appears to do
+ * nothing. Leaving the rail drops the filter with it, so the list is whole
+ * again the next time it is opened.
+ */
+watch([railShown, () => chat.historyOpen], ([rail, open]) => {
+  if (rail && open) {
+    chat.historyOpen = false
+    return
+  }
+  // No list on screen at all: the filter goes with it, so neither surface ever
+  // opens onto a list already hiding rows for a search nobody remembers making.
+  if (!rail && !open) {
+    chat.historyQuery = ''
+    searchOpen.value = false
+  }
+})
 
 /** The empty panel's three rows: what it reads, what it writes, how to hand it
  *  something. Computed rather than a constant so switching the interface
@@ -813,30 +931,157 @@ watch(
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-bg-1 relative">
+  <div class="h-full flex bg-bg-1">
+    <!-- The maximized panel's left rail: navigation and the doors out, so the
+         conversation column beside it holds nothing but the conversation. Only
+         ever drawn when there is room for two columns — see railShown. -->
+    <aside
+      v-if="railShown"
+      class="w-[264px] shrink-0 h-full flex flex-col border-r border-border bg-bg-2/40"
+    >
+      <!-- Same h-9 and the same rule as the conversation's header beside it, so
+           the line across the top of the window is one line. -->
+      <div class="flex items-center gap-2 px-3 h-9 shrink-0 border-b border-border">
+        <span class="codicon codicon-sm codicon-sparkle text-accent" />
+        <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
+        <span class="flex-1" />
+        <!-- The way back to the workspace. It lives here rather than beside the
+             conversation's own buttons because it is about the mode, not about
+             the chat — the same reason New and the history do. A ✕: from
+             inside, this is not "un-maximize a panel", it is closing the view
+             you are in to get back to your files. -->
+        <button
+          class="text-fg-3 hover:text-fg-0"
+          :title="$t('chat.backToWorkspace')"
+          @click="ui.agentMaximized = false"
+        >
+          <span class="codicon codicon-sm codicon-close" />
+        </button>
+      </div>
+
+      <!-- Two rows that do the same kind of thing — start something, find
+           something — so they are the same kind of thing on screen: plain rows
+           that light up under the cursor. A framed button would claim to be the
+           one action in a column whose whole point is the list below it. -->
+      <div class="pt-3 shrink-0">
+        <button :class="railRow" @click="chat.newSession()">
+          <span class="codicon codicon-sm codicon-add shrink-0" />
+          <span>{{ $t('chat.newChat') }}</span>
+        </button>
+      </div>
+
+      <!-- Searching the list is filtering it, not a second view of it: the rows
+           below are the same rows, minus the ones that don't match. Which is
+           why it sits here as a row like any other until it is asked for — a
+           box standing open all day advertises typing as the way to use this
+           column, when picking from the list is. -->
+      <div class="pb-2 shrink-0">
+        <button v-if="!searchOpen" :class="railRow" @click="searchOpen = true">
+          <span class="codicon codicon-sm codicon-search shrink-0" />
+          <span>{{ $t('chat.searchChats') }}</span>
+        </button>
+        <!-- The box keeps a small inset — a row highlights edge to edge, but a
+             field pressed against the window's side reads as an unfinished
+             layout — and that inset is px-1 for a reason: 4 + the box's own
+             left-2 lands the magnifier exactly where the row's icon was, and
+             4 + its pl-8 lands the caret exactly where the row's label was. Any
+             other value and the icon hops sideways as you click. -->
+        <div v-else class="px-1">
+          <SessionSearch
+            @blur="collapseSearch()"
+            @move="moveHistorySel"
+            @choose="openSelectedSession()"
+          />
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 panel-scroll overscroll-contain border-t border-border">
+        <div v-if="!shownSessions.length" class="p-3 text-xs text-fg-3">
+          {{ chat.historyQuery ? $t('chat.noMatchingChats') : $t('chat.noPreviousChats') }}
+        </div>
+        <!-- No outline while the box is closed: there is nothing to press
+             Enter in, so an outlined row would point at nothing. -->
+        <SessionList
+          :sessions="shownSessions"
+          :selected="searchOpen ? historySel : -1"
+          compact
+        />
+      </div>
+
+      <!-- Maximized, the activity bar is covered, and with it every way into
+           Settings and the manual. They are put back here rather than left to
+           an exit-and-return the user has to think of. -->
+      <div class="shrink-0 border-t border-border py-1.5">
+        <button
+          v-for="entry in railEntries"
+          :key="entry.icon"
+          :class="railRow"
+          @click="entry.run()"
+        >
+          <span class="codicon codicon-sm shrink-0" :class="entry.icon" />
+          <span class="truncate">{{ entry.label }}</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- The conversation column. Everything below is what the panel has always
+         been, one wrapper deeper and at its old indentation — reflowing seven
+         hundred lines to move them two spaces would hide the change that
+         actually happened. -->
+    <div class="h-full flex-1 min-w-0 flex flex-col bg-bg-1 relative">
     <!-- Header. Maximized, the panel is the whole window and everything else in
          it (transcript, composer) already narrows to max-w-3xl — a header still
          pinned to the window edges left the title and the buttons a screen
          apart, framing a column they do not belong to. The rule stays full
          width; only the row inside it narrows. -->
-    <div class="border-b border-border shrink-0">
+    <!-- h-9 on the RULE, h-full on the row inside it: the file tree's header and
+         the editor's tab bar are h-9 with the border drawn inside that, so a
+         wrapper that added its border to a 36px row put this one line lower
+         than the other two across the top of the window. -->
+    <div class="h-9 border-b border-border shrink-0">
       <div
-        class="flex items-center gap-2 px-3 h-9"
+        class="flex items-center gap-2 px-3 h-full"
         :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }"
       >
-        <span class="codicon codicon-sm codicon-sparkle text-accent" />
-        <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
-        <!-- Starting over is the most-reached-for thing in this header, so it
-             sits next to the title with a shape of its own rather than as the
-             third identical icon in the row on the right. -->
-        <button
-          class="flex shrink-0 items-center gap-1 rounded-md border border-border bg-bg-2/60 px-1.5 py-0.5 text-[11px] text-fg-2 transition-colors hover:border-accent/40 hover:bg-bg-2 hover:text-fg-0"
-          :title="$t('chat.newChat')"
-          @click="chat.newSession()"
-        >
-          <span class="codicon codicon-sm codicon-add" />
-          <span>{{ $t('chat.newChatShort') }}</span>
-        </button>
+        <!-- Beside the rail the header names the conversation, because the rail
+             already carries the app's name and the buttons that were here. With
+             several open it names them all: the tabs move up into this row
+             rather than taking a second one to repeat what the title said. -->
+        <template v-if="railShown">
+          <div
+            v-if="chat.tabs.length > 1"
+            class="flex items-stretch self-stretch min-w-0 flex-1 -ml-3"
+          >
+            <SessionTabs />
+          </div>
+          <span v-else class="truncate text-sm text-fg-1">{{ currentTitle }}</span>
+        </template>
+        <template v-else>
+          <span class="codicon codicon-sm codicon-sparkle text-accent" />
+          <span class="text-xs uppercase tracking-wide text-fg-3">Agent</span>
+          <!-- Starting over is the most-reached-for thing in this header, so it
+               sits next to the title with a shape of its own rather than as the
+               third identical icon in the row on the right. -->
+          <button
+            class="flex shrink-0 items-center gap-1 rounded-md border border-border bg-bg-2/60 px-1.5 py-0.5 text-[11px] text-fg-2 transition-colors hover:border-accent/40 hover:bg-bg-2 hover:text-fg-0"
+            :title="$t('chat.newChat')"
+            @click="chat.newSession()"
+          >
+            <span class="codicon codicon-sm codicon-add" />
+            <span>{{ $t('chat.newChatShort') }}</span>
+          </button>
+          <!-- Next to New, not away with the icons on the right: these two are
+               one pair — start a conversation, or go back to one — and the row
+               on the right is what you do TO the conversation you are in. -->
+          <button
+            class="shrink-0 text-fg-3 hover:text-fg-0"
+            :class="{ '!text-accent': chat.historyOpen }"
+            :title="$t('chat.history')"
+            @click="chat.historyOpen = !chat.historyOpen"
+          >
+            <span class="codicon codicon-sm codicon-history" />
+          </button>
+        </template>
         <span class="flex-1" />
         <button
           class="text-fg-3 hover:text-fg-0 disabled:opacity-40 disabled:hover:text-fg-3"
@@ -859,14 +1104,7 @@ watch(
           />
         </button>
         <button
-          class="text-fg-3 hover:text-fg-0"
-          :class="{ '!text-accent': chat.historyOpen }"
-          :title="$t('chat.history')"
-          @click="chat.historyOpen = !chat.historyOpen"
-        >
-          <span class="codicon codicon-sm codicon-history" />
-        </button>
-        <button
+          v-if="!railShown"
           class="text-fg-3 hover:text-fg-0"
           :title="ui.agentMaximized ? $t('chat.restorePanel') : $t('chat.maximizePanel')"
           @click="ui.agentMaximized = !ui.agentMaximized"
@@ -899,27 +1137,12 @@ watch(
 
     <!-- Session tabs (concurrent chats). Tabs shrink evenly to fit the panel
          width (VS Code style) so the close button never scrolls out of view. -->
-    <div v-if="chat.tabs.length > 1" class="border-b border-border bg-bg-1 shrink-0">
+    <div
+      v-if="chat.tabs.length > 1 && !railShown"
+      class="border-b border-border bg-bg-1 shrink-0"
+    >
       <div class="flex items-stretch h-8" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
-        <button
-          v-for="t in chat.tabs"
-          :key="t.id"
-          class="group flex items-center gap-1 px-2 text-xs border-r border-border whitespace-nowrap flex-1 min-w-0 max-w-[150px] overflow-hidden"
-          :class="t.id === chat.currentSessionId ? 'bg-bg-0 text-fg-0' : 'text-fg-2 hover:bg-bg-2/50'"
-          :title="t.title"
-          @click="chat.activateTab(t.id)"
-        >
-          <span
-            v-if="t.running"
-            class="codicon codicon-sm codicon-loading codicon-modifier-spin text-accent shrink-0"
-          />
-          <span class="truncate flex-1 min-w-0 text-left">{{ t.title }}</span>
-          <span
-            class="codicon codicon-sm codicon-close text-fg-3 hover:text-fg-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
-            :class="{ '!opacity-100': t.id === chat.currentSessionId }"
-            @click.stop="chat.closeTab(t.id)"
-          />
-        </button>
+        <SessionTabs />
       </div>
     </div>
     <div
@@ -935,85 +1158,22 @@ watch(
          scroll from bleeding the transcript through — a composited scroll-layer
          artifact that overscroll-behavior alone can't fix. The list is centered
          at the transcript's readable width when maximized. -->
-    <div v-if="chat.historyOpen" class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1">
-      <div class="h-full panel-scroll overscroll-contain">
-      <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
-      <div v-if="!chat.sessions.length" class="p-4 text-xs text-fg-3">{{ $t('chat.noPreviousChats') }}</div>
-      <!-- active = the one on screen (unique); open = loaded in a tab (many). -->
-      <div
-        v-for="s in chat.sessions"
-        :key="s.id"
-        class="group relative flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-border/50"
-        :class="
-          s.id === chat.currentSessionId
-            ? 'bg-accent/15'
-            : chat.tabs.some((t) => t.id === s.id)
-              ? 'bg-bg-2 hover:bg-bg-3'
-              : 'hover:bg-bg-2/60'
-        "
-        @click="chat.openSession(s.id)"
-      >
-        <span
-          v-if="s.id === chat.currentSessionId"
-          class="absolute left-0 top-1 bottom-1 w-0.5 rounded-r bg-accent"
-        />
-        <!-- Left slot: chat/open status icon by default; on row hover a star
-             toggle replaces it. A favorited session shows the lit star in place
-             of the status icon entirely. -->
-        <div class="relative w-4 h-4 shrink-0">
-          <span
-            v-if="!s.favorite"
-            class="codicon codicon-sm absolute inset-0 flex items-center justify-center group-hover:hidden"
-            :class="
-              chat.tabs.some((t) => t.id === s.id)
-                ? `codicon-circle-filled ${s.id === chat.currentSessionId ? 'text-accent' : 'text-fg-2'}`
-                : 'codicon-comment-discussion text-fg-3'
-            "
-          />
-          <button
-            class="absolute inset-0 items-center justify-center"
-            :class="
-              s.favorite
-                ? 'flex text-yellow-500 hover:text-yellow-400'
-                : 'hidden group-hover:flex text-fg-3 hover:text-fg-1'
-            "
-            :title="s.favorite ? $t('chat.unfavorite') : $t('chat.favorite')"
-            @click.stop="chat.toggleFavorite(s.id)"
-          >
-            <span
-              class="codicon codicon-sm"
-              :class="s.favorite ? 'codicon-star-full' : 'codicon-star-empty'"
-            />
-          </button>
-        </div>
-        <span
-          class="flex-1 truncate text-sm"
-          :class="s.id === chat.currentSessionId ? 'text-fg-0 font-medium' : 'text-fg-1'"
-        >{{ s.title }}</span>
-        <span
-          v-if="s.id === chat.currentSessionId"
-          class="text-[10px] px-1 rounded bg-accent/20 text-accent shrink-0"
-        >{{ $t('chat.currentBadge') }}</span>
-        <span
-          v-else-if="chat.tabs.some((t) => t.id === s.id)"
-          class="text-[10px] px-1 rounded bg-bg-3 text-fg-3 shrink-0"
-        >{{ $t('chat.openBadge') }}</span>
-        <span class="text-xs text-fg-3 shrink-0">
-          {{ new Date(s.updatedAt).toLocaleDateString() }}
-        </span>
-        <button
-          class="text-fg-3 hover:text-removed opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 shrink-0"
-          :title="$t('common.delete')"
-          @click.stop="chat.removeSession(s.id)"
-        >
-          <span class="codicon codicon-sm codicon-trash" />
-        </button>
-        <!-- Full title on hover — row titles truncate. pointer-events-none so it
-             never intercepts the row's click. -->
-        <div
-          class="pointer-events-none absolute left-9 top-full -mt-1 z-30 hidden max-w-[280px] break-words rounded-md border border-border bg-bg-0 px-2 py-1 text-xs text-fg-0 shadow-lg group-hover:block"
-        >{{ s.title }}</div>
+    <div
+      v-if="chat.historyOpen && !railShown"
+      class="absolute inset-x-0 top-9 bottom-0 z-10 bg-bg-1 flex flex-col"
+    >
+      <!-- Opening the history is already "find me a conversation", so the box
+           to narrow it by name leads the list rather than hiding behind a
+           second click. -->
+      <div class="shrink-0 w-full px-2 py-2" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
+        <SessionSearch @move="moveHistorySel" @choose="openSelectedSession()" />
       </div>
+      <div class="flex-1 min-h-0 panel-scroll overscroll-contain">
+      <div class="w-full" :class="{ 'max-w-3xl mx-auto': ui.agentMaximized }">
+      <div v-if="!shownSessions.length" class="p-4 text-xs text-fg-3">
+        {{ chat.historyQuery ? $t('chat.noMatchingChats') : $t('chat.noPreviousChats') }}
+      </div>
+      <SessionList :sessions="shownSessions" :selected="historySel" />
       </div>
       </div>
     </div>
@@ -1029,11 +1189,13 @@ watch(
       :class="{ '[&>*]:max-w-3xl [&>*]:mx-auto': ui.agentMaximized }"
       @scroll.passive="onTranscriptScroll"
     >
-      <!-- Empty panel: a centred greeting, then the three things worth knowing
-           as rows. One child of the scroller, so the transcript's own spacing is
-           untouched the moment a message exists. -->
+      <!-- Empty panel: a greeting, then the three things worth knowing as rows.
+           All on one left edge — a centred line above a left-aligned list reads
+           as two blocks that happen to be near each other. One child of the
+           scroller, so the transcript's own spacing is untouched the moment a
+           message exists. -->
       <div v-if="!chat.messages.length">
-        <p class="text-center text-base font-medium text-fg-1 leading-relaxed">
+        <p class="text-base font-medium text-fg-1 leading-relaxed">
           {{ $t('chat.emptyLead') }}
         </p>
         <ul class="mt-4 space-y-2">
@@ -1134,6 +1296,7 @@ watch(
               v-for="s in kbSkills"
               :key="s.name"
               class="w-full flex items-baseline gap-2 px-2 py-1.5 text-left text-xs text-fg-2 hover:bg-bg-2"
+              :title="`/${s.name} — ${s.description}`"
               @click="runSkill(s.name)"
             >
               <span class="font-mono shrink-0">/{{ s.name }}</span>
@@ -1184,10 +1347,18 @@ watch(
       </button>
     </div>
 
-    <!-- Input -->
+    <!-- Input. The rule above the composer is dropped in the full-window layout:
+         the composer is a framed box of its own, and a line the width of the
+         window to separate it from the transcript only draws a second edge
+         beside the one already there. It comes back the moment a file is
+         dragged over — that border IS the drop target saying so — and stays in
+         the docked panel, where the column is narrow enough that the framed box
+         and the transcript above it read as one block without it. -->
     <div
       class="p-3 border-t shrink-0"
-      :class="dragOver ? 'border-accent bg-accent/5' : 'border-border'"
+      :class="
+        dragOver ? 'border-accent bg-accent/5' : railShown ? 'border-transparent' : 'border-border'
+      "
       @dragover.prevent="dragOver = true"
       @dragleave="dragOver = false"
       @drop="onDrop"
@@ -1205,6 +1376,7 @@ watch(
           :key="s.name"
           class="w-full flex items-baseline gap-2 px-2 py-1.5 text-left text-xs"
           :class="i === slashSel ? 'bg-accent/15 text-fg-0' : 'text-fg-2 hover:bg-bg-2'"
+          :title="`/${s.name} — ${s.description}`"
           @mousedown.prevent="pickSkill(s.name)"
           @mousemove="slashSel = i"
         >
@@ -1384,7 +1556,7 @@ watch(
               v-if="r.file"
               class="truncate min-w-0 font-medium text-fg-1 hover:text-fg-0 hover:underline"
               :title="r.file"
-              @click="files.openFile(r.file)"
+              @click="openInEditor(r.file)"
             >
               {{ baseName(r.file) }}
             </button>
@@ -1511,6 +1683,7 @@ watch(
         </div>
       </div>
       </div>
+    </div>
     </div>
   </div>
 </template>

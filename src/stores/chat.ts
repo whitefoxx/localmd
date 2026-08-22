@@ -316,6 +316,12 @@ export const useChatStore = defineStore('chat', () => {
   const activeId = ref<string | null>(null)
   const sessions = ref<SessionSummary[]>([])
   const historyOpen = ref(false)
+  /** The filter over that list in the maximized panel's rail. It lives out here
+   *  with the flag beside it for the same reason that one does: Esc walks the
+   *  app's layers from the outside (App.vue's closeTopLayer), and a filter that
+   *  only the panel knows about would be a layer Esc could not reach — pressing
+   *  it mid-search would throw the whole mode away rather than clear the box. */
+  const historyQuery = ref('')
   const limitMsg = ref('')
 
   const controllers = new Map<string, AbortController>()
@@ -1378,6 +1384,7 @@ export const useChatStore = defineStore('chat', () => {
     sessions,
     running,
     historyOpen,
+    historyQuery,
     limitMsg,
     sessionUsage,
     currentSessionId: computed(() => active.value?.id ?? null),

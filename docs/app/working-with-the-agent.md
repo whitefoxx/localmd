@@ -71,6 +71,25 @@ The conversation closes off immediately. A few things cannot be called back
 once they are under way — a push already sent, a document part-way through
 indexing — and those finish in the background; nothing waits for them.
 
+## Finding an earlier conversation
+
+Every session is kept, and the clock icon in the assistant's header lists them —
+newest first, with the one you are reading marked. Click a row to open it; the
+star keeps a conversation at hand, and the ✕ deletes it.
+
+The ⤢ button beside it expands the assistant to fill the window. That mode
+carries the list permanently down the left side, with New chat and Search chats
+above it — the shape of a chat app, for when the conversation is the work rather
+than something beside it. Settings and this manual are at the foot of that
+column, since the icon bar is covered. Esc, or the ✕ at the top of it, returns
+you to your files.
+
+Clicking anything the assistant named — a file, a wikilink, a quoted passage, a
+citation — leaves that mode and opens what it points at, and so does picking a
+file out of the search palette, which the keyboard still reaches from in there.
+A reference whose file is gone leaves you where you are rather than clearing the
+window for nothing.
+
 ## Asking something a different way
 
 If a reply went somewhere you did not want, you do not have to start over or
