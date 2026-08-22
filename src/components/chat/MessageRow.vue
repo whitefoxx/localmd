@@ -38,7 +38,8 @@ import {
 import { t } from '@/i18n'
 import KbImageThumb from './KbImageThumb.vue'
 import ApprovalCard from './ApprovalCard.vue'
-import { baseName, now, openAttachment, revealEditor, snippet } from './shared'
+import { baseName, now, openAttachment, snippet } from './shared'
+import { openInEditor, revealEditor } from '@/lib/openInEditor'
 
 const props = defineProps<{
   m: UiMessage
@@ -233,10 +234,7 @@ async function openSource(s: Source): Promise<void> {
     return
   }
   const rel = files.resolveMarkdownLink('', s.target) ?? s.target
-  if (rel) {
-    await files.openFile(rel)
-    revealEditor()
-  }
+  if (rel) await openInEditor(rel)
 }
 
 /** Compact display of a URL for the Sources list (host + path, no scheme). */
@@ -256,9 +254,13 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   e.preventDefault()
   if (a.classList.contains('citation') || a.classList.contains('cite-source')) {
     const path = a.dataset.citePath
-    if (path) await citations.openCitation(path, a.dataset.block ?? null)
-    else if (a.dataset.block) await citations.openByBlock(a.dataset.block)
-    revealEditor()
+    // Only step out of the full-window view if the cited document actually
+    // came up — a chip whose file has been deleted must not cost the layout.
+    if (path) {
+      if (await citations.openCitation(path, a.dataset.block ?? null)) revealEditor()
+    } else if (a.dataset.block) {
+      if (await citations.openByBlock(a.dataset.block)) revealEditor()
+    }
     return
   }
   // Injected reply-citation superscript → jump to its source.
@@ -268,14 +270,12 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
     return
   }
   if (a.classList.contains('wikilink') && a.dataset.resolved === '1' && a.dataset.target) {
-    await files.openFile(a.dataset.target)
-    revealEditor()
+    await openInEditor(a.dataset.target)
     return
   }
   // A `path` the agent named, resolved to a real file at render time.
   if (a.classList.contains('file-path') && a.dataset.path) {
-    await files.openFile(a.dataset.path)
-    revealEditor()
+    await openInEditor(a.dataset.path)
     return
   }
   const href = a.getAttribute('href') ?? ''
@@ -287,10 +287,7 @@ async function onPreviewClick(e: MouseEvent): Promise<void> {
   // so resolve against the KB (bundle) root — absolute /… and bare paths both
   // land correctly there.
   const rel = files.resolveMarkdownLink('', href)
-  if (rel) {
-    await files.openFile(rel)
-    revealEditor()
-  }
+  if (rel) await openInEditor(rel)
 }
 
 /* ── the message as a whole ──────────────────────────────────────────────── */
@@ -358,7 +355,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
           <button
             class="flex items-center gap-1 max-w-full text-xs px-1.5 py-0.5 rounded bg-bg-2 text-fg-2"
             :class="c.file ? 'hover:text-fg-0' : 'cursor-default'"
-            @click="c.file && files.openFile(c.file)"
+            @click="c.file && openInEditor(c.file)"
           >
             <span class="codicon codicon-sm codicon-quote shrink-0" />
             <span class="truncate min-w-0 font-medium">{{
@@ -495,7 +492,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
           :class="part.pending ? 'cursor-default' : 'hover:bg-accent/10'"
           :disabled="part.pending"
           :title="part.pending ? '' : part.path"
-          @click="!part.pending && files.openFile(part.path)"
+          @click="!part.pending && openInEditor(part.path)"
         >
           <span
             class="codicon shrink-0 text-accent"

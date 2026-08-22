@@ -16,7 +16,6 @@
  */
 import { ref, computed, watch, nextTick } from 'vue'
 import { useUiStore } from '@/stores/ui'
-import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore, type SearchHit } from '@/stores/kbIndex'
 import { useCitationsStore } from '@/stores/citations'
 import { useChatStore, type SessionSummary } from '@/stores/chat'
@@ -24,12 +23,12 @@ import { useSettingsStore } from '@/stores/settings'
 import { useCommands, type Command } from '@/composables/useCommands'
 import { fuzzyRank, termPositions, queryTerms } from '@/lib/fuzzy'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
+import { openInEditor, revealEditor } from '@/lib/openInEditor'
 import { baseName } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
 import { t } from '@/i18n'
 
 const ui = useUiStore()
-const files = useFilesStore()
 const index = useKbIndexStore()
 const citations = useCitationsStore()
 const chat = useChatStore()
@@ -275,12 +274,15 @@ async function pick(row: Row | undefined): Promise<void> {
   }
   ui.searchOpen = false
   ui.graphOpen = false
+  // Either way the file is the point, so the agent panel gives the window back
+  // if it was filling it — the palette is reachable by keyboard from in there,
+  // and a hit that opened behind the panel would look like nothing happened.
   if (row.kind === 'doc') {
     // Jump straight to the matched passage inside the PDF/EPUB.
-    await citations.openCitation(row.path!, row.blockId ?? null)
+    if (await citations.openCitation(row.path!, row.blockId ?? null)) revealEditor()
     return
   }
-  await files.openFile(row.path!)
+  await openInEditor(row.path!)
 }
 
 function onKeydown(e: KeyboardEvent): void {

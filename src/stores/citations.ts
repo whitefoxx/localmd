@@ -37,13 +37,16 @@ let nonce = 0
 export const useCitationsStore = defineStore('citations', () => {
   const pending = ref<PendingJump | null>(null)
 
-  /** Set the jump and open the document — `path` is trusted to be real here. */
-  async function jump(path: string, blockId: string | null): Promise<void> {
+  /** Set the jump and open the document — `path` is trusted to be real here.
+   *  Answers whether the document is now on screen (see files.openFile): a
+   *  citation whose file has since been deleted opens nothing, and the caller
+   *  may need to know that rather than rearrange the app around a blank. */
+  async function jump(path: string, blockId: string | null): Promise<boolean> {
     const ui = useUiStore()
     const files = useFilesStore()
     ui.graphOpen = false
     pending.value = { path, blockId, nonce: ++nonce }
-    await files.openFile(path)
+    return files.openFile(path)
   }
 
   /** Open a cited document. The declared path is repaired first (basename
@@ -51,7 +54,7 @@ export const useCitationsStore = defineStore('citations', () => {
    *  opens a "not found" tab has failed at its one job. When no file
    *  defensibly matches, fall back to locating the block through the
    *  document indexes rather than opening a dead path. */
-  async function openCitation(path: string, blockId: string | null): Promise<void> {
+  async function openCitation(path: string, blockId: string | null): Promise<boolean> {
     const files = useFilesStore()
     const resolved = resolveCitePath(path, files.allFiles)
     if (resolved) return jump(resolved, blockId)
@@ -73,7 +76,7 @@ export const useCitationsStore = defineStore('citations', () => {
   /** Fallback for chips with no resolved source (declaration out of reach, or
    *  the numberless [[bxx-y]] form): locate the block through the document
    *  indexes. Block ids repeat across documents, so prefer the current one. */
-  async function openByBlock(blockId: string): Promise<void> {
+  async function openByBlock(blockId: string): Promise<boolean> {
     const kbIndex = useKbIndexStore()
     const files = useFilesStore()
     let sources = kbIndex.findBlockSources(blockId)
@@ -81,13 +84,13 @@ export const useCitationsStore = defineStore('citations', () => {
       await kbIndex.refresh() // index may not be loaded yet
       sources = kbIndex.findBlockSources(blockId)
     }
-    if (!sources.length) return
+    if (!sources.length) return false
     const path = files.currentPath && sources.includes(files.currentPath)
       ? files.currentPath
       : sources[0]
     // jump, not openCitation: an index can name a since-deleted file, and
     // repairing THAT would send openCitation back here forever.
-    await jump(path, blockId)
+    return jump(path, blockId)
   }
 
   /** Called by a viewer once it has handled (or cannot handle) the jump. */

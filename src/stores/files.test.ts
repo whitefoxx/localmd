@@ -69,6 +69,17 @@ describe('files store — openFile with a file that is not there', () => {
     expect(files.openTabs).not.toContain('wiki/gone.md')
   })
 
+  it('says whether the file is actually on screen', async () => {
+    // What the agent panel needs in order to decide: it leaves its full-window
+    // layout to reveal a file the transcript named, and a reference to a file
+    // that is gone must not cost the user that layout for nothing.
+    const files = useFilesStore()
+
+    expect(await files.openFile('wiki/index.md')).toBe(true)
+    expect(await files.openFile('wiki/index.md')).toBe(true) // already current
+    expect(await files.openFile('wiki/gone.md')).toBe(false)
+  })
+
   it('keeps a tab the user already had, even when its file goes missing', async () => {
     const files = useFilesStore()
     await files.openFile('wiki/index.md')

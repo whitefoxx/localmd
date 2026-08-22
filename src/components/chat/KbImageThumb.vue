@@ -4,10 +4,9 @@
 import { ref, watch, onUnmounted } from 'vue'
 import * as fs from '@/lib/fs'
 import { mimeFor } from '@/lib/filetypes'
-import { useFilesStore } from '@/stores/files'
+import { openInEditor } from '@/lib/openInEditor'
 
 const props = defineProps<{ path: string }>()
-const files = useFilesStore()
 const url = ref('')
 const failed = ref(false)
 
@@ -38,7 +37,7 @@ onUnmounted(revoke)
     v-if="url"
     class="block my-2 max-w-[320px] overflow-hidden rounded-lg border border-border hover:border-accent/50 transition-colors"
     :title="`${path} · ${$t('chat.openImage')}`"
-    @click="files.openFile(path)"
+    @click="openInEditor(path)"
   >
     <img :src="url" :alt="path" class="block w-full h-auto" />
   </button>

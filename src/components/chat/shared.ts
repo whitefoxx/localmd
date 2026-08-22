@@ -5,8 +5,7 @@
  * either duplicating these or reaching back into `ChatPanel` for them.
  */
 import { ref } from 'vue'
-import { useFilesStore } from '@/stores/files'
-import { useUiStore } from '@/stores/ui'
+import { openInEditor } from '@/lib/openInEditor'
 
 /**
  * Shared "now" for the in-flight timers in the transcript — a tool call still
@@ -48,13 +47,6 @@ export function snippet(text: string): string {
   return first.length > 60 ? `${first.slice(0, 60)}…` : first
 }
 
-/** Opening a file from inside the agent panel is pointless while the panel IS
- *  the window — restore it so the file is actually visible. No-op otherwise. */
-export function revealEditor(): void {
-  const ui = useUiStore()
-  if (ui.agentMaximized) ui.agentMaximized = false
-}
-
 /** Open an attachment where every other file opens — the middle pane — rather
  *  than in a lightbox of its own. A pasted screenshot is a file in the KB, and
  *  the file view already knows how to show a picture, a PDF, a spreadsheet or a
@@ -63,6 +55,5 @@ export function revealEditor(): void {
  *  is the only way in — which is exactly why the thumbnail and the chip both
  *  take the click, and the remove button stops it. */
 export function openAttachment(path: string): void {
-  void useFilesStore().openFile(path)
-  revealEditor()
+  void openInEditor(path)
 }

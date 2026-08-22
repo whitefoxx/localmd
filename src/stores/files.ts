@@ -230,10 +230,18 @@ export const useFilesStore = defineStore('files', () => {
     reveal.value = { path, target, nonce: ++revealNonce }
   }
 
-  async function openFile(path: string): Promise<void> {
+  /**
+   * Show a file in the middle pane. Answers whether anything is now on screen
+   * for it: a text file that is no longer there opens nothing at all, and a
+   * caller that changes the layout to make room for it (the agent panel leaving
+   * its full-window mode, say) has to be able to tell that from a file that
+   * opened. Binary formats count as opened — their viewer is what says "not
+   * found", and it can only say it once it is on screen.
+   */
+  async function openFile(path: string): Promise<boolean> {
     const wasOpen = openTabs.value.includes(path)
     if (!wasOpen) openTabs.value.push(path)
-    if (currentPath.value === path) return
+    if (currentPath.value === path) return true
     await flush()
     if (isTextual(path)) {
       const read = await fs.readTextFile(path)
@@ -246,7 +254,7 @@ export const useFilesStore = defineStore('files', () => {
         // Nothing to open. Don't leave behind the tab we just created for it;
         // a tab the user already had stays, because its file may come back.
         if (!wasOpen) openTabs.value = openTabs.value.filter((p) => p !== path)
-        return
+        return false
       }
       currentPath.value = path
       if (read.ok) {
@@ -269,6 +277,7 @@ export const useFilesStore = defineStore('files', () => {
       loadedMtime = null
     }
     saveState.value = 'saved'
+    return true
   }
 
   function onEdited(next: string): void {
