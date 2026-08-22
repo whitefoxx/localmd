@@ -59,6 +59,15 @@ const HEAVY_NODES = 25
  *  line up over a graph that has plainly arrived. */
 const SETTLED_ALPHA = 0.2
 
+/** How far back the graph steps while one node is focused. Stepped back, not
+ *  taken away: the rest of the graph is the context that makes the focused
+ *  cluster mean something, and a node you can no longer read is one you have to
+ *  drop the focus to find again. Links go a little further down than nodes
+ *  because a thin line at the same opacity still reads as a line. */
+const DIM = 0.3
+const DIM_LINK = 0.2
+const FADE_MS = 140
+
 /** How big a node is drawn: the more it is linked, the bigger. Square-rooted
  *  so a hub stands out without swallowing the page — area, not radius, tracks
  *  the degree — and capped so one runaway index page stays a circle. */
@@ -97,9 +106,20 @@ function render(): void {
   const nodes: GraphNode[] = index.graph.nodes.map((id) => ({ id, type: index.types.get(id) ?? null }))
   const links: GraphLink[] = index.graph.links.map((l) => ({ ...l }))
   const degree = new Map<string, number>()
+  // Who lights up with whom. Undirected on purpose: a page you point at and a
+  // page that points at you are equally "connected to this one" when you are
+  // looking at it.
+  const neighbors = new Map<string, Set<string>>()
+  const relate = (a: string, b: string): void => {
+    let set = neighbors.get(a)
+    if (!set) neighbors.set(a, (set = new Set()))
+    set.add(b)
+  }
   for (const l of index.graph.links) {
     degree.set(l.source, (degree.get(l.source) ?? 0) + 1)
     degree.set(l.target, (degree.get(l.target) ?? 0) + 1)
+    relate(l.source, l.target)
+    relate(l.target, l.source)
   }
 
   const svg = select(el)
@@ -159,12 +179,53 @@ function render(): void {
     .attr('dy', 3)
     .attr('fill', 'rgb(var(--c-fg-2))')
 
+  // --- Focus: point at one node and the rest of the graph steps back ---------
+  //
+  // The node the graph is currently about — hovered, or held by a drag. Null is
+  // the resting state, where everything is drawn at full strength; a dense graph
+  // is otherwise unreadable one node at a time.
+  let focus: string | null = null
+  let dragging = false
+
+  const endId = (e: string | GraphNode): string => (typeof e === 'string' ? e : e.id)
+  const lit = (id: string): boolean =>
+    focus === null || focus === id || (neighbors.get(focus)?.has(id) ?? false)
+
+  function applyFocus(): void {
+    node.style('opacity', (d) => (lit(d.id) ? 1 : DIM))
+    // A link survives only if it is one of the focused node's own — a line
+    // between two lit neighbours is not part of what you are pointing at.
+    link.style('opacity', (d) =>
+      focus === null || endId(d.source) === focus || endId(d.target) === focus ? 1 : DIM_LINK,
+    )
+  }
+
+  function setFocus(id: string | null): void {
+    if (focus === id) return
+    focus = id
+    applyFocus()
+  }
+
+  node
+    .style('transition', `opacity ${FADE_MS}ms ease`)
+    .on('mouseenter', (_e, d) => setFocus(d.id))
+    // A drag keeps its node: the pointer routinely outruns the node it is
+    // pulling, and the graph re-lighting mid-drag is exactly the flicker this
+    // is meant to remove. The pointer is still over it when the drag ends, so
+    // the leave that clears the focus is the one after the user lets go.
+    .on('mouseleave', () => {
+      if (!dragging) setFocus(null)
+    })
+  link.style('transition', `opacity ${FADE_MS}ms ease`)
+
   node.call(
     drag<SVGGElement, GraphNode>()
       .on('start', (e, d) => {
         if (!e.active) sim?.alphaTarget(0.3).restart()
         d.fx = d.x
         d.fy = d.y
+        dragging = true
+        setFocus(d.id)
       })
       .on('drag', (e, d) => {
         d.fx = e.x
@@ -174,6 +235,8 @@ function render(): void {
         if (!e.active) sim?.alphaTarget(0)
         d.fx = null
         d.fy = null
+        dragging = false
+        setFocus(d.id)
       }) as never,
   )
 
