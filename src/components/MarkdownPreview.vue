@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
+import { useCiteQuote } from '@/composables/useCiteQuote'
 import { renderMarkdown } from '@/lib/markdown'
 import { handleCodeCopy } from '@/lib/copyCode'
 import { splitFrontmatter } from '@/lib/wiki'
@@ -13,6 +14,9 @@ import { t } from '@/i18n'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
+/** A wiki page's citation chips carry their quote in the tooltip too — the
+ *  chips are the same markup, distilled out of the reply that made them. */
+const quoteOnHover = useCiteQuote()
 
 const root = ref<HTMLElement | null>(null)
 const scroller = ref<HTMLElement | null>(null)
@@ -137,6 +141,12 @@ watch(
 <template>
   <div ref="scroller" class="h-full panel-scroll">
     <!-- eslint-disable-next-line vue/no-v-html -->
-    <div ref="root" class="md-preview max-w-3xl mx-auto px-8 py-6" v-html="html" @click="onClick" />
+    <div
+      ref="root"
+      class="md-preview max-w-3xl mx-auto px-8 py-6"
+      v-html="html"
+      @click="onClick"
+      @mouseover="quoteOnHover"
+    />
   </div>
 </template>

@@ -54,7 +54,9 @@ When the assistant answers from an indexed document, its citations are
 **clickable and land on the exact passage** — not the document, the paragraph.
 
 This is the part worth knowing about. If it tells you something surprising about
-a 400-page book, you are one click from the sentence it came from.
+a 400-page book, you are one click from the sentence it came from — and often
+you do not need the click: **rest the pointer on a citation** and it shows you
+the passage it is citing, above the file it came from.
 
 Citations survive reorganizing. Move a document to another folder and an old
 citation still finds it — by name, or failing that by the cited passage itself.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { pad, slugify, fnv1a, indexDirFor } from './util'
+import { pad, slugify, fnv1a, indexDirFor, blockPassage } from './util'
 
 describe('pad', () => {
   it('zero-pads to 3 digits', () => {
@@ -102,5 +102,58 @@ describe('writeAll — rebuild survives being killed at any point', () => {
   it('handles the first build, when the directory does not exist yet', async () => {
     const ops = await run([{ path: 'manifest.json', content: '{}' }])
     expect(ops).toEqual(['write dir/manifest.json'])
+  })
+})
+
+describe('blockPassage', () => {
+  const section = [
+    '<!-- section 001 · ch1.xhtml -->',
+    '# [[b1-1]] The Origins',
+    '',
+    '[[b1-2]] Attention replaced recurrence in sequence models.',
+    '',
+    '## [[b1-3]] A subheading',
+    '',
+    '[[b1-4]]',
+    '```',
+    'const x = 1',
+    'const y = 2',
+    '```',
+    '',
+    '> [[b1-5]] A quoted line.',
+    '',
+    '- [[b1-6]] A list item.',
+    '',
+    '[[b1-7]] (table)',
+    '| a | b |',
+    '| c | d |',
+    '',
+  ].join('\n')
+
+  it('reads the text after the tag', () => {
+    expect(blockPassage(section, 'b1-2')).toBe(
+      'Attention replaced recurrence in sequence models.',
+    )
+  })
+  it('reads headings, quotes and list items without their markers', () => {
+    expect(blockPassage(section, 'b1-1')).toBe('The Origins')
+    expect(blockPassage(section, 'b1-3')).toBe('A subheading')
+    expect(blockPassage(section, 'b1-5')).toBe('A quoted line.')
+    expect(blockPassage(section, 'b1-6')).toBe('A list item.')
+  })
+  it('collects a fenced code block from the lines below its tag', () => {
+    expect(blockPassage(section, 'b1-4')).toBe('const x = 1\nconst y = 2')
+  })
+  it('collects a table as its rows', () => {
+    expect(blockPassage(section, 'b1-7')).toBe('a | b\nc | d')
+  })
+  it('is null for a block this section does not carry', () => {
+    expect(blockPassage(section, 'b9-9')).toBeNull()
+  })
+  it('clips a very long passage', () => {
+    const long = `[[b2-1]] ${'x'.repeat(900)}`
+    const out = blockPassage(long, 'b2-1')!
+    expect(out).toHaveLength(601)
+    expect(out.endsWith('…')).toBe(true)
   })
 })

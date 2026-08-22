@@ -8,7 +8,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
-import { isCitationToken } from '@/lib/citations'
+import { isCitationToken, resolveCitePath } from '@/lib/citations'
+import { blockPassage } from '@/lib/docindex/util'
 import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
@@ -329,6 +330,32 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return { files, hits: [...hits, ...docHits] }
   }
 
+  /** What the block a citation names actually says — the sections are already
+   *  in memory for search, so a chip can show its quote without touching disk.
+   *
+   *  A chip that declares where it came from is held to it: block ids are
+   *  per-document and collide freely (every document has a `b1-1`), so a quote
+   *  pulled from *some* document while the tooltip names another is worse than
+   *  no quote at all. The declared path is repaired first, exactly as a click
+   *  repairs it — the model abbreviates, and users move files. Only a chip
+   *  that names no source takes the first document carrying that block, which
+   *  is the same guess its click makes.
+   *
+   *  Null whenever that turns up nothing: an unindexed document, an index not
+   *  read yet, a markdown source (no sections on disk to read). The caller
+   *  keeps the plain tooltip and asks again later. */
+  function blockText(blockId: string, source?: string | null): string | null {
+    const declared = source
+      ? (resolveCitePath(source, useFilesStore().allFiles) ?? source)
+      : null
+    for (const section of docSections.value.values()) {
+      if (declared && section.source !== declared) continue
+      const text = blockPassage(section.content, blockId)
+      if (text) return text
+    }
+    return null
+  }
+
   /** Source documents whose index contains the given block tag — the click-
    *  time fallback for citation chips that carry no resolved source path.
    *  Block ids are per-document, so several docs can legitimately match. */
@@ -347,5 +374,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, graph, health, search, findBlockSources, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, graph, health, search, findBlockSources, blockText, reset }
 })

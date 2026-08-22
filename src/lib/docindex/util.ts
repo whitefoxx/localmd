@@ -110,3 +110,45 @@ export async function readFreshManifest<T extends { version: number; contentHash
   }
   return null
 }
+
+/** Longest passage a citation chip's tooltip carries. A block is a paragraph,
+ *  so this only ever bites on the long ones — and a tooltip nobody can read to
+ *  the end of is worse than one that stops. */
+const PASSAGE_MAX = 600
+
+/**
+ * The passage a block id names, read back out of a section file.
+ *
+ * Every indexer writes a block as `[[id]] text` on one line — with the
+ * markdown marker for its kind in front (`## `, `> `, `- `), which is why this
+ * reads forward from the tag rather than parsing the line. Two blocks put
+ * nothing after the tag: a code block (fenced on the following lines) and a
+ * docx table (`(table)`, then its rows), so those are collected from the lines
+ * below, up to the blank line that ends every block.
+ *
+ * Returns null when the section does not carry that block — the caller is
+ * usually asking every section it has.
+ */
+export function blockPassage(sectionContent: string, blockId: string): string | null {
+  const tag = `[[${blockId}]]`
+  const at = sectionContent.indexOf(tag)
+  if (at < 0) return null
+  const lines = sectionContent.slice(at + tag.length).split('\n')
+  let text = lines[0].trim()
+  if (!text || text === '(table)') {
+    const body: string[] = []
+    for (const line of lines.slice(1)) {
+      const t = line.trim()
+      // A fence or a blank line opens the block on the way in and closes it on
+      // the way out, so the same test does both jobs.
+      if (!t || t === '```') {
+        if (body.length) break
+        continue
+      }
+      body.push(t.replace(/^\|\s*/, '').replace(/\s*\|$/, ''))
+    }
+    text = body.join('\n')
+  }
+  if (!text) return null
+  return text.length > PASSAGE_MAX ? `${text.slice(0, PASSAGE_MAX)}…` : text
+}

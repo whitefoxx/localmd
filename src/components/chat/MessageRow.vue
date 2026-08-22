@@ -40,6 +40,7 @@ import KbImageThumb from './KbImageThumb.vue'
 import ApprovalCard from './ApprovalCard.vue'
 import { baseName, now, openAttachment, snippet } from './shared'
 import { openInEditor, revealEditor } from '@/lib/openInEditor'
+import { useCiteQuote } from '@/composables/useCiteQuote'
 
 const props = defineProps<{
   m: UiMessage
@@ -66,6 +67,8 @@ const emit = defineEmits<{ copied: []; reAsk: []; continueTurn: [] }>()
 const chat = useChatStore()
 const files = useFilesStore()
 const citations = useCitationsStore()
+/** Citation chips get their quoted passage into the tooltip on hover. */
+const quoteOnHover = useCiteQuote()
 
 type ToolPart = Extract<MessagePart, { type: 'tool' }>
 type ThinkPart = Extract<MessagePart, { type: 'thinking' }>
@@ -520,6 +523,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
           class="md-preview text-sm"
           v-html="rendered.html.get(i) ?? ''"
           @click="onPreviewClick"
+          @mouseover="quoteOnHover"
         />
       </template>
       <!-- Sources: files / URLs the reply referenced, numbered to match the
