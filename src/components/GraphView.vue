@@ -16,6 +16,7 @@ import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { fileStem } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
+import { openInEditor } from '@/lib/openInEditor'
 
 interface GraphNode {
   id: string
@@ -131,8 +132,10 @@ function render(): void {
     .join('g')
     .attr('cursor', 'pointer')
     .on('click', (_e, d) => {
+      // The graph is reachable from inside the full-window agent panel, so the
+      // file has to be uncovered as well as opened — see lib/openInEditor.
       ui.graphOpen = false
-      void files.openFile(d.id)
+      void openInEditor(d.id)
     })
 
   const nodeRadius = (d: GraphNode): number => radiusOf(degree.get(d.id) ?? 0)

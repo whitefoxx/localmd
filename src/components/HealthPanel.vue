@@ -12,6 +12,7 @@ import { computed, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
+import { openInEditor, revealEditor } from '@/lib/openInEditor'
 
 const ui = useUiStore()
 const index = useKbIndexStore()
@@ -30,7 +31,7 @@ watch(
 async function open(path: string): Promise<void> {
   ui.healthOpen = false
   ui.graphOpen = false
-  await files.openFile(path)
+  await openInEditor(path)
 }
 
 /** Straight to the scan-scope list — the panel's own "why is this here?". */
@@ -44,6 +45,7 @@ async function revealBroken(path: string, target: string): Promise<void> {
   ui.healthOpen = false
   ui.graphOpen = false
   await files.openAndReveal(path, target)
+  revealEditor()
 }
 </script>
 
