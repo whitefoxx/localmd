@@ -4,14 +4,21 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirro
 import { EditorState, Compartment, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
+import { yamlFrontmatter } from '@codemirror/lang-yaml'
 import { languages } from '@codemirror/language-data'
-import { syntaxHighlighting, defaultHighlightStyle, LanguageDescription } from '@codemirror/language'
+import {
+  syntaxHighlighting,
+  defaultHighlightStyle,
+  HighlightStyle,
+  LanguageDescription,
+} from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import {
   autocompletion,
   type CompletionContext,
   type CompletionResult,
 } from '@codemirror/autocomplete'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { oneDarkTheme, oneDarkHighlightStyle } from '@codemirror/theme-one-dark'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
 import { useSettingsStore } from '@/stores/settings'
@@ -59,8 +66,48 @@ function richExt(): Extension {
   })
 }
 
+/**
+ * What oneDark gets wrong for a notes app: it paints headings and property
+ * names coral, so every page opens with its own title — and its whole
+ * frontmatter block — shouting in red before a word of the writing is read.
+ * That is a colour for errors, and a heading is not one.
+ *
+ * Built from oneDark's own specs with ours appended rather than layered as a
+ * second highlighter: two highlighters both emit their class onto the same
+ * span, and which colour lands is then a question about the order rules were
+ * written into the stylesheet — a coin toss to build a look on. Appended
+ * inside ONE style, the later spec for a tag simply replaces the earlier one.
+ * The rest of the theme stays as it is: a hand-rolled palette for every tag in
+ * every language would be a far larger thing to own. The app's own accent takes
+ * the headings, and the frontmatter drops to a comment-grey — it is metadata
+ * about the page, not part of it, and reads best as the quietest thing on
+ * screen.
+ */
+const darkHighlight = HighlightStyle.define([
+  ...oneDarkHighlightStyle.specs,
+  {
+    tag: [
+      tags.heading,
+      tags.heading1,
+      tags.heading2,
+      tags.heading3,
+      tags.heading4,
+      tags.heading5,
+      tags.heading6,
+    ],
+    color: 'rgb(var(--c-accent))',
+    fontWeight: 'bold',
+  },
+  {
+    tag: [tags.propertyName, tags.definition(tags.propertyName)],
+    color: 'rgb(var(--c-fg-3))',
+  },
+])
+
 function themeExt() {
-  return theme.isDark ? oneDark : syntaxHighlighting(defaultHighlightStyle)
+  return theme.isDark
+    ? [oneDarkTheme, syntaxHighlighting(darkHighlight)]
+    : syntaxHighlighting(defaultHighlightStyle)
 }
 
 /** Softer line-number gutter — muted, borderless and transparent so it recedes
@@ -90,7 +137,12 @@ async function langExtFor(path: string | null): Promise<Extension> {
     // The editing keys and media paste ride along with the language, so they
     // are only live in markdown — `![](shot.png)` in a .json file is nonsense.
     return [
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      // Frontmatter is yaml, and saying so is not a nicety: to a markdown
+      // parser alone, `---` under a block of text is a setext heading, so every
+      // page's metadata was parsed — and coloured — as one enormous title.
+      yamlFrontmatter({
+        content: markdown({ base: markdownLanguage, codeLanguages: languages }),
+      }),
       markdownEditing,
       mediaPaste(() => files.currentPath),
       richExt(),
