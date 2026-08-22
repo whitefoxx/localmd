@@ -1,14 +1,14 @@
 ---
-title: Memory across conversations
-summary: MEMORY.md is what the assistant remembers between sessions; it is only ever written when you ask, and it is a file you can read and edit.
+title: Memory across chats
+summary: MEMORY.md is what the assistant remembers between chats; it is only ever written when you ask, and it is a file you can read and edit.
 ---
 
-# Memory across conversations
+# Memory across chats
 
-Each conversation starts fresh. What carries over is a single file:
+Each chat starts fresh. What carries over is a single file:
 **`MEMORY.md`** in your folder's root.
 
-If it exists, the assistant reads it at the start of every session and honours
+If it exists, the assistant reads it at the start of every chat and honours
 what it says. Typical contents:
 
 - how you like things written or filed
@@ -18,7 +18,7 @@ what it says. Typical contents:
 ## It is only written when you ask
 
 The assistant will not add to your memory on its own, and it will not quietly
-summarize a conversation into it. Say "remember that…" or "forget that…" and it
+summarize a chat into it. Say "remember that…" or "forget that…" and it
 edits the file, keeping what is already there.
 
 This is a deliberate limit. Memory that grows by itself becomes a file nobody
@@ -50,5 +50,5 @@ If you find yourself putting knowledge into memory, it is probably a note.
 
 ## Related
 
-Saving and distilling conversations: `working-with-the-agent`. Reusable
+Saving and distilling chats: `working-with-the-agent`. Reusable
 workflows: `skills`.

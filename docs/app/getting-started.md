@@ -108,9 +108,9 @@ to reach anything:
   emergent: it does not help small models" — and every word it matched is
   marked in the result.
 - **Start with `>`** to run a command instead: toggle a panel, start a new
-  conversation, switch theme, open settings. Commands that have a keyboard
+  chat, switch theme, open settings. Commands that have a keyboard
   shortcut show it, so the palette teaches them as you go.
-- **Start with `@`** to find a past conversation by title.
+- **Start with `@`** to find a past chat by title.
 - **Press ⇧Enter** at any point to hand what you typed to the assistant instead
   of searching for it. It arrives in the message box as a draft, so you can add
   to it before sending — useful exactly when a search comes back with nothing,
@@ -138,7 +138,7 @@ key from a provider, and they bill you directly at their prices. Nothing is
 added on top, and nothing here caps how much you use it — that is between you
 and them. See `keys`.
 
-**The app is free**, with no limit on how many files, documents or conversations
+**The app is free**, with no limit on how many files, documents or chats
 you keep. That part does not change.
 
 One part is paid, and the line is this: everything you can do with your own

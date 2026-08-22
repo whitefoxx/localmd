@@ -1,7 +1,7 @@
 ---
 title: Skill —— 把一套做法存下来
 summary: 把一个重复性的工作流教给助手一次，存成你文件夹里的一个文件，以后用斜杠命令直接调用。
-source-hash: 2c9a69075c2ab775
+source-hash: 96f59fc0fed15a3a
 ---
 
 # Skill —— 把一套做法存下来

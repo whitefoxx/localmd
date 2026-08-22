@@ -4,7 +4,7 @@ export default {
     title: 'A new version is ready',
     // Says what the click costs, because the cost is the whole reason this is
     // a question: reloading ends an agent turn in progress.
-    body: 'Updating reloads the page. Your files are already on disk; a conversation in progress will stop.',
+    body: 'Updating reloads the page. Your files are already on disk; a chat in progress will stop.',
     apply: 'Reload now',
     applying: 'Reloading…',
     later: 'Later',

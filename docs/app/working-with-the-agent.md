@@ -1,6 +1,6 @@
 ---
 title: Working with the assistant
-summary: What the assistant can do for you, how to control whether its edits land immediately, and how to save or distill a conversation into your notes.
+summary: What the assistant can do for you, how to control whether its edits land immediately, and how to save or distill a chat into your notes.
 ---
 
 # Working with the assistant
@@ -15,7 +15,7 @@ Plain language works. Some examples of the range:
 
 - "What did I write about attention mechanisms?"
 - "File this PDF where it belongs and write me a summary page."
-- "Turn this conversation into a note."
+- "Turn this chat into a note."
 - "Install the research tools so you can look up papers."
 - "Switch write mode to ask first."
 - "How do API keys work in this app?"
@@ -33,10 +33,10 @@ when a message gives it nothing to go on, like a bare path or a dropped file.
 
 - **Write directly (review afterward)** — the default. Edits happen, and each
   changed file is listed for you to approve or undo afterwards.
-- **Ask first** — every write, edit and delete pauses the conversation on a
+- **Ask first** — every write, edit and delete pauses the chat on a
   card right there in the chat: the file, the diff, and Approve / Reject
   buttons. The assistant waits until you decide — there is no dialog to miss,
-  and each conversation asks for its own changes.
+  and each chat asks for its own changes.
 
 Either way, **deleting a folder or a binary file always asks**, because nothing
 can bring those back. And committing to git is always separate and explicit —
@@ -54,32 +54,32 @@ written, and the assistant simply picks the question back up if you continue.
 
 For anything with several steps, the assistant keeps a visible checklist so you
 can see where it is and what is left. You do not need to ask for this. The
-checklist belongs to its conversation and is saved with it — close the tab or
+checklist belongs to its chat and is saved with it — close the tab or
 reload the page, and it is still there when you come back. Dismissing it with
 its × is what forgets it.
 
-## Sessions
+## Chats
 
-Each conversation is a session. If multi-tab is enabled in Settings → Agent, you
+Each chat is a tab of its own. If multi-tab is enabled in Settings → Agent, you
 can have several going at once.
 
-A running session keeps running if you switch tabs or close its tab. It stops
-only when you press stop, delete the session, or close the page.
+A running chat keeps running if you switch tabs or close its tab. It stops
+only when you press stop, delete the chat, or close the page.
 
 Stop means stop: the request in flight is cancelled too, not just the reply.
-The conversation closes off immediately. A few things cannot be called back
+The chat closes off immediately. A few things cannot be called back
 once they are under way — a push already sent, a document part-way through
 indexing — and those finish in the background; nothing waits for them.
 
-## Finding an earlier conversation
+## Finding an earlier chat
 
-Every session is kept, and the clock icon in the assistant's header lists them —
+Every chat is kept, and the list icon in the assistant's header lists them —
 newest first, with the one you are reading marked. Click a row to open it; the
-star keeps a conversation at hand, and the ✕ deletes it.
+star keeps a chat at hand, and the ✕ deletes it.
 
-The ⤢ button beside it expands the assistant to fill the window. That mode
+The ⤢ button beside it — or **⇧⌘.** — expands the assistant to fill the window. That mode
 carries the list permanently down the left side, with New chat and Search chats
-above it — the shape of a chat app, for when the conversation is the work rather
+above it — the shape of a chat app, for when the chat is the work rather
 than something beside it. Settings and this manual are at the foot of that
 column, since the icon bar is covered. Esc, or the ✕ at the top of it, returns
 you to your files.
@@ -95,7 +95,7 @@ window for nothing.
 If a reply went somewhere you did not want, you do not have to start over or
 argue your way out of it. Hover over one of your own messages and click the
 pencil: the text comes back to the composer, you change it, and sending it picks
-the conversation up from there.
+the chat up from there.
 
 The reply you are leaving behind is not thrown away. Your message now has
 versions — a small **1/2** appears beside it, and the arrows move between them.
@@ -106,24 +106,24 @@ Two things worth knowing:
 
 - The assistant answers again from that point, so it costs a reply.
 - **Your files are not rewound.** Anything already written, moved or deleted
-  stays exactly as it is. Going back changes the conversation, not your folder —
+  stays exactly as it is. Going back changes the chat, not your folder —
   undo file changes from the diff panel, or with git.
 
-In a conversation that started before this existed, the older messages have no
+In a chat that started before this existed, the older messages have no
 pencil — they were never recorded in a way that can be replayed one at a time.
 Everything you say in it from now on can be re-asked normally.
 
-## Saving a conversation
+## Saving a chat
 
 Two different things, and the difference matters:
 
-- **Save** writes the conversation to your folder as a plain markdown file. Ask
-  for "save this conversation". You get a transcript — an ordinary note.
+- **Save** writes the chat to your folder as a plain markdown file. Ask
+  for "save this chat". You get a transcript — an ordinary note.
 - **Distill** pulls the *conclusions* out of a discussion and writes them into
   topic pages, merging into a page that already exists when one fits. Ask to
   "turn this into notes".
 
-You can distill a conversation you saved weeks ago too — it is just a file, so
+You can distill a chat you saved weeks ago too — it is just a file, so
 name it and ask.
 
 When a discussion reaches a real conclusion, the assistant may offer once to
@@ -140,7 +140,7 @@ The chips go with the message you send next, and the row is empty again
 afterwards. That is the whole point of them: a chip means *this* message is
 about that page, so "summarize this" is about the tab you picked and not about
 whatever file you happen to have open in the editor. A follow-up still works
-without re-picking — the address stays in the conversation.
+without re-picking — the address stays in the chat.
 
 What travels with your message is the address of the tab, not a copy of the
 page: the assistant reads it when it needs it, and reads it *then* rather than
@@ -158,5 +158,5 @@ general knowledge rather than a page it read, it says so.
 
 ## Related
 
-What it can be given access to: `tools`. Long-term memory across conversations:
+What it can be given access to: `tools`. Long-term memory across chats:
 `memory-and-sessions`. Choosing a model: `models`.

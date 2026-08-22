@@ -1071,8 +1071,8 @@ watch(
             <span>{{ $t('chat.newChatShort') }}</span>
           </button>
           <!-- Next to New, not away with the icons on the right: these two are
-               one pair — start a conversation, or go back to one — and the row
-               on the right is what you do TO the conversation you are in. -->
+               one pair — start a chat, or go back to one — and the row on the
+               right is what you do TO the chat you are in. -->
           <button
             class="shrink-0 text-fg-3 hover:text-fg-0"
             :class="{ '!text-accent': chat.historyOpen }"

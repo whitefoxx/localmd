@@ -65,9 +65,9 @@ export default {
       'In ask mode every write, edit and delete stops in the chat, shows exactly what would change, and waits for your click. Deleting a folder, or a picture, video or PDF, asks in both modes — nothing brings those back. Either way, what did change is listed in the “Agent changes” panel.',
     writeAuto: 'Write directly (review afterward)',
     writeAsk: 'Ask first (approve each time)',
-    multiTab: 'Multi-tab sessions',
+    multiTab: 'Multi-tab chats',
     multiTabDesc:
-      'Let the agent panel hold several session tabs at once; off means a single session. A running session is not interrupted by switching or closing its tab — only the stop button, deleting the session, or closing the page stops it.',
+      'Let the agent panel hold several chat tabs at once; off means a single chat. A running chat is not interrupted by switching or closing its tab — only the stop button, deleting the chat, or closing the page stops it.',
     maxTabs: 'Max tabs',
 
     // Hotkeys
@@ -183,7 +183,7 @@ export default {
       },
       parallel: {
         title: 'Parallel web search',
-        desc: 'Web search and page extraction built for agents, keyless. Takes what you are trying to find out rather than just keywords, and returns long quotable excerpts — better answers than the Jina pack, and a fair slice of the conversation to hold them.',
+        desc: 'Web search and page extraction built for agents, keyless. Takes what you are trying to find out rather than just keywords, and returns long quotable excerpts — better answers than the Jina pack, and a fair slice of the chat to hold them.',
       },
     },
 
@@ -342,9 +342,9 @@ export default {
       '「先询问」模式下，每次写入、修改、删除都会停在聊天里，把要改什么摆给你看，等你点确认。删除文件夹，或者图片、视频、PDF，两种模式下都会先问——那些删了找不回来。无论哪种模式，改过什么都列在 “Agent changes” 面板里。',
     writeAuto: '直接写入（事后审查）',
     writeAsk: '先询问（每次批准）',
-    multiTab: '多标签页会话',
+    multiTab: '多标签页对话',
     multiTabDesc:
-      '允许 agent 面板同时开多个会话标签；关闭时最多一个会话。运行中的会话，切换标签或关闭它的标签都不会中断——只有输入框的 stop 按钮、删除会话或关闭网页才会停止。',
+      '允许 agent 面板同时开多个对话标签；关闭时最多一个对话。运行中的对话，切换标签或关闭它的标签都不会中断——只有输入框的 stop 按钮、删除对话或关闭网页才会停止。',
     maxTabs: '最多标签数',
 
     // Hotkeys

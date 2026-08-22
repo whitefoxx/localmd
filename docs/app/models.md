@@ -47,7 +47,7 @@ larger bill; none at all can mean a worse one.
 
 Below the list, each role points at one of your models:
 
-- **Primary** — runs the conversation and does the work. This is the only one
+- **Primary** — runs the chat and does the work. This is the only one
   that must be set.
 - **Vision** — used when an image needs to be looked at.
 - **Image generation** — optional. Set it and the assistant can create pictures,
@@ -78,9 +78,9 @@ You can change the primary at any time, including mid-project.
 You are billed by your provider, at their rates. The app is built to keep the
 repeated part of each request identical between messages, because every provider
 charges much less for a repeated prefix than for fresh text — which is why a
-long conversation costs far less than its length suggests.
+long chat costs far less than its length suggests.
 
-Hovering the token counter under the message box shows what a session has used.
+Hovering the token counter under the message box shows what a chat has used.
 
 ## Related
 

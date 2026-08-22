@@ -14,7 +14,7 @@ you like — including while the app is open.
 For a brand-new empty folder, the app offers a starting layout:
 
 - **`raw/`** — material you captured: papers, articles, images, books, saved
-  conversations
+  chats
 - **`wiki/`** — pages you wrote
 
 That is a suggestion for people who want one, not a rule. **If you open a folder
@@ -51,7 +51,7 @@ assistant to move it somewhere real.
 
 A file called **`AGENTS.md`** in the folder root describes your conventions —
 what goes where, how you name things, anything it should know. The assistant
-reads it every session.
+reads it at the start of every chat.
 
 You do not have to write it. Ask the assistant to look at your folder and write
 one, and it will describe what you *actually* have rather than prescribing
@@ -92,7 +92,7 @@ One says 10B parameters, the other 100B. Unresolved.
 ```
 
 The assistant offers to write one when a scan turns something up, instead of
-mentioning it once in a conversation you will close. It will not quietly edit
+mentioning it once in a chat you will close. It will not quietly edit
 one of the pages to make the disagreement go away — which side is right is
 yours to say.
 

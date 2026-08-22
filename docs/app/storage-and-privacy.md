@@ -20,7 +20,7 @@ Everything that *is* your knowledge base, plus anything meant to travel with it:
 - `MEMORY.md` — what the assistant remembers about you
 - `.agents/` — saved workflows, and any tools this folder carries
 - `.trace/` — document indexes, and any result too large to fit in one
-  conversation, kept so the assistant can read the rest of it back
+  chat, kept so the assistant can read the rest of it back
 - `artifacts/` — interactive pages the assistant generated
 
 Share or clone the folder and all of this comes along.
@@ -47,7 +47,7 @@ would hurt, keep them wherever you normally keep passwords.
 
 Only these, and only when the relevant thing happens:
 
-- **To your AI provider** — the conversation, and whatever file content is read
+- **To your AI provider** — the chat, and whatever file content is read
   during it. This is the main one: if you ask the assistant about a note, that
   note's text goes to the model.
 - **To a tool's service** — only the request that tool makes, only when it runs.
@@ -58,7 +58,7 @@ visit — which page, where you arrived from, and rough facts about the browser
 (country, device, browser name). It is measured by the host that serves the
 site, with no cookie and no identifier that follows you between visits or
 between sites, and it says nothing about your folder, your notes or your
-conversation. A content blocker that stops it changes nothing about how the app
+chat. A content blocker that stops it changes nothing about how the app
 works.
 
 That is the complete list. Nothing else is sent in the background, and nothing

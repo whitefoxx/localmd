@@ -39,10 +39,14 @@ docs/llm-wiki-prior-art.md), inbox (that is the neutral landing dir, lib/capture
 
 ## Sessions
 
-**Session** (会话):
+**Session** (UI: "chat" / 对话):
 One thread of messages between the user and the agent — live and persisted
-(`ChatSession`). The unit of conversation. There can be several open at once.
-_Avoid_: conversation, chat, thread, transcript.
+(`ChatSession`). There can be several open at once. Two names on purpose:
+`session` is the code term (types, stores, i18n keys), and every string a user
+reads — UI and manual, both languages — says **chat** / 对话. The UI having
+exactly one word for it is the point; "conversation" was the second word and is
+retired.
+_Avoid_: conversation, thread, transcript; "session" in anything user-facing.
 
 **Saved session**:
 A session exported to a markdown file under `raw/conversations/` — a *source* like any

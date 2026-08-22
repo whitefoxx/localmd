@@ -26,7 +26,7 @@ Type `/` in the message box and pick it. Or just describe the task — the
 assistant sees a one-line summary of every skill and loads the full instructions
 when one matches.
 
-A new conversation also puts your first few skills as buttons right above the
+A new chat also puts your first few skills as buttons right above the
 message box; the ▲ next to them opens the full list.
 
 That summary line matters: it is the only thing considered when deciding whether

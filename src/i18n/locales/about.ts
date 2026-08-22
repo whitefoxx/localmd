@@ -6,7 +6,7 @@ export default {
     whyBody1:
       "Notes in one app, PDFs in a downloads folder, highlights locked inside a reader you'll cancel next year, half-read papers everywhere. Every tool wants to be the place your knowledge lives — on its servers, in its format, behind its login.",
     whyBody2:
-      'localmd makes the opposite bet: your knowledge is just files in a folder on your own computer. Markdown you can read in any editor, the PDFs and EPUBs you already have, conversations you choose to keep. An AI agent works inside that folder with you — and getting to it costs nothing: no download, no install, no sign-up. The folder is yours, and it stays where you put it.',
+      'localmd makes the opposite bet: your knowledge is just files in a folder on your own computer. Markdown you can read in any editor, the PDFs and EPUBs you already have, chats you choose to keep. An AI agent works inside that folder with you — and getting to it costs nothing: no download, no install, no sign-up. The folder is yours, and it stays where you put it.',
 
     diffLabel: 'What makes it different',
     diff1Title: 'Nothing to install.',
@@ -63,7 +63,7 @@ export default {
     does3:
       'An AI agent with tools: search, read, write, edit, plan, run skills, call MCP servers',
     does4: 'Bring-your-own-key for many providers, each hitting its own endpoint directly',
-    does5: 'Save conversations as Markdown and distill them into notes',
+    does5: 'Save chats as Markdown and distill them into notes',
     does6: 'Version your knowledge base with built-in git and sync to GitHub',
     does7: 'Installable and offline — everything cached on your device',
     // localmd Connect. The extension is listed on the Chrome Web Store as of

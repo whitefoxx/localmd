@@ -62,7 +62,7 @@ there.
 **Nothing it proposes happens on its own.** When it wants to add a server you
 get a card showing the exact address, and it is added only when you click. When
 a service needs a key, the card takes the key straight into the app — it is
-never typed into the conversation, and the assistant never sees it. When a
+never typed into the chat, and the assistant never sees it. When a
 service needs you to log in, the card opens that service's own sign-in page.
 
 That rule is worth knowing the reason for: the assistant reads web pages, files
