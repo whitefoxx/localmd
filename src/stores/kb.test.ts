@@ -23,22 +23,66 @@ vi.mock('@/lib/viewMemory', () => ({ hydrateReadingPositions: () => {} }))
 
 const handle = { name: 'notes' } as unknown as FileSystemDirectoryHandle
 
-/** A lock manager with the property that matters here: the release happens
- *  after the callback's promise settles, not when release() is called. */
-function fakeLocks(): { request: (name: string, opts: unknown, cb: (l: unknown) => unknown) => Promise<void> } {
+interface FakeOpts {
+  ifAvailable?: boolean
+  signal?: AbortSignal
+}
+
+/** A lock manager with the two properties that matter here: the release happens
+ *  after the callback's promise settles, not when release() is called; and a
+ *  request without `ifAvailable` QUEUES for a lock somebody else holds rather
+ *  than being turned away — which is the whole difference between "busy for a
+ *  moment while a tab reloads" and "another tab has it". */
+function fakeLocks(): {
+  request: (name: string, opts: FakeOpts, cb: (l: unknown) => unknown) => Promise<void>
+  /** Take a lock from outside the store, as a second tab would. */
+  grab: (name: string) => () => void
+} {
   const held = new Set<string>()
+  const queues = new Map<string, (() => void)[]>()
+
+  function release(name: string): void {
+    held.delete(name)
+    queues.get(name)?.shift()?.()
+  }
+
+  async function run(name: string, cb: (l: unknown) => unknown): Promise<void> {
+    held.add(name)
+    try {
+      await cb({ name })
+    } finally {
+      release(name)
+    }
+  }
+
   return {
-    async request(name, _opts, cb) {
-      if (held.has(name)) {
+    async request(name, opts, cb) {
+      if (!held.has(name)) return run(name, cb)
+      if (opts?.ifAvailable) {
         await cb(null)
         return
       }
-      held.add(name)
-      try {
-        await cb({ name })
-      } finally {
-        held.delete(name)
+      await new Promise<void>((turn) => {
+        const queue = queues.get(name) ?? []
+        queues.set(name, queue)
+        queue.push(turn)
+        opts?.signal?.addEventListener('abort', () => {
+          queues.set(
+            name,
+            (queues.get(name) ?? []).filter((t) => t !== turn),
+          )
+          turn()
+        })
+      })
+      if (opts?.signal?.aborted) {
+        await cb(null)
+        return
       }
+      return run(name, cb)
+    },
+    grab(name) {
+      held.add(name)
+      return () => release(name)
     },
   }
 }
@@ -87,6 +131,45 @@ describe('demo is a property of the open KB', () => {
     await kb.openHandle(handle, { ephemeral: true, demo: true })
     kb.close()
     expect(kb.isDemo).toBe(false)
+  })
+
+  it('waits out a lock still held by the page it is replacing', async () => {
+    // A reload: the outgoing document has not let go yet when the incoming one
+    // asks. One miss is not another tab — the warning waits, and never comes.
+    vi.useFakeTimers()
+    const locks = fakeLocks()
+    vi.stubGlobal('navigator', { locks })
+    const letGo = locks.grab('browser-md:kb:notes')
+
+    const { useKbStore } = await import('./kb')
+    const kb = useKbStore()
+    await kb.openHandle(handle)
+    expect(kb.lockedByOther).toBe(false) // nothing said yet
+
+    letGo() // the old page finishes going away
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(kb.lockedByOther).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('does say so when the lock stays with somebody else', async () => {
+    vi.useFakeTimers()
+    const locks = fakeLocks()
+    vi.stubGlobal('navigator', { locks })
+    const letGo = locks.grab('browser-md:kb:notes')
+
+    const { useKbStore } = await import('./kb')
+    const kb = useKbStore()
+    await kb.openHandle(handle)
+
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(kb.lockedByOther).toBe(true)
+
+    // …and takes it back the moment that tab goes away.
+    letGo()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(kb.lockedByOther).toBe(false)
+    vi.useRealTimers()
   })
 
   it('does not mistake this tab for another one after a trip through the demo', async () => {

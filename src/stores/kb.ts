@@ -82,6 +82,13 @@ export const useKbStore = defineStore('kb', () => {
   let releaseLock: (() => void) | null = null
   /** Resolves once the browser has actually let go of the lock above. */
   let lockHeld: Promise<void> | null = null
+  /** Cancels a still-pending wait for a lock somebody else is holding. */
+  let waiting: AbortController | null = null
+  /** How long a lock may stay taken before we believe it really is another tab.
+   *  A reload's old document holds its locks for a few milliseconds after the
+   *  new one starts asking; concluding from that first miss is how a single tab
+   *  came to warn about itself on every refresh. */
+  const OTHER_TAB_GRACE_MS = 500
 
   /**
    * Let go of the lock this tab holds — and wait for the browser to have let go.
@@ -94,6 +101,8 @@ export const useKbStore = defineStore('kb', () => {
    * own release.
    */
   async function releaseHeldLock(): Promise<void> {
+    waiting?.abort()
+    waiting = null
     releaseLock?.()
     releaseLock = null
     const done = lockHeld
@@ -101,30 +110,62 @@ export const useKbStore = defineStore('kb', () => {
     if (done) await done
   }
 
-  /** Try to take the exclusive Web Lock for this KB; held until close().
-   *  Locks auto-release when the tab dies, so stale locks can't happen. */
+  /** Keep the lock until someone calls `releaseLock`. */
+  function holdLock(): Promise<void> {
+    return new Promise<void>((release) => {
+      releaseLock = release
+    })
+  }
+
+  /**
+   * Try to take the exclusive Web Lock for this KB; held until close().
+   * Locks auto-release when the tab dies, so stale locks can't happen.
+   *
+   * Taking it is instant or it isn't ours, so the caller is not made to wait:
+   * if the lock is busy we queue for it in the background and warn — but only
+   * once it has stayed busy longer than a reload takes to let go, and we take
+   * the warning back the moment the lock comes to us. The alternative, which
+   * this replaces, was to conclude "another tab" from a single miss and never
+   * look again: a warning that was wrong every time you pressed ⌘R, and stayed
+   * wrong for as long as the folder was open.
+   */
   async function acquireLock(kbName: string): Promise<void> {
     await releaseHeldLock()
     lockedByOther.value = false
     if (!('locks' in navigator)) return
+    const key = `browser-md:kb:${kbName}`
     await new Promise<void>((ready) => {
       lockHeld = navigator.locks
-        .request(`browser-md:kb:${kbName}`, { ifAvailable: true }, (lock) => {
-          if (!lock) {
-            lockedByOther.value = true
-            ready()
-            return
-          }
+        .request(key, { ifAvailable: true }, (lock) => {
           ready()
-          return new Promise<void>((release) => {
-            releaseLock = release
-          })
+          return lock ? holdLock() : undefined
         })
         .then(
           () => undefined,
           () => undefined,
         )
     })
+    if (releaseLock) return // it was free — this tab holds it
+
+    const ctl = new AbortController()
+    waiting = ctl
+    const warn = setTimeout(() => {
+      if (waiting === ctl) lockedByOther.value = true
+    }, OTHER_TAB_GRACE_MS)
+    lockHeld = navigator.locks
+      .request(key, { signal: ctl.signal }, () => {
+        clearTimeout(warn)
+        if (ctl.signal.aborted) return
+        waiting = null
+        lockedByOther.value = false
+        return holdLock()
+      })
+      .then(
+        () => undefined,
+        () => {
+          clearTimeout(warn)
+        },
+      )
   }
 
   async function refreshRecents(): Promise<void> {
