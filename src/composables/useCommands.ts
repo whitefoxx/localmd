@@ -98,7 +98,10 @@ export function useCommands(): Command[] {
     {
       id: 'zen',
       label: 'commands.zen',
-      icon: 'codicon-screen-full',
+      // The window square, everywhere zen is offered — shell, palette, and both
+      // readers. The four-corners glyph belongs to the agent panel's maximize,
+      // which sits two rows away in this same list.
+      icon: 'codicon-chrome-maximize',
       hotkey: 'zen',
       run: () => ui.toggleZen(),
     },

@@ -1079,7 +1079,7 @@ watch(
             :title="$t('chat.history')"
             @click="chat.historyOpen = !chat.historyOpen"
           >
-            <span class="codicon codicon-sm codicon-history" />
+            <span class="codicon codicon-sm codicon-list-unordered" />
           </button>
         </template>
         <span class="flex-1" />

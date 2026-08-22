@@ -928,7 +928,9 @@ function customizeViewerUi(r: PluginRegistry): void {
     viewBox: '0 0 24 24',
     paths: [{ d: 'M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14z', fill: 'primary', stroke: 'none' }],
   })
-  // Zen (lucide "maximize"): four corners opening outwards.
+  // Zen (lucide "square"): the same window shape codicon-chrome-maximize draws
+  // in the shell and the EPUB toolbar, redrawn here in the stroke weight of the
+  // buttons beside it — one glyph for zen, two icon sets to say it in.
   registerIcon('bm-zen', {
     viewBox: '0 0 24 24',
     strokeWidth: 2,
@@ -936,7 +938,7 @@ function customizeViewerUi(r: PluginRegistry): void {
     strokeLinejoin: 'round',
     paths: [
       {
-        d: 'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',
+        d: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z',
         stroke: 'primary',
         fill: 'none',
       },

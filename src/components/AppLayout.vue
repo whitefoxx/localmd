@@ -603,7 +603,7 @@ function closeKb(): void {
           :title="$t('layout.leaveZen')"
           @click="ui.toggleZen()"
         >
-          <span class="codicon codicon-screen-normal" />
+          <span class="codicon codicon-chrome-restore" />
         </button>
         <EditorTabs v-if="ui.editorTabsVisible && !ui.zen" />
         <!-- data-file-selection marks the open-file region: text selected here

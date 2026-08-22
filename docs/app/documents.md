@@ -41,8 +41,7 @@ notes whose source moved on).
 
 ## Reading with nothing else on screen
 
-The button in a PDF or EPUB toolbar that opens out into four corners is **zen
-mode** (⌘.). The file tree, the tabs, the assistant panel and the toolbar itself
+The empty-square button in a PDF or EPUB toolbar is **zen mode** (⌘.). The file tree, the tabs, the assistant panel and the toolbar itself
 step out, and the page takes the whole window.
 
 Nothing is lost, only put away. Move the cursor towards the top of the screen
@@ -67,7 +66,7 @@ list under the answer.
 ## About made-up sources
 
 The assistant will not cite a web page it did not actually open in that
-conversation. URLs reconstructed from memory look right and are frequently dead
+chat. URLs reconstructed from memory look right and are frequently dead
 or wrong, and passing one off as a source is worse than having no source.
 
 If something comes from its general knowledge rather than a page it read, it

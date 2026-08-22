@@ -1135,7 +1135,10 @@ watch(
           :title="$t('viewers.zen')"
           @click="ui.toggleZen()"
         >
-          <span class="codicon codicon-sm" :class="ui.zen ? 'codicon-screen-normal' : 'codicon-screen-full'" />
+          <span
+            class="codicon codicon-sm"
+            :class="ui.zen ? 'codicon-chrome-restore' : 'codicon-chrome-maximize'"
+          />
         </button>
         <button class="btn text-xs" :title="$t('viewers.epub.viewAnnotations')" @click="viewAnnotations">
           <span class="codicon codicon-sm codicon-list-selection" />
