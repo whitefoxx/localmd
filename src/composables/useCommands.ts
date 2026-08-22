@@ -52,6 +52,25 @@ export function useCommands(): Command[] {
       run: () => (ui.agentOpen = !ui.agentOpen),
     },
     {
+      id: 'agentMaximize',
+      label: 'commands.agentMaximize',
+      icon: 'codicon-screen-full',
+      hotkey: 'agentMaximize',
+      // One store action either way (it also opens the panel and leaves zen —
+      // see toggleAgentMaximized); two rows because a palette row has to say
+      // which way it goes before you run it, and `when` keeps them exclusive.
+      when: () => !ui.agentMaximized,
+      run: () => ui.toggleAgentMaximized(),
+    },
+    {
+      id: 'agentRestore',
+      label: 'commands.agentRestore',
+      icon: 'codicon-screen-normal',
+      hotkey: 'agentMaximize',
+      when: () => ui.agentMaximized,
+      run: () => ui.toggleAgentMaximized(),
+    },
+    {
       id: 'newChat',
       label: 'commands.newChat',
       icon: 'codicon-add',
@@ -63,7 +82,7 @@ export function useCommands(): Command[] {
     {
       id: 'chatHistory',
       label: 'commands.chatHistory',
-      icon: 'codicon-history',
+      icon: 'codicon-list-unordered',
       run: () => {
         ui.agentOpen = true
         chat.historyOpen = true
@@ -126,6 +145,13 @@ export function useCommands(): Command[] {
       hotkey: 'tabNext',
       when: () => files.openTabs.length > 1,
       run: () => void files.cycleTab(1),
+    },
+    {
+      id: 'closeAllTabs',
+      label: 'commands.closeAllTabs',
+      icon: 'codicon-close-all',
+      when: () => files.openTabs.length > 0,
+      run: () => void files.closeAllTabs(),
     },
     {
       id: 'theme',

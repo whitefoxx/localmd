@@ -54,6 +54,21 @@ export const useUiStore = defineStore('ui', () => {
    *  just an overlay covering the app). Transient; not persisted. */
   const agentMaximized = ref(false)
   /**
+   * Fill the window with the agent panel, or give it back — the shortcut, the
+   * panel's own ⤢ button and the palette all come through here.
+   *
+   * Whatever would stop you actually seeing it steps aside on the way in: a
+   * closed panel opens, and zen (which hides the panel outright) ends. A key
+   * that maximizes something invisible is a key that does nothing.
+   */
+  function toggleAgentMaximized(): void {
+    if (!agentMaximized.value) {
+      agentOpen.value = true
+      zen.value = false
+    }
+    agentMaximized.value = !agentMaximized.value
+  }
+  /**
    * Reading with nothing else on screen: the activity bar, the file tree, the
    * editor tabs and the agent panel all step out, and the reader's own toolbar
    * fades until the cursor goes looking for it. A mode you enter for a chapter
@@ -201,6 +216,7 @@ export const useUiStore = defineStore('ui', () => {
     shownSidebarWidth,
     closeDrawers,
     agentMaximized,
+    toggleAgentMaximized,
     zen,
     zenPeek,
     toggleZen,

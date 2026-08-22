@@ -48,6 +48,7 @@ const RUN: Record<HotkeyId, () => void> = {
   search: () => (ui.searchOpen = !ui.searchOpen),
   sidebar: () => (ui.sidebarOpen = !ui.sidebarOpen),
   agent: () => (ui.agentOpen = !ui.agentOpen),
+  agentMaximize: () => ui.toggleAgentMaximized(),
   zen: () => ui.toggleZen(),
   tabPrev: () => void files.cycleTab(-1),
   tabNext: () => void files.cycleTab(1),

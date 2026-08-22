@@ -13,7 +13,14 @@
  *  - `shift` is matched exactly.
  */
 
-export type HotkeyId = 'search' | 'sidebar' | 'agent' | 'zen' | 'tabPrev' | 'tabNext'
+export type HotkeyId =
+  | 'search'
+  | 'sidebar'
+  | 'agent'
+  | 'agentMaximize'
+  | 'zen'
+  | 'tabPrev'
+  | 'tabNext'
 
 export interface Binding {
   /** KeyboardEvent.code, e.g. 'KeyS', 'BracketLeft', 'Backquote', 'Enter'. */
@@ -58,9 +65,19 @@ export const HOTKEYS: HotkeyDef[] = [
   {
     id: 'agent',
     label: 'Agent panel',
-    hint: 'Show / hide the agent conversation',
+    hint: 'Show / hide the agent chat',
     defaultBinding: { mod: true, code: 'KeyJ' },
     aliases: [{ mod: true, code: 'Enter', notInEditable: true }],
+  },
+  {
+    // ⇧⌘. rather than the ⇧⌘J you would expect beside ⌘J: Chrome keeps ⇧⌘J for
+    // its own Downloads window and the page never sees the keydown at all. This
+    // pairs with zen (⌘.) instead, which is the same sentence anyway — give one
+    // thing the whole window; ⌘. means the document, ⇧⌘. means the chat.
+    id: 'agentMaximize',
+    label: 'Maximize the agent panel',
+    hint: 'Fill the window with the chat, and drop back out of it. Opens the panel first if it is closed.',
+    defaultBinding: { mod: true, shift: true, code: 'Period' },
   },
   {
     id: 'zen',
@@ -72,8 +89,8 @@ export const HOTKEYS: HotkeyDef[] = [
   },
   // ⌘[ / ⌘] are CodeMirror's indent — yield them inside the editor so paging tabs
   // only fires outside an editable target (the global handler runs in capture phase).
-  { id: 'tabPrev', label: 'Previous tab', defaultBinding: { mod: true, code: 'BracketLeft', notInEditable: true } },
-  { id: 'tabNext', label: 'Next tab', defaultBinding: { mod: true, code: 'BracketRight', notInEditable: true } },
+  { id: 'tabPrev', label: 'Previous file tab', defaultBinding: { mod: true, code: 'BracketLeft', notInEditable: true } },
+  { id: 'tabNext', label: 'Next file tab', defaultBinding: { mod: true, code: 'BracketRight', notInEditable: true } },
 ]
 
 export const HOTKEY_BY_ID = Object.fromEntries(HOTKEYS.map((h) => [h.id, h])) as Record<

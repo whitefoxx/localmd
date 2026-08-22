@@ -1107,7 +1107,7 @@ watch(
           v-if="!railShown"
           class="text-fg-3 hover:text-fg-0"
           :title="ui.agentMaximized ? $t('chat.restorePanel') : $t('chat.maximizePanel')"
-          @click="ui.agentMaximized = !ui.agentMaximized"
+          @click="ui.toggleAgentMaximized()"
         >
           <span
             class="codicon codicon-sm"
