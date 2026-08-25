@@ -199,8 +199,12 @@ function render(): void {
   // is otherwise unreadable one node at a time.
   let focus: string | null = null
   let dragging = false
-  /** What is currently lifted, and the layer to drop it back into. */
-  let lifted: [Element, SVGGElement][] = []
+  /** What is currently lifted, and where to put it back: its layer and the
+   *  sibling it sat in front of. Restored in reverse so a recorded sibling is
+   *  always home before the element that names it — which keeps paint order
+   *  across a hover byte-identical, so which node is drawn on top of which
+   *  never quietly changes under the pointer. */
+  let lifted: [Element, SVGGElement, ChildNode | null][] = []
 
   const endId = (e: string | GraphNode): string => (typeof e === 'string' ? e : e.id)
 
@@ -222,9 +226,10 @@ function render(): void {
   function setFocus(id: string | null): void {
     if (focus === id) return
     focus = id
-    // Put back whatever was lifted last time. Order inside a layer is only
-    // paint order among peers, so appending is enough.
-    for (const [el, home] of lifted) home.appendChild(el)
+    for (let i = lifted.length - 1; i >= 0; i--) {
+      const [el, home, before] = lifted[i]
+      home.insertBefore(el, before)
+    }
     lifted = []
     if (id === null) {
       baseLinks.style.opacity = ''
@@ -233,18 +238,25 @@ function render(): void {
     }
     baseLinks.style.opacity = String(DIM_LINKS)
     baseNodes.style.opacity = String(DIM_NODES)
-    for (const nid of [id, ...(neighbors.get(id) ?? [])]) {
-      const el = nodeEl.get(nid)
-      if (!el) continue
-      lifted.push([el, baseNodes])
-      topNodes.appendChild(el)
+    const raise = (el: Element, home: SVGGElement, to: SVGGElement): void => {
+      lifted.push([el, home, el.nextSibling])
+      to.appendChild(el)
     }
     // Only the focused node's OWN lines: one between two lit neighbours is not
-    // part of what you are pointing at.
-    for (const el of linkEls.get(id) ?? []) {
-      lifted.push([el, baseLinks])
-      topLinks.appendChild(el)
+    // part of what you are pointing at. Lines first, and in their own layer
+    // below the nodes', so a lifted line never covers a circle.
+    for (const el of linkEls.get(id) ?? []) raise(el, baseLinks, topLinks)
+    // Neighbours before the node itself, so the node you are pointing AT ends
+    // up on top of everything this hover raised. Lifting a neighbour over it
+    // instead hands the pointer to that neighbour — which focuses the
+    // neighbour, which lifts this node back over it, which… the labels overlap,
+    // and the graph flickers between two nodes for as long as you hold still.
+    for (const nid of neighbors.get(id) ?? []) {
+      const el = nodeEl.get(nid)
+      if (el) raise(el, baseNodes, topNodes)
     }
+    const self = nodeEl.get(id)
+    if (self) raise(self, baseNodes, topNodes)
   }
 
   node
