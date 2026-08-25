@@ -1270,8 +1270,19 @@ async function runIndex(auto = false, rebuild = false): Promise<void> {
   try {
     const result = await indexDocument(
       props.path,
-      (c, total) => {
-        indexMsg.value = t('viewers.pdf.indexExtracting', { c, t: total })
+      (c, total, phase) => {
+        // Three parts, and only the first used to say anything: a big PDF sat
+        // under "Extracting page 2480/2480" for the whole of the other two,
+        // which reads as hung rather than busy. `build` announces itself before
+        // it has anything to count (see the parsers), hence the bare form.
+        indexMsg.value =
+          phase === 'extract'
+            ? t('viewers.pdf.indexExtracting', { c, t: total })
+            : phase === 'write'
+              ? t('viewers.pdf.indexWriting', { c, t: total })
+              : total
+                ? t('viewers.pdf.indexBuildingN', { c, t: total })
+                : t('viewers.pdf.indexBuilding')
       },
       { rebuild },
     )

@@ -3,7 +3,7 @@
  * the document's own headings, a table of contents, and agent instructions.
  * Mirrors the EPUB index so the agent navigates every document the same way.
  */
-import { pad, slugify, writeAll } from '../util'
+import { pad, slugify, writeAll, type IndexProgress } from '../util'
 import { BUILDER, INDEX_VERSION, type DocxBlock, type DocxIndexManifest, type DocxSectionMeta } from './types'
 
 interface BuildInput {
@@ -14,6 +14,10 @@ interface BuildInput {
   title: string
   contentHash: string
   blocks: DocxBlock[]
+  /** Progress for the two halves this function owns: rendering the sections,
+   *  then writing them out. Both were silent, and on a long document both take
+   *  long enough to look like nothing happening. */
+  onProgress?: IndexProgress
 }
 
 /** Build + write the whole index directory. Returns the manifest. */
@@ -27,10 +31,11 @@ export async function buildIndex(input: BuildInput): Promise<DocxIndexManifest> 
     file: `sections/${pad(i + 1)}-${slugify(g.title)}.md`,
   }))
 
-  const files: { path: string; content: string }[] = groups.map((g, i) => ({
-    path: sections[i].file,
-    content: renderSection(sections[i], g.blocks),
-  }))
+  const files: { path: string; content: string }[] = groups.map((g, i) => {
+    const rendered = { path: sections[i].file, content: renderSection(sections[i], g.blocks) }
+    input.onProgress?.(i + 1, groups.length, 'build')
+    return rendered
+  })
   files.push({ path: 'toc.md', content: renderToc(title, source, groups, sections) })
   files.push({ path: '_README.md', content: renderReadme(title, source) })
 
@@ -46,7 +51,7 @@ export async function buildIndex(input: BuildInput): Promise<DocxIndexManifest> 
   }
   files.push({ path: 'manifest.json', content: JSON.stringify(manifest, null, 2) })
 
-  await writeAll(indexDir, files)
+  await writeAll(indexDir, files, (w, t) => input.onProgress?.(w, t, 'write'))
   return manifest
 }
 

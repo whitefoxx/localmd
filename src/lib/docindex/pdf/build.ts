@@ -4,7 +4,7 @@
  * contents, a block→coordinates map, and agent-facing instructions.
  * Ported from trace-app; the on-disk format is identical.
  */
-import { pad, slugify, writeAll } from '../util'
+import { pad, slugify, writeAll, type IndexProgress } from '../util'
 import {
   BUILDER,
   INDEX_VERSION,
@@ -28,6 +28,10 @@ interface BuildInput {
    *  current blocks. Absent (tests, first principles) → derived from blocks. */
   locations?: Record<string, { page: number; rects: PdfBlock['rects'] }>
   outline: { tree: OutlineNode[]; flat: { title: string; level: number; page: number }[] }
+  /** Progress for the two halves this function owns: rendering the sections,
+   *  then writing them out. Both were silent, and on a long document both take
+   *  long enough to look like nothing happening. */
+  onProgress?: IndexProgress
 }
 
 interface Boundary {
@@ -48,6 +52,7 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
   const files: { path: string; content: string }[] = []
   for (const sec of sections) {
     files.push({ path: sec.file, content: renderSection(sec, blocks, source) })
+    input.onProgress?.(files.length, sections.length, 'build')
   }
   files.push({
     path: 'toc.md',
@@ -78,7 +83,7 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
   }
   files.push({ path: 'manifest.json', content: JSON.stringify(manifest, null, 2) })
 
-  await writeAll(indexDir, files)
+  await writeAll(indexDir, files, (w, t) => input.onProgress?.(w, t, 'write'))
   return manifest
 }
 

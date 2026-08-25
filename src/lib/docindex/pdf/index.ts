@@ -3,7 +3,7 @@
  * the work when a fresh index (same format version + content hash) exists.
  */
 import * as fs from '@/lib/fs'
-import { indexDirFor, readFreshManifest, sha256Hex } from '../util'
+import { indexDirFor, readFreshManifest, sha256Hex, type IndexProgress } from '../util'
 import { buildIndex } from './build'
 import { extractPdf } from './extract'
 import { inheritIds, type PriorEntry } from './inherit'
@@ -17,7 +17,7 @@ export interface PdfParseResult {
 
 export async function parsePdf(
   source: string,
-  onProgress: (page: number, total: number) => void = () => {},
+  onProgress: IndexProgress = () => {},
   opts: { force?: boolean } = {},
 ): Promise<PdfParseResult> {
   const indexDir = indexDirFor('pdf', source)
@@ -33,7 +33,12 @@ export async function parsePdf(
   }
 
   const base = source.split('/').pop()?.replace(/\.pdf$/i, '') ?? source
-  const extracted = await extractPdf(bytes, base, onProgress)
+  const extracted = await extractPdf(bytes, base, (c, t) => onProgress(c, t, 'extract'))
+  // The turn is announced with no numbers of its own: what happens next —
+  // inheriting ids, then rendering — has no unit worth counting until the
+  // sections exist, and leaving the extractor's last page on screen through
+  // it is exactly what looked hung.
+  onProgress(0, 0, 'build')
   // Ids already published by a prior build of these SAME bytes are inherited,
   // not renumbered — the invariant that keeps existing citations pointing at
   // the passage they cited (see ./inherit).
@@ -49,6 +54,7 @@ export async function parsePdf(
     blocks,
     locations,
     outline: extracted.outline,
+    onProgress,
   })
   return { indexDir, manifest, cached: false }
 }

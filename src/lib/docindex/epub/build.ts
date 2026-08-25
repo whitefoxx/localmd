@@ -3,7 +3,7 @@
  * spine item, large items sub-split on headings), a table of contents, a
  * block→CFI map, and agent-facing instructions. Ported from trace-app.
  */
-import { pad, slugify, writeAll } from '../util'
+import { pad, slugify, writeAll, type IndexProgress } from '../util'
 import type { SpineItemInfo } from './extract'
 import {
   BUILDER,
@@ -25,6 +25,10 @@ interface BuildInput {
   blocks: EpubBlock[]
   spineItems: SpineItemInfo[]
   toc: TocNode[]
+  /** Progress for the two halves this function owns: rendering the sections,
+   *  then writing them out. Both were silent, and on a long document both take
+   *  long enough to look like nothing happening. */
+  onProgress?: IndexProgress
 }
 
 /** Build + write the whole index directory. Returns the manifest. */
@@ -59,6 +63,7 @@ export async function buildIndex(input: BuildInput): Promise<EpubIndexManifest> 
   const files: { path: string; content: string }[] = []
   groups.forEach((g, i) => {
     files.push({ path: sections[i].file, content: renderSection(sections[i], g.blocks) })
+    input.onProgress?.(i + 1, groups.length, 'build')
   })
   files.push({ path: 'toc.md', content: renderToc(title, source, toc, sections) })
   files.push({ path: '_README.md', content: renderReadme(title, source) })
@@ -84,7 +89,7 @@ export async function buildIndex(input: BuildInput): Promise<EpubIndexManifest> 
   }
   files.push({ path: 'manifest.json', content: JSON.stringify(manifest, null, 2) })
 
-  await writeAll(indexDir, files)
+  await writeAll(indexDir, files, (w, t) => input.onProgress?.(w, t, 'write'))
   return manifest
 }
 

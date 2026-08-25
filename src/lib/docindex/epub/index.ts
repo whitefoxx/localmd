@@ -4,7 +4,7 @@
  */
 import ePub from 'epubjs'
 import * as fs from '@/lib/fs'
-import { indexDirFor, readFreshManifest, sha256Hex } from '../util'
+import { indexDirFor, readFreshManifest, sha256Hex, type IndexProgress } from '../util'
 import { buildIndex } from './build'
 import { extractEpub } from './extract'
 import { INDEX_VERSION, type EpubIndexManifest, type EpubLocations } from './types'
@@ -17,7 +17,7 @@ export interface EpubParseResult {
 
 export async function parseEpub(
   source: string,
-  onProgress: (section: number, total: number) => void = () => {},
+  onProgress: IndexProgress = () => {},
   opts: { force?: boolean } = {},
 ): Promise<EpubParseResult> {
   const indexDir = indexDirFor('epub', source)
@@ -33,7 +33,12 @@ export async function parseEpub(
   const book = ePub(bytes)
   try {
     await book.ready
-    const extracted = await extractEpub(book, onProgress)
+    const extracted = await extractEpub(book, (c, t) => onProgress(c, t, 'extract'))
+    // The turn is announced with no numbers of its own: what happens next —
+    // inheriting ids, then rendering — has no unit worth counting until the
+    // sections exist, and leaving the extractor's last page on screen through
+    // it is exactly what looked hung.
+    onProgress(0, 0, 'build')
     const manifest = await buildIndex({
       indexDir,
       source,
@@ -43,6 +48,7 @@ export async function parseEpub(
       blocks: extracted.blocks,
       spineItems: extracted.spineItems,
       toc: extracted.toc,
+      onProgress,
     })
     return { indexDir, manifest, cached: false }
   } finally {

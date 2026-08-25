@@ -7,6 +7,19 @@
 import * as fs from '@/lib/fs'
 import { ensureIgnored } from '@/lib/gitignore'
 
+/**
+ * Which part of a build is running.
+ *
+ * Extraction is the one everybody thinks of, and it was the only one anybody
+ * was told about: a 2480-page PDF sat under "Extracting page 2480/2480" for
+ * the whole of the other two — inheriting ids and rendering sections
+ * (`build`), then writing hundreds of files (`write`) — which is minutes of
+ * looking hung on a long document.
+ */
+export type IndexPhase = 'extract' | 'build' | 'write'
+
+export type IndexProgress = (current: number, total: number, phase: IndexPhase) => void
+
 /** Zero-pad a number to 3 digits (`7` → `"007"`). */
 export function pad(n: number): string {
   return String(n).padStart(3, '0')
@@ -58,6 +71,7 @@ export function indexDirFor(kind: 'pdf' | 'epub' | 'md' | 'docx', source: string
 export async function writeAll(
   indexDir: string,
   files: { path: string; content: string }[],
+  onProgress: (written: number, total: number) => void = () => {},
 ): Promise<void> {
   await ensureIgnored('.trace').catch(() => {
     /* the index is still worth writing if the .gitignore cannot be touched */
@@ -74,6 +88,10 @@ export async function writeAll(
   //      sections/*.md that toc.md stopped linking would still turn up in
   //      search_files). A crash here leaves orphans, never a broken index —
   //      and the next successful rebuild sweeps them.
+  // Said before the directory listing below, not after: on a big index that
+  // listing is itself a wait, and the point of reporting at all is that the
+  // caller stops showing the last thing the extractor said.
+  onProgress(0, files.length)
   const before = fs
     .collectFiles(await fs.readTreeFrom(indexDir).catch(() => []))
     .map((p) => p.slice(indexDir.length + 1))
@@ -84,8 +102,10 @@ export async function writeAll(
     await Promise.all(
       rest.slice(i, i + CHUNK).map((f) => fs.writeFile(`${indexDir}/${f.path}`, f.content)),
     )
+    onProgress(Math.min(i + CHUNK, rest.length), files.length)
   }
   for (const f of manifest) await fs.writeFile(`${indexDir}/${f.path}`, f.content)
+  onProgress(files.length, files.length)
   const produced = new Set(files.map((f) => f.path))
   for (const stale of before.filter((p) => !produced.has(p))) {
     await fs.removeFile(`${indexDir}/${stale}`).catch(() => {

@@ -3,7 +3,7 @@
  * extension and returns a uniform summary the UI and the agent tool share.
  */
 import * as fs from '@/lib/fs'
-import { indexDirFor } from './util'
+import { indexDirFor, type IndexProgress } from './util'
 import { BUILDER as PDF_BUILDER, INDEX_VERSION as PDF_VERSION } from './pdf/types'
 import { BUILDER as EPUB_BUILDER, INDEX_VERSION as EPUB_VERSION } from './epub/types'
 import { BUILDER as DOCX_BUILDER, INDEX_VERSION as DOCX_VERSION } from './docx/types'
@@ -17,7 +17,7 @@ export interface IndexSummary {
   cached: boolean
 }
 
-export type IndexProgress = (current: number, total: number) => void
+export type { IndexPhase, IndexProgress } from './util'
 
 export interface IndexOpts {
   /** Rebuild even when a usable index exists — the user's explicit choice. */

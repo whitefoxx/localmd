@@ -3,7 +3,7 @@
  * when a fresh index already exists.
  */
 import * as fs from '@/lib/fs'
-import { indexDirFor, readFreshManifest, sha256Hex } from '../util'
+import { indexDirFor, readFreshManifest, sha256Hex, type IndexProgress } from '../util'
 import { buildIndex } from './build'
 import { extractDocx } from './extract'
 import { INDEX_VERSION, type DocxIndexManifest } from './types'
@@ -16,7 +16,7 @@ export interface DocxParseResult {
 
 export async function parseDocx(
   source: string,
-  onProgress: (current: number, total: number) => void = () => {},
+  onProgress: IndexProgress = () => {},
   opts: { force?: boolean } = {},
 ): Promise<DocxParseResult> {
   const indexDir = indexDirFor('docx', source)
@@ -30,13 +30,19 @@ export async function parseDocx(
   }
 
   const fallbackTitle = (source.split('/').pop() ?? source).replace(/\.docx?$/i, '')
-  const extracted = await extractDocx(bytes, fallbackTitle, onProgress)
+  const extracted = await extractDocx(bytes, fallbackTitle, (c, t) => onProgress(c, t, 'extract'))
+  // The turn is announced with no numbers of its own: what happens next —
+  // inheriting ids, then rendering — has no unit worth counting until the
+  // sections exist, and leaving the extractor's last page on screen through
+  // it is exactly what looked hung.
+  onProgress(0, 0, 'build')
   const manifest = await buildIndex({
     indexDir,
     source,
     title: extracted.title,
     contentHash,
     blocks: extracted.blocks,
+    onProgress,
   })
   return { indexDir, manifest, cached: false }
 }
