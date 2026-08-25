@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 
 /**
  * The palette (⌘K) and its four modes: fuzzy file search, `>` commands,
- * `@` conversations, and ⇧Enter to hand the query to the agent.
+ * `@` chats, and ⇧Enter to hand the query to the agent.
  */
 
 test.beforeEach(async ({ page }) => {
@@ -20,7 +20,7 @@ async function openPalette(page: Page): Promise<void> {
 }
 
 function palette(page: Page) {
-  return page.getByPlaceholder(/Search files and content|Run a command|Find a conversation/)
+  return page.getByPlaceholder(/Search files and content|Run a command|Find a chat/)
 }
 
 /** Result rows, scoped to the panel — the same names live in the file tree. */
@@ -103,14 +103,14 @@ test('> runs a command, and shows the key binding for the ones that have it', as
   await expect(results(page).filter({ hasText: 'Toggle the sidebar' })).toContainText('B')
 })
 
-test('@ finds a past conversation by title and reopens it', async ({ page }) => {
+test('@ finds a past chat by title and reopens it', async ({ page }) => {
   // Give it something to find: one exchange becomes one stored session.
   const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('echo wikilink digest')
   await input.press('Enter')
   await expect(page.getByText('wikilink digest').last()).toBeVisible({ timeout: 10_000 })
 
-  // A second conversation, so picking the first one is a real choice.
+  // A second chat, so picking the first one is a real choice.
   await page.getByTitle('New chat').click()
   await input.fill('echo unrelated chatter')
   await input.press('Enter')
