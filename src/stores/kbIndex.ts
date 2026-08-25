@@ -60,6 +60,11 @@ export interface HealthReport {
 
 const MAX_HITS = 100
 
+/** How many files the index reads at once. Small on purpose: enough to hide
+ *  the per-file latency of the File System Access API, not so many that the
+ *  browser is holding hundreds of handles open at the same time. */
+const READ_CHUNK = 8
+
 export const useKbIndexStore = defineStore('kbIndex', () => {
   const pages = ref<Map<string, CachedPage>>(new Map())
   const docSections = ref<Map<string, DocSection>>(new Map())
@@ -113,13 +118,14 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       }
     }
 
-    for (const path of mdPaths) {
+    /** Re-read one page, or null when it is unchanged, gone, or unreadable. */
+    async function reread(path: string): Promise<[string, CachedPage] | null> {
       const mtime = await fs.statMtime(path)
-      if (mtime === null) continue
+      if (mtime === null) return null
       const cached = next.get(path)
-      if (cached && cached.mtime === mtime) continue
+      if (cached && cached.mtime === mtime) return null
       const content = await fs.tryReadFile(path)
-      if (content === null) continue
+      if (content === null) return null
       const outgoing: string[] = []
       const broken: string[] = []
       for (const link of parseWikilinks(content)) {
@@ -137,8 +143,22 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         if (resolved) outgoing.push(resolved)
         else broken.push(href)
       }
-      next.set(path, { mtime, content, outgoing, broken, type: extractType(content) })
-      changed = true
+      return [path, { mtime, content, outgoing, broken, type: extractType(content) }]
+    }
+
+    // A page at a time was a page-sized round trip at a time: opening the graph
+    // on a few hundred notes sat on a blank rectangle while the File System
+    // Access API was asked for one handle after another, each one mostly
+    // waiting. Read them in small groups instead — bounded because firing every
+    // handle at once is its own way of being slow (docindex/util writes the
+    // same way, for the same reason).
+    const paths = [...mdPaths]
+    for (let i = 0; i < paths.length; i += READ_CHUNK) {
+      for (const entry of await Promise.all(paths.slice(i, i + READ_CHUNK).map(reread))) {
+        if (!entry) continue
+        next.set(entry[0], entry[1])
+        changed = true
+      }
     }
     if (changed) pages.value = next
     await refreshSourceMtimes(next)
@@ -186,16 +206,26 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         const sectionPaths = fs
           .collectFiles(dir.children ?? [])
           .filter((p) => /\/sections\/[^/]+\.md$/.test(p))
-        for (const p of sectionPaths) {
-          seen.add(p)
-          const mtime = await fs.statMtime(p)
-          if (mtime === null) continue
-          const cached = next.get(p)
-          if (cached && cached.mtime === mtime) continue
-          const content = await fs.tryReadFile(p)
-          if (content === null) continue
-          next.set(p, { mtime, content, source })
-          changed = true
+        for (const p of sectionPaths) seen.add(p)
+        // Same round-trip-at-a-time problem as the page pass, and a bigger one:
+        // a book is hundreds of section files, and they are re-stat'ed on every
+        // refresh.
+        for (let i = 0; i < sectionPaths.length; i += READ_CHUNK) {
+          const batch = await Promise.all(
+            sectionPaths.slice(i, i + READ_CHUNK).map(async (p) => {
+              const mtime = await fs.statMtime(p)
+              if (mtime === null) return null
+              const cached = next.get(p)
+              if (cached && cached.mtime === mtime) return null
+              const content = await fs.tryReadFile(p)
+              return content === null ? null : ([p, { mtime, content, source }] as const)
+            }),
+          )
+          for (const entry of batch) {
+            if (!entry) continue
+            next.set(entry[0], entry[1])
+            changed = true
+          }
         }
       }
     }

@@ -102,3 +102,25 @@ test('leaving a node puts the graph back exactly as it was', async ({ page }) =>
   expect(after.nodeOpacity).toBe('')
 })
 })
+
+test('the wait says which half of it you are in', async ({ page }) => {
+  // Reading the KB comes first and used to say nothing at all: the panel mounts
+  // against an index that is empty until every page has been read.
+  await page.goto('/?e2e=1')
+  await expect(page.getByText('This folder is empty')).toBeVisible({ timeout: 10_000 })
+  await page.getByTitle('Graph view').click()
+  await expect(page.getByText('Click a node to open its file')).toBeVisible()
+  await expect(page.getByText(/Reading your pages/)).toBeHidden()
+
+  await page.evaluate(async () => {
+    const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+    useKbIndexStore().refreshing = true
+  })
+  await expect(page.getByText(/Reading your pages/)).toBeVisible()
+
+  await page.evaluate(async () => {
+    const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+    useKbIndexStore().refreshing = false
+  })
+  await expect(page.getByText(/Reading your pages/)).toBeHidden()
+})

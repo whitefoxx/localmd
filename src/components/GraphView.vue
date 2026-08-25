@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
 import {
   forceSimulation,
   forceLink,
@@ -54,6 +54,22 @@ let sim: Simulation<GraphNode, GraphLink> | null = null
  */
 const laying = ref(false)
 const HEAVY_NODES = 25
+
+/**
+ * What the chip says, or null for nothing to say.
+ *
+ * Reading the knowledge base is the FIRST half of the wait and used to be the
+ * silent one: the panel mounts against whatever the index already has, which on
+ * a cold one is nothing, so a KB of any size opened to a blank rectangle and
+ * stayed there while every page was read. The chip only came up afterwards, for
+ * the part that was already visibly happening.
+ *
+ * A refresh that runs while a graph is on screen says nothing — the graph is
+ * still true, and a chip flashing on every window focus is noise.
+ */
+const busy = computed<'reading' | 'laying' | null>(() =>
+  index.refreshing && index.graph.nodes.length === 0 ? 'reading' : laying.value ? 'laying' : null,
+)
 /** Alpha below which the graph has stopped visibly moving. The simulation runs
  *  on to ~0.001, long after it is readable; waiting for that would hold the
  *  line up over a graph that has plainly arrived. */
@@ -340,12 +356,12 @@ onBeforeUnmount(() => {
     <!-- Near the top of the graph area, not in its middle: forceCenter pulls
          every node into the centre, so that is the one place a line of text
          cannot be read. Same chip as the PDF reader's. -->
-    <div v-if="laying" class="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
+    <div v-if="busy" class="pointer-events-none absolute inset-x-0 top-4 flex justify-center">
       <span
         class="flex items-center gap-2 rounded-full border border-border bg-bg-1/95 px-3 py-1.5 text-xs text-fg-2 shadow-lg"
       >
         <span class="codicon codicon-sm codicon-loading codicon-modifier-spin" />
-        {{ $t('graph.laying') }}
+        {{ busy === 'reading' ? $t('graph.reading') : $t('graph.laying') }}
       </span>
     </div>
   </div>
