@@ -3,12 +3,27 @@
 **An AI knowledge base that runs in your browser and your local folder. Open a
 URL, pick a folder, start thinking — nothing to install.**
 
+### ▶ [Try it now](https://localmd.app) — no install, no account, no key
+
+It is a web page. Open it, click **Try a demo knowledge base**, ask a question
+about a real 43-page paper, then click a citation and land on the paragraph it
+came from. Nothing to clone first; come back here if you like it.
+
+---
+
 There is no backend. The app is a static page: it reads and writes your files
 through the File System Access API, and it talks to whichever model provider you
 gave it a key for. Nothing is uploaded, because there is nowhere to upload to.
 
-Hosted at **[localmd.app](https://localmd.app)** · bugs and ideas → the
-[issues](https://github.com/whitefoxx/localmd/issues) on this repository
+**That last sentence is the reason this repository exists.** "Your files are not
+uploaded" is a claim, and claims about privacy are worth exactly as much as your
+willingness to take someone's word for it. Here you can read the code, run it
+yourself, and watch the network tab. Every feature the hosted build has is in
+here — what is not is the free trial, which spends our API budget and needs a
+server to meter it. See [Two editions](#two-editions).
+
+Bugs and ideas → the [issues](https://github.com/whitefoxx/localmd/issues) on
+this repository.
 
 ## What it does
 
@@ -47,6 +62,20 @@ send to a model goes to that model's provider.
 Custom gateways often refuse browser CORS; the providers' own endpoints work.
 
 ## Running it
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fwhitefoxx%2Flocalmd)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/whitefoxx/localmd)
+
+Those build the static output and serve it over https, which is all this needs —
+there is nothing to configure and no server to keep running. (No Dockerfile, on
+purpose: a container whose whole job is to serve a folder of files is more
+moving parts than `npm run build` and any static host, not fewer.)
+
+Deploying it is yours to run. Bug reports about the app are welcome in the
+issues; "my host is not serving it" is a question about your host, and this is a
+solo project with no support commitment behind it.
+
+Locally:
 
 ```bash
 npm install

@@ -1,0 +1,8 @@
+# So the deploy button in README.md does not have to guess.
+#
+# Netlify's auto-detection usually gets a Vite project right, but "usually" is
+# not what you want behind a one-click button: a failed first deploy is the
+# worst possible introduction, and it costs four lines to make it deterministic.
+[build]
+  command = "npm run build"
+  publish = "dist"
