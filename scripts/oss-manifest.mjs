@@ -45,6 +45,12 @@ export const EXCLUDE = [
   // that belong to the hosted build. The overlay's index.html replaces the
   // matching <head> — see oss/index.html for why it carries none of it.
   'public/llms.txt',
+  // The social card for that same <head>, and the two files that generate it.
+  // With no og:/twitter: tags to point at it, all three are orphans. (The
+  // landing page's own images are NOT here: those are imported by the app.)
+  'public/og.png',
+  'scripts/og.html',
+  'scripts/shoot-og.mjs',
 
   // ── Is ours, not the project's ──────────────────────────────────────────
   // Working agreements that point at a private knowledge base and a launch
@@ -114,5 +120,5 @@ export const PACKAGE_PATCH = {
     homepage: 'https://localmd.app',
   },
   /** Scripts whose file the export drops. */
-  removeScripts: ['sign-key'],
+  removeScripts: ['sign-key', 'shoot:og'],
 }
