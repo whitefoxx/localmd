@@ -1,8 +1,8 @@
 /**
  * Format-agnostic helpers shared by the document indexers (PDF, EPUB, MD).
- * Ported from trace-app's doc-index/util.ts; writes go through our File System
- * Access layer instead of Electron IPC. Index formats and directory naming are
- * kept byte-compatible with trace-app so existing KBs interoperate.
+ * Writes go through the File System Access layer. Index formats and directory
+ * naming are byte-stable: existing knowledge bases hold directories named by
+ * these rules, and a name that moves orphans the index it points at.
  */
 import * as fs from '@/lib/fs'
 import { ensureIgnored } from '@/lib/gitignore'

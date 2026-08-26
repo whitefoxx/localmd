@@ -251,7 +251,7 @@ async function load(path: string | null): Promise<void> {
   // Register the content hook BEFORE display so the FIRST chapter's iframe also
   // gets the listener — hooks only apply to chapters rendered after they're
   // registered, so a late registration leaves the opening chapter unbound and
-  // arrow-key paging dies once focus is inside it (trace-app fix).
+  // arrow-key paging dies once focus is inside it.
   rendition.hooks.content.register((contents: { document: Document }) => {
     // Read-aloud highlight style — the CSS Highlight API is scoped per document,
     // so each chapter iframe needs its own copy of the rule.

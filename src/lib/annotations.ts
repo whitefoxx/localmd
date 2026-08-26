@@ -1,6 +1,7 @@
 /**
- * Highlight annotations, stored in trace-app-compatible sidecar files
- * (`<source>.annotations.json`) so both apps read each other's highlights.
+ * Highlight annotations, stored in sidecar files beside the document
+ * (`<source>.annotations.json`) — a published format existing knowledge bases
+ * already hold, so the shape is not ours to change.
  *
  * PDF entries use EmbedPDF's annotation object shape (top-left-origin PDF
  * points, 0-based pageIndex, type 9 = highlight). We keep each raw entry

@@ -1,8 +1,8 @@
 /**
  * Turn extracted blocks into the on-disk PDF index: a section tree (from the
  * embedded outline, detected headings, or one-file-per-page), a table of
- * contents, a block→coordinates map, and agent-facing instructions.
- * Ported from trace-app; the on-disk format is identical.
+ * contents, a block→coordinates map, and agent-facing instructions. The
+ * on-disk format is the one existing KBs already hold.
  */
 import { pad, slugify, writeAll, type IndexProgress } from '../util'
 import {

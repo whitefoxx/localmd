@@ -1,7 +1,7 @@
 /**
  * Turn extracted EPUB blocks into the on-disk index: section files (one per
  * spine item, large items sub-split on headings), a table of contents, a
- * block→CFI map, and agent-facing instructions. Ported from trace-app.
+ * block→CFI map, and agent-facing instructions.
  */
 import { pad, slugify, writeAll, type IndexProgress } from '../util'
 import type { SpineItemInfo } from './extract'

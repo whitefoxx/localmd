@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Container for all open PDFs — trace-app's pattern, lazily: a <PdfDocument>
- * is mounted the first time its tab comes on screen and kept alive from then
+ * Container for all open PDFs, lazily: a <PdfDocument> is mounted the first
+ * time its tab comes on screen and kept alive from then
  * on; only the active one is shown (v-show). Switching back to a tab is a
  * visibility toggle — no reload, page position kept, annotations stay live.
  */

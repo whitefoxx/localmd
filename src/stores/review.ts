@@ -1,6 +1,5 @@
 /**
- * Review of agent edits that already happened — the browser replacement for
- * trace-app's git-based review flow. Every write the agent lands (auto mode
+ * Review of agent edits that already happened. Every write the agent lands (auto mode
  * immediately; ask mode once the user approves the card in the conversation)
  * is recorded here as a before/after snapshot, so the user can keep (approve)
  * or restore (discard) it afterwards, per file or in bulk.

@@ -5,7 +5,6 @@
  * maps a citation back to the nth rendered element) — so the two always agree.
  *
  * Ids use the same `b<section>-<n>` shape as the PDF/EPUB indexes.
- * Ported from trace-app.
  */
 import { marked, type Token } from 'marked'
 

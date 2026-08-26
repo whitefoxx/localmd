@@ -635,8 +635,8 @@ function closeKb(): void {
               </button>
             </div>
 
-            <!-- PDFs stay mounted per open tab (trace-app pattern) — switching
-                 tabs only toggles visibility, never reloads the document. -->
+            <!-- PDFs stay mounted per open tab — switching tabs only toggles
+                 visibility, never reloads the document. -->
             <PdfViewer v-show="kind === 'pdf'" class="absolute inset-0" />
             <template v-if="files.currentPath && kind !== 'pdf'">
               <MarkdownEditor v-if="isMarkdown && files.mode === 'edit'" />

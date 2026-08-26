@@ -70,8 +70,8 @@ approval 卡片、connectGuard)——不新增攻击面,只是换了驱动方式
 
 - **GitHub 同步 live 验证**:push/pull 代码与错误路径已测,但真实推送需用户 PAT
   (Settings → Git & GitHub;README 有 token 指南)
-- **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(trace-app 用 macOS Vision,
-  浏览器可考虑 tesseract.js,精度/体积待评估)
+- **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(浏览器可考虑 tesseract.js,
+  精度/体积待评估)
 - **EPUB 页内截图**:epub.js 渲染的是 iframe HTML,无现成区域截图;若做,用
   getDisplayMedia(preferCurrentTab)抓帧 + 自绘选框裁剪(每次多一步浏览器确认,
   画质受屏幕分辨率限制)。当前结论:用系统截图(⌘⇧4)+ 聊天粘贴即可

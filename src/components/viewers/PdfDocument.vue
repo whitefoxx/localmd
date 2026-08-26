@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * One EmbedPDF viewer instance per open PDF — ported from trace-app's
- * PdfDocument.vue. The engine provides rendering, selection, zoom, search,
+ * One EmbedPDF viewer instance per open PDF. The engine provides rendering,
+ * selection, zoom, search,
  * outline sidebar and the highlight-annotation UI natively; this component
  * adds: sidecar annotation persistence, AI-index status, citation reveal,
  * and per-path page memory. `path` is fixed for the instance's lifetime.
@@ -123,7 +123,7 @@ const config = computed(() => ({
   ],
 }))
 
-/* ── EmbedPDF plugin capability slices (same shapes trace-app drives) ────── */
+/* ── EmbedPDF plugin capability slices ──────────────────────────────────── */
 
 interface TransferItem {
   annotation: { id: string; type?: number; [k: string]: unknown }
@@ -721,7 +721,7 @@ function restoreSavedPage(): void {
   }, attempts[attempts.length - 1] + 400)
 }
 
-/* ── Annotation persistence (trace-app sidecar format) ───────────────────── */
+/* ── Annotation persistence (the published sidecar format) ──────────────── */
 // Only the USER's annotations are persisted, built incrementally from events.
 // Never call exportAnnotations() — hyperlinked books carry thousands of
 // embedded Link annotations and serialising them freezes the renderer.
@@ -1314,7 +1314,7 @@ async function initIndexStatus(): Promise<void> {
 /* ── Citation reveal ─────────────────────────────────────────────────────── */
 // Drawn as a native EmbedPDF highlight annotation, so it tracks the page on
 // scroll/zoom for free. A fresh unique id every time — reusing one crashes
-// EmbedPDF's async delete-commit (see trace-app's embedpdf-config note).
+// EmbedPDF's async delete-commit.
 
 let citationHighlightId: string | null = null
 let citationHighlightPage: number | null = null

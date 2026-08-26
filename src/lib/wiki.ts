@@ -1,6 +1,5 @@
 /**
- * Wikilink / frontmatter parsing helpers.
- * Ported from trace-app src/shared/wiki.ts — pure TS, no platform APIs.
+ * Wikilink / frontmatter parsing helpers. Pure TS, no platform APIs.
  */
 
 export const WIKILINK_RE = /\[\[([^\[\]]+)\]\]/g

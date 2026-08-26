@@ -2,7 +2,7 @@
  * Image generation for the `image` capability slot. The agent calls the
  * generate_image tool; the loop routes it here, which asks the image-slot
  * model (via the AI SDK) to produce an image and saves the bytes into the KB —
- * raw/images/ in raw-layout KBs (trace-app's archiving convention), inbox/
+ * raw/images/ in raw-layout KBs, inbox/
  * elsewhere — returning the path so the chat can show it and the model can
  * reference it.
  */

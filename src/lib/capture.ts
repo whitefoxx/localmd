@@ -1,9 +1,9 @@
 /**
  * Source capture (drag-drop onto the app + paste/upload in the chat input):
  * route incoming files to a landing spot with collision-safe names. KBs using
- * the trace-app layout (a `raw/` tree exists) bucket by type into
- * `raw/<subdir>` — that routing table is byte-for-byte trace-app's, so both
- * apps file sources identically. Any other KB gets a flat neutral `inbox/`
+ * the raw layout (a `raw/` tree exists) bucket by type into
+ * `raw/<subdir>` — that routing table is fixed, because existing knowledge
+ * bases were organized by it. Any other KB gets a flat neutral `inbox/`
  * instead: opening a pre-existing folder must never graft our layout onto it
  * (the agent re-files from inbox/ into the user's own structure on ingest).
  * Pure helpers are exported for unit tests; the only I/O lives in
@@ -15,7 +15,7 @@ import { ensureIgnored } from '@/lib/gitignore'
 /** Neutral landing directory for KBs that don't use the raw/ layout. */
 export const INBOX_DIR = 'inbox'
 
-/** Whether this KB uses the trace-app raw/ intake layout. Automatic writes
+/** Whether this KB uses the raw/ intake layout. Automatic writes
  *  (drops, pastes, generated images, saved sessions) bucket into raw/ only
  *  when the tree already has one. */
 export async function usesRawLayout(): Promise<boolean> {

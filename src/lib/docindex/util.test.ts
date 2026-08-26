@@ -20,10 +20,11 @@ describe('slugify', () => {
   })
 })
 
-describe('fnv1a — must stay byte-compatible with trace-app', () => {
-  // Golden values verified against directories created by trace-app in a real
-  // knowledge base. Changing the hash breaks index dir interop between apps.
-  it('matches trace-app-generated index directory hashes', () => {
+describe('fnv1a — must stay byte-stable', () => {
+  // Golden values taken from index directories in a real knowledge base. The
+  // hash names the directory, so changing it does not produce a different name
+  // for the same document — it orphans every index already on disk.
+  it('matches the index directory hashes existing KBs hold', () => {
     expect(fnv1a('raw/books/毛泽东选集.pdf')).toBe('b03d722c')
     expect(fnv1a('raw/books/全球通史.pdf')).toBe('5178e6ec')
     expect(fnv1a('raw/books/被讨厌的勇气.epub')).toBe('c7f57e57')
@@ -31,7 +32,7 @@ describe('fnv1a — must stay byte-compatible with trace-app', () => {
 })
 
 describe('indexDirFor', () => {
-  it('builds the trace-app-compatible directory name', () => {
+  it('builds the published directory name', () => {
     expect(indexDirFor('pdf', 'raw/books/毛泽东选集.pdf')).toBe(
       '.trace/pdf-index/毛泽东选集-b03d722c',
     )

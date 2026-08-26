@@ -1,12 +1,10 @@
 /**
- * The agent's tool surface over the opened KB folder — the browser replacement
- * for trace-app's "Claude Code in a terminal". Tools are defined once with Zod
+ * The agent's tool surface over the opened KB folder. Tools are defined once with Zod
  * schemas; the Anthropic runner consumes them via betaZodTool and the
  * OpenAI-compatible loop derives JSON Schema with z.toJSONSchema().
  *
  * write_file records a before/after snapshot in the review store so the user
- * can approve or discard agent edits afterwards (the browser equivalent of
- * trace-app's git-based review flow). In ask mode a write instead pauses on an
+ * can approve or discard agent edits afterwards. In ask mode a write instead pauses on an
  * approval card in the conversation (stores/approvals) until the user decides
  * there. delete_path composes both — an undoable snapshot for text files, an
  * always-ask card for the directories and binaries no snapshot can bring back.

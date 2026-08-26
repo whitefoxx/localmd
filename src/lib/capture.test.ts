@@ -19,7 +19,7 @@ describe('landingPathFor — raw/ bucketing only when the KB has a raw/ tree', (
   })
 })
 
-describe('rawSubdirFor — must stay aligned with trace-app routing', () => {
+describe('rawSubdirFor — the routing existing KBs were organized by', () => {
   it('routes by extension', () => {
     expect(rawSubdirFor('paper.pdf')).toBe('papers')
     expect(rawSubdirFor('book.EPUB')).toBe('books')

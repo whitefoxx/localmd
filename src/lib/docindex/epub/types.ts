@@ -1,7 +1,7 @@
 /**
  * Shared types for the EPUB index. The on-disk layout is the format existing
- * KBs already hold (inherited from trace-app, INDEX_VERSION 3) and is kept
- * stable for the notes that cite into it.
+ * KBs already hold (INDEX_VERSION 3) and is kept stable for the notes that
+ * cite into it.
  */
 
 /** READ CONTRACT — see pdf/types.ts for the INDEX_VERSION/BUILDER split. */

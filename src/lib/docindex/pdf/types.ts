@@ -2,9 +2,9 @@
  * Shared types for the PDF index — a parsed, location-aware representation of
  * a PDF that an AI agent can browse like a small codebase, and that the app
  * can use to map a cited block back to coordinates in the PDF.
- * The on-disk layout is the format existing KBs already hold (inherited from
- * trace-app, INDEX_VERSION 11) — user notes cite block ids from that era, so
- * the format is kept stable for them, not for another app.
+ * The on-disk layout is the format existing KBs already hold
+ * (INDEX_VERSION 11) — user notes cite block ids from that era, so the format
+ * is kept stable for them.
  */
 
 /**

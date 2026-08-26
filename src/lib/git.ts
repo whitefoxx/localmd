@@ -1,7 +1,7 @@
 /**
  * Git operations over the opened KB folder — isomorphic-git + the gitFs
  * adapter. Reads/writes the standard .git format, so everything here interops
- * with CLI git and trace-app.
+ * with CLI git.
  *
  * Status is scoped to TEXT files outside .trace/: the dirty list drives the
  * in-app commit flow (agent edits = text), and hashing multi-GB untracked
@@ -53,7 +53,7 @@ export async function isRepo(): Promise<boolean> {
 }
 
 /** Initialize a fresh git repository in the opened KB folder (branch `main`),
- *  writing the standard .git layout so it interops with CLI git and trace-app.
+ *  writing the standard .git layout so it interops with CLI git.
  *  isomorphic-git's init is idempotent, but callers should guard with isRepo()
  *  to avoid touching an existing repo. Resets the object cache. */
 export async function init(defaultBranch = 'main'): Promise<void> {

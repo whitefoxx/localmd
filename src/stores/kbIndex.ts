@@ -1,8 +1,7 @@
 /**
  * KB-wide content index: an mtime-keyed cache of every markdown file's text
  * plus the wikilink graph derived from it. One index feeds search, backlinks,
- * the graph view, and health checks (the browser counterpart of trace-app's
- * main-process page-cache.ts).
+ * the graph view, and health checks.
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'

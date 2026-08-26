@@ -23,9 +23,8 @@ names are never reassigned.
 
 `INDEX_VERSION` (11 PDF / 3 EPUB / 1 MD / 1 DOCX) is the **read contract**:
 what a reader must understand to use the directory. It strands every index on
-disk when bumped, so it is expected never to move again. The PDF/EPUB values
-were inherited from trace-app (discontinued); the constraint is owed to
-existing KBs, not to another app.
+disk when bumped, so it is expected never to move again. The constraint is
+owed to existing KBs and to the block ids their notes already cite.
 
 `builder` (manifest field, per-kind constant) is the **algorithm revision**.
 Bump it whenever the pipeline's published output changes — block boundaries,

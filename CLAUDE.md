@@ -183,9 +183,8 @@ agent pipeline (docs/token-optimization.md has the full log):
 
 - doc-index format stability (docs/docindex-compat.md has the full design):
   existing KBs hold `.trace/*-index/` indexes at INDEX_VERSION 11 (PDF) /
-  3 (EPUB) — formats inherited from trace-app, which is discontinued; the
-  constraint is owed to those KBs and to the block-id citations users' notes
-  already carry, not to another app. INDEX_VERSION is the read contract and
+  3 (EPUB); the constraint is owed to those KBs and to the block-id citations
+  users' notes already carry. INDEX_VERSION is the read contract and
   is expected never to move; algorithm changes bump BUILDER instead (see
   src/lib/docindex/pdf/types.ts) and must keep the id invariant: **a block
   id, once published, always resolves to the same passage** — rebuilds

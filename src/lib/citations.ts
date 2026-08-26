@@ -1,6 +1,6 @@
 /**
  * Render-time handling of Q&A citation tokens inside wiki pages and chat
- * answers. Ported from trace-app — token forms:
+ * answers. Token forms:
  *   [[pdf1:raw/papers/x.pdf]]   — declares source #1 (also [[epub2:…]], [[md3:…]], [[docx4:…]])
  *   [[1:b14-3]]                 — inline citation into source #1, block b14-3
  *   [[b14-3]]                   — inline citation, source inferred at click time

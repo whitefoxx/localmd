@@ -1,6 +1,7 @@
 /**
  * Shared types for the DOCX index. Unlike the PDF/EPUB indexes there is no
- * trace-app format to stay compatible with — this one is ours.
+ * published format to stay compatible with — nothing on anyone's disk cites
+ * into this one yet.
  */
 
 /** READ CONTRACT — see pdf/types.ts for the INDEX_VERSION/BUILDER split. */

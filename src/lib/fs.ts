@@ -2,8 +2,8 @@
  * File System Access API layer over the opened KB directory handle.
  *
  * All paths are KB-relative, '/'-separated, no leading slash (e.g.
- * "wiki/concepts/foo.md"). This replaces trace-app's main-process fs.ts:
- * the browser talks to the user's real folder directly — no server involved.
+ * "wiki/concepts/foo.md"). The browser talks to the user's real folder
+ * directly — no server involved.
  *
  * Writes go through createWritable(), which the browser stages in a swap file
  * and commits atomically on close(), so interrupted writes never corrupt files.

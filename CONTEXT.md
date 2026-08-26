@@ -1,7 +1,7 @@
 # browser-md
 
-A pure-browser knowledge-base and AI-agent app: a browser rewrite of the trace-app
-Electron application. The user opens a URL, configures an LLM key, and picks a local
+A pure-browser knowledge-base and AI-agent app. The user opens a URL,
+configures an LLM key, and picks a local
 folder; nothing leaves the device. This file is the shared glossary — the canonical
 word for each domain concept, and the words to avoid.
 
@@ -78,9 +78,8 @@ _Avoid_: capability slot (fine in prose, but "slot" is canonical), channel, role
 
 **Doc-index**:
 The extracted structure of a single document (PDF/EPUB/DOCX/MD), stored under
-`.trace/<kind>-index/`. The PDF/EPUB on-disk formats were inherited from
-trace-app (now discontinued) and are kept stable for the KBs and citations
-that already exist, not for another app. This is the per-document artifact —
+`.trace/<kind>-index/`. The PDF/EPUB on-disk formats are kept stable for the
+KBs and citations that already exist. This is the per-document artifact —
 never call it just "the index".
 _Avoid_: bare "index", parse, extraction.
 
@@ -96,8 +95,8 @@ content-hash mismatch — the source bytes changed).
 **Source**:
 A document a note cites, declared in a note with `[[pdf1:raw/papers/x.pdf]]`. The digit
 is the **source number** — the source's own identity within that note, assigned at
-declaration. It is NOT the ordinal position of a citation. (trace-app semantics — do
-not reinterpret.)
+declaration. It is NOT the ordinal position of a citation — notes already on
+disk depend on that reading, so do not reinterpret it.
 _Avoid_: citation ordinal, reference number, footnote number.
 
 **Block id**:

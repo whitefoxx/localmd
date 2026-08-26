@@ -28,7 +28,7 @@ function session(overrides: Partial<TranscriptSession> = {}): TranscriptSession 
 }
 
 describe('transcriptDirFor', () => {
-  it('keeps trace-app’s conversations dir in raw-layout KBs, inbox/ elsewhere', () => {
+  it('keeps the established conversations dir in raw-layout KBs, inbox/ elsewhere', () => {
     expect(transcriptDirFor(true)).toBe('raw/conversations/browser-md')
     expect(transcriptDirFor(false)).toBe('inbox/conversations')
   })

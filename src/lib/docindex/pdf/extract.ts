@@ -3,8 +3,7 @@
  * each page's text items to `./layout` to be read as lines, columns and
  * paragraphs, then label headings by size relative to the body median. Every
  * block carries normalized top-left-origin rects so the viewer can highlight
- * it. (trace-app used the EmbedPDF engine for this; the output shape is
- * identical.)
+ * it.
  *
  * The layout rules live next door on purpose — this module cannot be imported
  * outside a browser, and rules that decide what every citation points at should

@@ -1,6 +1,6 @@
 /**
  * First-run scaffolding: turn an empty folder into a working knowledge base
- * (the trace-app "LLM Wiki" layout) — raw/ intake dirs, a wiki index and log,
+ * (the "LLM Wiki" layout) — raw/ intake dirs, a wiki index and log,
  * a tool-neutral AGENTS.md schema, and the starter skills.
  */
 import * as fs from '@/lib/fs'

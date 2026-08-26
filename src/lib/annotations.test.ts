@@ -14,7 +14,7 @@ import {
 } from './annotations'
 
 describe('sidecarPath', () => {
-  it('appends .annotations.json (trace-app convention)', () => {
+  it('appends .annotations.json, the published sidecar name', () => {
     expect(sidecarPath('raw/books/x.pdf')).toBe('raw/books/x.pdf.annotations.json')
   })
 

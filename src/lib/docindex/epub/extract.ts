@@ -5,7 +5,6 @@
  * explicit. Each block carries an epub.js range CFI — the app navigates and
  * highlights with it. Because extraction and the viewer both run epub.js over
  * the same bytes, a CFI made here resolves identically in the viewer.
- * Ported from trace-app.
  */
 import type { Book, NavItem } from 'epubjs'
 import type { EpubBlock, TocNode } from './types'

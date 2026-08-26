@@ -1,7 +1,7 @@
 /**
  * System prompt for the KB agent. The KB's own instructions file is appended
  * verbatim when present — AGENTS.md (the tool-neutral standard) preferred,
- * CLAUDE.md as fallback — so KBs created with trace-app keep their workflows.
+ * CLAUDE.md as fallback — so a KB that already carries one keeps its workflows.
  * Skills get a name+description listing only (progressive disclosure); the
  * agent loads full instructions via use_skill. MEMORY.md — the KB's durable
  * cross-session memory — is appended in full when present.

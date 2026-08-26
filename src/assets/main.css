@@ -27,8 +27,7 @@
 
 /* Theme palettes — RGB triplets consumed by tailwind.config.ts via
    rgb(var(--c-…) / alpha). `data-theme` on <html> picks the set; the theme
-   store keeps it in sync with the light/dark/system preference.
-   Ported from trace-app. */
+   store keeps it in sync with the light/dark/system preference. */
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -324,7 +323,7 @@
   color: inherit;
 }
 
-/* Markdown preview styles (ported from trace-app) */
+/* Markdown preview styles */
 .md-preview {
   @apply text-fg-1 leading-relaxed;
   user-select: text;
