@@ -29,7 +29,7 @@ import { useSettingsStore, newProfileId } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
-import { restricted } from '@/edition/gate'
+import { gate } from '@/edition/gate'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { serverSecretRefs } from '@/lib/mcp'
@@ -280,7 +280,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: t(`settings.catalog.${e.id}.title`),
       source: 'preset',
       kind: e.server ? (e.kind === 'extension' ? 'extension' : 'mcp') : null,
-      ...(restricted && !e.bundled && !e.server ? lockedStatus() : entryStatus(e)),
+      ...(gate.restricted && !e.bundled && !e.server ? lockedStatus() : entryStatus(e)),
       target: { name: 'entry', id: e.id },
     })
   }
@@ -291,7 +291,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: g.bundle ?? g.tools[0].name,
       source: isKbTool(g.tools[0]) ? 'kb' : 'yours',
       kind: null,
-      ...(restricted ? lockedStatus() : staticCount(g.tools.length)),
+      ...(gate.restricted ? lockedStatus() : staticCount(g.tools.length)),
       target: { name: 'group', key: groupKey(g) },
     })
   }
@@ -1350,7 +1350,7 @@ function removeDetail(): void {
         </span>
       </span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectionsDesc') }}</p>
-      <p v-if="restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
+      <p v-if="gate.restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
         {{ $t('settings.connectionsLocked') }}
         <button class="underline hover:text-fg-0" @click="ui.settingsSection = 'licence'">
           {{ $t('settings.nav.licence') }}
@@ -1401,8 +1401,8 @@ function removeDetail(): void {
         <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
         <button
           class="btn text-xs mt-2"
-          :disabled="restricted"
-          :title="restricted ? $t('settings.connectionsLocked') : undefined"
+          :disabled="gate.restricted"
+          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="askAgent"
         >{{ $t('settings.connectAction') }}</button>
       </div>
@@ -1487,8 +1487,8 @@ function removeDetail(): void {
       <div class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
         <button
           class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="restricted"
-          :title="restricted ? $t('settings.connectionsLocked') : undefined"
+          :disabled="gate.restricted"
+          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newTool"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addManually') }}</span>
@@ -1497,8 +1497,8 @@ function removeDetail(): void {
         </button>
         <button
           class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="restricted"
-          :title="restricted ? $t('settings.connectionsLocked') : undefined"
+          :disabled="gate.restricted"
+          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newServer"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addServer') }}</span>

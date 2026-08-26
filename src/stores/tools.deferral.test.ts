@@ -6,14 +6,11 @@ import { setActivePinia, createPinia } from 'pinia'
 // The gate is mocked open, not switched off through the licence it happens to
 // be backed by: `@/edition/gate` is what the code under test imports, so this
 // says the same thing in an edition that has no licence module at all.
-vi.mock('@/edition/gate', async () => {
-  const { computed } = await import('vue')
-  return {
-    restricted: computed(() => false),
-    toolRestricted: () => false,
-    restrictedToolResult: (name: string) => `Error: ${name} is restricted.`,
-  }
-})
+vi.mock('@/edition/gate', () => ({
+  gate: { restricted: false },
+  toolRestricted: () => false,
+  restrictedToolResult: (name: string) => `Error: ${name} is restricted.`,
+}))
 
 // Mutating settings.state fires its persist watch, and the recall/trust reads
 // go to storage too — node has none (same shim as manageTools.test.ts).

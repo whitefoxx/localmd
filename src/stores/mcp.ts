@@ -52,7 +52,7 @@ import {
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS, CATALOG } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
-import { restricted } from '@/edition/gate'
+import { gate } from '@/edition/gate'
 import * as fs from '@/lib/fs'
 
 export interface McpServerState {
@@ -510,7 +510,7 @@ export const useMcpStore = defineStore('mcp', () => {
     // that would have spent the reader's key must be told that, not handed a
     // billing message — the security reason is the more important thing to say,
     // and it stays true whether or not a licence ever arrives.
-    if (!isBundledServer(raw) && restricted.value) {
+    if (!isBundledServer(raw) && gate.restricted) {
       patch(raw.id, { status: 'error', error: LICENCE_REQUIRED, tools: [] })
       return
     }
@@ -660,7 +660,7 @@ export const useMcpStore = defineStore('mcp', () => {
     // otherwise leave every one of its tools callable for the rest of the
     // session. Connect-time alone gates who may start, not who may continue.
     const config = servers.value.find((s) => s.config.id === serverId)?.config
-    if ((!config || !isBundledServer(config)) && restricted.value) {
+    if ((!config || !isBundledServer(config)) && gate.restricted) {
       return `Error: ${LICENCE_REQUIRED}`
     }
     try {
@@ -712,7 +712,10 @@ export const useMcpStore = defineStore('mcp', () => {
   // or lapsing has to re-run the same decision. Without this the rows keep
   // whatever status they had — green and unreachable, or red after the key that
   // would have fixed them was pasted.
-  watch(restricted, () => void refresh())
+  watch(
+    () => gate.restricted,
+    () => void refresh(),
+  )
 
   /**
    * Entering a key a row was waiting on should bring it up, without the user
