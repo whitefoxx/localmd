@@ -14,16 +14,20 @@
  */
 import type { ProviderPreset } from '@/lib/providers'
 import type { LlmProfile } from '@/stores/settings'
-import { trialSession, trialProfile, type TrialSession } from '@/lib/trial'
+import { trialSession, trialProfile } from '@/lib/trial'
 
+/**
+ * Every type crossing this interface is one core already has. A session is
+ * pointedly not among them: it is the trial's own bookkeeping, and an edition
+ * without a trial could not name the type, let alone stub it. So the seam hands
+ * over the finished thing — a profile — and keeps the two-step dance behind it.
+ */
 export interface EditionTrial {
   /** Registered into ALL_PROVIDERS so a trial profile resolves its SDK. */
   preset: ProviderPreset
-  /** A usable session, reusing the tab's own until it is nearly expired.
-   *  Throws `TrialUnavailable` when the answer is no. */
-  session(): Promise<TrialSession>
-  /** The ephemeral profile a session becomes. */
-  profile(session: TrialSession): LlmProfile
+  /** An ephemeral profile on a session, reusing the tab's own until it is
+   *  nearly expired. Throws when the trial has nothing left to lend. */
+  lendProfile(): Promise<LlmProfile>
 }
 
 export const TRIAL: EditionTrial | null = {
@@ -44,6 +48,7 @@ export const TRIAL: EditionTrial | null = {
     defaultModel: 'deepseek-chat',
     internal: true,
   },
-  session: trialSession,
-  profile: trialProfile,
+  async lendProfile() {
+    return trialProfile(await trialSession())
+  },
 }

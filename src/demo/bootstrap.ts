@@ -109,7 +109,7 @@ async function lendTrialModel(): Promise<void> {
   const settings = useSettingsStore()
   if (settings.state.slots.primary) return
   try {
-    const profile = TRIAL.profile(await TRIAL.session())
+    const profile = await TRIAL.lendProfile()
     settings.state.profiles = [...settings.state.profiles, profile]
     settings.state.slots = { ...settings.state.slots, primary: profile.id }
   } catch {
