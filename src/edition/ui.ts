@@ -8,6 +8,19 @@
  */
 import type { Component } from 'vue'
 import PricingDialog from '@/components/PricingDialog.vue'
+
+/**
+ * Whether this edition sells anything.
+ *
+ * Not the same question as `gate.restricted`, which asks whether a licence is
+ * missing right now — a licensed hosted browser answers `false` to that and
+ * still wants the Tools page to say which half of it is paid for. This asks
+ * whether the words "paid", "licence" and "free" mean anything here at all.
+ * Where they do not, copy asserting them is simply false, and the Tools page
+ * once told open-source users that connections were paid while cheerfully
+ * letting them tick every box.
+ */
+export const HAS_PAID_TIER = true
 import PricingBlock from '@/components/PricingBlock.vue'
 import LicenceSection from '@/components/settings/LicenceSection.vue'
 

@@ -30,6 +30,7 @@ import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
 import { gate } from '@/edition/gate'
+import { HAS_PAID_TIER } from '@/edition/ui'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { serverSecretRefs } from '@/lib/mcp'
@@ -1311,7 +1312,10 @@ function removeDetail(): void {
            same grey as everything around it. -->
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.bundledGroup') }}</span>
-        <span class="rounded-full bg-added/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-added">
+        <span
+          v-if="HAS_PAID_TIER"
+          class="rounded-full bg-added/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-added"
+        >
           {{ $t('settings.priceFree') }}
         </span>
       </span>
@@ -1345,11 +1349,17 @@ function removeDetail(): void {
     <div>
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectionsGroup') }}</span>
-        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+        <span
+          v-if="HAS_PAID_TIER"
+          class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent"
+        >
           {{ $t('settings.pricePaid') }}
         </span>
       </span>
-      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectionsDesc') }}</p>
+      <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">
+        {{ $t('settings.connectionsDesc')
+        }}<template v-if="HAS_PAID_TIER"> {{ $t('settings.connectionsLicence') }}</template>
+      </p>
       <p v-if="gate.restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
         {{ $t('settings.connectionsLocked') }}
         <button class="underline hover:text-fg-0" @click="ui.settingsSection = 'licence'">
@@ -1476,7 +1486,10 @@ function removeDetail(): void {
            read as "everything under Connections", and these sat outside it. -->
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
-        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+        <span
+          v-if="HAS_PAID_TIER"
+          class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent"
+        >
           {{ $t('settings.pricePaid') }}
         </span>
       </span>

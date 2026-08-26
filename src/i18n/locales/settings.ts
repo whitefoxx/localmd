@@ -103,7 +103,8 @@ export default {
       'These ship with the app and cost nothing, ever. Today that is web search and page reading; the set can grow.',
     connectionsGroup: 'Connections',
     connectionsDesc:
-      'Anything that reaches a service outside this browser. One licence covers all of it.',
+      'Anything that reaches a service outside this browser.',
+    connectionsLicence: 'One licence covers all of it.',
     connectionsLocked: 'Adding and using connections needs a licence —',
     rowNeedsLicence: 'Needs a licence',
     connectTitle: 'Connect something',
@@ -175,7 +176,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect browser extension',
-        desc: 'Your logged-in Chrome as agent tools: read pages, click and type, search, and open sites you are signed in to — including the many that a web page cannot reach on its own. Plus ~300 ready-made site adapters (Twitter, Zhihu, Reddit, YouTube, …) and site scripts that fix a page on every visit. Using it here is part of the paid tier, and anything that posts to a real site or injects code asks you first.',
+        desc: 'Your logged-in Chrome as agent tools: read pages, click and type, search, and open sites you are signed in to — including the many that a web page cannot reach on its own. Plus ~300 ready-made site adapters (Twitter, Zhihu, Reddit, YouTube, …) and site scripts that fix a page on every visit. Anything that posts to a real site or injects code asks you first.',
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -378,7 +379,8 @@ export default {
     pricePaid: '付费',
     bundledDesc: '随应用附带，永远不收费。目前是网页搜索和读网页；这个集合以后会变多。',
     connectionsGroup: '外部接入',
-    connectionsDesc: '所有连到这个浏览器之外的服务的能力。一份许可全都涵盖。',
+    connectionsDesc: '所有连到这个浏览器之外的服务的能力。',
+    connectionsLicence: '一份许可全都涵盖。',
     connectionsLocked: '添加和使用外部接入需要许可 ——',
     rowNeedsLicence: '需要许可',
     connectTitle: '接入一个服务',
@@ -445,7 +447,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect 浏览器扩展',
-        desc: '把你已登录的 Chrome 变成 agent 的工具：读网页、点击输入、搜索、打开你已登录的站点 —— 包括很多网页本身够不着的地方。另有约 300 个现成的站点适配器（Twitter、知乎、Reddit、YouTube……），以及每次打开页面自动生效的站点脚本。在这里使用属于付费部分；任何会向真实网站发内容或注入代码的操作都会先问你。',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：读网页、点击输入、搜索、打开你已登录的站点 —— 包括很多网页本身够不着的地方。另有约 300 个现成的站点适配器（Twitter、知乎、Reddit、YouTube……），以及每次打开页面自动生效的站点脚本。任何会向真实网站发内容或注入代码的操作都会先问你。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',
