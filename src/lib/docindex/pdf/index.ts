@@ -1,5 +1,5 @@
 /**
- * Parse a PDF into a location-aware index under `.trace/pdf-index/`, skipping
+ * Parse a PDF into a location-aware index under `.localmd/pdf-index/`, skipping
  * the work when a fresh index (same format version + content hash) exists.
  */
 import * as fs from '@/lib/fs'

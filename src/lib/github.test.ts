@@ -15,9 +15,9 @@ function apiError(status: number, message = `GitHub API ${status}`): Error {
 
 describe('parseGithubRemote', () => {
   it('parses ssh scp-style URLs (the common clone form)', () => {
-    expect(parseGithubRemote('git@github.com:whitefoxx/my-trace.git')).toEqual({
-      owner: 'whitefoxx',
-      repo: 'my-trace',
+    expect(parseGithubRemote('git@github.com:octocat/Hello-World.git')).toEqual({
+      owner: 'octocat',
+      repo: 'Hello-World',
     })
   })
   it('parses https URLs with and without .git', () => {

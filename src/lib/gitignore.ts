@@ -2,7 +2,7 @@
  * Keeping app-generated directories out of the user's repo.
  *
  * The app writes two trees the user never asked for: `.tmp/` (composer
- * attachments) and `.trace/` (document indexes, oversized tool results). The
+ * attachments) and `.localmd/` (document indexes, oversized tool results). The
  * in-app git panel already skips them, but that only governs the panel — a
  * `git add -A` from the terminal would sweep them in, and a doc index is
  * megabytes of regenerable derivative data nobody wants in their history.
@@ -18,7 +18,7 @@ import * as fs from '@/lib/fs'
  * Ensure `.gitignore` covers `entry`. Idempotent and cheap enough to call on
  * every write into an ignored tree.
  *
- * Matching is deliberately loose — `.trace/` and `.trace` mean the same thing
+ * Matching is deliberately loose — `.localmd/` and `.localmd` mean the same thing
  * to git, and a user who wrote either has already made the decision. Never
  * rewrites or reorders what is there; only appends when nothing matches.
  */

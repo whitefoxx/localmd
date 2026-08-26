@@ -1,5 +1,5 @@
 /**
- * Parse a .docx into an index under `.trace/docx-index/`, skipping the work
+ * Parse a .docx into an index under `.localmd/docx-index/`, skipping the work
  * when a fresh index already exists.
  */
 import * as fs from '@/lib/fs'

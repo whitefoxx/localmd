@@ -22,11 +22,11 @@ const TOOL = 'mcp__localmd-connect__generic__run_adapter'
 beforeEach(() => {
   fs.writeFile.mockReset().mockResolvedValue(undefined)
   fs.removeDir.mockReset().mockResolvedValue(undefined)
-  fs.tryReadFile.mockReset().mockResolvedValue('.trace/\n') // already ignored
+  fs.tryReadFile.mockReset().mockResolvedValue('.localmd/\n') // already ignored
 })
 
 describe('toolResultPath', () => {
-  it('parks results under .trace/, per session, named for the tool', () => {
+  it('parks results under .localmd/, per session, named for the tool', () => {
     const path = toolResultPath(SESSION, TOOL, 'body')
     expect(path.startsWith(`${TOOL_RESULTS_DIR}/`)).toBe(true)
     expect(path).toContain(SESSION)
@@ -60,7 +60,7 @@ describe('storeToolResult', () => {
   it("keeps what it parks out of the user's repo", async () => {
     fs.tryReadFile.mockResolvedValue('') // nothing ignored yet
     await storeToolResult(SESSION, TOOL, 'body')
-    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.trace/\n')
+    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.localmd/\n')
   })
 })
 
@@ -82,9 +82,9 @@ describe('clipWithRecall', () => {
   })
 
   it('points at the file and the offset to continue from', () => {
-    const out = clipWithRecall('y'.repeat(50_000), 40_000, '.trace/tool-results/s/t-1234abcd.txt')
+    const out = clipWithRecall('y'.repeat(50_000), 40_000, '.localmd/tool-results/s/t-1234abcd.txt')
     expect(out.slice(0, 40_000)).toBe('y'.repeat(40_000))
-    expect(out).toContain('.trace/tool-results/s/t-1234abcd.txt')
+    expect(out).toContain('.localmd/tool-results/s/t-1234abcd.txt')
     expect(out).toContain('offset=40000')
     // The whole point: it must not send the agent back to the tool.
     expect(out).toContain('rather than calling this tool again')
@@ -99,10 +99,10 @@ describe('clipWithRecall', () => {
   })
 
   it('recommends digesting via run_subagent when the remainder is large', () => {
-    const out = clipWithRecall('y'.repeat(105_000), 40_000, '.trace/tool-results/s/t-1234abcd.txt')
+    const out = clipWithRecall('y'.repeat(105_000), 40_000, '.localmd/tool-results/s/t-1234abcd.txt')
     expect(out.slice(0, 40_000)).toBe('y'.repeat(40_000))
     expect(out).toContain('run_subagent')
-    expect(out).toContain('.trace/tool-results/s/t-1234abcd.txt')
+    expect(out).toContain('.localmd/tool-results/s/t-1234abcd.txt')
     // The inline continuation stays available for targeted extraction.
     expect(out).toContain('offset=40000')
   })
@@ -110,7 +110,7 @@ describe('clipWithRecall', () => {
 
 describe('recallPathIn', () => {
   it('finds the stored path inside a clip note', () => {
-    const path = '.trace/tool-results/s/t-1234abcd.txt'
+    const path = '.localmd/tool-results/s/t-1234abcd.txt'
     expect(recallPathIn(clipWithRecall('y'.repeat(50_000), 40_000, path))).toBe(path)
     expect(recallPathIn(clipWithRecall('y'.repeat(105_000), 40_000, path))).toBe(path)
   })

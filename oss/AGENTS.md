@@ -162,7 +162,7 @@ pipeline (`docs/token-optimization.md` has the full log):
 ## Hard compatibility constraints
 
 - doc-index format stability (`docs/docindex-compat.md` has the full design):
-  existing KBs hold `.trace/*-index/` indexes at INDEX_VERSION 11 (PDF) / 3
+  existing KBs hold `.localmd/*-index/` indexes at INDEX_VERSION 11 (PDF) / 3
   (EPUB); the constraint is owed to those KBs and to the block-id citations
   users' notes already carry. INDEX_VERSION is the read contract and is
   expected never to
@@ -177,9 +177,9 @@ pipeline (`docs/token-optimization.md` has the full log):
 - The `localmd:`-prefixed `localStorage` keys and the IndexedDB database name
   are storage contracts. Renaming one does not move data, it hides it: the
   browser still holds the old name, nothing reads it, and to whoever it happens
-  to that is indistinguishable from a wipe. These names were renamed once, in
-  August 2026, and got away without a migration only because the product had
-  almost no users yet. That is a fact about the date, not a precedent.
+  to that is indistinguishable from a wipe. Anything that changes one owes a
+  migration that runs before the first read — and before, not after, the modules
+  that read storage while being imported.
 - Browser-only: no backend. LLM endpoints must allow CORS from the browser; all
   file access goes through the File System Access API.
 

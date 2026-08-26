@@ -33,7 +33,7 @@
  *   cannot be recycled for different text by a later one.
  *
  * The residual holes, stated honestly rather than papered over: deleting
- * `.trace/` discards the carried record itself, and editing the PDF changes
+ * `.localmd/` discards the carried record itself, and editing the PDF changes
  * the geometry — in both cases the next build numbers from scratch, exactly
  * like a first build. kb_health's source-outran-the-page check is the
  * backstop for the latter.

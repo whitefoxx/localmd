@@ -8,7 +8,7 @@
  * calling the tool again is none of those (a transcript has no page parameter,
  * a search re-ranks between calls, a rate limit simply refuses).
  *
- * `.trace/` is the app's own scratch area inside the KB, and everything needed
+ * `.localmd/` is the app's own scratch area inside the KB, and everything needed
  * already treats it as such: the file tree and search hide it (`IGNORED` in
  * lib/fs.ts), git status skips it (lib/git.ts), and `read_file` reaches it
  * unchanged because path resolution never filtered dot-directories. So recall
@@ -28,8 +28,8 @@ import { ensureIgnored } from '@/lib/gitignore'
 import { fnv1a, slugify } from '@/lib/docindex/util'
 import { clipText } from '@/lib/wellFormed'
 
-/** Under `.trace/`, so it is invisible to the tree, to search, and to git. */
-export const TOOL_RESULTS_DIR = '.trace/tool-results'
+/** Under `.localmd/`, so it is invisible to the tree, to search, and to git. */
+export const TOOL_RESULTS_DIR = '.localmd/tool-results'
 
 /**
  * Where one result lands. Content-addressed: the same result fetched twice
@@ -55,9 +55,9 @@ export async function storeToolResult(
   const path = toolResultPath(sessionId, toolName, text)
   try {
     // A transcript is not history the user wants in their repo, and this is
-    // the first thing that puts sizeable files under `.trace/` — doc indexes
+    // the first thing that puts sizeable files under `.localmd/` — doc indexes
     // got there without ever asking git to look away.
-    await ensureIgnored('.trace')
+    await ensureIgnored('.localmd')
     await writeFile(path, text)
     return path
   } catch {
@@ -74,11 +74,11 @@ export async function dropToolResults(sessionId: string): Promise<void> {
   }
 }
 
-/** A `.trace/tool-results/…` path mentioned in `text` (a clip note), so a trim
+/** A `.localmd/tool-results/…` path mentioned in `text` (a clip note), so a trim
  *  that destroys the visible part can point its stub at the file that already
  *  holds the WHOLE result instead of storing a second, truncated copy. */
 export function recallPathIn(text: string): string | null {
-  const m = text.match(/\.trace\/tool-results\/\S+?\.txt/)
+  const m = text.match(/\.localmd\/tool-results\/\S+?\.txt/)
   return m ? m[0] : null
 }
 

@@ -77,10 +77,10 @@ describe('trimHistory', () => {
   })
 
   it('points the stub at the recall path when the caller stored the result', () => {
-    const recallPaths = new Map([['t1', '.trace/tool-results/s/mcp-fetch-1a2b3c4d.txt']])
+    const recallPaths = new Map([['t1', '.localmd/tool-results/s/mcp-fetch-1a2b3c4d.txt']])
     const out = trimHistory(history, { maxChars: 100, recallPaths })
     const value = (parts(out[2])[0].output as Rec).value as string
-    expect(value).toContain('.trace/tool-results/s/mcp-fetch-1a2b3c4d.txt')
+    expect(value).toContain('.localmd/tool-results/s/mcp-fetch-1a2b3c4d.txt')
     expect(value).toContain('read_file')
     // The content-array part (t2) has no stored path — generic stub.
     const inner = (parts(out[2])[1].output as Rec).value as Rec[]

@@ -202,7 +202,7 @@ test('a .docx renders with its structure and is indexed for the agent', async ({
   // The empty spacer paragraph is dropped rather than becoming a citeable block.
   await expect(reader.locator('p[data-bid]')).toHaveCount(2)
 
-  // Auto-indexed on open — the agent reads the document through .trace/.
+  // Auto-indexed on open — the agent reads the document through .localmd/.
   await expect(page.getByText(/Indexed · \d+ blocks/)).toBeVisible({ timeout: 15_000 })
 
   // A [[docx1:…]] citation chip jumps back into the document and flashes the

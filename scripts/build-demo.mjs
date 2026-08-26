@@ -11,7 +11,7 @@
  * replaced a browser download, which Chrome blocks when nothing on the page
  * was clicked — silently, so it looked like the build had simply not run.
  *
- * Why `.trace/` is stored as `trace/`: a leading-dot directory under `public/`
+ * Why `.localmd/` is stored as `localmd/`: a leading-dot directory under `public/`
  * is not reliably published by every static host, so the assets are undotted
  * and the manifest carries both names.
  */
@@ -38,16 +38,16 @@ function walk(dir, out = []) {
 }
 
 /**
- * Write an index bundle into `public/demo/trace/`, replacing whatever was
+ * Write an index bundle into `public/demo/localmd/`, replacing whatever was
  * there. Replacing matters: a rebuild that produces fewer section files than
  * last time would otherwise leave the extras behind, and the manifest would
  * cheerfully seed them.
  */
 export function unpackIndex({ indexDir, files }) {
-  if (!indexDir?.startsWith('.trace/')) throw new Error(`unexpected index dir: ${indexDir}`)
-  rmSync(join(DEMO, 'trace'), { recursive: true, force: true })
+  if (!indexDir?.startsWith('.localmd/')) throw new Error(`unexpected index dir: ${indexDir}`)
+  rmSync(join(DEMO, 'localmd'), { recursive: true, force: true })
   for (const [kbPath, content] of Object.entries(files)) {
-    const asset = join(DEMO, kbPath.replace(/^\.trace\//, 'trace/'))
+    const asset = join(DEMO, kbPath.replace(/^\.localmd\//, 'localmd/'))
     mkdirSync(dirname(asset), { recursive: true })
     writeFileSync(asset, content)
   }
@@ -60,7 +60,7 @@ export function rebuildManifest() {
     .filter((p) => p !== 'manifest.json')
     .sort()
     .map((asset) => {
-      const path = asset.startsWith('trace/') ? `.${asset}` : asset
+      const path = asset.startsWith('localmd/') ? `.${asset}` : asset
       const entry = { path }
       if (asset !== path) entry.asset = asset
       if (BINARY.test(asset)) entry.binary = true

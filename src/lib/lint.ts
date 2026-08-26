@@ -65,7 +65,7 @@ const THIN_LINES = 10
 /**
  * A file that can be *cited* rather than linked: source material a page could
  * have read. Excluded: notes (the orphan checks own those), anything under a
- * dot-directory (`.trace/` indexes, `.agents/`, `.obsidian/` are plumbing, ours
+ * dot-directory (`.localmd/` indexes, `.agents/`, `.obsidian/` are plumbing, ours
  * or the user's), and annotation sidecars — a `foo.pdf.annotations.json` is
  * metadata *about* a source that the app wrote and the tree deliberately shows,
  * so calling it unread material would send the agent after our own bookkeeping.

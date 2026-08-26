@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d1117" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <title>localmd — AI knowledge base in your browser and local folder</title>
+    <meta
+      name="description"
+      content="An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install."
+    />
+    <!--
+      Deliberately no canonical link, no og:/twitter: cards and no JSON-LD.
+      All of those name a specific deployment — its address, its social image,
+      its price, what its demo offers — and this file is served from wherever
+      you put it. A build claiming to be somebody else's site is worse than one
+      that says nothing, and search engines are entitled to a straight answer
+      about which page they are looking at.
+
+      If you deploy this, this is the file to add your own metadata to.
+    -->
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -15,7 +15,7 @@ raw/           Source material. Immutable — read it, don't rewrite it.
   conversations/  Sessions worth keeping, saved as Markdown.
 wiki/          The notes. Interlinked with [[wikilinks]].
   index.md     The home page. Every note should be reachable from here.
-.trace/        Document indexes. Generated, not authored — leave it alone.
+.localmd/      Document indexes. Generated, not authored — leave it alone.
 ```
 
 ## Conventions
@@ -31,4 +31,4 @@ wiki/          The notes. Interlinked with [[wikilinks]].
 The user is trying localmd for the first time. Be concrete, cite what you
 claim, and keep answers short enough to read in one screen. When you are asked
 about the paper, use the document index rather than re-reading the whole PDF —
-`.trace/pdf-index/` already has it broken into citeable blocks.
+`.localmd/pdf-index/` already has it broken into citeable blocks.

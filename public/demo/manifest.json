@@ -16,108 +16,108 @@
       "binary": true
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/_README.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/_README.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/_README.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/_README.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/locations.json",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/locations.json"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/locations.json",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/locations.json"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/manifest.json",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/manifest.json"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/manifest.json",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/manifest.json"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/001-front-matter.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/001-front-matter.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/001-front-matter.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/001-front-matter.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/002-1-introduction.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/002-1-introduction.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/002-1-introduction.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/002-1-introduction.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/003-3-arithmetic-reasoning.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/003-3-arithmetic-reasoning.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/003-3-arithmetic-reasoning.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/003-3-arithmetic-reasoning.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/004-3-2-results.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/004-3-2-results.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/004-3-2-results.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/004-3-2-results.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/005-3-3-ablation-study.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/005-3-3-ablation-study.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/005-3-3-ablation-study.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/005-3-3-ablation-study.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/006-3-4-robustness-of-chain-of-thought.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/006-3-4-robustness-of-chain-of-thought.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/006-3-4-robustness-of-chain-of-thought.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/006-3-4-robustness-of-chain-of-thought.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/007-4-commonsense-reasoning.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/007-4-commonsense-reasoning.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/007-4-commonsense-reasoning.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/007-4-commonsense-reasoning.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/008-5-symbolic-reasoning.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/008-5-symbolic-reasoning.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/008-5-symbolic-reasoning.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/008-5-symbolic-reasoning.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/009-7-related-work.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/009-7-related-work.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/009-7-related-work.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/009-7-related-work.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/010-a-frequently-asked-questions.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/010-a-frequently-asked-questions.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/010-a-frequently-asked-questions.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/010-a-frequently-asked-questions.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/011-a-2-what-is-the-role-of-prompt-engineering.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/011-a-2-what-is-the-role-of-prompt-engineering.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/011-a-2-what-is-the-role-of-prompt-engineering.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/011-a-2-what-is-the-role-of-prompt-engineering.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/012-a-3-will-chain-of-thought-prompting-improve-perf.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/012-a-3-will-chain-of-thought-prompting-improve-perf.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/012-a-3-will-chain-of-thought-prompting-improve-perf.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/012-a-3-will-chain-of-thought-prompting-improve-perf.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/013-a-4-why-is-prompting-with-the-equation-only-not-.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/013-a-4-why-is-prompting-with-the-equation-only-not-.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/013-a-4-why-is-prompting-with-the-equation-only-not-.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/013-a-4-why-is-prompting-with-the-equation-only-not-.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/014-b-all-experimental-results.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/014-b-all-experimental-results.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/014-b-all-experimental-results.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/014-b-all-experimental-results.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/015-c-extended-related-work.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/015-c-extended-related-work.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/015-c-extended-related-work.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/015-c-extended-related-work.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/016-d-appendix-additional-analysis.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/016-d-appendix-additional-analysis.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/016-d-appendix-additional-analysis.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/016-d-appendix-additional-analysis.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/017-d-2-incorrect-chain-of-thought-analysis.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/017-d-2-incorrect-chain-of-thought-analysis.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/017-d-2-incorrect-chain-of-thought-analysis.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/017-d-2-incorrect-chain-of-thought-analysis.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/018-d-3-additional-robustness-analysis.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/018-d-3-additional-robustness-analysis.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/018-d-3-additional-robustness-analysis.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/018-d-3-additional-robustness-analysis.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/019-e-additional-details.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/019-e-additional-details.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/019-e-additional-details.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/019-e-additional-details.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/020-f-appendix-input-output-examples.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/020-f-appendix-input-output-examples.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/020-f-appendix-input-output-examples.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/020-f-appendix-input-output-examples.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/021-g-appendix-full-prompts.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/021-g-appendix-full-prompts.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/021-g-appendix-full-prompts.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/021-g-appendix-full-prompts.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/022-h-appendix-alternate-annotators-for-mwp.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/sections/022-h-appendix-alternate-annotators-for-mwp.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/022-h-appendix-alternate-annotators-for-mwp.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/sections/022-h-appendix-alternate-annotators-for-mwp.md"
     },
     {
-      "path": ".trace/pdf-index/chain-of-thought-prompting-e617b0a8/toc.md",
-      "asset": "trace/pdf-index/chain-of-thought-prompting-e617b0a8/toc.md"
+      "path": ".localmd/pdf-index/chain-of-thought-prompting-e617b0a8/toc.md",
+      "asset": "localmd/pdf-index/chain-of-thought-prompting-e617b0a8/toc.md"
     },
     {
       "path": "wiki/chain-of-thought.md"

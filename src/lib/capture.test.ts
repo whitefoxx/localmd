@@ -68,6 +68,6 @@ describe('numberedVariant', () => {
     expect(numberedVariant('raw/articles/note', 3)).toBe('raw/articles/note-3')
   })
   it('ignores dots in directory names', () => {
-    expect(numberedVariant('.trace/foo', 2)).toBe('.trace/foo-2')
+    expect(numberedVariant('.localmd/foo', 2)).toBe('.localmd/foo-2')
   })
 })

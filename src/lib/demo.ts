@@ -14,7 +14,7 @@
  *
  * Why the asset paths are remapped: the demo ships a prebuilt document index so
  * the citation click is instant rather than a wait for pdf.js. That index lives
- * at `.trace/…` inside the KB, but a leading-dot directory under `public/` is
+ * at `.localmd/…` inside the KB, but a leading-dot directory under `public/` is
  * not reliably published by every host, so the assets are stored undotted and
  * the manifest carries both names.
  *

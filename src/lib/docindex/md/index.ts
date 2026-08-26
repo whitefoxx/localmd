@@ -1,5 +1,5 @@
 /**
- * Index a markdown source under `.trace/md-index/` — one section file per
+ * Index a markdown source under `.localmd/md-index/` — one section file per
  * H1/H2 run, every block tagged `[[id]]`, plus toc/README/manifest.
  * Mirrors the EPUB/PDF indexes so the agent navigates them the same way.
  */

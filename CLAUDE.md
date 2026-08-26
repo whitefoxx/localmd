@@ -182,7 +182,7 @@ agent pipeline (docs/token-optimization.md has the full log):
 ## Hard compatibility constraints
 
 - doc-index format stability (docs/docindex-compat.md has the full design):
-  existing KBs hold `.trace/*-index/` indexes at INDEX_VERSION 11 (PDF) /
+  existing KBs hold `.localmd/*-index/` indexes at INDEX_VERSION 11 (PDF) /
   3 (EPUB); the constraint is owed to those KBs and to the block-id citations
   users' notes already carry. INDEX_VERSION is the read contract and
   is expected never to move; algorithm changes bump BUILDER instead (see

@@ -32,10 +32,10 @@ describe('files store — revealPath (tree follows the active file)', () => {
     const files = useFilesStore()
     files.select('AGENTS.md', false)
 
-    files.revealPath('.trace/pdf-index/foo/toc.md')
+    files.revealPath('.localmd/pdf-index/foo/toc.md')
 
     expect(files.selectedPath).toBe('AGENTS.md')
-    expect(files.expandedDirs.has('.trace')).toBe(false)
+    expect(files.expandedDirs.has('.localmd')).toBe(false)
   })
 })
 

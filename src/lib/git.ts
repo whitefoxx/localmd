@@ -3,7 +3,7 @@
  * adapter. Reads/writes the standard .git format, so everything here interops
  * with CLI git.
  *
- * Status is scoped to TEXT files outside .trace/: the dirty list drives the
+ * Status is scoped to TEXT files outside .localmd/: the dirty list drives the
  * in-app commit flow (agent edits = text), and hashing multi-GB untracked
  * books on every refresh would be prohibitive. Binary/large sources are
  * committed from the terminal; the panel says so.
@@ -81,7 +81,7 @@ export async function headOid(): Promise<string | null> {
  *  are detected by index membership instead (see status()). Which names count
  *  as text is lib/filetypes' call, not a second list to keep in step. */
 export function statusEligible(filepath: string): boolean {
-  if (filepath === '.trace' || filepath.startsWith('.trace/')) return false
+  if (filepath === '.localmd' || filepath.startsWith('.localmd/')) return false
   return isTextName(filepath)
 }
 
@@ -132,10 +132,10 @@ async function changedFilesInner(): Promise<FileChange[]> {
 
   // Binaries: membership-only detection, no content reads.
   const index = new Set(await git.listFiles(base()))
-  const worktree = kb.collectFiles(await kb.readTree()) // skips .git and .trace
+  const worktree = kb.collectFiles(await kb.readTree()) // skips .git and .localmd
   for (const path of worktree) {
     if (statusEligible(path)) continue // text — handled above
-    if (path === '.trace' || path.startsWith('.trace/')) continue
+    if (path === '.localmd' || path.startsWith('.localmd/')) continue
     if (index.has(path)) continue
     if (await git.isIgnored({ fs: gitFs, dir, filepath: path })) continue
     const size = (await gitFs.promises.stat(`/${path}`).catch(() => null))?.size ?? 0

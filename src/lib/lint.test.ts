@@ -69,7 +69,7 @@ describe('computeLint — file-aware checks', () => {
     'raw/papers/never opened.pdf',
     'raw/assets/shot.png',
     'raw/papers/read.pdf.annotations.json',
-    '.trace/pdf-index/read/manifest.json',
+    '.localmd/pdf-index/read/manifest.json',
     '.obsidian/workspace.json',
   ]
   const kb = new Map<string, LintPage>([
@@ -85,7 +85,7 @@ describe('computeLint — file-aware checks', () => {
   ])
 
   it('flags only sources nothing mentions, ignoring dot-dirs, sidecars and notes', () => {
-    // read.pdf is cited, shot.png is embedded as an image; the .trace/ and
+    // read.pdf is cited, shot.png is embedded as an image; the .localmd/ and
     // .obsidian/ files are plumbing; the .annotations.json is our own sidecar
     // (visible in the tree on purpose); index.md is a note (orphans own it).
     expect(computeLint(kb, FILES).unreferencedSources).toEqual(['raw/papers/never opened.pdf'])

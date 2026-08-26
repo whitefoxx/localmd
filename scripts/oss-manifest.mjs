@@ -40,6 +40,12 @@ export const EXCLUDE = [
   'src/components/settings/LicenceSection.vue',
   'tests-e2e/licence.spec.ts',
 
+  // ── Describes one deployment, not the software ──────────────────────────
+  // Marketing copy for an LLM crawler, naming a price, a trial and an address
+  // that belong to the hosted build. The overlay's index.html replaces the
+  // matching <head> — see oss/index.html for why it carries none of it.
+  'public/llms.txt',
+
   // ── Is ours, not the project's ──────────────────────────────────────────
   // Working agreements that point at a private knowledge base and a launch
   // plan. The open-source repo gets its own; see oss/README.md.

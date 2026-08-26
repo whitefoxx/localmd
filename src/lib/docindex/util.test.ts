@@ -34,10 +34,10 @@ describe('fnv1a — must stay byte-stable', () => {
 describe('indexDirFor', () => {
   it('builds the published directory name', () => {
     expect(indexDirFor('pdf', 'raw/books/毛泽东选集.pdf')).toBe(
-      '.trace/pdf-index/毛泽东选集-b03d722c',
+      '.localmd/pdf-index/毛泽东选集-b03d722c',
     )
     expect(indexDirFor('epub', 'raw/books/被讨厌的勇气.epub')).toBe(
-      '.trace/epub-index/被讨厌的勇气-c7f57e57',
+      '.localmd/epub-index/被讨厌的勇气-c7f57e57',
     )
   })
 })

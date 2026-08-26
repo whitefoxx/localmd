@@ -1,5 +1,5 @@
 /**
- * Parse an EPUB into a location-aware index under `.trace/epub-index/`,
+ * Parse an EPUB into a location-aware index under `.localmd/epub-index/`,
  * skipping the work when a fresh index exists.
  */
 import ePub from 'epubjs'

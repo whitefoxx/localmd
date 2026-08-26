@@ -41,7 +41,7 @@ from theirs:
 - **Definition is layout-neutral.** Theirs checks `raw/` against article
   `sources:` frontmatter, which presumes their layout. Ours asks "is this a
   non-markdown file that no page anywhere mentions", so it works on a KB with
-  no `raw/` at all. Dot-directories (`.trace/`, `.agents/`, `.obsidian/`) are
+  no `raw/` at all. Dot-directories (`.localmd/`, `.agents/`, `.obsidian/`) are
   excluded as plumbing; markdown is excluded because the orphan checks own it.
 - **Match on filename, not on resolved links.** Wikilinks, markdown links,
   image embeds and `[[pdfN:…]]` declarations all reference files differently,

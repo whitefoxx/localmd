@@ -190,9 +190,9 @@ function defineTool<S extends z.ZodType>(spec: ToolSpec<S>): ToolSpec<S> {
 const listFiles = defineTool({
   name: 'list_files',
   description:
-    'List files as newline-separated paths relative to the KB root. Call with no arguments first to understand the KB structure. Pass "dir" to list inside a specific directory — including app-generated index directories under .trace/ (e.g. ".trace/pdf-index"), which the default listing hides.',
+    'List files as newline-separated paths relative to the KB root. Call with no arguments first to understand the KB structure. Pass "dir" to list inside a specific directory — including app-generated index directories under .localmd/ (e.g. ".localmd/pdf-index"), which the default listing hides.',
   schema: z.object({
-    dir: z.string().optional().describe('Directory to list, e.g. ".trace/pdf-index"'),
+    dir: z.string().optional().describe('Directory to list, e.g. ".localmd/pdf-index"'),
   }),
   describeCall: (a) => (a.dir ? `list ${a.dir}` : 'list files'),
   run: async ({ dir }) => {
@@ -550,10 +550,10 @@ function matcher(query: string): ((s: string) => boolean) | string {
 const searchFiles = defineTool({
   name: 'search_files',
   description:
-    'Search the knowledge base and return "path:line: text" matches. The query is a case-insensitive substring, or a regular expression when wrapped in slashes ("/^#+ .*API/"). Pass names: true to match file PATHS instead of contents (how you find a file by name in a big KB), and dir to restrict the scan — including index directories under .trace/.',
+    'Search the knowledge base and return "path:line: text" matches. The query is a case-insensitive substring, or a regular expression when wrapped in slashes ("/^#+ .*API/"). Pass names: true to match file PATHS instead of contents (how you find a file by name in a big KB), and dir to restrict the scan — including index directories under .localmd/.',
   schema: z.object({
     query: z.string().describe('Substring, or /regex/ to match with a regular expression'),
-    dir: z.string().optional().describe('Directory to search in, e.g. ".trace/pdf-index/foo-123"'),
+    dir: z.string().optional().describe('Directory to search in, e.g. ".localmd/pdf-index/foo-123"'),
     names: z.boolean().optional().describe('Match file paths instead of file contents'),
   }),
   describeCall: (a) =>
@@ -611,7 +611,7 @@ const kbHealth = defineTool({
 const indexDocument = defineTool({
   name: 'index_document',
   description:
-    'Generate (or refresh) the structured AI index for a PDF, EPUB, Word (.docx), or markdown source under .trace/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a usable index already exists — including one built by an older algorithm revision, which keeps working and is never rebuilt without being asked. Pass rebuild: true ONLY when the user has explicitly chosen to re-index.',
+    'Generate (or refresh) the structured AI index for a PDF, EPUB, Word (.docx), or markdown source under .localmd/. Returns the index directory. Read its _README.md and toc.md next, then the relevant sections/*.md — every block carries a citeable [[block-id]] tag. Skips work when a usable index already exists — including one built by an older algorithm revision, which keeps working and is never rebuilt without being asked. Pass rebuild: true ONLY when the user has explicitly chosen to re-index.',
   schema: z.object({
     path: z.string().describe('KB-relative source path, e.g. "raw/papers/x.pdf"'),
     rebuild: z
@@ -1305,7 +1305,7 @@ const gitInit = defineTool({
 const gitStatus = defineTool({
   name: 'git_status',
   description:
-    'Show the git state of the KB: current branch, GitHub remote, and text files changed vs HEAD. Note: .trace/ and large binaries (PDF/EPUB/media) are excluded from in-app git — those are committed from a terminal.',
+    'Show the git state of the KB: current branch, GitHub remote, and text files changed vs HEAD. Note: .localmd/ and large binaries (PDF/EPUB/media) are excluded from in-app git — those are committed from a terminal.',
   schema: z.object({}),
   describeCall: () => 'git status',
   run: () => lockedGit(async () => {

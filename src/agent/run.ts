@@ -63,7 +63,7 @@ const MAX_OVERFLOW_RECOVERIES = 2
  *  stubs everything older, including earlier results of this same turn. If
  *  that still does not fit, the second spares nothing: at that point the
  *  choice is a degraded turn or no turn, and a stubbed result names a
- *  `.trace/` path the model can read back. */
+ *  `.localmd/` path the model can read back. */
 const OVERFLOW_KEEP_MESSAGES = [2, 0]
 const MAX_IMAGES_PER_CALL = 5
 
@@ -102,7 +102,7 @@ export interface RunTurnOptions {
    *  no dangling call) so the caller can append the steer and continue. */
   steerPending?: () => boolean
   /** Save the oversized tool results an overflow prune is about to stub, so the
-   *  stubs can name a `.trace/` path to read back. Supplied by the chat store
+   *  stubs can name a `.localmd/` path to read back. Supplied by the chat store
    *  (the effect belongs with it); without it the prune still works and the
    *  stubs fall back to "call the tool again". */
   stashTrimmable?: (

@@ -123,7 +123,7 @@ Finding nothing worth distilling is a perfectly normal outcome — just say so.
  * lib/gitignore.ts). Both are regenerable derivative data — indexes, oversized
  * tool results, composer attachments — and none of it belongs in a history. */
 const GITIGNORE = `# Written by localmd: regenerable, not part of your knowledge base.
-.trace/
+.localmd/
 .tmp/
 `
 

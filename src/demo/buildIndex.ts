@@ -1,7 +1,7 @@
 /**
  * Dev-only tool that regenerates the demo KB's prebuilt document index.
  *
- * The demo ships its `.trace/` index rather than building it on open, so the
+ * The demo ships its `.localmd/` index rather than building it on open, so the
  * first citation click is instant instead of a wait for pdf.js. That index has
  * to be produced by the real indexer — a hand-written one would drift from
  * `INDEX_VERSION` and be silently rejected as stale — and the real indexer only
@@ -9,7 +9,7 @@
  * reads `location.href`, so a Node script cannot drive it.
  *
  * So: run `npm run dev` and open `/?demo-build=1`. The result is POSTed to the
- * dev server, which writes it into `public/demo/trace/` and rebuilds the
+ * dev server, which writes it into `public/demo/localmd/` and rebuilds the
  * manifest (see the demoIndexWriter plugin in vite.config.ts).
  *
  * Re-run this whenever the PDF changes or `INDEX_VERSION` is bumped — a stale
@@ -41,7 +41,7 @@ export async function buildDemoIndex(): Promise<void> {
   // renumbering would silently re-point every citation chip they contain.
   const indexDir = indexDirFor('pdf', SOURCE)
   for (const f of ['manifest.json', 'locations.json']) {
-    const prev = await fetch(`demo/trace/${indexDir.replace(/^\.trace\//, '')}/${f}`)
+    const prev = await fetch(`demo/localmd/${indexDir.replace(/^\.localmd\//, '')}/${f}`)
     if (prev.ok) await fs.writeFile(`${indexDir}/${f}`, await prev.text())
   }
 

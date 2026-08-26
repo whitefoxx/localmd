@@ -60,7 +60,7 @@ an id-level no-op.
 
 Residual holes, stated rather than papered over:
 
-- deleting `.trace/` deletes the id record itself — the next build numbers
+- deleting `.localmd/` deletes the id record itself — the next build numbers
   from scratch, and if the algorithm changed in between, citations scramble;
 - replacing the PDF's content invalidates the geometry — inheritance is
   correctly refused (hash mismatch) and ids restart; kb_health's

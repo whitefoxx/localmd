@@ -54,17 +54,17 @@ export function fnv1a(s: string): string {
   return (h >>> 0).toString(16).padStart(8, '0')
 }
 
-/** Index directory for a source path: `.trace/<kind>-index/<name>-<hash>`. */
+/** Index directory for a source path: `.localmd/<kind>-index/<name>-<hash>`. */
 export function indexDirFor(kind: 'pdf' | 'epub' | 'md' | 'docx', source: string): string {
   const base = source.split('/').pop()?.replace(/\.[^.]+$/, '') ?? source
-  return `.trace/${kind}-index/${slugify(base)}-${fnv1a(source)}`
+  return `.localmd/${kind}-index/${slugify(base)}-${fnv1a(source)}`
 }
 
 /**
  * Write the index files with bounded concurrency — a large book becomes
  * hundreds of section files, and firing every write at once exhausts handles.
  *
- * The one place every index kind writes, so it is also where `.trace/` earns
+ * The one place every index kind writes, so it is also where `.localmd/` earns
  * its `.gitignore` line: an index is megabytes of regenerable derivative data,
  * and a KB that only ever indexes documents would otherwise never be told.
  */
@@ -73,7 +73,7 @@ export async function writeAll(
   files: { path: string; content: string }[],
   onProgress: (written: number, total: number) => void = () => {},
 ): Promise<void> {
-  await ensureIgnored('.trace').catch(() => {
+  await ensureIgnored('.localmd').catch(() => {
     /* the index is still worth writing if the .gitignore cannot be touched */
   })
   // A rebuild must survive being killed at ANY point — the user closes the

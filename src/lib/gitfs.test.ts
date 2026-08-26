@@ -197,9 +197,9 @@ describe('.git/index write-back guard', () => {
     // several: the refusal drops the cache map while the in-flight operation
     // keeps its parsed-index object, an innocent re-read then updates the
     // guard's generation token, and the late stale write sails through — caught
-    // live against the trace KB (2026-08-04: the landed bytes were identical to
-    // a parse from 73 minutes earlier). The class dies only one way: a status
-    // is a READ, and a read must not write.
+    // live against a real knowledge base (2026-08-04: the landed bytes were
+    // identical to a parse from 73 minutes earlier). The class dies only one
+    // way: a status is a READ, and a read must not write.
     const cache = {}
     await git.init({ fs: gitFs, dir, defaultBranch: 'main' })
     await commitFile(cache, 'a.txt', 'original\n', 'commit A')

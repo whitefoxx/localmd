@@ -12,7 +12,7 @@ them like anything else — but they need one preparation step first.
 
 Ask the assistant to index a document, or open it and use the index action. It
 reads the file once and writes a structured, searchable version alongside it (in
-a hidden `.trace/` folder).
+a hidden `.localmd/` folder).
 
 This takes a moment for a long book. Afterwards:
 

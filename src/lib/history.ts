@@ -9,7 +9,7 @@
  * chars of comments and wrote 5k of analysis; after the turn, the 5k is what
  * later turns need. So tool traffic keeps a tighter window (the last turn
  * only) than conversation media, and stubbing it is safe: built-in tools are
- * deterministic to re-run, and external results are stored to `.trace/`
+ * deterministic to re-run, and external results are stored to `.localmd/`
  * before the stub destroys them (see lib/toolResults.ts), so the stub can
  * point at a file recallable with one read_file.
  *

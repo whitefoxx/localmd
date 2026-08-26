@@ -66,7 +66,7 @@ export const useFilesStore = defineStore('files', () => {
    * Point the tree at `path`: expand the folders on the way to it and make it
    * THE selected row (selection is single, so every other highlight drops).
    * The state half of "reveal the active file" — FileTree does the scrolling.
-   * Paths the tree doesn't show (.trace/, .git/) are ignored: selecting a row
+   * Paths the tree doesn't show (.localmd/, .git/) are ignored: selecting a row
    * that isn't rendered would only strand `targetDir` inside a hidden folder.
    */
   function revealPath(path: string): void {

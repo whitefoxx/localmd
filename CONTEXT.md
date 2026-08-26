@@ -78,7 +78,7 @@ _Avoid_: capability slot (fine in prose, but "slot" is canonical), channel, role
 
 **Doc-index**:
 The extracted structure of a single document (PDF/EPUB/DOCX/MD), stored under
-`.trace/<kind>-index/`. The PDF/EPUB on-disk formats are kept stable for the
+`.localmd/<kind>-index/`. The PDF/EPUB on-disk formats are kept stable for the
 KBs and citations that already exist. This is the per-document artifact —
 never call it just "the index".
 _Avoid_: bare "index", parse, extraction.
@@ -117,7 +117,7 @@ The in-memory cache (the `kbIndex` store) of every note's text plus the wikilink
 plus cached doc-index sections. KB-wide; rebuilt from disk.
 _Avoid_: bare "index", cache.
 
-(See also **Doc-index** above — per-document, on disk under `.trace/`.)
+(See also **Doc-index** above — per-document, on disk under `.localmd/`.)
 
 **Git index**:
 The isomorphic-git staging area. Only ever "git index", never bare "index".

@@ -27,7 +27,7 @@ interface CachedPage {
   type: string | null
 }
 
-/** A cached section file from a PDF/EPUB index under .trace/. */
+/** A cached section file from a PDF/EPUB index under .localmd/. */
 interface DocSection {
   mtime: number
   content: string
@@ -187,7 +187,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     for (const kind of ['pdf-index', 'epub-index', 'docx-index']) {
       let tree
       try {
-        tree = await fs.readTreeFrom(`.trace/${kind}`)
+        tree = await fs.readTreeFrom(`.localmd/${kind}`)
       } catch {
         continue // no such index kind yet
       }

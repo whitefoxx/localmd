@@ -70,7 +70,7 @@ describe('splitIntoSections', () => {
       { id: 'b1-4', kind: 'table', level: 0, text: 'Metric | Value\nRetention | 62%' },
     ]
     const manifest = await buildIndex({
-      indexDir: '.trace/docx-index/notes-abc',
+      indexDir: '.localmd/docx-index/notes-abc',
       source: 'raw/articles/notes.docx',
       title: 'Field Notes',
       contentHash: 'hash',
@@ -80,24 +80,24 @@ describe('splitIntoSections', () => {
     expect(manifest.blockCount).toBe(4)
     expect(manifest.sections).toHaveLength(1)
     expect([...written.keys()].sort()).toEqual([
-      '.trace/docx-index/notes-abc/_README.md',
-      '.trace/docx-index/notes-abc/manifest.json',
-      '.trace/docx-index/notes-abc/sections/001-field-notes.md',
-      '.trace/docx-index/notes-abc/toc.md',
+      '.localmd/docx-index/notes-abc/_README.md',
+      '.localmd/docx-index/notes-abc/manifest.json',
+      '.localmd/docx-index/notes-abc/sections/001-field-notes.md',
+      '.localmd/docx-index/notes-abc/toc.md',
     ])
 
     // Every block is citeable, and each kind keeps its markdown shape.
-    const section = written.get('.trace/docx-index/notes-abc/sections/001-field-notes.md') ?? ''
+    const section = written.get('.localmd/docx-index/notes-abc/sections/001-field-notes.md') ?? ''
     expect(section).toContain('# [[b1-1]] Field Notes')
     expect(section).toContain('[[b1-2]] The pilot ran for six weeks.')
     expect(section).toContain('- [[b1-3]] First observation')
     expect(section).toContain('| Retention | 62% |')
 
     // The README teaches the docx-specific declaration form.
-    expect(written.get('.trace/docx-index/notes-abc/_README.md')).toContain(
+    expect(written.get('.localmd/docx-index/notes-abc/_README.md')).toContain(
       '[[docx1:raw/articles/notes.docx]]',
     )
-    expect(written.get('.trace/docx-index/notes-abc/toc.md')).toContain(
+    expect(written.get('.localmd/docx-index/notes-abc/toc.md')).toContain(
       '- [Field Notes](sections/001-field-notes.md)',
     )
   })

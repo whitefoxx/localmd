@@ -15,8 +15,8 @@ beforeEach(() => {
 
 describe('ensureIgnored', () => {
   it('creates .gitignore when the KB has none', async () => {
-    await ensureIgnored('.trace')
-    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.trace/\n')
+    await ensureIgnored('.localmd')
+    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.localmd/\n')
   })
 
   it('appends without disturbing what is already there', async () => {
@@ -27,24 +27,24 @@ describe('ensureIgnored', () => {
 
   it('adds the missing newline a hand-edited file may lack', async () => {
     fs.tryReadFile.mockResolvedValue('*.log')
-    await ensureIgnored('.trace')
-    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '*.log\n.trace/\n')
+    await ensureIgnored('.localmd')
+    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '*.log\n.localmd/\n')
   })
 
-  it.each(['.trace/', '.trace', '  .trace/  '])('leaves %o alone — already covered', async (l) => {
+  it.each(['.localmd/', '.localmd', '  .localmd/  '])('leaves %o alone — already covered', async (l) => {
     fs.tryReadFile.mockResolvedValue(`# mine\n${l}\n`)
-    await ensureIgnored('.trace')
+    await ensureIgnored('.localmd')
     expect(fs.writeFile).not.toHaveBeenCalled()
   })
 
   it('does not mistake a longer name for the entry', async () => {
-    fs.tryReadFile.mockResolvedValue('.tracer/\n')
-    await ensureIgnored('.trace')
-    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.tracer/\n.trace/\n')
+    fs.tryReadFile.mockResolvedValue('.localmdr/\n')
+    await ensureIgnored('.localmd')
+    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.localmdr/\n.localmd/\n')
   })
 
   it('normalizes the entry, so a trailing slash on the caller changes nothing', async () => {
-    await ensureIgnored('.trace/')
-    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.trace/\n')
+    await ensureIgnored('.localmd/')
+    expect(fs.writeFile).toHaveBeenCalledWith('.gitignore', '.localmd/\n')
   })
 })

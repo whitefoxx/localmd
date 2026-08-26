@@ -12,7 +12,7 @@ export default {
     selectAll: 'Select all',
     selectNone: 'Clear',
     noChanges:
-      'No changes. (.trace/ is excluded; content changes in tracked binaries can\'t be detected — commit those from the terminal.)',
+      'No changes. (.localmd/ is excluded; content changes in tracked binaries can\'t be detected — commit those from the terminal.)',
     binary: 'bin',
     binaryTitle: 'Binary file',
     oversizedTitle: 'Over 100MB — commit from the terminal',
@@ -40,7 +40,7 @@ export default {
     selectAll: '全选',
     selectNone: '全不选',
     noChanges:
-      '没有改动。（.trace/ 不参与；tracked 二进制的内容改动无法检测，如有请在终端提交）',
+      '没有改动。（.localmd/ 不参与；tracked 二进制的内容改动无法检测，如有请在终端提交）',
     binary: 'bin',
     binaryTitle: '二进制文件',
     oversizedTitle: '超过 100MB，请在终端提交',

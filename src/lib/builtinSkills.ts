@@ -166,7 +166,7 @@ to build our layout around them.
 
 ## 3. Read each source properly
 
-- PDF, EPUB and DOCX go through \`index_document\` first (skip it when \`.trace/\`
+- PDF, EPUB and DOCX go through \`index_document\` first (skip it when \`.localmd/\`
   already has an index), then read the index's \`_README.md\`, \`toc.md\`, and the
   sections that matter. Never try to read the binary directly.
 - Everything else: \`read_file\`.

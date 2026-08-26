@@ -28,7 +28,7 @@ export interface TreeNode {
  *  right answer for a directory whose contents may be cleaned up. None of this
  *  puts it out of reach: `read_file`, `openFile` and the composer's own chips
  *  address it by path, and path resolution never filtered dot-directories. */
-const IGNORED = new Set(['.git', '.trace', '.tmp', '.obsidian', 'node_modules', '.DS_Store'])
+const IGNORED = new Set(['.git', '.localmd', '.tmp', '.obsidian', 'node_modules', '.DS_Store'])
 
 /** True for entries the UI tree hides. PDF/EPUB annotation sidecars
  *  (`*.annotations.json`) are NOT hidden: they open as a rendered annotations
@@ -238,7 +238,7 @@ export async function readTree(): Promise<TreeNode[]> {
 
 /**
  * Recursive listing rooted at `dirPath` — used by the agent to browse
- * app-generated directories like `.trace/pdf-index/` that the UI tree hides.
+ * app-generated directories like `.localmd/pdf-index/` that the UI tree hides.
  */
 export async function readTreeFrom(dirPath: string): Promise<TreeNode[]> {
   const dir = await getDirHandle(dirPath)

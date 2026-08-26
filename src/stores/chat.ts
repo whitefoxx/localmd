@@ -137,7 +137,7 @@ function capToolResult(s: string): string {
 }
 
 /** Store the external tool results the coming trim is about to destroy, so
- *  their stubs can point at `.trace/` files — recall becomes one deterministic
+ *  their stubs can point at `.localmd/` files — recall becomes one deterministic
  *  read_file instead of a re-call that may re-rank, refuse, or bill. Built-in
  *  results are skipped (cheap to re-run, file content already in the KB), and
  *  a result clipped at call time already has its FULL text on disk — its clip
@@ -578,9 +578,9 @@ export const useChatStore = defineStore('chat', () => {
     stop(id)
     closeTab(id)
     await idb.deleteSession(id)
-    // Oversized tool results this session parked in .trace/ go with it. Best
+    // Oversized tool results this session parked in .localmd/ go with it. Best
     // effort and unawaited: the session is already gone from the user's view,
-    // and a leftover file under .trace/ is invisible anyway.
+    // and a leftover file under .localmd/ is invisible anyway.
     void dropToolResults(id)
     if (kb.name) sessions.value = summarize(await idb.listSessions(kb.name))
   }

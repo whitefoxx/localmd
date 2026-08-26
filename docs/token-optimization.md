@@ -120,8 +120,8 @@ P0 exists to keep those bytes stable, and activation was quietly undoing it.
 ### P4 — raw bulk stays out of the main history (2026-08-12)
 
 Diagnosed from a real session (an HN-reading session compacted on four
-consecutive turns): the `.trace/` recall added in P3's wake (oversized external
-results saved to `.trace/tool-results/`, clip note pointing at the file) let a
+consecutive turns): the `.localmd/` recall added in P3's wake (oversized external
+results saved to `.localmd/tool-results/`, clip note pointing at the file) let a
 single turn ingest a whole web page — 40k clipped inline plus the remainder via
 `read_file` continuation at up to `MAX_READ_CHARS` = 100k. One turn reached
 ~216k serialized chars, above `COMPACT_AT_CHARS` on its own. The trim/compact
@@ -142,7 +142,7 @@ productized server-side as Anthropic's `clear_tool_uses` context editing):
   nothing here rewrites bytes per-turn.
 - ✅ **Store before the stub destroys** (`history.ts` `trimCandidates` +
   `chat.ts` `stashTrimmable` + `toolResults.ts` `recallPathIn`): external
-  results the trim is about to stub are written to `.trace/tool-results/`
+  results the trim is about to stub are written to `.localmd/tool-results/`
   first, and the stub names the path — recall is one deterministic `read_file`,
   not a re-call that may re-rank, refuse, or bill. Results already clipped at
   call time reuse the path in their clip note. Built-in results keep the plain
@@ -175,7 +175,7 @@ assistant's own analysis — survives), the history drops back under
 One fact worth recording, found while verifying: `clipWithRecall` sits on the
 MCP path only (`toExternalSpec`). Installed HTTP tools apply their own
 `maxChars` budget inside the tools store and never reach the clip, so they
-neither store to `.trace/` at call time nor get the delegate note. They do
+neither store to `.localmd/` at call time nor get the delegate note. They do
 still get stored by the trim, which works off the history and does not care
 where a result came from.
 
@@ -188,7 +188,7 @@ against a real KB and real sessions:
 | Check | Result |
 |---|---|
 | Real `send()` on an 81k-char session | persisted history 81,318 → 35,208 chars |
-| External results stored | 3 files under `.trace/tool-results/<session>/`, one of which did not exist before — proof the send path wrote it |
+| External results stored | 3 files under `.localmd/tool-results/<session>/`, one of which did not exist before — proof the send path wrote it |
 | Content-addressed writes | re-storing the same result rewrote the same path, no duplicates |
 | Stubs | all three carried their recall path |
 | Recall round-trip | `read_file` on a stub's path returned exactly 27,654 chars, matching the original result |
@@ -291,7 +291,7 @@ code with only the thresholds moved, which is what makes it a control:
 The pair is the point: the guard suppresses a useless compaction without
 suppressing a useful one, and in both rows the anchor carried the prefix
 through the trim so compaction judged 19,656 rather than 1,363. Trim's own
-mechanics (stubbing, `.trace/` stashing, recall paths) were not re-verified
+mechanics (stubbing, `.localmd/` stashing, recall paths) were not re-verified
 here — this change touches only the trigger and the anchor, and P4 verified the
 rest against a real session.
 - Runtime-only by choice: an anchor describes one exact `history` array and
@@ -424,7 +424,7 @@ actually advanced:
   repairable by trimming tool results; without this the loop would re-send the
   same request and burn the cap.
 - ✅ **Pruned results stay recallable** — the chat store passes its
-  `stashTrimmable` in, so an emergency stub names a `.trace/` path like a
+  `stashTrimmable` in, so an emergency stub names a `.localmd/` path like a
   routine trim's does, and the surviving history is the pruned one (persisting
   the oversized version would put the next turn straight back over the window).
 

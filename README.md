@@ -12,8 +12,8 @@ localmd 借鉴了 [files.md](https://files.md) 的 local-first 网页模式。�
 - **聊天附件与 @ 引用**：输入框可直接粘贴截图 / 上传 / 拖入文件——自动按类型归档进 `raw/`（截图 → `raw/images/`，PDF → `raw/papers/`，已有知识库就是按这张路由表组织的）并随消息告知 agent；输入 `@` 弹出文件补全（Claude Code 式），引用的小文本文件直接内联进消息，大文件/文档指引 agent 用工具读
 - **Claude Code 式 agent 工具**：`edit_file` 精确替换（old/new string，唯一性校验）、`update_plan` 任务清单（聊天面板实时渲染进度）、`run_subagent` 子任务 agent（独立上下文跑同一套工具，只回传最终答案，深度限一层）
 - **变更审查（两种模式）**：默认直接写入 + 事后审查（写前快照、行级 diff、Approve/Discard）；「先询问」模式下每次 write/edit 暂停等你批准，Reject 则完全不落盘
-- **Git 集成（isomorphic-git，读写标准 .git，与终端 git 互认）**：标题栏分支 + 改动数徽章；Git 面板看逐文件 diff vs HEAD、勾选提交、查看提交历史；**GitHub 同步**走 REST Git Data API（浏览器可直连，git smart-HTTP 不给 CORS）——push/pull 均为镜像 git 对象、逐一校验 sha、fast-forward-only，冲突回终端处理。状态与提交只覆盖文本文件（.trace/ 与大二进制排除，终端提交）
-- **文档索引与块级引用**：PDF/EPUB/Markdown 源解析为结构化索引（`.trace/` 下），agent 引用原文时写 `[[1:b14-3]]` token，渲染为可点击徽章——点击跳转到 PDF 的具体段落并高亮（EPUB 按 CFI 定位，Markdown 按块定位）
+- **Git 集成（isomorphic-git，读写标准 .git，与终端 git 互认）**：标题栏分支 + 改动数徽章；Git 面板看逐文件 diff vs HEAD、勾选提交、查看提交历史；**GitHub 同步**走 REST Git Data API（浏览器可直连，git smart-HTTP 不给 CORS）——push/pull 均为镜像 git 对象、逐一校验 sha、fast-forward-only，冲突回终端处理。状态与提交只覆盖文本文件（.localmd/ 与大二进制排除，终端提交）
+- **文档索引与块级引用**：PDF/EPUB/Markdown 源解析为结构化索引（`.localmd/` 下），agent 引用原文时写 `[[1:b14-3]]` token，渲染为可点击徽章——点击跳转到 PDF 的具体段落并高亮（EPUB 按 CFI 定位，Markdown 按块定位）
 - **知识库工具**：⌘K 搜索（文件名 + 全文）、backlinks 面板、D3 力导向图谱、健康检查（断链/孤儿页）、拖拽文件自动归档到 `raw/`
 - **文件查看器**：PDF（EmbedPDF：原生选择/高亮标注/缩放/搜索，标注写成 `<源文件>.annotations.json` sidecar）、EPUB（epub.js 分页 + 主题 + 标注 + 进度）、图片、代码/文本；PDF/EPUB 有目录面板，标签页切换保持阅读位置
 - **PWA**：可安装、离线可用
@@ -141,7 +141,7 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 
 打开的文件夹是 git 仓库时，标题栏出现分支徽章（如 `main 3`），点开 Git 面板：
 
-- **Changes**：相对 HEAD 的改动——文本文件按内容检测；二进制（PDF/EPUB/图片等）按"新增/删除"检测并可正常提交（**>100MB 的除外**——那是 GitHub API 的单文件推送上限，请在终端提交；tracked 二进制的**内容修改**无法检测，也请在终端提交）。`.trace/` 不参与。点文件看 diff（未变动区域折叠），勾选 + 填消息 + Commit
+- **Changes**：相对 HEAD 的改动——文本文件按内容检测；二进制（PDF/EPUB/图片等）按"新增/删除"检测并可正常提交（**>100MB 的除外**——那是 GitHub API 的单文件推送上限，请在终端提交；tracked 二进制的**内容修改**无法检测，也请在终端提交）。`.localmd/` 不参与。点文件看 diff（未变动区域折叠），勾选 + 填消息 + Commit
 - **Recent commits**：最近 20 条提交
 - **Pull / Push**：与 GitHub 同步（remote 需指向 github.com，SSH/HTTPS 形式都能识别）
 
@@ -163,7 +163,7 @@ Token 和 LLM key 一样只存在本浏览器的 localStorage、只发给 api.gi
 知识库文件夹里的这几样东西是**已发布的格式**：已有知识库的磁盘上就是这么存的，笔记里的引用也是按这个解析的，所以它们不是我们能随手改的：
 
 - **KB 结构**：`raw/`（不可变源文件）+ `wiki/`（LLM 维护的页面）+ `CLAUDE.md`（KB schema，会被两个应用的 agent 同样遵循）
-- **索引目录与命名**：`.trace/{pdf,epub,md}-index/<slugify(文件名)>-<fnv1a(KB相对路径)>/`，内含 `sections/*.md`（每块带 `[[b<页/章>-<序>]]` ID）、`toc.md`、`locations.json`（块 → PDF 坐标 / EPUB CFI）、`manifest.json`、`_README.md`
+- **索引目录与命名**：`.localmd/{pdf,epub,md}-index/<slugify(文件名)>-<fnv1a(KB相对路径)>/`，内含 `sections/*.md`（每块带 `[[b<页/章>-<序>]]` ID）、`toc.md`、`locations.json`（块 → PDF 坐标 / EPUB CFI）、`manifest.json`、`_README.md`
 - **新鲜度判定**：`manifest.contentHash`（源文件 sha256）+ 格式版本号（PDF=11，EPUB=3，MD=1）。任一应用生成的索引，另一应用命中即复用、不重建。**改动索引格式必须升版本号，且会破坏互认——慎动**
 - **引用 token**：`[[pdf1:raw/papers/x.pdf]]` 声明来源（数字标识**来源**而非引用序号），`[[1:b14-3]]` 内联引用。写进 wiki 的引用在两个应用里都可点击回溯
 - **索引生成**：点查看器上的 "Index for AI"，或让 agent 自己调 `index_document` 工具

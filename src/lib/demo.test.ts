@@ -51,7 +51,7 @@ describe('demo knowledge base', () => {
 
   it('ships a PDF index at the current format version', () => {
     const indexes = manifest.files.filter((f) =>
-      /^\.trace\/pdf-index\/[^/]+\/manifest\.json$/.test(f.path),
+      /^\.localmd\/pdf-index\/[^/]+\/manifest\.json$/.test(f.path),
     )
     expect(indexes).toHaveLength(1)
     const parsed = JSON.parse(text(assetOf(indexes[0]))) as {
@@ -115,7 +115,7 @@ describe('demo knowledge base', () => {
     for (const file of manifest.files) {
       const asset = assetOf(file)
       // A leading-dot directory under `public/` is not reliably published, so
-      // `.trace/…` is stored as `trace/…` and remapped when seeding.
+      // `.localmd/…` is stored as `localmd/…` and remapped when seeding.
       expect(asset.startsWith('.')).toBe(false)
       expect(PRESENT[key(asset)]).toBeTruthy()
     }

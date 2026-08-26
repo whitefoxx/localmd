@@ -194,13 +194,13 @@ describe('context-overflow recovery', () => {
   })
 
   it('offers the doomed results to the caller so their stubs can be recalled', async () => {
-    const stash = vi.fn().mockResolvedValue(new Map([['c1', '.trace/tool-results/s1/a.txt']]))
+    const stash = vi.fn().mockResolvedValue(new Map([['c1', '.localmd/tool-results/s1/a.txt']]))
     doStream.mockResolvedValueOnce(errorStep(OVERFLOW)).mockResolvedValueOnce(textStep('ok'))
 
     const history = await run(historyWithBulk(), { stashTrimmable: stash }).promise
 
     expect(stash).toHaveBeenCalledTimes(1)
-    expect(JSON.stringify(history)).toContain('.trace/tool-results/s1/a.txt')
+    expect(JSON.stringify(history)).toContain('.localmd/tool-results/s1/a.txt')
   })
 
   it('leaves a turn that never overflows byte-identical to before', async () => {
