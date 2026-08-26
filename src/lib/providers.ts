@@ -175,8 +175,9 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
 /** Every provider a profile can use, dedicated packages first.
  *
  *  The trial rides in from the edition rather than sitting in a table above:
- *  it names OUR endpoint, so an edition with no `api/trial/` behind it has no
- *  such provider at all rather than one that 404s. It is still registered here
+ *  it names an endpoint of ours, so an edition with no trial server behind it
+ *  has no such provider at all rather than one that 404s. It is still registered
+ *  here
  *  and not only offered in the picker — `SELECTABLE_PROVIDERS` filters it out
  *  by `internal`, while `presetFor` must keep resolving it for a live profile. */
 export const ALL_PROVIDERS: ProviderPreset[] = [

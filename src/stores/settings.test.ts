@@ -235,18 +235,22 @@ describe('normalizeSettings — retired catalog packs', () => {
 describe('persistable — what reaches localStorage', () => {
   const base = { ...normalizeSettings({}), profiles: [], slots: {} }
   const own = { id: 'own', label: 'Mine', provider: 'anthropic', baseUrl: '', apiKey: 'sk-real', model: 'm' }
-  const trial = {
-    id: 'trial',
-    label: 'Free trial',
-    provider: 'trial',
-    baseUrl: '/api/trial/v1',
+  // Shaped like a lent profile — an id, a short-lived token, `ephemeral` — but
+  // deliberately not naming any edition's endpoint: what is under test is the
+  // flag, and a fixture that carries a real address makes a shared test belong
+  // to one build.
+  const lent = {
+    id: 'lent',
+    label: 'Lent model',
+    provider: 'lent',
+    baseUrl: 'https://example.invalid/v1',
     apiKey: 'session-token',
-    model: 'deepseek-chat',
+    model: 'some-model',
     ephemeral: true,
   }
 
   it('never writes an ephemeral profile or its token', () => {
-    const out = persistable({ ...base, profiles: [own, trial], slots: { primary: 'trial' } })
+    const out = persistable({ ...base, profiles: [own, lent], slots: { primary: 'lent' } })
     expect(out.profiles.map((p) => p.id)).toEqual(['own'])
     expect(JSON.stringify(out)).not.toContain('session-token')
   })
@@ -254,7 +258,7 @@ describe('persistable — what reaches localStorage', () => {
   it('drops a slot left pointing at a profile it just removed', () => {
     // A slot naming a profile that is not in the file reads as a broken config
     // on the next visit.
-    const out = persistable({ ...base, profiles: [trial], slots: { primary: 'trial' } })
+    const out = persistable({ ...base, profiles: [lent], slots: { primary: 'lent' } })
     expect(out.profiles).toEqual([])
     expect(out.slots.primary).toBeUndefined()
   })
@@ -262,8 +266,8 @@ describe('persistable — what reaches localStorage', () => {
   it('keeps slots that point at profiles which survive', () => {
     const out = persistable({
       ...base,
-      profiles: [own, trial],
-      slots: { primary: 'own', vision: 'trial' },
+      profiles: [own, lent],
+      slots: { primary: 'own', vision: 'lent' },
     })
     expect(out.slots.primary).toBe('own')
     expect(out.slots.vision).toBeUndefined()

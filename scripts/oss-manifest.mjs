@@ -83,8 +83,12 @@ export const FORBID = [
   { pattern: /TRIAL_UPSTREAM_KEY|TRIAL_SIGNING_SECRET/, why: 'trial server secrets' },
   { pattern: /UPSTASH_REDIS_REST_TOKEN|KV_REST_API_TOKEN/, why: 'trial store credentials' },
   { pattern: /signing-key\.pem/, why: 'the private key’s path' },
-  { pattern: /api\/trial\//, why: 'a call into the trial endpoint, which this build does not have' },
-  { pattern: /\/api\/slots/, why: 'a call into the slot counter, which this build does not have' },
+  // Any mention, not just a call: shared code that names an address only one
+  // edition can reach is already carrying that edition around, whether or not
+  // it dials it. Both hits this caught on its first run were comments and a
+  // test fixture, and both were worth fixing at the source.
+  { pattern: /api\/trial\//, why: 'the trial endpoint, which this build does not have' },
+  { pattern: /\/api\/slots/, why: 'the slot counter, which this build does not have' },
   { pattern: /gist\.githubusercontent\.com/, why: 'the slot-count gist' },
   { pattern: /tally\.so/, why: 'the early-access form' },
   { pattern: /sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/, why: 'an API key' },
