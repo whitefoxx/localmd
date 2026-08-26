@@ -59,6 +59,22 @@ approval 卡片、connectGuard)——不新增攻击面,只是换了驱动方式
 **边界**:不做通用代码执行工具(那是另一回事,面向用户跑任意脚本)。这里只是工具调用的
 另一种**传输方式**,模型可见的能力集合必须完全一致。
 
+## 开源仓的一键部署按钮:验证过再加(待做)
+
+2026-08-26 加过又撤了。按钮本身很简单(两个 markdown 链接 + `oss/netlify.toml`
+里的 build 配置,那个文件留着了),难的是**确认它们真的能跑通** —— 要在 Vercel /
+Netlify 上实打实部署一次才知道。
+
+不验证就挂上去,风险正是它想解决的那个问题:第一周、最需要好口碑的时候,来自
+最挑剔那批人的一次失败部署。
+
+要加回来的话,先自己各点一次确认能出站,再往 README 的「Running it」一节顶部放:
+
+    [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fwhitefoxx%2Flocalmd)
+    [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/whitefoxx/localmd)
+
+Cloudflare Pages 也可以考虑,同样要先验证。
+
 ## 用一个角色邮箱替回手册里的私下联系渠道(待做)
 
 2026-08-26 开源准备时,`lib/links.ts` 里的 `CONTACT_EMAIL` 和手册
