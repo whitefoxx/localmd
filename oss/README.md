@@ -63,19 +63,18 @@ Custom gateways often refuse browser CORS; the providers' own endpoints work.
 
 ## Running it
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fwhitefoxx%2Flocalmd)
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/whitefoxx/localmd)
+`npm run build` writes a folder of static files. Serve it over https from
+anywhere that serves static files — there is nothing to configure, no
+environment to set and no server to keep running. `netlify.toml` is included so
+Netlify does not have to guess the build command; every other host wants
+`npm run build` and `dist`.
 
-Those build the static output and serve it over https, which is all this needs —
-there is nothing to configure and no server to keep running. (No Dockerfile, on
-purpose: a container whose whole job is to serve a folder of files is more
-moving parts than `npm run build` and any static host, not fewer.)
+(No Dockerfile, on purpose: a container whose whole job is serving a folder of
+files is more moving parts than a build plus any static host, not fewer.)
 
 Deploying it is yours to run. Bug reports about the app are welcome in the
 issues; "my host is not serving it" is a question about your host, and this is a
 solo project with no support commitment behind it.
-
-Locally:
 
 ```bash
 npm install

@@ -1,8 +1,7 @@
-# So the deploy button in README.md does not have to guess.
-#
 # Netlify's auto-detection usually gets a Vite project right, but "usually" is
-# not what you want behind a one-click button: a failed first deploy is the
-# worst possible introduction, and it costs four lines to make it deterministic.
+# not a good enough answer for someone deploying this for the first time. Four
+# lines make it deterministic. Any other static host wants the same two facts:
+# build with `npm run build`, serve `dist`.
 [build]
   command = "npm run build"
   publish = "dist"
