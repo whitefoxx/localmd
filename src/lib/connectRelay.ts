@@ -345,7 +345,7 @@ export class McpRelayClient implements McpClientLike {
         {
           protocolVersion: '2025-03-26',
           capabilities: {},
-          clientInfo: { name: 'browser-md', version: '0.1.0' },
+          clientInfo: { name: 'localmd', version: '0.1.0' },
         },
         HANDSHAKE_TIMEOUT_MS,
       )

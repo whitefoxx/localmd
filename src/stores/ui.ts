@@ -2,9 +2,9 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { isE2eMode } from '@/lib/e2e'
 
-const AGENT_WIDTH_KEY = 'browser-md:agentWidth'
+const AGENT_WIDTH_KEY = 'localmd:agentWidth'
 const DEFAULT_AGENT_WIDTH = 384 // matches the old w-96
-const SIDEBAR_WIDTH_KEY = 'browser-md:sidebarWidth'
+const SIDEBAR_WIDTH_KEY = 'localmd:sidebarWidth'
 const DEFAULT_SIDEBAR_WIDTH = 256 // matches the old w-64
 
 /**

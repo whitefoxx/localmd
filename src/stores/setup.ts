@@ -17,7 +17,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 /** Ids only — the values live in settings and never come here. */
-const PROVIDED_KEY = 'browser-md:provided-secrets:v1'
+const PROVIDED_KEY = 'localmd:provided-secrets:v1'
 
 function readProvided(): string[] {
   try {

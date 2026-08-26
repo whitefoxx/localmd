@@ -60,7 +60,7 @@ async function makeDocx(): Promise<Buffer> {
 
 /** Open a fresh KB with the fixture imported (the same path a drop takes) and rendered. */
 async function openFixture(page: Page): Promise<void> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-docx-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-docx-'))
   const file = path.join(dir, 'field-notes.docx')
   await writeFile(file, await makeDocx())
 
@@ -172,7 +172,7 @@ test('a mark can be deleted again', async ({ page }) => {
 })
 
 test('a legacy .doc explains itself instead of failing silently', async ({ page }) => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-doc-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-doc-'))
   const file = path.join(dir, 'legacy-report.doc')
   // OLE2 compound-file magic — what a real Word 97–2003 file starts with.
   await writeFile(file, Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0]))

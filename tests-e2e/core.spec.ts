@@ -250,7 +250,7 @@ test('e2e mode never persists to real storage', async ({ page }) => {
   // Regression guard: the mock profile once leaked through the settings
   // watcher into localStorage and wiped the user's real API keys.
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  const stored = await page.evaluate(() => localStorage.getItem('browser-md:settings'))
+  const stored = await page.evaluate(() => localStorage.getItem('localmd:settings'))
   expect(stored).toBeNull()
 })
 

@@ -152,7 +152,7 @@ describe('demo is a property of the open KB', () => {
     vi.useFakeTimers()
     const locks = fakeLocks()
     vi.stubGlobal('navigator', { locks })
-    const letGo = locks.grab('browser-md:kb:notes')
+    const letGo = locks.grab('localmd:kb:notes')
 
     const { useKbStore } = await import('./kb')
     const kb = useKbStore()
@@ -169,7 +169,7 @@ describe('demo is a property of the open KB', () => {
     vi.useFakeTimers()
     const locks = fakeLocks()
     vi.stubGlobal('navigator', { locks })
-    const letGo = locks.grab('browser-md:kb:notes')
+    const letGo = locks.grab('localmd:kb:notes')
 
     const { useKbStore } = await import('./kb')
     const kb = useKbStore()
@@ -192,7 +192,7 @@ describe('demo is a property of the open KB', () => {
     vi.useFakeTimers()
     const locks = fakeLocks()
     vi.stubGlobal('navigator', { locks })
-    locks.grab('browser-md:kb:notes')
+    locks.grab('localmd:kb:notes')
 
     const { useKbStore } = await import('./kb')
     const kb = useKbStore()
@@ -203,7 +203,7 @@ describe('demo is a property of the open KB', () => {
     await kb.recheckOtherTab()
     expect(kb.lockedByOther).toBe(true) // still held: the bar is right
 
-    locks.vanish('browser-md:kb:notes') // that tab went away, silently
+    locks.vanish('localmd:kb:notes') // that tab went away, silently
     await kb.recheckOtherTab()
     expect(kb.lockedByOther).toBe(false)
     vi.useRealTimers()
@@ -215,7 +215,7 @@ describe('demo is a property of the open KB', () => {
     vi.stubGlobal('navigator', {
       locks: { ...locks, query: () => Promise.reject(new Error('nope')) },
     })
-    locks.grab('browser-md:kb:notes')
+    locks.grab('localmd:kb:notes')
 
     const { useKbStore } = await import('./kb')
     const kb = useKbStore()

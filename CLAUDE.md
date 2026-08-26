@@ -1,4 +1,4 @@
-# browser-md — working agreements
+# localmd-app — working agreements
 
 Principles for anyone (human or agent) working in this repo. CONTEXT.md is the
 glossary — read it before renaming or reinterpreting a concept ("index",

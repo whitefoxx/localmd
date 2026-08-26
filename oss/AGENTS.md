@@ -174,9 +174,10 @@ pipeline (`docs/token-optimization.md` has the full log):
   check inheritance", never "regenerate to green".
 - The `raw/` capture routing table (`rawSubdirFor` in `src/lib/capture.ts`)
   keeps its established layout — existing KBs were organized by it.
-- The `localmd:`- and `browser-md:`-prefixed `localStorage` keys and the
-  IndexedDB database name are storage contracts. Renaming one silently discards
-  every existing user's settings, folder handles or chat history.
+- The `localmd:`-prefixed `localStorage` keys and the IndexedDB database name
+  are storage contracts. Renaming one does not move data, it hides it — the
+  browser still holds the old names and nothing reads them. `lib/legacyStorage`
+  is what a rename costs, and it was worth writing for one rename.
 - Browser-only: no backend. LLM endpoints must allow CORS from the browser; all
   file access goes through the File System Access API.
 

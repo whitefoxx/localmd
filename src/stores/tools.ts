@@ -44,8 +44,8 @@ import { useKbStore } from '@/stores/kb'
 import { gate, restrictedToolResult } from '@/edition/gate'
 import * as fs from '@/lib/fs'
 
-const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
-const HTTP_RECALL_KEY = 'browser-md:http-tool-recall:v1'
+const TRUST_KEY = 'localmd:kb-tools-trust:v1'
+const HTTP_RECALL_KEY = 'localmd:http-tool-recall:v1'
 
 function readHttpRecall(): Record<string, string[]> {
   try {

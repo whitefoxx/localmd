@@ -146,7 +146,7 @@ export function makeRawPdfAnnotation(
       created: new Date().toISOString(),
       id: crypto.randomUUID(),
       custom: { text },
-      author: 'browser-md',
+      author: 'localmd',
     },
   }
 }

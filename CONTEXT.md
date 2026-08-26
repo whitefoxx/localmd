@@ -1,4 +1,4 @@
-# browser-md
+# localmd
 
 A pure-browser knowledge-base and AI-agent app. The user opens a URL,
 configures an LLM key, and picks a local

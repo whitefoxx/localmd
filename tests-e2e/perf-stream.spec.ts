@@ -95,7 +95,7 @@ async function seedSession(page: Page, turns: number): Promise<void> {
       favorite: false,
     }
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open('browser-md', 2)
+      const req = indexedDB.open('localmd', 2)
       req.onsuccess = () => {
         const db = req.result
         const t = db.transaction('sessions', 'readwrite')

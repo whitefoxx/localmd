@@ -4,7 +4,7 @@
  * localStorage, keyed by KB folder name — matching idb.ts (recents) and
  * viewMemory.ts (reading positions).
  */
-const LS_KEY = 'browser-md:open-tabs:v1'
+const LS_KEY = 'localmd:open-tabs:v1'
 
 export interface KbTabs {
   tabs: string[]

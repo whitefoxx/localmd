@@ -141,7 +141,7 @@ function makeWav(): Buffer {
 
 /** Open a fresh KB (?e2e=1) and import the given files via the capture input. */
 async function openWith(page: Page, files: Array<[string, Buffer | string]>): Promise<void> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-preview-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-preview-'))
   const paths: string[] = []
   for (const [name, content] of files) {
     const p = path.join(dir, name)

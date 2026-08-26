@@ -29,7 +29,7 @@ function session(overrides: Partial<TranscriptSession> = {}): TranscriptSession 
 
 describe('transcriptDirFor', () => {
   it('keeps the established conversations dir in raw-layout KBs, inbox/ elsewhere', () => {
-    expect(transcriptDirFor(true)).toBe('raw/conversations/browser-md')
+    expect(transcriptDirFor(true)).toBe('raw/conversations/localmd')
     expect(transcriptDirFor(false)).toBe('inbox/conversations')
   })
 })

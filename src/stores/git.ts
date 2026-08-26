@@ -202,8 +202,8 @@ export const useGitStore = defineStore('git', () => {
         async () => {
           const settings = useSettingsStore()
           const author = await g.resolveAuthor({
-            name: settings.state.gitName || 'browser-md',
-            email: settings.state.gitEmail || 'browser-md@local',
+            name: settings.state.gitName || 'localmd',
+            email: settings.state.gitEmail || 'localmd@local',
           })
           const selected = changes.value.filter((c) => paths.includes(c.path))
           return g.commitPaths(selected, message.trim(), author)

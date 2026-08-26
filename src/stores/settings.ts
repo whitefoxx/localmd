@@ -145,7 +145,7 @@ export interface SettingsState {
   richEditor: boolean
 }
 
-const STORAGE_KEY = 'browser-md:settings'
+const STORAGE_KEY = 'localmd:settings'
 
 export function newProfileId(): string {
   return crypto.randomUUID()

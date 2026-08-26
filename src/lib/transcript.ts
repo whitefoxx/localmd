@@ -24,7 +24,7 @@ export interface TranscriptSession {
  *  picks a location instead): the conversations corner of a raw/ layout, or
  *  the neutral inbox/ elsewhere. Pure — layout detection is the caller's job. */
 export function transcriptDirFor(rawLayout: boolean): string {
-  return rawLayout ? 'raw/conversations/browser-md' : `${INBOX_DIR}/conversations`
+  return rawLayout ? 'raw/conversations/localmd' : `${INBOX_DIR}/conversations`
 }
 
 function localDate(ts: number): string {

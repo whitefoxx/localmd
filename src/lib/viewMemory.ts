@@ -27,7 +27,7 @@ export const epubLocation = new Map<string, string>()
  *  and not persisted — it's derivable by regenerating, just slow to compute. */
 export const epubLocations = new Map<string, string>()
 
-const LS_KEY = 'browser-md:reading-position:v1'
+const LS_KEY = 'localmd:reading-position:v1'
 interface KbPositions {
   pdf: Record<string, number>
   epub: Record<string, string>

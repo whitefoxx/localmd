@@ -634,7 +634,7 @@ const indexDocument = defineTool({
 const saveTranscript = defineTool({
   name: 'save_transcript',
   description:
-    'Save THIS conversation as a markdown file in the knowledge base. Use when the user asks to save, record, or archive the chat. It is a plain snapshot — a normal KB file. Defaults to the KB\'s conversations landing dir (raw/conversations/browser-md/ in raw-layout KBs, inbox/conversations/ otherwise); pass `path` to save elsewhere. Returns the saved path.',
+    'Save THIS conversation as a markdown file in the knowledge base. Use when the user asks to save, record, or archive the chat. It is a plain snapshot — a normal KB file. Defaults to the KB\'s conversations landing dir (raw/conversations/localmd/ in raw-layout KBs, inbox/conversations/ otherwise); pass `path` to save elsewhere. Returns the saved path.',
   schema: z.object({
     path: z
       .string()
@@ -1456,8 +1456,8 @@ const gitCommit = defineTool({
     }
     const settings = useSettingsStore()
     const author = await g.resolveAuthor({
-      name: settings.state.gitName || 'browser-md',
-      email: settings.state.gitEmail || 'browser-md@local',
+      name: settings.state.gitName || 'localmd',
+      email: settings.state.gitEmail || 'localmd@local',
     })
     const oid = await g.commitPaths(chosen, message.trim(), author)
     // Committing is an approval — drop these from the agent-changes review list.

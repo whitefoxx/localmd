@@ -73,7 +73,7 @@ export interface ExternalTool {
 
 /* ── recall store (which deferred tools this KB actually uses) ───────────── */
 
-const RECALL_KEY = 'browser-md:mcp-recall:v1'
+const RECALL_KEY = 'localmd:mcp-recall:v1'
 
 /** Persisted per KB folder name, matching how viewMemory keys reading
  *  positions — identical tool names in different KBs must not collide. */

@@ -48,7 +48,7 @@ async function makeEpub(): Promise<Buffer> {
     `<?xml version="1.0"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-<dc:identifier id="bookid">urn:uuid:browser-md-epub-fixture</dc:identifier>
+<dc:identifier id="bookid">urn:uuid:localmd-epub-fixture</dc:identifier>
 <dc:title>A Long Enough Book</dc:title><dc:language>en</dc:language>
 </metadata>
 <manifest>
@@ -73,7 +73,7 @@ ${ids.map((n) => `<li><a href="c${n}.xhtml">Chapter ${n}</a></li>`).join('\n')}
 
 /** Open a fresh KB with the book imported and rendered, sitting on page one. */
 async function openBook(page: Page): Promise<void> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-epub-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-epub-'))
   const file = path.join(dir, 'long-book.epub')
   await writeFile(file, await makeEpub())
 
@@ -153,7 +153,7 @@ test('the book is laid out at its final size before its first page is drawn', as
   // so a jump to an annotation was read against a pagination that no longer
   // existed and came up a page short. Sampling from before the reader exists is
   // the only way to see it: by the time a page is on screen it is over.
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-epub-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-epub-'))
   const file = path.join(dir, 'long-book.epub')
   await writeFile(file, await makeEpub())
 

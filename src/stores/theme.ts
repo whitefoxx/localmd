@@ -6,7 +6,9 @@ import { isE2eMode } from '@/lib/e2e'
 export type ThemePref = 'light' | 'dark' | 'system'
 
 /** Where the preference lived before it joined the rest of the settings. Read
- *  once, to carry an existing choice over, then retired. */
+ *  once, to carry an existing choice over, then retired. Deliberately the
+ *  pre-rename spelling: this is the location it was actually written to, and
+ *  lib/legacyStorage's copy leaves the original in place. */
 const LEGACY_KEY = 'browser-md:theme'
 
 export const useThemeStore = defineStore('theme', () => {

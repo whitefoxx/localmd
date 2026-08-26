@@ -43,7 +43,7 @@ function makePdf(): Buffer {
 /** Fresh KB with the fixture PDF imported and RENDERED (canvas on screen) —
  *  rendered matters: the shortcut listener registers on viewer ready. */
 async function openKbWithPdf(page: Page): Promise<void> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'browser-md-pdf-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-pdf-'))
   const file = path.join(dir, 'tiny.pdf')
   await writeFile(file, makePdf())
 

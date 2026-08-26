@@ -324,7 +324,7 @@ export class McpHttpClient implements McpClientLike {
     await this.rpc('initialize', {
       protocolVersion: '2025-03-26',
       capabilities: {},
-      clientInfo: { name: 'browser-md', version: '0.1.0' },
+      clientInfo: { name: 'localmd', version: '0.1.0' },
     })
     await this.notify('notifications/initialized')
     const result = (await this.rpc('tools/list', {})) as {

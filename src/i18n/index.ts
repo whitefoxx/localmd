@@ -1,5 +1,5 @@
 /**
- * Lightweight i18n for browser-md. No external dependency — a reactive locale
+ * Lightweight i18n for localmd. No external dependency — a reactive locale
  * ref plus a `t(key, params?)` lookup over per-namespace message catalogs.
  *
  * Message catalogs live in ./locales/<namespace>.ts, each default-exporting
@@ -26,7 +26,7 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   zh: 'Chinese (中文)',
 }
 
-const STORAGE_KEY = 'browser-md:locale'
+const STORAGE_KEY = 'localmd:locale'
 
 type Messages = Record<string, unknown>
 

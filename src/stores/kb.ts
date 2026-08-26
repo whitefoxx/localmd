@@ -9,7 +9,7 @@ import { hydrateReadingPositions } from '@/lib/viewMemory'
  *  hint — the handle itself lives in IndexedDB — but a synchronous one, which
  *  is the point: it is read before the first paint to decide whether the start
  *  screen may render at all (see `restoring`). */
-const LAST_KB_KEY = 'browser-md:lastKb'
+const LAST_KB_KEY = 'localmd:lastKb'
 
 function readLastKb(): string | null {
   try {
@@ -133,7 +133,7 @@ export const useKbStore = defineStore('kb', () => {
     await releaseHeldLock()
     lockedByOther.value = false
     if (!('locks' in navigator)) return
-    const key = `browser-md:kb:${kbName}`
+    const key = `localmd:kb:${kbName}`
     await new Promise<void>((ready) => {
       lockHeld = navigator.locks
         .request(key, { ifAvailable: true }, (lock) => {
@@ -187,7 +187,7 @@ export const useKbStore = defineStore('kb', () => {
     try {
       const q = await navigator.locks?.query?.()
       if (!q) return
-      if (q.held?.some((l) => l.name === `browser-md:kb:${kbName}`)) return
+      if (q.held?.some((l) => l.name === `localmd:kb:${kbName}`)) return
       if (name.value === kbName) lockedByOther.value = false
     } catch {
       /* an unanswered question is not an answer */
