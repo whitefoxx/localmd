@@ -125,12 +125,11 @@ audience (HN, PKM, local-first, AI tinkerers) follows process, not ads — the
 build itself is the marketing, and the first 200 commits produced zero public
 words. Don't repeat that.
 
-The publishing system no longer lives here. Story material, drafts, schedule,
-channel facts and the launch plan all live in `~/code/trace/influence` — the
-`influence/` wing of the private trace knowledge base — driven by the global
-skills `/story`, `/draft`, `/log`, available in any project directory. (Note
-`/story`, not `/harvest`: in a KB, `harvest` means distilling a conversation
-into wiki notes.)
+The publishing system does not live here, and its location is deliberately not
+written down here either — it is a private knowledge base, and this repository
+has no business naming it. The global skills `/story`, `/draft` and `/log` know
+where their own data is; invoke them and they find it. (Note `/story`, not
+`/harvest`: in a KB, `harvest` means distilling a conversation into wiki notes.)
 
 - **When a task lands something tellable, offer `/story` in the same breath
   as the commit prompt** — "want me to commit and push? this also looks
@@ -142,12 +141,15 @@ into wiki notes.)
 - The unit is the story, not the diff. Don't nag on every commit; batch at
   feature merges and session ends. A good commit message often *is* the draft
   (see 917ba00) — harvest it, don't rewrite it.
-- localmd's one-liner, pillars and **anti-claims** live in
-  `~/code/trace/influence/products/localmd/README.md`. Read it before writing
-  any public-facing copy about the product; the anti-claims are binding.
-- Methodology (transferable patterns + experiment log) lives in
-  `~/code/trace/influence/principles/playbook.md`. When the process teaches
-  something, that's where it goes.
+- **The message house is binding, and it is not in this repo.** localmd's
+  one-liner, its three pillars and its **anti-claims** live with the publishing
+  system; `/draft` loads them. Writing public-facing copy about the product
+  without having read them is the mistake — the one-liner is reused verbatim so
+  the bytes compound, and an anti-claim is a sentence we have decided is not
+  true enough to say. If you are about to write such copy and have not loaded
+  it, stop and load it.
+- Methodology — transferable patterns and the experiment log — lives there too.
+  When the process teaches something, that is where it goes, not here.
 
 ## Token economy
 

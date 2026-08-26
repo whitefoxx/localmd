@@ -151,7 +151,7 @@ description: 处理 raw/ 下未入库的源文件,生成或更新 wiki 页面并
 
 1. 打开 <https://github.com/settings/personal-access-tokens/new>（GitHub → Settings → Developer settings → Fine-grained personal access tokens → Generate new token）
 2. **Token name** 随意（如 `localmd`）；**Expiration** 按需（到期后重新生成）
-3. **Repository access** 选 **Only select repositories**，只勾选你的知识库仓库（如 `whitefoxx/my-trace`）——不要给全部仓库授权
+3. **Repository access** 选 **Only select repositories**，只勾选你的知识库仓库（那一个）——不要给全部仓库授权
 4. **Permissions → Repository permissions → Contents** 设为 **Read and write**（Metadata 会自动带上 Read-only；其余全部 No access）
 5. 点 **Generate token**，复制 `github_pat_…` 开头的字符串
 6. 回到 localmd：右侧面板齿轮 → Git & GitHub → 粘贴到 **GitHub Token**
