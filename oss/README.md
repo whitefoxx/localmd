@@ -14,8 +14,8 @@ Hosted at **[localmd.app](https://localmd.app)** · bugs and ideas →
 
 - **Markdown, in a folder you already have.** File tree, editor, preview,
   `[[wikilinks]]`, backlinks, a force-directed graph, full-text search. It
-  adapts to your folders, not the other way round — there is no import step,
-  because there is no format to import into.
+  adapts to your folders, not the other way round. There is no import, because
+  there is no format to import into.
 - **An agent that works in your files.** It lists, reads, searches, writes and
   edits, with a review panel that shows every change as a diff before or after
   it lands. Bring a key for Anthropic, OpenAI, DeepSeek, Gemini, xAI, Groq,
