@@ -7,8 +7,8 @@ There is no backend. The app is a static page: it reads and writes your files
 through the File System Access API, and it talks to whichever model provider you
 gave it a key for. Nothing is uploaded, because there is nowhere to upload to.
 
-Hosted at **[localmd.app](https://localmd.app)** · bugs and ideas →
-[localmd-feedback](https://github.com/whitefoxx/localmd-feedback)
+Hosted at **[localmd.app](https://localmd.app)** · bugs and ideas → the
+[issues](https://github.com/whitefoxx/localmd/issues) on this repository
 
 ## What it does
 

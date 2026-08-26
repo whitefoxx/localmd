@@ -155,14 +155,15 @@ locked; everything else in this manual works without one.
 
 ## When something is wrong
 
-Bug reports and ideas go in the open, at
-<https://github.com/whitefoxx/localmd-feedback> — worth a look before writing,
-in case someone has already hit it. Say which browser you are on; almost
-everything unusual here runs on browser APIs that differ between them.
+Bug reports and ideas go in the open. The Help panel links the issue tracker
+for the build you are running — worth a look before writing, in case someone
+has already hit it. Say which browser you are on; almost everything unusual
+here runs on browser APIs that differ between them.
 
 Anything you would rather not discuss in public — a security issue, or a
-document you cannot paste into a public tracker — goes to
-<yunbiaoch@gmail.com> instead.
+document you cannot paste into a public tracker — goes through that
+repository's **Security → Report a vulnerability**, which opens a private
+thread rather than a public issue.
 
 ## Related
 

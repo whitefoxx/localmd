@@ -5,11 +5,13 @@ slow — that is a bandwidth limit, not disinterest.
 
 ## Where things go
 
-- **Something in the app is broken, or you want a feature** →
-  [localmd-feedback](https://github.com/whitefoxx/localmd-feedback). It is the
-  product's issue tracker and gets read first.
-- **The code is wrong, the build fails, a test is flaky, you have a patch** →
-  here.
+Here — bug reports, feature requests, questions and patches all belong on this
+repository's issues. There is no second tracker to guess between.
+
+(The hosted build at localmd.app has its own, at
+[localmd.app-feedback](https://github.com/whitefoxx/localmd.app-feedback), for
+reports about that deployment specifically — its trial, its licence, its
+uptime. Anything about the software itself belongs here.)
 
 ## Running it
 
