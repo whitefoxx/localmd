@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   CATALOG,
+  BUNDLED_TOOL_SOURCES,
+  isBundledToolSource,
   sortedCatalog,
   defaultInstalledIds,
   toolsForEntries,
@@ -68,6 +70,22 @@ describe('catalog shape', () => {
         expect(copy?.desc, `${id} (${lang}) desc`).toBeTruthy()
       }
     }
+  })
+
+  it('keeps the bundled search pair free, and nothing else by default', () => {
+    expect(isBundledToolSource('jina')).toBe(true)
+    expect(isBundledToolSource('parallel')).toBe(true)
+    expect(isBundledToolSource('localmd-connect')).toBe(false)
+    expect(isBundledToolSource('anything-a-user-adds')).toBe(false)
+  })
+
+  it('agrees with the catalog about which entries are bundled', () => {
+    // Two lists name the same set — `BUNDLED_TOOL_SOURCES` for the gate and the
+    // `bundled` flag for the Tools page. Drift between them would mean the free
+    // tier and the free-looking UI disagreed, silently and in either direction.
+    expect(CATALOG.filter((e) => e.bundled).map((e) => e.id).sort()).toEqual(
+      [...BUNDLED_TOOL_SOURCES].sort(),
+    )
   })
 })
 

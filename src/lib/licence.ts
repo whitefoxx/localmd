@@ -268,23 +268,6 @@ export function needsLicence(toolName: string): boolean {
 }
 
 /**
- * Catalog entries whose tools ship with the app, free forever ("bundled" — NOT
- * "built-in", which CONTEXT.md reserves for tools native to the agent code).
- *
- * A named set rather than "the entries currently in the catalog", because the
- * catalog is an editorial list that will be added to and pruned, and pinning
- * the free tier to it would mean the free tier changed every time someone had
- * an opinion about a recommendation. Membership here is a decision about what
- * is free; a test keeps it in lockstep with the catalog's `bundled` flags.
- * Expected to grow — moving a paid tool here is one entry plus one flag.
- */
-export const BUNDLED_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
-
-export function isBundledToolSource(id: string): boolean {
-  return BUNDLED_TOOL_SOURCES.includes(id)
-}
-
-/**
  * What a locked tool hands back to the model.
  *
  * A tool result rather than a missing tool, for two reasons. The registered

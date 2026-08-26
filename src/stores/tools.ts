@@ -34,6 +34,7 @@ import {
   CATALOG,
   catalogEntryById,
   toolsForEntries,
+  isBundledToolSource,
   EXTENSION_FETCH_TOOL,
 } from '@/lib/toolCatalog'
 import { parseExtensionFetch } from '@/lib/connectRelay'
@@ -41,7 +42,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
 import { useLicenceStore } from '@/stores/licence'
-import { isBundledToolSource, lockedToolResult } from '@/lib/licence'
+import { lockedToolResult } from '@/lib/licence'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'browser-md:kb-tools-trust:v1'

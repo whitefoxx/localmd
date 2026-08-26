@@ -68,8 +68,8 @@ export interface CatalogEntry {
    *  "built-in": that word is reserved for tools native to the agent code.
    *  Deliberately a flag on the entry rather than "whatever is in the catalog
    *  today" — the catalog is an editorial list that will change, and the free
-   *  tier must not change with it. See `BUNDLED_TOOL_SOURCES` in lib/licence.ts,
-   *  which names the same set for the gate; a test keeps the two in lockstep. */
+   *  tier must not change with it. See `BUNDLED_TOOL_SOURCES` below, which
+   *  names the same set for the gate; a test keeps the two in lockstep. */
   bundled?: boolean
   /** Where to read about / install it. */
   homepage?: string
@@ -449,6 +449,28 @@ export const CATALOG: CatalogEntry[] = [
     server: { name: 'parallel', url: 'https://search.parallel.ai/mcp' },
   },
 ]
+
+/**
+ * Catalog entries whose tools ship with the app, free forever ("bundled" — NOT
+ * "built-in", which CONTEXT.md reserves for tools native to the agent code).
+ *
+ * A named set rather than "the entries currently in the catalog", because the
+ * catalog is an editorial list that will be added to and pruned, and pinning
+ * the free tier to it would mean the free tier changed every time someone had
+ * an opinion about a recommendation. Membership here is a decision about what
+ * is free; a test keeps it in lockstep with the `bundled` flags above.
+ * Expected to grow — moving a paid tool here is one entry plus one flag.
+ *
+ * It sits with the catalog rather than with the gate that reads it because it
+ * is a fact about what SHIPS, not about what is licensed. `stores/tools.ts`
+ * asks it which entries stay active regardless, and that question keeps the
+ * same answer wherever there is no gate at all.
+ */
+export const BUNDLED_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
+
+export function isBundledToolSource(id: string): boolean {
+  return BUNDLED_TOOL_SOURCES.includes(id)
+}
 
 export function catalogEntryById(id: string): CatalogEntry | undefined {
   return CATALOG.find((e) => e.id === id)

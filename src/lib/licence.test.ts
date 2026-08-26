@@ -6,8 +6,6 @@ import {
   daysLeft,
   unlocks,
   needsLicence,
-  isBundledToolSource,
-  BUNDLED_TOOL_SOURCES,
   lockedToolResult,
   type Licence,
 } from './licence'
@@ -194,22 +192,6 @@ describe('what the licence covers', () => {
     // spend their own money.
     expect(needsLicence('run_subagent')).toBe(false)
     expect(needsLicence('use_skill')).toBe(false)
-  })
-
-  it('keeps the bundled search pair free, and nothing else by default', () => {
-    expect(isBundledToolSource('jina')).toBe(true)
-    expect(isBundledToolSource('parallel')).toBe(true)
-    expect(isBundledToolSource('localmd-connect')).toBe(false)
-    expect(isBundledToolSource('anything-a-user-adds')).toBe(false)
-  })
-
-  it('agrees with the catalog about which entries are bundled', () => {
-    // Two lists name the same set — `BUNDLED_TOOL_SOURCES` for the gate and the
-    // `bundled` flag for the Tools page. Drift between them would mean the free
-    // tier and the free-looking UI disagreed, silently and in either direction.
-    expect(CATALOG.filter((e) => e.bundled).map((e) => e.id).sort()).toEqual(
-      [...BUNDLED_TOOL_SOURCES].sort(),
-    )
   })
 
   it('frees exactly one MCP endpoint, matched by URL', () => {
