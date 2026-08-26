@@ -36,6 +36,8 @@ export default {
     // Said on the way in, positively, rather than left for someone to discover
     // as a failure. The limit is real and it is also the reason this can work
     // at all — so it is stated as a fact about the web, not an apology.
+    source: 'Open source',
+    sourceTitle: 'Read the code, or run your own copy — MIT, on GitHub',
     whyChrome: 'Why Chrome or Edge?',
     whyChromeBody:
       'Letting a web page read and write a folder you choose takes the File System Access API, and only Chromium browsers have it. That rules out Firefox and Safari today — and it is also the whole reason a page can work inside your own folder at all. The demo knowledge base needs none of it and runs anywhere.',
@@ -66,6 +68,8 @@ export default {
       '不用再配置什么——直接问就行。问一句 PDF 里的事，点引用就落到原文的那一段；它还能写笔记，经你批准直接改文件。',
     privacy: '无需账号 · 无需安装 · 文件只待在你的文件夹里',
     frameCaption: '示例知识库 · 不用选文件夹 · 不用填 Key · 关掉标签页就没了',
+    source: '开源',
+    sourceTitle: '代码可以读，也可以自己跑一份 —— MIT，在 GitHub 上',
     whyChrome: '为什么只有 Chrome 和 Edge？',
     whyChromeBody:
       '让一个网页读写你选定的文件夹，靠的是 File System Access API，目前只有 Chromium 系浏览器有。这确实把 Firefox 和 Safari 挡在了外面——而它同时也是「网页能在你自己的文件夹里干活」这件事成立的全部原因。示例知识库不需要它，在哪儿都能跑。',

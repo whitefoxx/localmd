@@ -73,6 +73,10 @@ export default {
     does8:
       'Automate your logged-in browser with localmd Connect — generic page tools and ready-made actions for 30+ sites',
 
+    sourceLead: 'None of this has to be taken on trust.',
+    sourceBody:
+      'The app is open source, MIT — read the code, run your own copy, watch the network tab. A privacy claim is worth exactly what your willingness to believe it is worth; this is the only thing that makes it checkable.',
+    sourceLink: 'Source on GitHub',
     dontLabel: "What we don't do",
     dont1: "No account. You don't sign up to think.",
     dont2: "No server storing your files. There's nowhere for us to put them.",
@@ -150,6 +154,10 @@ export default {
     does8:
       '用 localmd Connect 自动化你已登录的浏览器——通用页面工具，加上 30+ 个站点的现成动作',
 
+    sourceLead: '上面这些都不用你信。',
+    sourceBody:
+      '应用是开源的，MIT —— 代码可以读，可以自己跑一份，网络请求可以自己看。隐私主张的价值，等于你愿意相信它的程度；开源是唯一能让它可被验证的东西。',
+    sourceLink: '在 GitHub 上看源码',
     dontLabel: '我们不做的事',
     dont1: '不要账号。思考不需要先注册。',
     dont2: '不在服务器上存你的文件。我们根本没有地方放。',

@@ -14,3 +14,8 @@
 /** Public issue tracker for the hosted service. A repository with no code in
  *  it, so a visitor can see what is already known before writing anything. */
 export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd.app-feedback'
+
+/** Where the code is. The same address in both editions today — a fork that
+ *  deploys its own build should point this at itself, which is the whole reason
+ *  this file is the edition's and not the app's. */
+export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'

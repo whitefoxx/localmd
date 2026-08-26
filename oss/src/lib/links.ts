@@ -14,3 +14,8 @@
 
 /** Issue tracker: this repository's own. */
 export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd/issues'
+
+/** Where the code is. The same address in both editions today — a fork that
+ *  deploys its own build should point this at itself, which is the whole reason
+ *  this file is the edition's and not the app's. */
+export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SOURCE_URL } from '@/lib/links'
 import { computed, ref } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
@@ -109,6 +110,19 @@ async function forget(entry: RecentKb): Promise<void> {
               ><span class="text-fg-0">local</span><span class="text-accent">md</span
               ><span class="text-fg-3/45">]]</span>
             </span>
+            <!-- Quiet, and beside the wordmark rather than among the buttons:
+                 it is a fact about what this is, not a third thing to click
+                 instead of the two that matter. -->
+            <a
+              :href="SOURCE_URL"
+              target="_blank"
+              rel="noopener"
+              :title="$t('openKb.sourceTitle')"
+              class="ml-auto inline-flex items-center gap-1.5 self-center text-sm text-fg-3 transition-colors hover:text-fg-0"
+            >
+              <span class="codicon codicon-sm codicon-github" />
+              <span class="hidden sm:inline">{{ $t('openKb.source') }}</span>
+            </a>
           </div>
 
           <h1

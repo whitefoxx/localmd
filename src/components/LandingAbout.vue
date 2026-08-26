@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { t } from '@/i18n'
 import { PRICING_BLOCK } from '@/edition/ui'
 import { SELECTABLE_PROVIDERS } from '@/lib/providers'
-import { FEEDBACK_URL } from '@/lib/links'
+import { FEEDBACK_URL, SOURCE_URL } from '@/lib/links'
 import { vReveal } from '@/composables/useReveal'
 import { useThemeStore } from '@/stores/theme'
 import citeNoteLight from '@/assets/landing-cite-note.jpg'
@@ -251,6 +251,26 @@ const donts = computed(() => [
               <span class="leading-relaxed">{{ f }}</span>
             </li>
           </ul>
+        </div>
+
+        <!-- The claim above this is "nothing is uploaded", and a privacy
+             claim is worth what the reader's willingness to believe it is
+             worth. The source is the only thing that turns it into something
+             they can check, so it sits with the list it vouches for rather
+             than in a footer. -->
+        <div v-reveal class="border-t border-border pt-6 md:col-span-2">
+          <p class="max-w-[44rem] text-[0.95rem] leading-relaxed text-fg-2">
+            <span class="text-fg-0">{{ $t('about.sourceLead') }}</span>
+            {{ $t('about.sourceBody') }}
+          </p>
+          <a
+            :href="SOURCE_URL"
+            target="_blank"
+            rel="noopener"
+            class="mt-3 inline-flex items-center gap-1.5 text-[0.95rem] text-accent hover:underline"
+          >
+            <span class="codicon codicon-sm codicon-github" />{{ $t('about.sourceLink') }}
+          </a>
         </div>
 
         <!-- The browser limit belongs with the rest of what we will not
