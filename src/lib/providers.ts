@@ -13,6 +13,8 @@
  * Google/xAI/Groq are offered for BYO-key use but their browser-CORS behavior
  * is not individually verified here.
  */
+import { TRIAL } from '@/edition/trial'
+
 
 /**
  * Output-token ceiling for a profile that does not set one. Lives here rather
@@ -39,8 +41,8 @@ export interface ProviderPreset {
   sdk: SdkKind
   /** Kept out of the provider picker. Not a secret — just not something a user
    *  can usefully choose, because its "key" is a session token this app mints
-   *  (see lib/trial.ts). Picking it by hand would only produce a profile that
-   *  cannot authenticate. */
+   *  (see edition/trial.ts, the only preset that sets this). Picking it by hand
+   *  would only produce a profile that cannot authenticate. */
   internal?: boolean
   /** Only meaningful for 'openai-compatible'; baked into the package otherwise.
    *  Empty + `needsBaseUrl` = the user types it (Custom). */
@@ -115,23 +117,6 @@ export const OPENAI_COMPAT_PRESETS: ProviderPreset[] = [
     defaultModel: '',
     needsBaseUrl: true,
   },
-  {
-    // The free trial, on our own origin — so no CORS question arises, and the
-    // key on the wire is a session token that expires within the hour rather
-    // than anything of the user's. The endpoint decides the model; the value
-    // here only fills the profile's label.
-    //
-    // The path is recorded here, but the profile that actually reaches the SDK
-    // carries the absolute form — see `trialBaseUrl` in lib/trial.ts, and do
-    // not "simplify" that back to this string: the OpenAI-compatible provider
-    // resolves nothing, and a site-relative base throws before the request.
-    id: 'trial',
-    label: 'Free trial',
-    sdk: 'openai-compatible',
-    baseUrl: '/api/trial/v1',
-    defaultModel: 'deepseek-chat',
-    internal: true,
-  },
 ]
 
 /** Providers with a dedicated `@ai-sdk/<provider>` package — base URL and wire
@@ -187,8 +172,18 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
   },
 ]
 
-/** Every provider a profile can use, dedicated packages first. */
-export const ALL_PROVIDERS: ProviderPreset[] = [...DEDICATED_PRESETS, ...OPENAI_COMPAT_PRESETS]
+/** Every provider a profile can use, dedicated packages first.
+ *
+ *  The trial rides in from the edition rather than sitting in a table above:
+ *  it names OUR endpoint, so an edition with no `api/trial/` behind it has no
+ *  such provider at all rather than one that 404s. It is still registered here
+ *  and not only offered in the picker — `SELECTABLE_PROVIDERS` filters it out
+ *  by `internal`, while `presetFor` must keep resolving it for a live profile. */
+export const ALL_PROVIDERS: ProviderPreset[] = [
+  ...DEDICATED_PRESETS,
+  ...OPENAI_COMPAT_PRESETS,
+  ...(TRIAL ? [TRIAL.preset] : []),
+]
 
 /** The ones worth offering in the picker — everything a user can actually
  *  configure. Lookups still go through ALL_PROVIDERS, so an internal provider

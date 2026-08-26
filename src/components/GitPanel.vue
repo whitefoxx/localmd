@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useGitStore } from '@/stores/git'
 import { useFilesStore } from '@/stores/files'
-import { useLicenceStore } from '@/stores/licence'
+import { restricted } from '@/edition/gate'
 import { readHeadText } from '@/lib/git'
 import { GIT_DECOR } from '@/lib/gitStatus'
 import { diffLines, collapseContext, type HunkLine } from '@/lib/diff'
@@ -15,7 +15,6 @@ const files = useFilesStore()
 // buttons that reach GitHub are gated, and they stay visible while locked:
 // a control that explains why it is unavailable is honest, where one that
 // vanishes just looks like the feature does not exist.
-const licence = useLicenceStore()
 
 const message = ref('')
 const checked = ref<Set<string>>(new Set())
@@ -137,8 +136,8 @@ function fmtTime(ms: number): string {
             <span class="text-xs text-fg-3 truncate">{{ git.remote.owner }}/{{ git.remote.repo }}</span>
             <button
               class="btn text-xs"
-              :disabled="!!git.busy || licence.restricted"
-              :title="licence.restricted ? $t('git.needsLicence') : undefined"
+              :disabled="!!git.busy || restricted"
+              :title="restricted ? $t('git.needsLicence') : undefined"
               @click="git.sync('pull')"
             >
               <span class="codicon codicon-sm codicon-arrow-down mr-1" />{{ $t('git.pull') }}
@@ -149,9 +148,9 @@ function fmtTime(ms: number): string {
                  not be. -->
             <button
               class="btn text-xs"
-              :disabled="!!git.busy || licence.restricted"
+              :disabled="!!git.busy || restricted"
               :title="
-                licence.restricted
+                restricted
                   ? $t('git.needsLicence')
                   : git.unpushed.length
                     ? $t('git.pushTitle', { n: git.unpushed.length, branch: git.branch ?? '' })

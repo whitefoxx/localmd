@@ -12,7 +12,7 @@
  */
 import { watch } from 'vue'
 import { seedDemoKb, loadDemoManifest } from '@/lib/demo'
-import { trialSession, trialProfile } from '@/lib/trial'
+import { TRIAL } from '@/edition/trial'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
@@ -100,12 +100,16 @@ function guardAgainstLosingWork(): void {
  * one — on their own knowledge base, at our choice of provider — would be a
  * small betrayal of the thing the app is about. Failure is silent by design;
  * the composer already explains what to do when no model is set.
+ *
+ * An edition with no trial to lend is the same silence: the demo is still worth
+ * reading and clicking through without a model behind it.
  */
 async function lendTrialModel(): Promise<void> {
+  if (!TRIAL) return
   const settings = useSettingsStore()
   if (settings.state.slots.primary) return
   try {
-    const profile = trialProfile(await trialSession())
+    const profile = TRIAL.profile(await TRIAL.session())
     settings.state.profiles = [...settings.state.profiles, profile]
     settings.state.slots = { ...settings.state.slots, primary: profile.id }
   } catch {

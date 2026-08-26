@@ -46,8 +46,7 @@ import { isContextOverflow } from '@/lib/providerError'
 import { dropLoneSurrogatesDeep } from '@/lib/wellFormed'
 import { syncAfterFsChange } from '@/lib/fileOps'
 import { STOPPED_RESULT } from '@/lib/present'
-import { needsLicence, lockedToolResult } from '@/lib/licence'
-import { useLicenceStore } from '@/stores/licence'
+import { toolRestricted, restrictedToolResult } from '@/edition/gate'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
 import { generateKbImage } from './imagegen'
 import type { SystemPromptParts } from './prompt'
@@ -67,26 +66,6 @@ const MAX_OVERFLOW_RECOVERIES = 2
  *  `.trace/` path the model can read back. */
 const OVERFLOW_KEEP_MESSAGES = [2, 0]
 const MAX_IMAGES_PER_CALL = 5
-
-/**
- * Whether this call must be refused for want of a licence.
- *
- * Asked at call time, not at registration time: the tool list is part of the
- * provider's cache prefix, so a key pasted or expiring mid-session must not
- * change which tools were serialized. Only the answer changes.
- *
- * Tolerates the store being unavailable (tests, and any non-app caller) by
- * treating that as unlocked — a missing Pinia instance is our problem, and the
- * failure mode that matters is charging someone twice, not gating too little.
- */
-function licenceLocked(name: string): boolean {
-  if (!needsLicence(name)) return false
-  try {
-    return useLicenceStore().restricted
-  } catch {
-    return false
-  }
-}
 
 /* Subagent framing rides in the task's user message, NOT the system prompt:
  * a subagent request whose tools + system are byte-identical to the main
@@ -180,8 +159,8 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
           // Refused here rather than by withholding the tool: the registered
           // list is part of the cache prefix, and the attempt belongs in the
           // transcript so the user sees what the agent wanted to do.
-          if (licenceLocked(t.name)) {
-            out = lockedToolResult(t.name)
+          if (toolRestricted(t.name)) {
+            out = restrictedToolResult(t.name)
             return out
           }
           const signal = abortSignal ?? opts.signal

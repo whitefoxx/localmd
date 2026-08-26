@@ -41,8 +41,7 @@ import { parseExtensionFetch } from '@/lib/connectRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
-import { useLicenceStore } from '@/stores/licence'
-import { lockedToolResult } from '@/lib/licence'
+import { restricted, restrictedToolResult } from '@/edition/gate'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'browser-md:kb-tools-trust:v1'
@@ -105,8 +104,7 @@ export const useToolsStore = defineStore('tools', () => {
    *  shadowing order among the paid ones is unchanged from when they were the
    *  whole list. */
   const specs = computed<HttpToolSpec[]>(() => {
-    const licence = useLicenceStore()
-    const licensed = licence.restricted
+    const licensed = restricted.value
       ? []
       : [
           ...(kbTrusted.value ? kbTools.value : []),
@@ -386,8 +384,8 @@ export const useToolsStore = defineStore('tools', () => {
     // execution point and takes an arbitrary spec: the editor's Test button and
     // the agent's dry run both arrive here with a spec that was never in that
     // list. Gating the list alone would leave a way to run one anyway.
-    if (!bundledToolIds.value.has(spec.id) && useLicenceStore().restricted) {
-      return lockedToolResult(spec.name)
+    if (!bundledToolIds.value.has(spec.id) && restricted.value) {
+      return restrictedToolResult(spec.name)
     }
     return runHttpTool(spec, args, {
       resolveSecret: (id) => settings.state.toolSecrets[id],

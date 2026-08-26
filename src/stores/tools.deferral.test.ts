@@ -1,12 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
-// Deferral is orthogonal to the licence gate (asserted in licence.test.ts);
-// enforced here it would empty the licensed specs and test nothing.
-vi.mock('@/lib/licence', async (orig) => ({
-  ...(await orig<typeof import('@/lib/licence')>()),
-  ENFORCE_LICENCE: false,
-}))
+// Deferral is orthogonal to the gate (asserted in licence.test.ts); enforced
+// here it would empty the licensed specs and test nothing.
+// The gate is mocked open, not switched off through the licence it happens to
+// be backed by: `@/edition/gate` is what the code under test imports, so this
+// says the same thing in an edition that has no licence module at all.
+vi.mock('@/edition/gate', async () => {
+  const { computed } = await import('vue')
+  return {
+    restricted: computed(() => false),
+    toolRestricted: () => false,
+    restrictedToolResult: (name: string) => `Error: ${name} is restricted.`,
+  }
+})
 
 // Mutating settings.state fires its persist watch, and the recall/trust reads
 // go to storage too — node has none (same shim as manageTools.test.ts).
