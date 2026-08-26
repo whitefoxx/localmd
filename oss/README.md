@@ -89,13 +89,15 @@ A static Vue 3 SPA (Vite + Pinia + Tailwind). Reading order for the code:
 | `src/edition/` | the seam described above |
 | `docs/` | design notes and post-mortems, including `docs/token-optimization.md` |
 | `CONTEXT.md` | the glossary — read it before renaming a concept |
+| `AGENTS.md` | the working agreements: what the constraints are and why |
 
 ## Contributing
 
-Issues and pull requests are welcome. Two things worth knowing before a PR:
-the repo is written in English throughout (the only intentional Chinese is the
-`zh` half of the i18n catalogs), and `docs/app/*.md` is the user manual the app
-itself serves — a user-visible change is not finished until it matches.
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+for where things go and what a patch needs. [AGENTS.md](AGENTS.md) has the
+working agreements behind the code, and is worth handing to a coding agent if
+you use one. Security reports go through
+[SECURITY.md](SECURITY.md), privately.
 
 ## License
 
