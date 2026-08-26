@@ -5,6 +5,12 @@
  *   node scripts/export-oss.mjs --to ../localmd
  *   node scripts/export-oss.mjs --to ../localmd --commit "v0.2.0"
  *
+ *   --replace  redo an export the target has staged but not committed
+ *   --e2e      also run Playwright against the export, on port 5199
+ *   --fast     borrow this repo's node_modules instead of installing (not a
+ *              hermetic check, and it shares vite's cache — iteration only)
+ *   --keep     leave the temp tree behind for inspection
+ *
  * What separates the editions is `scripts/oss-manifest.mjs` — read that first;
  * this file only carries the list out.
  *
@@ -61,10 +67,17 @@ if (!existsSync(join(TARGET, '.git'))) {
 }
 if (resolve(TARGET) === REPO) die('refusing to export a repository onto itself')
 
-// A dirty target means an edit made directly in the public checkout, which the
-// sync below would erase without asking. Whoever made it should decide.
-if (git(TARGET, 'status', '--porcelain')) {
-  die(`${TARGET} has uncommitted changes. Commit or discard them — the export replaces its working tree.`)
+// A dirty target is either an edit made directly in the public checkout — which
+// the sync below would erase without asking — or the last export, not yet
+// committed. From here the two are indistinguishable, so the destructive
+// reading wins and re-exporting takes an explicit word.
+if (git(TARGET, 'status', '--porcelain') && !has('replace')) {
+  die(
+    `${TARGET} has uncommitted changes.\n` +
+      '  If they are a previous export you want to redo, pass --replace.\n' +
+      '  If they are edits made in that checkout, commit or discard them first —\n' +
+      '  the export replaces its working tree.',
+  )
 }
 
 /* ── what goes ────────────────────────────────────────────────────────────── */
