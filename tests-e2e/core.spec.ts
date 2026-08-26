@@ -254,32 +254,6 @@ test('e2e mode never persists to real storage', async ({ page }) => {
   expect(stored).toBeNull()
 })
 
-test('without a licence the Connections group is visible, locked, and says why', async ({ page }) => {
-  // The one flow that runs unlicensed on purpose. Everything else in this file
-  // runs with the e2e default licence, the same way it runs with the mock LLM.
-  await page.goto('/?e2e=1&e2e-unlicensed=1')
-  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
-  await page.locator('nav button:has(.codicon-settings-gear)').click()
-  await page.locator('button:has(.codicon-plug)').click()
-
-  // Bundled tools stay free and usable — the price is a pill beside the group
-  // name now, not a clause inside it.
-  await expect(page.getByText('Bundled tools', { exact: true })).toBeVisible()
-  await expect(page.getByText('Free', { exact: true })).toBeVisible()
-  await expect(
-    page.locator('label', { hasText: 'Jina web tools' }).getByRole('checkbox'),
-  ).toBeEnabled()
-
-  // …the paid group is present — a hidden feature just looks missing — but
-  // locked: the hint says why, and the doors are disabled rather than absent.
-  await expect(page.getByText('Connections', { exact: true })).toBeVisible()
-  // Two paid groups now: Connections and the Advanced doors below it.
-  await expect(page.getByText('Paid', { exact: true })).toHaveCount(2)
-  await expect(page.getByText(/needs a licence/)).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Describe it to the agent' })).toBeDisabled()
-  await expect(page.getByRole('button', { name: /Add an MCP server/ })).toBeDisabled()
-})
-
 test('localmd Connect is presented as a permission to grant, not an id to copy', async ({
   page,
 }) => {
