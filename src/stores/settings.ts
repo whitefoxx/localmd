@@ -72,10 +72,10 @@ export interface LlmProfile {
   maxTokens?: number
   /** Thinking depth; absent = provider default. */
   reasoning?: ReasoningEffort
-  /** Never written to storage. The trial profile is one of these: its key is a
-   *  session token that expires within the hour, so persisting it would leave
-   *  a profile that looks configured and answers "expired" on the next visit.
-   *  See lib/trial.ts. */
+  /** Never written to storage. An edition's trial profile is one of these: its
+   *  key is a session token that expires within the hour, so persisting it
+   *  would leave a profile that looks configured and answers "expired" on the
+   *  next visit. See edition/trial.ts where there is one. */
   ephemeral?: boolean
 }
 
@@ -90,10 +90,14 @@ export interface SettingsState {
   /** GitHub PAT for pushing via the REST API (pull of public repos works
    *  without it). Same localStorage trust model as the LLM keys. */
   githubToken: string
-  /** The paid tier's key, verified offline against a public key in the bundle
-   *  (see lib/licence.ts). Kept with the other credentials rather than in its
-   *  own storage slot so it follows the same trust model and the same "settings
-   *  belong to this browser, not to your folder" rule — and so it inherits the
+  /** The paid tier's key, where an edition has a paid tier — verified offline
+   *  by whatever answers `@/edition/gate`. The field is core because storage
+   *  shape is: it stays readable and clearable in a build that never fills it,
+   *  rather than becoming a value an upgrade has to migrate.
+   *
+   *  Kept with the other credentials rather than in its own storage slot so it
+   *  follows the same trust model and the same "settings belong to this
+   *  browser, not to your folder" rule — and so it inherits the
    *  agent-invisibility that comes from appSettings.ts being an allowlist. */
   licenceKey: string
   /** auto: agent writes land immediately (reviewable after the fact).
@@ -383,8 +387,8 @@ export function normalizeSettings(raw: unknown): SettingsState {
 /**
  * The settings as they should be written to disk.
  *
- * Ephemeral profiles are dropped — today that means the free trial, whose key
- * is a session token good for under an hour. Storing it would leave the next
+ * Ephemeral profiles are dropped — today that means an edition's free trial,
+ * whose key is a session token good for under an hour. Storing it would leave the next
  * visit looking configured and answering "expired", which is worse than
  * looking unconfigured. The slot pointing at a dropped profile goes with it:
  * a slot naming a profile that is not in the file is a config that reads as

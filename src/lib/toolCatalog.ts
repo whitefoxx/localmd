@@ -9,8 +9,8 @@
  * web-search pair. Those are free forever and sit beside read_file rather than
  * being connections to pay for, because a knowledge base that cannot look
  * anything up is not a working product to hand someone. Everything else here
- * reaches past the user's own folder and model, which is what the paid tier
- * covers (see lib/licence.ts).
+ * reaches past the user's own folder and model, which is what a paid tier
+ * covers where an edition has one (see `@/edition/gate`).
  *
  * Every endpoint below was probed for browser CORS before being listed. That
  * matters more than it sounds: a browser-only app can't reach an API that
