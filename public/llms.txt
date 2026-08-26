@@ -51,7 +51,7 @@ browser's File System Access API.
 Everything you can do with your own folder and your own model is free, with no
 usage caps — web search included; you pay your provider directly at their
 prices. Paid is what reaches past them: the localmd Connect browser extension,
-MCP servers, and GitHub sync — a one-time $39 licence, verified offline, with
+MCP servers, and GitHub sync — a one-time $20 licence, verified offline, with
 no account. Not on sale yet; the start screen offers free early-access slots.
 
 ## Compared with

@@ -18,7 +18,7 @@
 /** One time, for good. Not a subscription and not a year of updates — the app
  *  is a static page a buyer already holds, so metering upgrades would cost more
  *  to build than it could collect. */
-export const PRICE_USD = 39
+export const PRICE_USD = 20
 
 /** Early-slot cohort size. Small enough to stay scarce and to sign by hand,
  *  large enough that the claim→use rate means something. */
