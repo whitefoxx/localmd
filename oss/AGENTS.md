@@ -5,6 +5,10 @@ glossary — read it before renaming or reinterpreting a concept ("index",
 "session", "slot", "bundled", "connection", …). `CONTRIBUTING.md` covers the
 mechanics of a pull request; this file is about the judgment calls.
 
+This is the only copy. `CLAUDE.md` is a one-line import of it, because Claude
+Code looks for that name while most agents read this one — add a pointer for
+whatever tool you use, never a second copy to keep in step.
+
 ## Language
 
 **This is an English repo.** Code, identifiers, comments, docs, commit messages
