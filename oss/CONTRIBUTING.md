@@ -77,7 +77,8 @@ project's licence. It is a statement about provenance; it asks nothing of you
 beyond that.
 
 Contributions are licensed under the MIT terms in [LICENSE](LICENSE), the same
-as the rest of the repository.
+as the rest of the repository. [TRADEMARK.md](TRADEMARK.md) covers the one thing
+the licence does not: the name.
 
 ## The two editions
 

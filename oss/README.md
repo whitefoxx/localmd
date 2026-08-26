@@ -102,5 +102,5 @@ you use one. Security reports go through
 ## License
 
 MIT — see [LICENSE](LICENSE). The licence covers the code, not the name
-"localmd" or its logo, which identify the hosted service. Fork freely; please
-pick your own name.
+"localmd" or its logo, which identify the hosted service at localmd.app; see
+[TRADEMARK.md](TRADEMARK.md). Fork freely — please give your copy its own name.
