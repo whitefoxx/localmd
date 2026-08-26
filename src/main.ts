@@ -1,7 +1,3 @@
-// FIRST, and for its side effect: this browser's data may still be under the
-// names used before the rename to localmd, and modules imported below read
-// storage — and write defaults back — as they are evaluated. See lib/legacyStorage.
-import './lib/legacyStorage'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { inject as injectAnalytics } from '@vercel/analytics'

@@ -175,9 +175,11 @@ pipeline (`docs/token-optimization.md` has the full log):
 - The `raw/` capture routing table (`rawSubdirFor` in `src/lib/capture.ts`)
   keeps its established layout — existing KBs were organized by it.
 - The `localmd:`-prefixed `localStorage` keys and the IndexedDB database name
-  are storage contracts. Renaming one does not move data, it hides it — the
-  browser still holds the old names and nothing reads them. `lib/legacyStorage`
-  is what a rename costs, and it was worth writing for one rename.
+  are storage contracts. Renaming one does not move data, it hides it: the
+  browser still holds the old name, nothing reads it, and to whoever it happens
+  to that is indistinguishable from a wipe. These names were renamed once, in
+  August 2026, and got away without a migration only because the product had
+  almost no users yet. That is a fact about the date, not a precedent.
 - Browser-only: no backend. LLM endpoints must allow CORS from the browser; all
   file access goes through the File System Access API.
 

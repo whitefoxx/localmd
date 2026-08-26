@@ -1,26 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watchEffect } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
-import { isE2eMode } from '@/lib/e2e'
 
 export type ThemePref = 'light' | 'dark' | 'system'
 
-/** Where the preference lived before it joined the rest of the settings. Read
- *  once, to carry an existing choice over, then retired. Deliberately the
- *  pre-rename spelling: this is the location it was actually written to, and
- *  lib/legacyStorage's copy leaves the original in place. */
-const LEGACY_KEY = 'browser-md:theme'
-
 export const useThemeStore = defineStore('theme', () => {
   const settings = useSettingsStore()
-
-  if (!isE2eMode()) {
-    const legacy = localStorage.getItem(LEGACY_KEY)
-    if (legacy === 'light' || legacy === 'dark' || legacy === 'system') {
-      if (settings.state.theme === 'system') settings.state.theme = legacy
-      localStorage.removeItem(LEGACY_KEY)
-    }
-  }
 
   /** Settings owns the value; this is the handle everything else writes through. */
   const pref = computed<ThemePref>({
