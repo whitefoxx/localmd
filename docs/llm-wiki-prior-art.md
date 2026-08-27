@@ -126,6 +126,22 @@ technical: writing bookkeeping files into the user's folder is exactly what
 be buying is legibility to *other* tools (Obsidian, another agent), not agent
 efficiency.
 
+> **Narrowed 2026-08-27**, after this entry was twice miscited in planning as
+> "the project rejected creating files":
+>
+> - What this entry defers is the *derived-cache layer* — per-directory index
+>   files with a rebuild protocol, machine state a human cannot safely edit.
+>   Entry pages themselves were never in question: the scaffold creates
+>   `wiki/index.md` for a brand-new KB, and `log.md` is the third page kind.
+>   The durable razor: the agent may write a *note* (content a person can
+>   edit, move or delete without anything breaking or lying), never a
+>   *record* (state the machinery must keep correct).
+> - "Never create one" narrows to "never create one *unasked*". For an
+>   existing KB the agent may offer once to create an entry page that maps
+>   the user's own layout — the same shape as the AGENTS.md offer. Role
+>   resolution for these pages (name as default, frontmatter as override,
+>   AGENTS.md as narration) is specified in docs/TODO.md.
+
 ### ⏸ Self-clearing review queue (nashsu `sweep-reviews.ts`)
 
 Their ingest never blocks on human judgement: contradictions and suggestions go
