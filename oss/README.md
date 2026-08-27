@@ -1,11 +1,13 @@
 # localmd
 
-**An AI knowledge base that runs in your browser and your local folder. Open a
-URL, pick a folder, start thinking — nothing to install.**
+**An agent lives in your folder, a wiki grows around your files.** It reads
+the PDFs, EPUBs and notes already there and writes linked Markdown beside
+them — every citation clicks back to the exact paragraph, and every change
+waits for your yes.
 
 ### ▶ [Try it now](https://localmd.app) — no install, no account, no key
 
-It is a web page. Open it, click **Try a demo knowledge base**, ask a question
+It is a web page. Open it, click **Try the demo**, ask a question
 about a real 43-page paper, then click a citation and land on the paragraph it
 came from. Nothing to clone first; come back here if you like it.
 

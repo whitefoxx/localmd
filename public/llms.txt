@@ -1,7 +1,9 @@
 # localmd
 
-> An AI knowledge base that runs in your browser and your local folder. Open a
-> URL, pick a folder, start thinking — nothing to install.
+> An agent lives in your folder, a wiki grows around your files. It reads
+> the PDFs, EPUBs and notes already in the folder and writes linked Markdown
+> beside them — every citation clicks back to the exact paragraph, and every
+> change waits for your yes.
 
 localmd (https://localmd.app) turns an ordinary folder on your computer into a
 knowledge base with an AI agent working inside it. The app is a static web
@@ -30,6 +32,9 @@ browser's File System Access API.
   servers, a `MEMORY.md` the agent updates only when asked, and a companion
   Chrome extension (localmd Connect) that lets the agent use the user's own
   logged-in browser — 30+ sites, ~300 ready-made actions.
+- Open source under MIT: https://github.com/whitefoxx/localmd. The hosted app
+  at localmd.app runs the same code plus a free trial allowance, a licence
+  check and a paid tier.
 - A built-in demo knowledge base (https://localmd.app/?demo=1) opens with no
   folder and no key: three linked notes and a real 43-page paper with working
   citations, plus a small free model allowance for a few questions.
@@ -69,3 +74,4 @@ no account. Not on sale yet; the start screen offers free early-access slots.
 
 - App: https://localmd.app
 - Demo (no setup): https://localmd.app/?demo=1
+- Source (MIT): https://github.com/whitefoxx/localmd

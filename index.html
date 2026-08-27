@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d1117" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <title>localmd — AI knowledge base in your browser and local folder</title>
+    <title>localmd — an agent lives in your folder</title>
     <meta
       name="description"
-      content="An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install."
+      content="An agent lives in your folder, a wiki grows around your files. It reads the PDFs, EPUBs and notes already in the folder and writes linked Markdown beside them — every citation clicks back to the exact paragraph, and every change waits for your yes."
     />
     <link rel="canonical" href="https://localmd.app/" />
     <meta property="og:type" content="website" />
@@ -16,11 +16,11 @@
     <meta property="og:url" content="https://localmd.app/" />
     <meta
       property="og:title"
-      content="localmd — AI knowledge base in your browser and local folder"
+      content="localmd — an agent lives in your folder"
     />
     <meta
       property="og:description"
-      content="An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install."
+      content="An agent lives in your folder, a wiki grows around your files. It reads the PDFs, EPUBs and notes already in the folder and writes linked Markdown beside them — every citation clicks back to the exact paragraph, and every change waits for your yes."
     />
     <meta property="og:image" content="https://localmd.app/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -28,11 +28,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="localmd — AI knowledge base in your browser and local folder"
+      content="localmd — an agent lives in your folder"
     />
     <meta
       name="twitter:description"
-      content="An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install."
+      content="An agent lives in your folder, a wiki grows around your files. It reads the PDFs, EPUBs and notes already in the folder and writes linked Markdown beside them — every citation clicks back to the exact paragraph, and every change waits for your yes."
     />
     <meta name="twitter:image" content="https://localmd.app/og.png" />
     <!-- Structured data for search engines and LLM crawlers. The answers are
@@ -49,7 +49,7 @@
             "url": "https://localmd.app",
             "applicationCategory": "Productivity",
             "operatingSystem": "Chrome, Edge (Chromium browsers)",
-            "description": "An AI knowledge base that runs in your browser and your local folder. Open a URL, pick a folder, start thinking — nothing to install.",
+            "description": "An agent lives in your folder, a wiki grows around your files. It reads the PDFs, EPUBs and notes already in the folder and writes linked Markdown beside them — every citation clicks back to the exact paragraph, and every change waits for your yes.",
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
           },
           {
@@ -60,7 +60,7 @@
                 "name": "What is localmd?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "An AI knowledge base that runs in your browser and your local folder. You open a URL, grant the page access to one folder, and an AI agent can read, search, index and write the files in it — plain Markdown, PDFs and EPUBs. Nothing to install, no account."
+                  "text": "An agent that lives in a folder you already have. You open a URL, grant the page access to one folder, and it reads the PDFs, EPUBs and Markdown notes inside and grows a wiki around them — linked Markdown pages, with citations that click through to the exact paragraph of the source. Nothing to install, no account."
                 }
               },
               {
@@ -132,7 +132,7 @@
                 "name": "Is localmd open source?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "The app repository is currently private. The plan is to extract the browser-side agent runtime and open-source it as a standalone package."
+                  "text": "Yes — localmd is open source under the MIT licence: github.com/whitefoxx/localmd. The hosted app at localmd.app runs the same code and adds a free trial allowance, a licence check and a paid tier. The name is covered by a trademark note in the repository, so forks should pick their own."
                 }
               }
             ]
@@ -142,6 +142,30 @@
     </script>
   </head>
   <body>
+    <!-- For crawlers that do not execute JS. Users never see this; the copy
+         mirrors the message house and must move when it moves. -->
+    <noscript>
+      <main>
+        <h1>localmd — an agent lives in your folder</h1>
+        <p>
+          It reads the PDFs, EPUBs and notes already in the folder and writes
+          linked Markdown beside them — every citation clicks back to the
+          exact paragraph, and every change waits for your yes.
+        </p>
+        <p>
+          localmd is a knowledge base that runs entirely in your browser,
+          working inside a local folder you choose: an agent reads your PDFs,
+          EPUBs and Markdown notes and grows a wiki of linked Markdown pages
+          around them. No install, no server, no account. Free with your own
+          API key; open source (MIT).
+        </p>
+        <p>
+          <a href="https://localmd.app/?demo=1">Try the demo (no folder, no key)</a> ·
+          <a href="https://github.com/whitefoxx/localmd">Source on GitHub</a> ·
+          <a href="https://localmd.app/llms.txt">llms.txt</a>
+        </p>
+      </main>
+    </noscript>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

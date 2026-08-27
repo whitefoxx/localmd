@@ -9,7 +9,7 @@ Everything else in this manual assumes you have chosen a folder and added a
 model key. Neither is much work, but both are decisions, and you should not
 have to make them to find out whether this is for you.
 
-So there is a demo. On the start screen, **Try a demo knowledge base**.
+So there is a demo. On the start screen, **Try the demo**.
 
 ## What the demo is
 

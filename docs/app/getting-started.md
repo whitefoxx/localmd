@@ -1,6 +1,6 @@
 ---
 title: What localmd is
-summary: An AI knowledge base that runs in your browser and your local folder. Nothing to install, no account, and the files stay where you put them.
+summary: An agent that lives in a folder you already have, growing a wiki of linked notes around your files. Nothing to install, no account, and the files stay where you put them.
 ---
 
 # What localmd is
@@ -40,8 +40,8 @@ all. It is the same feature the whole no-install idea rests on.
 
 ## Getting started
 
-If you would rather look before deciding anything, **Try a demo knowledge
-base** opens a real one that needs no folder and no key — see `trying-it-out`.
+If you would rather look before deciding anything, **Try the demo** opens a
+real knowledge base that needs no folder and no key — see `trying-it-out`.
 Otherwise:
 
 1. Click **Open local folder** and choose a folder. Your browser will ask for

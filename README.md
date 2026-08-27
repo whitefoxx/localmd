@@ -1,6 +1,6 @@
 # localmd
 
-**一个 AI 知识库，跑在你的浏览器和本地文件夹里。** 打开网页 → 选择本地文件夹 → 配置 LLM API key，即可使用。无需安装、无需后端——文件通过 File System Access API 直接读写在你的设备上，API key 只存在你的浏览器里、只发给你配置的模型服务商。
+**一个 agent 住进你的文件夹，一座 wiki 绕着你的原件生长。** 打开网页 → 选择本地文件夹 → 配置 LLM API key，即可使用。无需安装、无需后端——文件通过 File System Access API 直接读写在你的设备上，API key 只存在你的浏览器里、只发给你配置的模型服务商。
 
 localmd 借鉴了 [files.md](https://files.md) 的 local-first 网页模式。知识库的数据格式是稳定的：已有知识库里的索引目录、标注 sidecar 和笔记里的块级引用都按它组织，格式不会因为版本升级而失效。
 
