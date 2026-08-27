@@ -21,6 +21,7 @@
  * one install that makes every *other* tool (and any the agent writes later)
  * more likely to work.
  */
+import { CONNECT_STORE_URL } from '@/lib/links'
 import type { HttpToolSpec } from '@/lib/httpTools'
 import { LOCALMD_CONNECT_RELAY_URL } from '@/lib/connectRelay'
 
@@ -421,8 +422,7 @@ export const CATALOG: CatalogEntry[] = [
     id: 'localmd-connect',
     kind: 'extension',
     featured: true,
-    homepage:
-      'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh',
+    homepage: CONNECT_STORE_URL,
     server: { name: 'localmd-connect', url: LOCALMD_CONNECT_RELAY_URL },
   },
   {

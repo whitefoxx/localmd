@@ -5,22 +5,26 @@ import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { isSupported } from '@/lib/fs'
 import { t } from '@/i18n'
-import { useThemeStore } from '@/stores/theme'
 import LandingAbout from '@/components/LandingAbout.vue'
-import noteLight from '@/assets/landing-note.jpg'
-import noteDark from '@/assets/landing-note-dark.jpg'
+import WikiGrowth from '@/components/WikiGrowth.vue'
 import type { RecentKb } from '@/lib/idb'
 
 const kb = useKbStore()
 const files = useFilesStore()
-const theme = useThemeStore()
 const supported = computed(() => isSupported())
 
 /** The product shot follows the theme. A screenshot of a light interface on a
  *  dark page reads as a picture of a different app — the one thing a hero shot
  *  may not do is make someone wonder whether it is really this one.
  *  `scripts/shoot-landing.mjs` regenerates both. */
-const noteShot = computed(() => (theme.isDark ? noteDark : noteLight))
+
+/** The headline, split at its nbsp so the second phrase owns line two.
+ *  The zh headline has no nbsp and renders as one flowing line. */
+const h1 = computed(() => {
+  const full = t('openKb.headline')
+  const i = full.indexOf('\u00A0')
+  return i === -1 ? [full] : [full.slice(0, i), full.slice(i + 1)]
+})
 
 const steps = computed(() => [
   { title: t('openKb.step1Title'), body: t('openKb.step1Body') },
@@ -82,16 +86,17 @@ async function forget(entry: RecentKb): Promise<void> {
     <!-- Hero: fills the first screen. `overflow-hidden` is what lets the
          product shot run off the right edge instead of being shrunk to fit. -->
     <section
-      class="landing-grid relative flex min-h-full items-center overflow-hidden py-12"
+      class="landing-grid landing-grain relative flex min-h-full items-center overflow-hidden py-12"
     >
+      <div class="landing-aurora inset-0" aria-hidden="true" />
       <div
-        class="landing-wrap grid items-center gap-x-14 gap-y-14 lg:grid-cols-[minmax(0,30rem)_1fr]"
+        class="landing-wrap grid items-center gap-x-14 gap-y-14 lg:grid-cols-[minmax(0,36rem)_1fr]"
       >
         <!-- ── The column that asks for the click ─────────────────────── -->
         <!-- Left-aligned at every width, not centred below lg: the product
              shot underneath runs from the same gutter, and a centred column
              above a left-aligned frame reads as two different pages. -->
-        <div class="relative z-10 w-full max-w-[30rem]">
+        <div class="relative z-10 w-full max-w-[36rem]">
           <div class="rise mb-8 flex items-center gap-3.5">
             <svg
               class="h-12 w-12 shrink-0 text-accent drop-shadow-[0_6px_18px_rgb(var(--c-accent)/0.35)]"
@@ -126,10 +131,10 @@ async function forget(entry: RecentKb): Promise<void> {
           </div>
 
           <h1
-            class="font-display rise mb-4 text-[1.9rem] leading-[1.15] text-fg-0 sm:text-[2.15rem]"
+            class="font-display rise mb-5 text-[1.9rem] leading-[1.14] text-fg-0 sm:text-[2.3rem]"
             style="animation-delay: 70ms"
           >
-            {{ $t('openKb.headline') }}
+            {{ h1[0] }}<br v-if="h1[1]" />{{ h1[1] }}
           </h1>
           <p class="rise mb-7 text-[1.05rem] leading-relaxed text-fg-2" style="animation-delay: 140ms">
             {{ $t('openKb.subline') }}
@@ -137,32 +142,18 @@ async function forget(entry: RecentKb): Promise<void> {
 
           <template v-if="supported">
             <div class="rise flex flex-wrap gap-3" style="animation-delay: 210ms">
-              <button class="btn-cta" @click="open">
-                <span class="codicon codicon-folder-opened" />{{ $t('openKb.openFolder') }}
-              </button>
-              <!-- The lowest-commitment door: no folder, no key, nothing kept.
-                   It sits beside the primary button rather than below the fold
-                   because most first visits are browsing, not moving in. -->
-              <button class="btn-ghost" @click="openDemo">
+              <!-- The lowest-commitment door leads: most first visits are
+                   browsing, not moving in, and the demo is the only button a
+                   cold visitor can click without deciding anything. Returning
+                   users re-enter through the Recent list below, so giving the
+                   demo the loud button costs them nothing. -->
+              <button class="btn-cta" @click="openDemo">
                 <span class="codicon codicon-beaker" />{{ $t('openKb.demo') }}
               </button>
+              <button class="btn-ghost" @click="open">
+                <span class="codicon codicon-folder-opened" />{{ $t('openKb.openFolder') }}
+              </button>
             </div>
-
-            <!-- Starting fresh is the same action — pick a folder. Opening one
-                 never writes to it; if it turns out to be empty, the app offers
-                 the starter layout inside, and only then on the user's word.
-                 The rule is on the label alone — spanning the icon and the gap
-                 too would draw it as two disconnected dashes. -->
-            <button
-              class="rise mt-5 inline-flex items-center gap-1.5 text-sm text-fg-2 transition-colors hover:text-fg-0"
-              style="animation-delay: 210ms"
-              @click="open"
-            >
-              <span class="codicon codicon-sm codicon-add" />
-              <span class="underline decoration-fg-3/40 underline-offset-4">
-                {{ $t('openKb.newKb') }}
-              </span>
-            </button>
 
             <div v-if="kb.error" class="mt-3 text-sm text-removed">{{ kb.error }}</div>
 
@@ -204,6 +195,10 @@ async function forget(entry: RecentKb): Promise<void> {
               <div class="mb-2 font-mono text-xs uppercase tracking-wider text-fg-3">
                 {{ $t('openKb.recent') }}
               </div>
+              <!-- Four rows, then scroll: the list is a doorway for returning
+                   users, not an archive, and a long one pushes the privacy
+                   line and everything after it off the first screen. -->
+              <div class="max-h-[9.75rem] overflow-y-auto overscroll-contain">
               <div v-for="r in kb.recents" :key="r.name" class="group relative rounded hover:bg-bg-2">
                 <button
                   class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-fg-1"
@@ -223,6 +218,7 @@ async function forget(entry: RecentKb): Promise<void> {
                 >
                   <span class="codicon codicon-sm codicon-close" />
                 </button>
+              </div>
               </div>
             </div>
 
@@ -249,8 +245,7 @@ async function forget(entry: RecentKb): Promise<void> {
             </template>
             </template>
 
-            <div class="mt-8 flex items-center gap-2 border-t border-border pt-5 text-xs text-fg-3">
-              <span class="codicon codicon-sm codicon-lock" />
+            <div class="mt-8 border-t border-border pt-5 font-mono text-[13px] text-fg-2">
               {{ $t('openKb.privacy') }}
             </div>
           </template>
@@ -284,77 +279,26 @@ async function forget(entry: RecentKb): Promise<void> {
           </div>
         </div>
 
-        <!-- Below lg there is no room beside the text, but there is still a
-             reason to show the thing: someone on a small screen may not be
-             able to open a folder here at all, and what they take away is
-             whether it is worth coming back on a desktop. Same frame, no
-             bleed — it just runs to the edge of the column. -->
-        <div class="relative -mx-6 overflow-hidden sm:-mx-10 lg:hidden" aria-hidden="true">
-          <div class="app-frame shot-fade-r ml-6 rounded-r-none border-r-0 sm:ml-10">
-            <div class="flex h-9 items-center gap-1.5 border-b border-border bg-bg-2 px-3.5">
-              <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-              <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-              <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-              <div
-                class="ml-3 flex h-5 w-[200px] items-center rounded border border-border bg-bg-0 px-2 font-mono text-[11px] text-fg-2"
-              >
-                localmd.app
-              </div>
-            </div>
-            <div class="h-[320px] overflow-hidden bg-bg-0">
-              <img :src="noteShot" alt="" class="block w-[1484px] max-w-none" />
-            </div>
-          </div>
+        <!-- Below lg the drawing sits under the text at a smaller size:
+             the point survives shrinking in a way a screenshot never did. -->
+        <div class="relative lg:hidden" aria-hidden="true">
+          <WikiGrowth class="mx-auto" />
         </div>
 
-        <!-- ── The product, at the size it really is ──────────────────────
-             Shown at its own scale and clipped by the viewport rather than
-             scaled to fit: a legible corner of the real interface says more
-             than an unreadable picture of all of it. Decorative, so it is
-             hidden from assistive tech and dropped below lg where there is no
-             room for it to say anything. -->
+        <!-- ── The one-liner, performed ───────────────────────────────────
+             File chips are already there; wiki chips pop up green; links draw
+             themselves. Decorative — the copy on the left says it in words —
+             and drawn in SVG, so there is nothing to load and nothing to
+             re-shoot when the interface changes. -->
         <div class="relative hidden h-[540px] lg:block" aria-hidden="true">
-          <!-- The centering transform and the entrance animation live on
-               separate elements on purpose: `rise` ends on `transform: none`,
-               which would otherwise cancel the -translate-y-1/2 the moment the
-               animation finished and drop the frame half a frame down the page. -->
-          <div class="absolute left-0 top-1/2 w-[1180px] -translate-y-1/2">
+          <div class="absolute left-0 top-1/2 w-full -translate-y-1/2">
             <div class="rise" style="animation-delay: 300ms">
-              <div class="app-frame">
-                <div class="flex h-9 items-center gap-1.5 border-b border-border bg-bg-2 px-3.5">
-                  <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-                  <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-                  <span class="h-2.5 w-2.5 rounded-full bg-fg-3/35" />
-                  <div
-                    class="ml-3 flex h-5 w-[240px] items-center rounded border border-border bg-bg-0 px-2 font-mono text-[11px] text-fg-2"
-                  >
-                    localmd.app
-                  </div>
-                </div>
-                <!-- Tall enough to clear the first citation chips in the note:
-                     they are the thing this picture is here to show. -->
-                <div class="h-[470px] overflow-hidden bg-bg-0">
-                  <img
-                    :src="noteShot"
-                    alt=""
-                    width="1484"
-                    height="812"
-                    class="block w-[1484px] max-w-none"
-                  />
-                </div>
-              </div>
-              <div class="mt-3.5 pl-1 font-mono text-xs text-fg-3">
-                {{ $t('openKb.frameCaption') }}
-              </div>
+              <WikiGrowth />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Scroll affordance to the about sections. -->
-      <span
-        class="codicon codicon-chevron-down absolute bottom-5 left-1/2 -translate-x-1/2 animate-bounce text-fg-3"
-      />
     </section>
 
     <!-- Below the fold: what localmd is, why it exists, what it does. -->

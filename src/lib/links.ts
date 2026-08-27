@@ -19,3 +19,8 @@ export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd.app-feedback'
  *  deploys its own build should point this at itself, which is the whole reason
  *  this file is the edition's and not the app's. */
 export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'
+
+/** localmd Connect on the Chrome Web Store — listed 2026-08. The landing and
+ *  the tool catalog both point here; one fact, one place. */
+export const CONNECT_STORE_URL =
+  'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh'
