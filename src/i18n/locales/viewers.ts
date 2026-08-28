@@ -71,7 +71,6 @@ export default {
       indexAlready: 'Already indexed',
       indexDone: 'Indexed',
       indexSections: '{n} sections',
-      indexNoText: 'no text layer (scanned?)',
       indexFailed: 'Indexing failed',
     },
 
@@ -231,7 +230,6 @@ export default {
       indexAlready: '已索引',
       indexDone: '已索引',
       indexSections: '{n} 个段落',
-      indexNoText: '无文本层（扫描件？）',
       indexFailed: '索引失败',
     },
 

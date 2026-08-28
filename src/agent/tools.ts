@@ -658,9 +658,13 @@ const indexDocument = defineTool({
       return (
         head +
         'No text could be extracted, which means this document has no text layer — ' +
-        'it is a scan, and every page is an image. Indexing it again will produce the same ' +
-        'result, so do not retry. You cannot quote or cite passages from it. Tell the user ' +
-        'plainly, and offer what still works: they can read, highlight and annotate it in the ' +
+        'it is a scan, and every page is an image. Indexing it again the same way will ' +
+        'produce the same result, so do not retry. As things stand you cannot quote or ' +
+        'cite passages from it. Tell the user plainly, and tell them the way out: the ' +
+        'notice on the document offers to read the pictures — they pick the language and ' +
+        'it recognises the pages, after which citations into this document work normally. ' +
+        'It takes seconds per page, so it is their call to start, not yours; you have no ' +
+        'tool for it. Until then they can still read, highlight and annotate it in the ' +
         'viewer, and you can write notes about it from what they tell you. If they have a ' +
         'vision model configured you may offer to look at specific pages as images.'
       )

@@ -46,12 +46,22 @@ export async function parsePdf(
 
   const base = source.split('/').pop()?.replace(/\.pdf$/i, '') ?? source
   // Reading the pictures is never automatic: it costs seconds of CPU per page
-  // and megabytes of engine, so the caller has to have been told yes.
-  const extracted = opts.ocr
+  // and megabytes of engine, so the caller has to have been told yes — either
+  // now (`opts.ocr`) or when they sat through it the first time.
+  //
+  // That second case is what `carriedOcr` is for. A rebuild of a document whose
+  // text was recognised would otherwise silently run the text-layer extractor,
+  // and a scan has no text layer: half an hour of the user's CPU replaced by
+  // zero blocks, the citations in their notes pointing at nothing, and the
+  // "this looks like a scan" notice back as if the work had never happened.
+  // Rebuild means build it again, not build a different thing.
+  const carriedOcr = opts.ocr ?? (await priorOcr(indexDir))
+  const extracted = carriedOcr
     ? await extractPdfViaOcr(bytes, base, {
-        lang: opts.ocr.lang,
-        onProgress: (c, t) => opts.ocr?.onPage?.(c, t),
-        signal: opts.ocr.signal,
+        lang: carriedOcr.lang,
+        onProgress: (c, t) =>
+          carriedOcr.onPage ? carriedOcr.onPage(c, t) : onProgress(c, t, 'extract'),
+        signal: carriedOcr.signal,
       })
     : await extractPdf(bytes, base, (c, t) => onProgress(c, t, 'extract'))
   // The turn is announced with no numbers of its own: what happens next —
@@ -74,8 +84,8 @@ export async function parsePdf(
     blocks,
     locations,
     outline: extracted.outline,
-    textSource: opts.ocr ? 'ocr' : 'layer',
-    ocrLang: opts.ocr?.lang,
+    textSource: carriedOcr ? 'ocr' : 'layer',
+    ocrLang: carriedOcr?.lang,
     onProgress,
   })
   return { indexDir, manifest, cached: false }
@@ -89,6 +99,23 @@ export async function parsePdf(
  * build that died before its manifest — writeAll orders writes so the old
  * manifest survives until the new index is complete) → nothing to inherit.
  */
+/**
+ * The OCR settings a previous build of this document was made with, or null if
+ * its text came out of the file. Deliberately indifferent to `contentHash`:
+ * different bytes are still the same scan, and the language the user picked is
+ * still the right one for it.
+ */
+async function priorOcr(indexDir: string): Promise<PdfParseOptions['ocr'] | null> {
+  const raw = await fs.tryReadFile(`${indexDir}/manifest.json`)
+  if (!raw) return null
+  try {
+    const m = JSON.parse(raw) as PdfIndexManifest
+    return m.textSource === 'ocr' && m.ocrLang ? { lang: m.ocrLang } : null
+  } catch {
+    return null
+  }
+}
+
 async function loadPriorIds(
   indexDir: string,
   contentHash: string,

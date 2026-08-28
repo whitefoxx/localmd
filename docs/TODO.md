@@ -377,6 +377,10 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 - **出处标记**:manifest 记 `textSource` / `ocrLang`;viewer 顶栏一枚常驻徽章
   「Text recognised」,索引的 `_README.md` 也对 agent 说明这是识别所得、引用时要
   声明。
+- **重建不降级**:`parsePdf` 在强制重建时读旧 manifest,`textSource: 'ocr'` 就带着
+  原来的 `ocrLang` 再跑一次 OCR。否则重建会静默用文本层抽取器去处理一份没有文本层的
+  扫描件——用户半小时的 CPU 换回 0 块,笔记里的引用全部悬空,提示卡还会像什么都没发生
+  过一样回来。`parse.test.ts` 钉住(去掉修复后 7 条里挂 3 条)。
 
 真实验收(311 页中文扫描件切出的 3 页,`chi_sim`):34 块、中文正确、`b2-3` 点回去
 精确高亮到第 2 页那段编号段落。
@@ -418,6 +422,13 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 另有一条不是坑但会影响观感:tesseract 逐字切中文再用空格拼回,`起 始 情 境` 要在
 `tidy()` 里收掉,否则空格会进笔记、进搜索索引、进每一条引文。
 
+### 收尾时扫出来的陈旧文本(已修)
+
+新增一条能力之后,凡是「说这件事做不到」的地方都变成了假话。这次扫出四处:
+`index_document` 给 agent 的工具结果(说「无法引用,不要重试」)、`public/llms.txt`
+的对外说明(说「不做 OCR」)、一个已经没人用的 i18n key `indexNoText`,以及上面那条
+重建降级的真 bug。**加能力时要反向搜一遍旧的否定句**,不只是加新文案。
+
 ### 还没做
 
 - **页范围 OCR**:311 页 ≈ 半小时,全有或全无。要做就得让 manifest 记下识别了哪些页,
@@ -425,5 +436,9 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 - **OCR 的标题判定偏噪**:行高来自 bbox,受升降部影响,正文段落容易被当成标题,
   于是 section 文件名变成一整段话。共享的启发式不能单独为 OCR 改(会波及文本层
   并触发 BUILDER bump),要做得另开一条按 `textSource` 分叉的路径。
-- 语言包目前从 tesseract.js 的 CDN 按需下载(手册两语言都写明了)。要不要自带
-  `eng` 还没定。
+- **重建 OCR 索引没有取消入口**:带着 `ocrLang` 重跑是对的,但走的是 viewer 的
+  「更新索引」按钮那条路,没有进度取消。今天不可达(OCR 索引写的是当前 BUILDER,
+  不会被标 outdated),BUILDER 一旦 bump 就会暴露。
+- 语言包目前从 tesseract.js 的 CDN 按需下载(手册两语言都写明了)。选择器里是十项
+  常用语言,tesseract 本身有一百多种,`+` 可组合——要加只是往 `OCR_LANGS` 加一行。
+  要不要自带 `eng` 还没定。
