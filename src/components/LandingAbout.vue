@@ -233,12 +233,13 @@ const donts = computed(() => [
             <!-- The whole install, set as type — no drawn address bar; the
                  words carry it. -->
             <div v-if="c.urlbar" class="relative mt-6 shrink-0 md:mt-0 md:text-right" aria-hidden="true">
-              <!-- the artifacts you do NOT need, struck through above the one
-                   thing you do -->
-              <div class="mb-2.5 flex items-center gap-2.5 font-mono text-sm text-fg-3 md:justify-end">
-                <span class="codicon codicon-sm codicon-close text-removed/60" />
-                <span class="line-through decoration-removed/45 decoration-2">localmd-setup.dmg</span>
-                <span class="line-through decoration-removed/45 decoration-2">install.exe</span>
+              <!-- The artifacts you do NOT need, struck out above the one
+                   thing you do. Grey rather than red, and no ✗: these are not
+                   errors or warnings, they are simply absent — a red cross
+                   makes an ordinary fact look like something went wrong. -->
+              <div class="mb-2.5 flex items-center gap-3 font-mono text-sm text-fg-3/70 md:justify-end">
+                <span class="line-through decoration-fg-3/60 decoration-2">localmd-setup.dmg</span>
+                <span class="line-through decoration-fg-3/60 decoration-2">install.exe</span>
               </div>
               <p class="font-mono text-2xl">
                 <span class="lm-url text-accent underline decoration-accent/50 underline-offset-4">localmd.app</span

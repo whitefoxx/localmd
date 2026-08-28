@@ -22,12 +22,12 @@ export default {
       'Any folder on your device — empty, or already full of Markdown and PDFs. Nothing is copied, moved or uploaded.',
     step2Title: 'Add your model key',
     step2Body:
-      'Bring your own API key (Anthropic, OpenAI, DeepSeek, Gemini). It stays in this browser, and you pay the provider directly, at their prices. Without a key it is still a complete, free notebook and reader for your folder.',
+      'Bring your own key — Anthropic, OpenAI, DeepSeek, Gemini. It stays in this browser; you pay the provider directly.',
     // Step three is not a step — by now the agent is there. The old title
     // ("Put an agent to work in it") read like a third thing to go and do.
     step3Title: 'The agent is already there',
     step3Body:
-      'Nothing more to set up — just start asking. Ask about a PDF and click the citation to land on the exact paragraph; it writes notes and edits files with your approval.',
+      'Nothing more to set up — just ask. Citations click back to the exact paragraph, and every note and edit waits for your yes.',
     privacy: 'No install · No account · No upload · No usage caps — only your folder',
     // Caption for the product shot, and the home of what used to be a loose
     // line under the buttons: it names the picture and says what the demo
@@ -63,10 +63,10 @@ export default {
       '设备上任意文件夹——空的，或已经装满 Markdown 和 PDF。不会被拷走、移动或上传。',
     step2Title: '填入你的模型 Key',
     step2Body:
-      '自带 API Key（Anthropic、OpenAI、DeepSeek、Gemini）。Key 只留在这个浏览器里，你按模型商的价格直接付给他们。不填 key，它也是一个完整免费的本地 Markdown 笔记本和 PDF/EPUB 阅读标注工具。',
+      '自带 Key——Anthropic、OpenAI、DeepSeek、Gemini。Key 只留在这个浏览器里，你直接付给模型商。',
     step3Title: 'agent 已经在里面了',
     step3Body:
-      '不用再配置什么——直接问就行。问一句 PDF 里的事，点引用就落到原文的那一段；它还能写笔记，经你批准直接改文件。',
+      '不用再配置什么——直接问。引用点回原文那一段，每个笔记和改动都等你点头。',
     privacy: '不用安装 · 没有账号 · 不上传 · 没有用量上限——只有你的文件夹',
     frameCaption: '示例知识库 · 不用选文件夹 · 不用填 Key · 关掉标签页就没了',
     source: '开源',

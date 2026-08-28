@@ -413,28 +413,32 @@
   .cit-pdf { animation: cit-pdf 8s infinite; }
   .cit-arrow { animation: cit-arrow 8s infinite; }
 }
+/* The cursor enters near the chip and gets there quickly. It used to travel
+   220px over 2.2s, which spends a third of the loop on the least interesting
+   part: the payoff is the paragraph lighting up, not the approach. Clicking
+   sooner buys that payoff 60% of the cycle instead of 40%. */
 @keyframes cit-cursor {
-  0%, 6% { opacity: 0; transform: translate(-150px, 160px); }
-  14% { opacity: 1; }
-  34% { transform: none; }
-  40% { transform: scale(0.85); }
-  44% { transform: scale(1); }
+  0%, 3% { opacity: 0; transform: translate(-48px, 52px); }
+  7% { opacity: 1; }
+  11% { transform: none; }
+  15% { transform: scale(0.85); }
+  19% { transform: scale(1); }
   58% { opacity: 1; }
   66%, 100% { opacity: 0; transform: none; }
 }
 @keyframes cit-click {
-  0%, 38% { opacity: 0; transform: scale(0.45); }
-  40% { opacity: 0.85; transform: scale(0.5); }
-  58%, 100% { opacity: 0; transform: scale(2.6); }
+  0%, 13% { opacity: 0; transform: scale(0.45); }
+  15% { opacity: 0.85; transform: scale(0.5); }
+  35%, 100% { opacity: 0; transform: scale(2.6); }
 }
 @keyframes cit-pdf {
-  0%, 42% { opacity: 0; transform: translateX(14px); }
-  50%, 90% { opacity: 1; transform: none; }
+  0%, 17% { opacity: 0; transform: translateX(14px); }
+  25%, 90% { opacity: 1; transform: none; }
   97%, 100% { opacity: 0; transform: translateX(14px); }
 }
 @keyframes cit-arrow {
-  0%, 42% { opacity: 0.35; }
-  48%, 90% { opacity: 1; }
+  0%, 17% { opacity: 0.35; }
+  23%, 90% { opacity: 1; }
   96%, 100% { opacity: 0.35; }
 }
 
@@ -446,9 +450,11 @@
   }
 }
 
-/* The mock cursor in the "Nothing to install" card: walks in from the lower
-   left, clicks the URL (dip + ring), rests, fades, loops. Pure decoration —
-   hidden entirely under reduced motion. */
+/* The mock cursor in the "Nothing to install" card: enters from just below
+   left, clicks the URL (dip + ring), rests, fades, loops. It starts close and
+   arrives fast for the same reason the citation one does — the approach is not
+   the point, the address being the whole install is. Pure decoration, hidden
+   entirely under reduced motion. */
 .lm-cursor {
   position: absolute;
   right: 30px;
@@ -476,11 +482,11 @@
   }
 }
 @keyframes lm-cursor {
-  0% { opacity: 0; transform: translate(-110px, 120px); }
-  16% { opacity: 1; }
-  40% { transform: translate(0, 0); }
-  48% { transform: translate(0, 0) scale(0.86); }
-  54% { transform: translate(0, 0) scale(1); }
+  0% { opacity: 0; transform: translate(-46px, 50px); }
+  7% { opacity: 1; }
+  12% { transform: translate(0, 0); }
+  18% { transform: translate(0, 0) scale(0.86); }
+  24% { transform: translate(0, 0) scale(1); }
   80% { opacity: 1; transform: translate(0, 0); }
   92%, 100% { opacity: 0; transform: translate(0, 0); }
 }
@@ -491,14 +497,14 @@
   }
 }
 @keyframes lm-url {
-  0%, 46% { filter: none; }
-  49%, 53% { filter: brightness(1.7); }
-  58%, 100% { filter: none; }
+  0%, 16% { filter: none; }
+  19%, 23% { filter: brightness(1.7); }
+  28%, 100% { filter: none; }
 }
 @keyframes lm-click {
-  0%, 47% { opacity: 0; transform: scale(0.4); }
-  50% { opacity: 0.9; transform: scale(0.55); }
-  66% { opacity: 0; transform: scale(1.6); }
+  0%, 17% { opacity: 0; transform: scale(0.4); }
+  20% { opacity: 0.9; transform: scale(0.55); }
+  36% { opacity: 0; transform: scale(1.6); }
   100% { opacity: 0; }
 }
 
