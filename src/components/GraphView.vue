@@ -4,7 +4,6 @@ import {
   forceSimulation,
   forceLink,
   forceManyBody,
-  forceCenter,
   forceCollide,
   forceX,
   forceY,
@@ -38,6 +37,12 @@ const ui = useUiStore()
 
 const host = ref<HTMLElement | null>(null)
 let sim: Simulation<GraphNode, GraphLink> | null = null
+/** Re-fit the current drawing to the container. Set by render(); calling it
+ *  is much cheaper than rebuilding the graph, and it keeps every node where
+ *  the user last saw it. */
+let refit: (() => void) | null = null
+/** Stops the previous render's watch on the legend filter. */
+let stopTypeWatch: (() => void) | null = null
 
 /**
  * Whether the layout is still being worked out.
@@ -91,12 +96,24 @@ const SETTLED_ALPHA = 0.2
  *  the shape of the rest is the context that makes the focused cluster mean
  *  something. Links go further down than nodes because a thin line at the same
  *  opacity still reads as a line. */
-const DIM_NODES = 0.3
-const DIM_LINKS = 0.2
+const DIM_NODES = 0.12
+const DIM_LINKS = 0.07
 
 /** How big a node is drawn: the more it is linked, the bigger. Square-rooted
  *  so a hub stands out without swallowing the page — area, not radius, tracks
  *  the degree — and capped so one runaway index page stays a circle. */
+/** How hard the middle of the frame pulls every node toward it.
+ *
+ *  This replaces forceCenter, which centres on the CENTROID: a few unlinked
+ *  nodes drifting to one side move the centroid, and forceCenter then slides
+ *  the whole picture the other way — the connected cluster, the thing anyone
+ *  opened the graph to look at, ends up against an edge. A tether to the
+ *  real middle has no such feedback: it pulls everything to the same point,
+ *  weakly enough that links still decide the shape. */
+function tether(): number {
+  return 0.05
+}
+
 function radiusOf(degree: number): number {
   return Math.min(24, 3 + 4.2 * Math.sqrt(degree))
 }
@@ -147,6 +164,21 @@ function render(): void {
     .attr('width', width)
     .attr('height', height)
     .attr('viewBox', [0, 0, width, height])
+
+  // The svg is sized in pixels at render time, so a window resize would
+  // otherwise leave it at its old size — a band down one side where nodes
+  // can never appear, and a centre force still pulling at the old middle.
+  refit = (): void => {
+    const w = el.clientWidth
+    const h = el.clientHeight
+    if (!w || !h) return
+    svg.attr('width', w).attr('height', h).attr('viewBox', [0, 0, w, h])
+    sim?.force('x', forceX<GraphNode>(w / 2).strength(tether()))
+    sim?.force('y', forceY<GraphNode>(h / 2).strength(tether()))
+    // A nudge, not a relayout: the graph settles into the new frame from
+    // where it is rather than jumping to a fresh arrangement.
+    sim?.alpha(0.3).restart()
+  }
 
   const g = svg.append('g')
 
@@ -327,6 +359,19 @@ function render(): void {
     }
   }
 
+  // The legend's type filter: the chosen type keeps its weight, the rest
+  // steps back. Applied per element rather than by dimming a layer, because
+  // this selection is not the hover's — it persists, and the hover has to
+  // keep working on top of it.
+  function applyTypeFilter(): void {
+    const want = ui.graphType
+    node.style('opacity', (d) => (!want || d.type === want ? null : String(DIM_NODES)))
+    link.style('opacity', () => (want ? String(DIM_LINKS) : null))
+  }
+  applyTypeFilter()
+  stopTypeWatch?.()
+  stopTypeWatch = watch(() => ui.graphType, applyTypeFilter)
+
   node
     .on('mouseenter', (_e, d) => setFocus(d.id))
     // A drag keeps its node: the pointer routinely outruns the node it is
@@ -364,20 +409,25 @@ function render(): void {
       'link',
       forceLink<GraphNode, GraphLink>(links)
         .id((d) => d.id)
-        .distance(70),
+        .distance(130),
     )
     // Repulsion with a range: past this it contributes nothing, so a node with
     // no links is not shoved to the far corner by every other node at once.
-    .force('charge', forceManyBody().strength(-180).distanceMax(420))
-    .force('center', forceCenter(width / 2, height / 2))
-    // A slack tether to the middle. forceCenter only translates the whole
-    // cloud — it cannot pull a stray back in, because it moves everything
-    // equally. These two can, and weakly enough that a linked cluster still
-    // arranges itself.
-    .force('x', forceX<GraphNode>(width / 2).strength(0.06))
-    .force('y', forceY<GraphNode>(height / 2).strength(0.06))
+    // Strong, because the tether below works against it and a graph that
+    // reads as one clump is no more useful than one scattered to the edges.
+    .force('charge', forceManyBody().strength(-900).distanceMax(700))
+    // A tether to the middle, scaled by how alone a node is. forceCenter only
+    // translates the whole cloud — it cannot pull a stray back in, because it
+    // moves everything equally, and it centres on the CENTROID, so a handful
+    // of unlinked nodes drifting off drag the whole picture after them.
+    //
+    // So the pull is strong for a node nothing links (it has no other reason
+    // to be anywhere) and slack for one that does (its links already place
+    // it). The cluster keeps its shape and stays in the middle of the frame.
+    .force('x', forceX<GraphNode>(width / 2).strength(tether()))
+    .force('y', forceY<GraphNode>(height / 2).strength(tether()))
     // Collision follows the drawn size, or the big nodes overlap each other.
-    .force('collide', forceCollide<GraphNode>((d) => nodeRadius(d) + 8))
+    .force('collide', forceCollide<GraphNode>((d) => nodeRadius(d) + 14))
     .on('tick', () => {
       // Cleared when the graph stops moving, not when it starts (see `laying`).
       if (laying.value && (sim?.alpha() ?? 0) < SETTLED_ALPHA) laying.value = false
@@ -391,17 +441,29 @@ function render(): void {
     .on('end', () => (laying.value = false))
 }
 
+let observer: ResizeObserver | null = null
+
 onMounted(() => {
   // Paint immediately from the cached index; refresh in the background — the
   // graph watch below re-renders only if something actually changed (refresh
   // keeps the same Map reference when nothing did).
   void renderMaybeSlow()
   void index.refresh()
+  if (host.value && typeof ResizeObserver !== 'undefined') {
+    observer = new ResizeObserver(() => refit?.())
+    observer.observe(host.value)
+  }
 })
 
 watch([() => index.graph, showTags], () => void renderMaybeSlow())
 
 onBeforeUnmount(() => {
+  stopTypeWatch?.()
+  stopTypeWatch = null
+  ui.graphType = null
+  observer?.disconnect()
+  observer = null
+  refit = null
   sim?.stop()
   sim = null
 })

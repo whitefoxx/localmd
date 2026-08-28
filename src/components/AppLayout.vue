@@ -742,14 +742,19 @@ function closeKb(): void {
         <span class="text-xs text-fg-3 shrink-0">{{ $t('layout.graphHint') }}</span>
         <!-- type color legend: what each node color means -->
         <div class="flex items-center gap-3 overflow-x-auto min-w-0 flex-1 pl-2 text-xs">
-          <span
+          <!-- Each entry is a filter: click one and the graph is about that
+               type, click it again and it is about everything. -->
+          <button
             v-for="[t, color] in graphLegend.types"
             :key="t"
-            class="flex items-center gap-1.5 shrink-0"
+            class="flex items-center gap-1.5 shrink-0 rounded px-1.5 py-0.5 transition-opacity hover:bg-bg-2"
+            :class="ui.graphType && ui.graphType !== t ? 'opacity-40' : ''"
+            :title="$t('layout.graphTypeFilter')"
+            @click="ui.graphType = ui.graphType === t ? null : t"
           >
             <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: color }" />
             <span class="text-fg-2 whitespace-nowrap">{{ t }}</span>
-          </span>
+          </button>
           <span v-if="graphLegend.hasUntyped" class="flex items-center gap-1.5 shrink-0">
             <span
               class="inline-block h-2.5 w-2.5 rounded-full"

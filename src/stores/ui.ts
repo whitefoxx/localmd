@@ -139,6 +139,11 @@ export const useUiStore = defineStore('ui', () => {
    *  handoff rather than shared state. */
   const pendingPrompt = ref('')
 
+  /** The one node type the graph is currently about, picked from the legend.
+   *  Null shows everything at full strength. Lives here because the legend is
+   *  in the layout and the drawing is in GraphView. */
+  const graphType = ref<string | null>(null)
+
   /** A query handed to the search palette from elsewhere — the graph's tag
    *  nodes use it to turn "what else carries this tag" into a real search the
    *  user can edit. One-shot, like pendingPrompt: the palette consumes it on
@@ -239,6 +244,7 @@ export const useUiStore = defineStore('ui', () => {
     pricingOpen,
     editorTabsVisible,
     pendingPrompt,
+    graphType,
     pendingSearch,
     searchFor,
     settingsSection,
