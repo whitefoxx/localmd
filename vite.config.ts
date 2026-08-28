@@ -49,6 +49,64 @@ function demoIndexWriter(): Plugin {
 }
 
 /**
+ * Ship pdf.js's image-decoder wasm at a stable URL.
+ *
+ * pdf.js 6 moved JBIG2 and JPEG 2000 decoding into WebAssembly, and looks the
+ * modules up by filename under whatever directory `wasmUrl` names. That rules
+ * out the `?url` import used for every other asset here: Rollup would hash the
+ * very filenames pdf.js is about to concatenate by hand. So these two are
+ * copied through verbatim, and the directory is what gets handed to
+ * `getDocument`.
+ *
+ * They are not optional, and their absence is silent. A scanned page is one
+ * big JBIG2 image; with no decoder pdf.js paints nothing, resolves the render
+ * promise, and merely *warns* — leaving a sheet of blank white paper that OCR
+ * reads as an empty page and a human reads as a bad scan.
+ *
+ * The `*_nowasm_fallback.js` siblings (600KB of the two) are deliberately left
+ * behind: they exist for environments without WebAssembly, and this app opens
+ * PDFs with a 4.6MB pdfium.wasm. There is no such environment in which the
+ * rest of it works.
+ *
+ * These two are also kept OUT of the precache (see `globIgnores` below) and
+ * cached at first use instead. pdf.js asks for them only when it actually
+ * meets a JBIG2 or JPEG 2000 image, and most people never open a scan — a
+ * first visit should not pay 357KB for a decoder it will never run.
+ */
+function pdfjsWasmAssets(): Plugin {
+  const DIR = 'pdfjs-wasm'
+  const FILES = ['jbig2.wasm', 'openjpeg.wasm']
+  const source = (f: string) =>
+    readFile(fileURLToPath(new URL(`./node_modules/pdfjs-dist/wasm/${f}`, import.meta.url)))
+  let serving = false
+  return {
+    name: 'localmd-pdfjs-wasm',
+    configResolved(config) {
+      serving = config.command === 'serve'
+    },
+    configureServer(server) {
+      server.middlewares.use(`/${DIR}`, (req, res, next) => {
+        const file = (req.url ?? '').replace(/^\//, '').split('?')[0]
+        if (!FILES.includes(file)) return next()
+        void source(file).then(
+          (bytes) => {
+            res.setHeader('Content-Type', 'application/wasm')
+            res.end(bytes)
+          },
+          () => next(),
+        )
+      })
+    },
+    async buildStart() {
+      if (serving) return
+      for (const f of FILES) {
+        this.emitFile({ type: 'asset', fileName: `${DIR}/${f}`, source: await source(f) })
+      }
+    },
+  }
+}
+
+/**
  * Refuse to finish a build whose service worker does not precache the PDF
  * engine.
  *
@@ -63,6 +121,10 @@ function demoIndexWriter(): Plugin {
  * exists in the built artifact: the source is identical either way. It also
  * covers the next version of the same mistake — `maximumFileSizeToCacheInBytes`
  * outgrown by a newer engine would drop the wasm again, just as quietly.
+ *
+ * It reads `assets/` only, and that is the scope: what has to be precached is
+ * the engine every PDF needs. An asset emitted elsewhere is one we decided to
+ * fetch on demand (`pdfjs-wasm/`), and this must not drag it back in.
  */
 function assertEnginePrecached(): Plugin {
   let outDir = ''
@@ -103,6 +165,7 @@ function assertEnginePrecached(): Plugin {
 export default defineConfig({
   plugins: [
     demoIndexWriter(),
+    pdfjsWasmAssets(),
     vue(),
     VitePWA({
       // 'prompt', not 'autoUpdate'. The registration script the plugin injects
@@ -144,6 +207,26 @@ export default defineConfig({
         // Nothing errored; it was just slow, and only on a real network, which
         // is why it never appeared in dev. See docs/pdf-blank-on-localmd.md.
         globPatterns: ['**/*.{js,mjs,wasm,css,html,svg,jpg,woff,woff2,ttf}', 'assets/*.png'],
+        // …but not every wasm belongs in the precache. `pdfjs-wasm/` is the
+        // JBIG2 / JPEG 2000 image decoders: 357KB that only a scanned PDF ever
+        // needs, and `**/*.wasm` above would otherwise make every first visit
+        // pay for them before the app is usable. pdf.js already fetches them
+        // lazily — only when it meets an image in one of those formats — so the
+        // only thing making them eager was this glob.
+        globIgnores: ['**/pdfjs-wasm/**'],
+        // Kept after first use, so a scanned document opened once still opens
+        // offline. CacheFirst because the URL is versioned by the build.
+        runtimeCaching: [
+          {
+            urlPattern: /\/pdfjs-wasm\/.*\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pdfjs-image-decoders',
+              expiration: { maxEntries: 4 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
         // Sized for the pdfium wasm (4.6MB today) with room to grow, plus the
         // pdf.js worker and the CodeMirror language chunks. Raising this is not
         // the safeguard — assertEnginePrecached() is; a limit outgrown by the
