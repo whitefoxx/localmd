@@ -12,6 +12,7 @@ import {
   fileStem,
   escapeHtml,
   extractRole,
+  deriveSourceTags,
 } from './wiki'
 
 describe('parseWikilinks', () => {
@@ -149,5 +150,32 @@ describe('extractRole', () => {
     expect(extractRole('---\nkb-role: hub\n---\n')).toBeNull()
     expect(extractRole('---\ntitle: x\n---\n')).toBeNull()
     expect(extractRole('kb-role: index in prose')).toBeNull()
+  })
+})
+
+describe('deriveSourceTags', () => {
+  it('unions the tags of every page citing a source', () => {
+    const out = deriveSourceTags([
+      { tags: ['llm', 'prompting'], sources: ['raw/a.pdf'] },
+      { tags: ['reasoning'], sources: ['raw/a.pdf', 'raw/b.epub'] },
+    ])
+    expect(out.get('raw/a.pdf')).toEqual(['llm', 'prompting', 'reasoning'])
+    expect(out.get('raw/b.epub')).toEqual(['reasoning'])
+  })
+
+  it('ignores pages with no tags, and sources nobody tagged', () => {
+    const out = deriveSourceTags([
+      { tags: [], sources: ['raw/a.pdf'] },
+      { tags: ['x'], sources: [] },
+    ])
+    expect(out.size).toBe(0)
+  })
+
+  it('de-duplicates a tag two pages share', () => {
+    const out = deriveSourceTags([
+      { tags: ['llm'], sources: ['raw/a.pdf'] },
+      { tags: ['llm'], sources: ['raw/a.pdf'] },
+    ])
+    expect(out.get('raw/a.pdf')).toEqual(['llm'])
   })
 })

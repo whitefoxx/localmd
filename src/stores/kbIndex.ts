@@ -6,8 +6,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
-import { parseWikilinks, parseMarkdownLinks, extractType, extractTags } from '@/lib/wiki'
-import { isCitationToken, resolveCitePath } from '@/lib/citations'
+import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFrontmatter, deriveSourceTags } from '@/lib/wiki'
+import { isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
 import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
@@ -301,6 +301,35 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return map
   })
 
+  /**
+   * A source's tags, derived: the union of the tags of every page that
+   * declares it with `[[pdfN:path]]`.
+   *
+   * A PDF has no frontmatter to carry tags of its own, and inventing a place
+   * to keep them — a sidecar only this app can read — would put a second copy
+   * of the same fact in the folder. So the tags stay where they already are,
+   * on the pages, and a document inherits what its readers said about it.
+   * Nothing to write, nothing to keep in sync, and re-tagging a page re-tags
+   * its sources for free.
+   */
+  const sourceTags = computed(() => {
+    const files = useFilesStore().allFiles
+    return deriveSourceTags(
+      [...pages.value].map(([path, page]) => ({
+        tags: tags.value.get(path) ?? [],
+        sources: [...parseCiteSources(splitFrontmatter(page.content).body).values()]
+          .map((d) => resolveCitePath(d.path, files))
+          .filter((p): p is string => !!p),
+      })),
+    )
+  })
+
+  /** The tags of anything in the KB: a page's own, or a source's inherited
+   *  ones. One question, one answer, whatever kind of file is asked about. */
+  function tagsFor(path: string): string[] {
+    return tags.value.get(path) ?? sourceTags.value.get(path) ?? []
+  }
+
   const graph = computed(() => {
     const nodes = [...pages.value.keys()]
     const links: { source: string; target: string }[] = []
@@ -433,5 +462,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, declaredSources, hasSourceNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, declaredSources, hasSourceNote, graph, health, search, findBlockSources, blockText, reset }
 })

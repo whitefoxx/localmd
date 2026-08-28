@@ -127,8 +127,10 @@ function relativeDay(ms: number): string {
 
 const searchRows = computed<Row[]>(() => {
   const { typeFilter, tagFilter, text } = parsed.value
+  // `tagsFor` answers for sources too — a PDF inherits the tags of the pages
+  // that cite it, so `tag:llm` finds the paper as well as the notes on it.
   const keep = (p: string): boolean =>
-    matchesFilters(parsed.value, index.types.get(p), index.tags.get(p))
+    matchesFilters(parsed.value, index.types.get(p), index.tagsFor(p))
   let fileMatches: Array<{ path: string; positions: number[] }>
   let hits: SearchHit[]
   if (typeFilter || tagFilter) {
@@ -137,8 +139,11 @@ const searchRows = computed<Row[]>(() => {
       fileMatches = r.files.filter((f) => keep(f.path))
       hits = r.hits.filter((h) => keep(h.path))
     } else {
-      // A filter alone → list every page it matches.
-      const pool = typeFilter ? [...index.types.keys()] : [...index.tags.keys()]
+      // A filter alone → list everything it matches. For a tag that includes
+      // the sources that inherited it.
+      const pool = typeFilter
+        ? [...index.types.keys()]
+        : [...new Set([...index.tags.keys(), ...index.sourceTags.keys()])]
       fileMatches = pool
         .filter(keep)
         .sort()

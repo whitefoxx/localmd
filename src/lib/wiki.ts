@@ -165,3 +165,29 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 }
+
+/**
+ * A source's tags, inherited from the pages that cite it.
+ *
+ * A PDF has no frontmatter of its own, and a sidecar only this app could read
+ * would put a second copy of the same fact in someone's folder. So the tags
+ * stay on the pages and a document gets the union of what its readers said
+ * about it — nothing to write, nothing to keep in sync, and re-tagging a page
+ * re-tags its sources for free.
+ *
+ * @param pages path → { tags it declares, sources it resolves to }
+ */
+export function deriveSourceTags(
+  pages: Iterable<{ tags: readonly string[]; sources: readonly string[] }>,
+): Map<string, string[]> {
+  const map = new Map<string, Set<string>>()
+  for (const { tags, sources } of pages) {
+    if (!tags.length) continue
+    for (const source of sources) {
+      let set = map.get(source)
+      if (!set) map.set(source, (set = new Set()))
+      for (const t of tags) set.add(t)
+    }
+  }
+  return new Map([...map].map(([k, v]) => [k, [...v].sort()]))
+}
