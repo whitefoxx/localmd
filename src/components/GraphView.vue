@@ -274,6 +274,19 @@ function render(): void {
     .attr('dy', 3)
     .attr('fill', (d) => (d.kind === 'tag' ? 'rgb(var(--c-added))' : 'rgb(var(--c-fg-2))'))
 
+  // The legend's type filter: the chosen type keeps its weight, the rest
+  // steps back. Applied per element rather than by dimming a layer, because
+  // this selection is not the hover's — it persists, and the hover has to
+  // keep working on top of it.
+  function applyTypeFilter(): void {
+    const want = ui.graphType
+    node.style('opacity', (d) => (!want || d.type === want ? null : String(DIM_NODES)))
+    link.style('opacity', () => (want ? String(DIM_LINKS) : null))
+  }
+  applyTypeFilter()
+  stopTypeWatch?.()
+  stopTypeWatch = watch(() => ui.graphType, applyTypeFilter)
+
   // --- Focus: point at one node and the rest of the graph steps back ---------
   //
   // The node the graph is currently about — hovered, or held by a drag. Null is
@@ -320,6 +333,9 @@ function render(): void {
       enlarged.removeAttribute('font-weight')
       enlarged = null
     }
+    // Re-assert the legend's filter over everything, then let the raise below
+    // exempt what this hover is about.
+    applyTypeFilter()
     if (id === null) {
       baseLinks.style.opacity = ''
       baseNodes.style.opacity = ''
@@ -327,9 +343,14 @@ function render(): void {
     }
     baseLinks.style.opacity = String(DIM_LINKS)
     baseNodes.style.opacity = String(DIM_NODES)
+    // Hover outranks the legend. What you are pointing at and what it is
+    // connected to are the answer to the question the pointer is asking, and
+    // a filtered-out neighbour is still a neighbour: raising it into the
+    // undimmed layer only helps if its own filter opacity comes off too.
     const raise = (el: Element, home: SVGGElement, to: SVGGElement): void => {
       lifted.push([el, home, el.nextSibling])
       to.appendChild(el)
+      ;(el as SVGElement).style.opacity = ''
     }
     // Only the focused node's OWN lines: one between two lit neighbours is not
     // part of what you are pointing at. Lines first, and in their own layer
@@ -358,19 +379,6 @@ function render(): void {
       }
     }
   }
-
-  // The legend's type filter: the chosen type keeps its weight, the rest
-  // steps back. Applied per element rather than by dimming a layer, because
-  // this selection is not the hover's — it persists, and the hover has to
-  // keep working on top of it.
-  function applyTypeFilter(): void {
-    const want = ui.graphType
-    node.style('opacity', (d) => (!want || d.type === want ? null : String(DIM_NODES)))
-    link.style('opacity', () => (want ? String(DIM_LINKS) : null))
-  }
-  applyTypeFilter()
-  stopTypeWatch?.()
-  stopTypeWatch = watch(() => ui.graphType, applyTypeFilter)
 
   node
     .on('mouseenter', (_e, d) => setFocus(d.id))

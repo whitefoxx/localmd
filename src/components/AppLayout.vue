@@ -747,9 +747,15 @@ function closeKb(): void {
           <button
             v-for="[t, color] in graphLegend.types"
             :key="t"
-            class="flex items-center gap-1.5 shrink-0 rounded px-1.5 py-0.5 transition-opacity hover:bg-bg-2"
-            :class="ui.graphType && ui.graphType !== t ? 'opacity-40' : ''"
-            :title="$t('layout.graphTypeFilter')"
+            class="flex items-center gap-1.5 shrink-0 rounded px-1.5 py-0.5 transition hover:bg-bg-2"
+            :class="
+              ui.graphType === t
+                ? 'ring-1 ring-accent/60 bg-accent/10'
+                : ui.graphType
+                  ? 'opacity-40'
+                  : ''
+            "
+            :title="ui.graphType === t ? $t('layout.graphTypeClear') : $t('layout.graphTypeFilter')"
             @click="ui.graphType = ui.graphType === t ? null : t"
           >
             <span class="inline-block h-2.5 w-2.5 rounded-full" :style="{ background: color }" />
