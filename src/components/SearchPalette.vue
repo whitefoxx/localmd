@@ -22,6 +22,7 @@ import { useChatStore, type SessionSummary } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useCommands, type Command } from '@/composables/useCommands'
 import { fuzzyRank, termPositions, queryTerms } from '@/lib/fuzzy'
+import { parseSearchQuery, matchesFilters } from '@/lib/searchQuery'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import { openInEditor, revealEditor } from '@/lib/openInEditor'
 import { baseName } from '@/lib/wiki'
@@ -62,9 +63,8 @@ interface Row {
   sessionId?: string
 }
 
-// `type:foo` (or `type:"foo bar"`) filters results to that OKF concept type;
-// the rest of the query is the usual filename/content search.
-const TYPE_RE = /\btype:(?:"([^"]*)"|(\S+))/i
+// `type:` / `tag:` filters plus free text — the grammar and matching live in
+// lib/searchQuery so they are testable as pure functions.
 
 const mode = computed<Mode>(() =>
   query.value.startsWith('>') ? 'command' : query.value.startsWith('@') ? 'session' : 'search',
@@ -74,13 +74,7 @@ const term = computed(() =>
   mode.value === 'search' ? query.value : query.value.slice(1).trimStart(),
 )
 
-const parsed = computed(() => {
-  const m = term.value.match(TYPE_RE)
-  return {
-    typeFilter: m ? (m[1] ?? m[2]).toLowerCase() : '',
-    text: term.value.replace(TYPE_RE, '').trim(),
-  }
-})
+const parsed = computed(() => parseSearchQuery(term.value))
 
 function bindingHint(cmd: Command): string | undefined {
   if (!cmd.hotkey) return undefined
@@ -132,20 +126,21 @@ function relativeDay(ms: number): string {
 }
 
 const searchRows = computed<Row[]>(() => {
-  const { typeFilter, text } = parsed.value
+  const { typeFilter, tagFilter, text } = parsed.value
+  const keep = (p: string): boolean =>
+    matchesFilters(parsed.value, index.types.get(p), index.tags.get(p))
   let fileMatches: Array<{ path: string; positions: number[] }>
   let hits: SearchHit[]
-  if (typeFilter) {
-    const inType = (p: string): boolean =>
-      (index.types.get(p) ?? '').toLowerCase().includes(typeFilter)
+  if (typeFilter || tagFilter) {
     if (text) {
       const r = index.search(text)
-      fileMatches = r.files.filter((f) => inType(f.path))
-      hits = r.hits.filter((h) => inType(h.path))
+      fileMatches = r.files.filter((f) => keep(f.path))
+      hits = r.hits.filter((h) => keep(h.path))
     } else {
-      // Type filter alone → list every page of that type.
-      fileMatches = [...index.types.keys()]
-        .filter(inType)
+      // A filter alone → list every page it matches.
+      const pool = typeFilter ? [...index.types.keys()] : [...index.tags.keys()]
+      fileMatches = pool
+        .filter(keep)
         .sort()
         .map((path) => ({ path, positions: [] }))
       hits = []

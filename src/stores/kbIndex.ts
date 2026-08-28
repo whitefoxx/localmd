@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
-import { parseWikilinks, parseMarkdownLinks, extractType } from '@/lib/wiki'
+import { parseWikilinks, parseMarkdownLinks, extractType, extractTags } from '@/lib/wiki'
 import { isCitationToken, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
 import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
@@ -164,6 +164,24 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     await refreshDocSections()
   }
 
+  /** Every source some page declares with `[[pdfN:path]]`, resolved against
+   *  the real file list. A declaration is a page claiming to have read the
+   *  document — which is what makes it the honest test for "does this source
+   *  have a note yet": merely naming a file in prose claims nothing. Derived
+   *  from the page cache like everything else here; nothing is persisted.
+   *
+   *  Feeds the viewer's offer to write a source note, and the mtime stats
+   *  below. */
+  const declaredSources = computed(
+    () => new Set(declaredSourcePaths(pages.value, useFilesStore().allFiles)),
+  )
+
+  /** Whether any page cites this document — the viewer asks before offering
+   *  to have one written. */
+  function hasSourceNote(path: string): boolean {
+    return declaredSources.value.has(path)
+  }
+
   /** Stat the sources pages declare with `[[pdfN:path]]`. Only those: a page
    *  citing a document is claiming to have read it, which is what makes "the
    *  document changed after the page did" worth saying, and it keeps this to a
@@ -268,6 +286,18 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   const types = computed(() => {
     const map = new Map<string, string>()
     for (const [path, page] of pages.value) if (page.type) map.set(path, page.type)
+    return map
+  })
+
+  /** KB path → frontmatter tags, for pages that declare any. Feeds the
+   *  search palette's `tag:` filter; derived on demand from the cached
+   *  content, like everything else here — computed, never persisted. */
+  const tags = computed(() => {
+    const map = new Map<string, string[]>()
+    for (const [path, page] of pages.value) {
+      const list = extractTags(page.content)
+      if (list.length) map.set(path, list)
+    }
     return map
   })
 
@@ -403,5 +433,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, declaredSources, hasSourceNote, graph, health, search, findBlockSources, blockText, reset }
 })
