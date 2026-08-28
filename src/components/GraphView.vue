@@ -6,6 +6,8 @@ import {
   forceManyBody,
   forceCenter,
   forceCollide,
+  forceX,
+  forceY,
   type Simulation,
 } from 'd3-force'
 import { select } from 'd3-selection'
@@ -185,12 +187,15 @@ function render(): void {
     .join('g')
     .attr('cursor', 'pointer')
     .on('click', (_e, d) => {
-      ui.graphOpen = false
-      // A tag is not a file: clicking it asks the question it stands for.
+      // A tag is not a file: clicking it asks the question it stands for, and
+      // the answer arrives ON TOP of the graph (the palette is z-50, this is
+      // z-40) — you are looking at the neighbourhood, so leaving it to read
+      // the list would put the thing you were comparing against away.
       if (d.kind === 'tag') {
         ui.searchFor(tagQuery(d.tag ?? ''))
         return
       }
+      ui.graphOpen = false
       // The graph is reachable from inside the full-window agent panel, so the
       // file has to be uncovered as well as opened — see lib/openInEditor.
       void openInEditor(d.id)
@@ -250,6 +255,8 @@ function render(): void {
    *  across a hover byte-identical, so which node is drawn on top of which
    *  never quietly changes under the pointer. */
   let lifted: [Element, SVGGElement, ChildNode | null][] = []
+  /** The label currently drawn large, so it can be put back. */
+  let enlarged: SVGTextElement | null = null
 
   const endId = (e: string | GraphNode): string => (typeof e === 'string' ? e : e.id)
 
@@ -276,6 +283,11 @@ function render(): void {
       home.insertBefore(el, before)
     }
     lifted = []
+    if (enlarged) {
+      enlarged.setAttribute('font-size', '10')
+      enlarged.removeAttribute('font-weight')
+      enlarged = null
+    }
     if (id === null) {
       baseLinks.style.opacity = ''
       baseNodes.style.opacity = ''
@@ -301,7 +313,18 @@ function render(): void {
       if (el) raise(el, baseNodes, topNodes)
     }
     const self = nodeEl.get(id)
-    if (self) raise(self, baseNodes, topNodes)
+    if (self) {
+      raise(self, baseNodes, topNodes)
+      // The label is the answer to "what is this one" — hovering asks the
+      // question, so it is worth reading without leaning in. Restored by the
+      // reset at the top of this function.
+      const label = self.querySelector('text')
+      if (label) {
+        enlarged = label
+        label.setAttribute('font-size', '14')
+        label.setAttribute('font-weight', '600')
+      }
+    }
   }
 
   node
@@ -343,8 +366,16 @@ function render(): void {
         .id((d) => d.id)
         .distance(70),
     )
-    .force('charge', forceManyBody().strength(-180))
+    // Repulsion with a range: past this it contributes nothing, so a node with
+    // no links is not shoved to the far corner by every other node at once.
+    .force('charge', forceManyBody().strength(-180).distanceMax(420))
     .force('center', forceCenter(width / 2, height / 2))
+    // A slack tether to the middle. forceCenter only translates the whole
+    // cloud — it cannot pull a stray back in, because it moves everything
+    // equally. These two can, and weakly enough that a linked cluster still
+    // arranges itself.
+    .force('x', forceX<GraphNode>(width / 2).strength(0.06))
+    .force('y', forceY<GraphNode>(height / 2).strength(0.06))
     // Collision follows the drawn size, or the big nodes overlap each other.
     .force('collide', forceCollide<GraphNode>((d) => nodeRadius(d) + 8))
     .on('tick', () => {
