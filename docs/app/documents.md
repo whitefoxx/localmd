@@ -23,6 +23,40 @@ This takes a moment for a long book. Afterwards:
 The index is rebuildable, so it is skipped when pushing to GitHub — no huge
 repositories.
 
+## Scanned documents
+
+Some PDFs are pictures of pages rather than text — anything that came off a
+scanner or a photocopier, and most old papers. There is nothing in the file
+for the index to read, so it comes back empty and the viewer says so: no
+passages to quote, and the assistant cannot cite anything from it.
+
+Everything else still works. You can read it, highlight it, annotate it and
+have it read aloud, and notes you write about it are ordinary notes. What is
+missing is only the part that needs machine-readable text.
+
+### Reading the pictures
+
+The notice offers a **Read the pictures** button, which recognises the text on
+each page and builds the index from that. Pick the language the document is
+written in — there is a combined option for a book in one language with terms
+in another — and the button tells you how many pages that is and roughly how
+long it will take. It is not fast: think seconds per page, so a long book is
+most of an hour.
+
+This happens on your machine, and the document never leaves the folder. The
+first time you use a language, its alphabet is downloaded once and then kept
+by the browser.
+
+Cancelling throws the work away rather than keeping the pages it got to. A
+book that was half read would produce an index that looks complete and quietly
+covers a third of the pages — neither you nor the assistant would have any way
+to tell.
+
+Recognition is good, not perfect. Expect the occasional wrong character,
+especially on a soft scan, and treat a quotation from a recognised page as
+something to check against the page itself — which is exactly what clicking
+the citation does.
+
 ## Turning a document into a note
 
 A document sitting in your folder is material; a note about it is knowledge.

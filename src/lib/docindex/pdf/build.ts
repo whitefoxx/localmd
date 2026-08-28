@@ -28,6 +28,9 @@ interface BuildInput {
    *  current blocks. Absent (tests, first principles) → derived from blocks. */
   locations?: Record<string, { page: number; rects: PdfBlock['rects'] }>
   outline: { tree: OutlineNode[]; flat: { title: string; level: number; page: number }[] }
+  /** Where the text came from — see PdfIndexManifest.textSource. */
+  textSource?: 'layer' | 'ocr'
+  ocrLang?: string
   /** Progress for the two halves this function owns: rendering the sections,
    *  then writing them out. Both were silent, and on a long document both take
    *  long enough to look like nothing happening. */
@@ -42,7 +45,7 @@ interface Boundary {
 
 /** Build + write the whole index directory. Returns the manifest. */
 export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
-  const { indexDir, source, title, contentHash, pageCount, pageSizes, blocks, outline } = input
+  const { indexDir, source, title, contentHash, pageCount, pageSizes, blocks, outline, textSource, ocrLang } = input
 
   const { structure, boundaries } = pickStructure(blocks, outline, pageCount)
   const sections = buildSections(boundaries, pageCount)
@@ -58,7 +61,7 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
     path: 'toc.md',
     content: renderToc(title, source, structure, outline.tree, sections, sectionForPage),
   })
-  files.push({ path: '_README.md', content: renderReadme(title, source) })
+  files.push({ path: '_README.md', content: renderReadme(title, source, textSource) })
 
   const locations = input.locations ?? {}
   if (!input.locations) {
@@ -76,6 +79,7 @@ export async function buildIndex(input: BuildInput): Promise<PdfIndexManifest> {
     title,
     pageCount,
     blockCount: blocks.length,
+    ...(textSource === 'ocr' ? { textSource, ocrLang } : {}),
     contentHash,
     parsedAt: new Date().toISOString(),
     structure,
@@ -228,12 +232,22 @@ function renderToc(
 }
 
 /** Render `_README.md` — instructions for the AI agent reading this index. */
-function renderReadme(title: string, source: string): string {
+function renderReadme(title: string, source: string, textSource?: 'layer' | 'ocr'): string {
   return `# PDF index — ${title}
 
 This folder is a **parsed, location-aware index** of the PDF \`${source}\`,
 generated so an AI agent can read the document like source code.
-
+${
+  textSource === 'ocr'
+    ? `
+> **This text was recognised from pictures of the pages** (the PDF is a scan
+> and has no text layer). Block ids and coordinates are exact, so citations
+> land on the right passage — but the wording is a machine's reading and
+> contains mistakes. Say so when you quote from it, and prefer paraphrase to
+> a long verbatim quotation.
+`
+    : ''
+}
 ## Files
 
 - \`toc.md\` — table of contents. **Start here.**

@@ -101,7 +101,6 @@ Cloudflare Pages 也可以考虑,同样要先验证。
 
 - **GitHub 同步 live 验证**:push/pull 代码与错误路径已测,但真实推送需用户 PAT
   (Settings → Git & GitHub;README 有 token 指南)
-- **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(见下方专节的完整方案)
 - **EPUB 页内截图**:epub.js 渲染的是 iframe HTML,无现成区域截图;若做,用
   getDisplayMedia(preferCurrentTab)抓帧 + 自绘选框裁剪(每次多一步浏览器确认,
   画质受屏幕分辨率限制)。当前结论:用系统截图(⌘⇧4)+ 聊天粘贴即可
@@ -358,7 +357,7 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 需要 embedding 或 LLM，另一个成本档位，明确往后排。
 
 
-## 扫描件 OCR:方案已定,暂缓实施(2026-08-28)
+## 扫描件 OCR:Stage 0 / Stage 1 已实现(2026-08-28)
 
 **引擎必须是 tesseract.js,不能是视觉模型——这条是几何决定的,不是成本。**
 `inherit.ts` 的不变量建立在**矩形重叠**上(「几何是 ground truth」),`locations.json`
@@ -367,36 +366,79 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 没有可靠坐标 → 只能伪造矩形 → 高亮退化成整页闪烁、继承全乱。**视觉模型不能喂索引**,
 它将来至多做「帮我读这一页」的便利功能,那是另一件事。
 
-### Stage 0 · 先把话说清楚(半天,无论后面选什么都欠着)
+### 已实现
 
-现状已有一句 `no text layer (scanned?)`,但它只是索引徽章后的尾巴:`index_document`
-的工具结果只报 `0 blocks`,agent 不知道这意味着什么;用户不知道「那我还能干什么」。
-要做的是在 viewer、工具结果、手册三处给一句完整的人话:这是扫描件、索引没有文本可引、
-**但标注/阅读/朗读照常可用**。这一步消掉「静默产出 0」这个最坏的失败模式。
+- **Stage 0**:viewer 上一张常驻提示卡(不是 toast 尾巴)、`index_document` 的工具
+  结果对 agent 说清 0 块的含义、手册两语言各一节。
+- **Stage 1**:`lib/docindex/pdf/ocr.ts` + `extractPdfViaOcr`,提示卡上「识别页面
+  上的文字」→ 选语言 → 按钮上写明页数与预估分钟数 → 进度条与取消。产物走既有
+  `assembleBlocks` / `boundsOf` / `inherit.ts`,所以块、矩形、id、引用与文本层路径
+  完全同一条。
+- **出处标记**:manifest 记 `textSource` / `ocrLang`;viewer 顶栏一枚常驻徽章
+  「Text recognised」,索引的 `_README.md` 也对 agent 说明这是识别所得、引用时要
+  声明。
+- **重建不降级**:`parsePdf` 在强制重建时读旧 manifest,`textSource: 'ocr'` 就带着
+  原来的 `ocrLang` 再跑一次 OCR。否则重建会静默用文本层抽取器去处理一份没有文本层的
+  扫描件——用户半小时的 CPU 换回 0 块,笔记里的引用全部悬空,提示卡还会像什么都没发生
+  过一样回来。`parse.test.ts` 钉住(去掉修复后 7 条里挂 3 条)。
 
-### Stage 1 · tesseract.js(1–2 天)
+真实验收(311 页中文扫描件切出的 3 页,`chi_sim`):34 块、中文正确、`b2-3` 点回去
+精确高亮到第 2 页那段编号段落。
 
-依赖判断按「默认自己实现」的规矩过了一遍:OCR 引擎「组件非常复杂」✓、「候选库非常
-稳定」✓(Apache-2.0、十年项目、纯 WASM 无后端)。**引,但要把为什么引、什么条件下
-重新评估记进仓库。**
+### 这个依赖为什么引,什么条件下重新评估
 
-| 事项 | 做法 |
-|---|---|
-| 体积 | 核心 WASM ~2MB + `eng.traineddata` ~10MB(fast 变体 ~4MB)。**绝不进主包**——走 `await import()`,与 pdf.js/epub.js 同一个懒加载模式(`docindex/index.ts` 有先例);语言包按需下载并缓存进 IndexedDB |
-| 触发位置 | 只在 `blockCount === 0` 时;有文本层的 PDF 一行不碰 |
-| 渲染 | pdf.js 渲页成 canvas(viewer 已在做),2–3x 缩放喂给 OCR |
-| 性能 | Intel Mac 纯 CPU 约 2–5 秒/页。**必须跑在 Web Worker 里**,要有进度与取消 |
-| 格式契约 | `INDEX_VERSION` **不动**(读契约未变);**`BUILDER` 必须 bump**。golden fixture 变红时按规矩是「bump BUILDER 并检查继承」,不是重新生成到绿 |
-| id 继承 | 首次 OCR 时旧索引 0 块,无历史 id 冲突;重跑 OCR 走既有 `inherit.ts`——有真坐标,几何匹配天然成立 |
-| 出处标记 | manifest 加 `textSource: 'layer' \| 'ocr'`(新增可选字段,不破读契约)。**引用徽章要显示这是 OCR 转写**——OCR 会错字,而我们承诺的是「点回去看原文」,用户有权知道这段引文是机器认的 |
-| 触发方式 | 手动。徽章显示 `Run OCR · N pages`,点了才跑;超过阈值先问一次 |
+按「默认自己实现」的规矩过了一遍:OCR 引擎「组件非常复杂」✓、「候选库非常稳定」✓
+(tesseract.js,Apache-2.0,十年项目,纯 WASM 无后端,与「浏览器内、无服务端」的
+硬约束天然相容)。它替换的不是薄层——自己写一个中文 OCR 不是一个季度的事。
 
-### Stage 2 · 只在有人要时做
+值得借鉴的:引擎与语言数据分离、按需下载再缓存;worker 生命周期由调用方持有并
+`terminate()`。**重新评估的条件**:(a) 浏览器原生 `Shape Detection API` 的
+`TextDetector` 在 Chrome 稳定落地并给出逐行坐标——那就是零依赖零下载;(b) tesseract.js
+的 CDN 语言包不再可靠(我们目前依赖它按需取字库);(c) 它停止维护,或某次大版本再
+一次静默改结果结构(7.0 就干过一次,见下面的坑 3)。
 
-页范围 OCR(只认在读的章节)、多语言包、视觉模型做「这一页讲什么」的便利路径。
+### 与原方案不同的几处(都是实现时才发现的)
 
-### 两个未决
+| 原计划 | 实际 | 为什么 |
+|---|---|---|
+| `BUILDER` 必须 bump | **没有 bump** | OCR 没有改文本层的抽取算法。bump 会把每一个既有索引标成「outdated」,为一条它们从未走过的路径 |
+| 取消保留已识别的页 | **取消丢弃全部** | 半本书会装配成一个完全合法、看起来完整、实际只覆盖三分之一页面的索引,而没有任何地方说得出来 |
+| 2–5 秒/页 | 正文页 ~4.5s、表格页 ~13s(Intel Mac) | 预估按 6s/页,按钮上直接写分钟数 |
+| Web Worker 里跑 | tesseract.js 自带 worker | 不需要我们再包一层 |
 
-1. **语言包默认只带英文吗?** 中文扫描件常见,但 `chi_sim` 体积翻倍且 CPU 上更慢。
-   倾向让用户在设置里选语言——「检测到 CJK 再提示」需要先 OCR 才能检测,循环依赖。
-2. Stage 0 是否先独立发一版。
+### 三个静默的坑(都不报错,只是产出空白)
+
+1. **pdf.js 6 把 JBIG2 / JPEG 2000 解码搬进了 WASM,需要 `getDocument({ wasmUrl })`。**
+   扫描件几乎都是 JBIG2,缺了它 pdf.js 只 warn 一句、把页面画成白纸、然后正常
+   resolve——OCR 拿到一张空白纸,看起来和「扫描质量太差」一模一样。
+   `vite.config.ts` 的 `pdfjsWasmAssets()` 把两个 wasm 复制到固定路径(`?url` 用不了,
+   pdf.js 自己按文件名拼)。
+2. **pdf.js 6 的 `render()` 收 `canvas`,只给 `canvasContext`(6 之前的签名)什么都
+   不画**,同样不抛错。
+3. **tesseract.js 7 把 `data.lines` 挪进了 `blocks[].paragraphs[].lines[]`**,读旧
+   位置得到 `undefined` 而不是报错——整页识别完美却产出 0 行。`ocr.test.ts` 钉住了
+   这三者中唯一可在 node 里测的那个。
+
+另有一条不是坑但会影响观感:tesseract 逐字切中文再用空格拼回,`起 始 情 境` 要在
+`tidy()` 里收掉,否则空格会进笔记、进搜索索引、进每一条引文。
+
+### 收尾时扫出来的陈旧文本(已修)
+
+新增一条能力之后,凡是「说这件事做不到」的地方都变成了假话。这次扫出四处:
+`index_document` 给 agent 的工具结果(说「无法引用,不要重试」)、`public/llms.txt`
+的对外说明(说「不做 OCR」)、一个已经没人用的 i18n key `indexNoText`,以及上面那条
+重建降级的真 bug。**加能力时要反向搜一遍旧的否定句**,不只是加新文案。
+
+### 还没做
+
+- **页范围 OCR**:311 页 ≈ 半小时,全有或全无。要做就得让 manifest 记下识别了哪些页,
+  并在 viewer 说明覆盖范围——否则就是上面「取消丢弃全部」那条要避免的东西。
+- **OCR 的标题判定偏噪**:行高来自 bbox,受升降部影响,正文段落容易被当成标题,
+  于是 section 文件名变成一整段话。共享的启发式不能单独为 OCR 改(会波及文本层
+  并触发 BUILDER bump),要做得另开一条按 `textSource` 分叉的路径。
+- **重建 OCR 索引没有取消入口**:带着 `ocrLang` 重跑是对的,但走的是 viewer 的
+  「更新索引」按钮那条路,没有进度取消。今天不可达(OCR 索引写的是当前 BUILDER,
+  不会被标 outdated),BUILDER 一旦 bump 就会暴露。
+- 语言包目前从 tesseract.js 的 CDN 按需下载(手册两语言都写明了)。选择器里是十项
+  常用语言,tesseract 本身有一百多种,`+` 可组合——要加只是往 `OCR_LANGS` 加一行。
+  要不要自带 `eng` 还没定。

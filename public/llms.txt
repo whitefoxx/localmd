@@ -47,7 +47,10 @@ browser's File System Access API.
 - Your files stay in your folder, but the text you send the agent goes to the
   model provider you configured, under your own key. "Nothing ever leaves your
   machine" would be false, and localmd does not claim it.
-- Scanned PDFs without a text layer are not OCRed and index to zero blocks.
+- Scanned PDFs have no text layer and index to zero blocks until you ask for
+  OCR, which is a button on the document, runs on your machine, and takes
+  seconds per page. Recognised text contains mistakes; citations still land
+  on the right paragraph, and the app says which documents were read that way.
 - LLM endpoints must allow browser CORS; the bundled presets are verified,
   many self-hosted gateways are not.
 

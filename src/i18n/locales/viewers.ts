@@ -8,6 +8,11 @@ export default {
     // Shared across readers.
     selection: 'Selection',
     index: {
+      // OCR is a reading, not a transcript. Said where the reader lands after
+      // clicking a citation, because that is the moment the difference bites.
+      recognised: 'Text recognised',
+      recognisedHint:
+        'This document has no text layer, so its text was recognised from pictures of the pages. Citations still land on the right passage, but the wording can contain mistakes — check anything you quote against the page.',
       updateAvailable: 'Update index',
       updateHint:
         'The AI index was built by an older version of the app. It still works as it is — click to rebuild with the current one. Citations in your notes keep working either way.',
@@ -16,6 +21,33 @@ export default {
     // The offer to write a source note. Shown only while no page in the KB
     // cites this document — an offer, never a nag: the detection is free, the
     // writing costs tokens, so a click sits between them.
+    // A scanned PDF is not a broken one, and "0 blocks" said nothing useful
+    // to anybody. This says what happened, what still works, and stops.
+    dismiss: 'Dismiss',
+    scanned: {
+      title: 'No text layer — this looks like a scan',
+      body: 'Every page is a picture, so there is nothing for the index to quote and the assistant cannot cite passages from it. Reading, highlighting, annotating and read-aloud all work as usual, and anything you write about it in your own notes is unaffected.',
+      // Reading the pictures is offered, never done uninvited: it is minutes
+      // of this machine's CPU, so the size of the bill is on the button.
+      offer: 'Read the pictures',
+      language: 'Language',
+      // The number is the point. A three-hundred-page book is most of an
+      // hour, and finding that out afterwards is finding it out too late.
+      start: 'Recognise {n} pages',
+      estimate: 'Roughly {mins} min on this machine. It runs here, so the document stays in the folder — but the alphabet is downloaded the first time you use a language.',
+      // Before page one there is a wait with nothing to count: the engine
+      // starts and, the first time a language is used, its data is fetched.
+      // Reported as "page 0 of 311" it reads as stuck.
+      preparing: 'Getting the language ready…',
+      running: 'Reading page {c} of {t}…',
+      cancel: 'Cancel',
+      // Said plainly because cancelling really does throw the work away.
+      cancelled: 'Cancelled — nothing was written.',
+      failed: 'Could not read the pages: {msg}',
+      done: 'Read {n} passages from the pictures. Citations into this document work now.',
+      empty: 'Nothing legible came back. A different language, or a sharper scan, may do better.',
+    },
+
     sourceNote: {
       write: 'Write a note',
       hint: 'No page in this knowledge base cites this document yet. This drafts a request to the assistant — you can edit it before sending.',
@@ -39,7 +71,6 @@ export default {
       indexAlready: 'Already indexed',
       indexDone: 'Indexed',
       indexSections: '{n} sections',
-      indexNoText: 'no text layer (scanned?)',
       indexFailed: 'Indexing failed',
     },
 
@@ -151,9 +182,29 @@ export default {
     zen: '禅模式 —— 只留下页面（Esc 退出）',
     selection: '选中内容',
     index: {
+      recognised: '文字为识别所得',
+      recognisedHint:
+        '这份文档没有文本层，正文是从页面图片里识别出来的。引用仍会落到正确的段落，但字句可能有误——引用前最好对照原页核一下。',
       updateAvailable: '更新索引',
       updateHint:
         'AI 索引由旧版本生成。不更新也能正常使用——点击用当前版本重建。无论是否重建，笔记里已有的引用都不受影响。',
+    },
+
+    dismiss: '知道了',
+    scanned: {
+      title: '没有文本层——这看起来是扫描件',
+      body: '每一页都是图片，索引没有文字可以引用，助手也无法引用其中的段落。阅读、划线、标注和朗读照常可用，你自己在笔记里写的关于它的内容也不受影响。',
+      offer: '识别页面上的文字',
+      language: '语言',
+      start: '识别 {n} 页',
+      estimate: '在这台机器上大约需要 {mins} 分钟。识别在本地进行，文档不会离开文件夹——但第一次用某种语言时会下载它的字库。',
+      preparing: '正在准备字库……',
+      running: '正在识别第 {c} / {t} 页……',
+      cancel: '取消',
+      cancelled: '已取消——没有写入任何内容。',
+      failed: '识别失败：{msg}',
+      done: '从图片里读出 {n} 段文字。现在可以引用这份文档了。',
+      empty: '没有识别出可用的文字。换一种语言，或者用更清晰的扫描件，也许会好一些。',
     },
 
     sourceNote: {
@@ -179,7 +230,6 @@ export default {
       indexAlready: '已索引',
       indexDone: '已索引',
       indexSections: '{n} 个段落',
-      indexNoText: '无文本层（扫描件？）',
       indexFailed: '索引失败',
     },
 

@@ -5,7 +5,7 @@
 import * as fs from '@/lib/fs'
 import { indexDirFor, readFreshManifest, sha256Hex, type IndexProgress } from '../util'
 import { buildIndex } from './build'
-import { extractPdf } from './extract'
+import { extractPdf, extractPdfViaOcr } from './extract'
 import { inheritIds, type PriorEntry } from './inherit'
 import { INDEX_VERSION, type PdfIndexManifest, type PdfLocations } from './types'
 
@@ -15,10 +15,22 @@ export interface PdfParseResult {
   cached: boolean
 }
 
+export interface PdfParseOptions {
+  /** Rebuild a usable index — the user's explicit choice, never ours. */
+  force?: boolean
+  /** Read the pages as pictures instead of looking for a text layer. Only set
+   *  when the user has asked: see extractPdfViaOcr. */
+  ocr?: {
+    lang: string
+    onPage?: (page: number, total: number) => void
+    signal?: AbortSignal
+  }
+}
+
 export async function parsePdf(
   source: string,
   onProgress: IndexProgress = () => {},
-  opts: { force?: boolean } = {},
+  opts: PdfParseOptions = {},
 ): Promise<PdfParseResult> {
   const indexDir = indexDirFor('pdf', source)
   const bytes = await fs.readBinary(source)
@@ -33,7 +45,25 @@ export async function parsePdf(
   }
 
   const base = source.split('/').pop()?.replace(/\.pdf$/i, '') ?? source
-  const extracted = await extractPdf(bytes, base, (c, t) => onProgress(c, t, 'extract'))
+  // Reading the pictures is never automatic: it costs seconds of CPU per page
+  // and megabytes of engine, so the caller has to have been told yes — either
+  // now (`opts.ocr`) or when they sat through it the first time.
+  //
+  // That second case is what `carriedOcr` is for. A rebuild of a document whose
+  // text was recognised would otherwise silently run the text-layer extractor,
+  // and a scan has no text layer: half an hour of the user's CPU replaced by
+  // zero blocks, the citations in their notes pointing at nothing, and the
+  // "this looks like a scan" notice back as if the work had never happened.
+  // Rebuild means build it again, not build a different thing.
+  const carriedOcr = opts.ocr ?? (await priorOcr(indexDir))
+  const extracted = carriedOcr
+    ? await extractPdfViaOcr(bytes, base, {
+        lang: carriedOcr.lang,
+        onProgress: (c, t) =>
+          carriedOcr.onPage ? carriedOcr.onPage(c, t) : onProgress(c, t, 'extract'),
+        signal: carriedOcr.signal,
+      })
+    : await extractPdf(bytes, base, (c, t) => onProgress(c, t, 'extract'))
   // The turn is announced with no numbers of its own: what happens next —
   // inheriting ids, then rendering — has no unit worth counting until the
   // sections exist, and leaving the extractor's last page on screen through
@@ -54,6 +84,8 @@ export async function parsePdf(
     blocks,
     locations,
     outline: extracted.outline,
+    textSource: carriedOcr ? 'ocr' : 'layer',
+    ocrLang: carriedOcr?.lang,
     onProgress,
   })
   return { indexDir, manifest, cached: false }
@@ -67,6 +99,23 @@ export async function parsePdf(
  * build that died before its manifest — writeAll orders writes so the old
  * manifest survives until the new index is complete) → nothing to inherit.
  */
+/**
+ * The OCR settings a previous build of this document was made with, or null if
+ * its text came out of the file. Deliberately indifferent to `contentHash`:
+ * different bytes are still the same scan, and the language the user picked is
+ * still the right one for it.
+ */
+async function priorOcr(indexDir: string): Promise<PdfParseOptions['ocr'] | null> {
+  const raw = await fs.tryReadFile(`${indexDir}/manifest.json`)
+  if (!raw) return null
+  try {
+    const m = JSON.parse(raw) as PdfIndexManifest
+    return m.textSource === 'ocr' && m.ocrLang ? { lang: m.ocrLang } : null
+  } catch {
+    return null
+  }
+}
+
 async function loadPriorIds(
   indexDir: string,
   contentHash: string,
@@ -80,6 +129,29 @@ async function loadPriorIds(
     if (!rawLoc) return null
     const loc = JSON.parse(rawLoc) as PdfLocations
     return loc.blocks ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Where this PDF's indexed text came from: read out of the file, or recognised
+ * off pictures of the pages.
+ *
+ * Worth asking about, and worth saying out loud, because the two are not the
+ * same kind of fact. A text layer is what the document says; OCR is a machine's
+ * best reading of what it looks like, and it gets characters wrong. The promise
+ * the app makes about a citation — that it lands on the passage — still holds
+ * either way, but "and the transcription is exact" only holds for one of them.
+ *
+ * `'layer'` for indexes written before the field existed: OCR is the newcomer,
+ * so an absent field means the old, non-recognised path.
+ */
+export async function pdfTextSource(source: string): Promise<'layer' | 'ocr' | null> {
+  const raw = await fs.tryReadFile(`${indexDirFor('pdf', source)}/manifest.json`)
+  if (!raw) return null
+  try {
+    return (JSON.parse(raw) as PdfIndexManifest).textSource ?? 'layer'
   } catch {
     return null
   }
