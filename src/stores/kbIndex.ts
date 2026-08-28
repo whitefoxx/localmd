@@ -10,6 +10,7 @@ import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFron
 import { isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
 import { indexableKind } from '@/lib/docindex'
+import { relatedTo, type RelatedResult } from '@/lib/related'
 import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
@@ -332,17 +333,42 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    * Nothing to write, nothing to keep in sync, and re-tagging a page re-tags
    * its sources for free.
    */
-  const sourceTags = computed(() => {
+  /** Page → the sources it declares, resolved. The declaration is repaired
+   *  against the real file list, so a moved PDF still counts as the same
+   *  source (see resolveCitePath). */
+  const pageSources = computed(() => {
     const files = useFilesStore().allFiles
-    return deriveSourceTags(
-      [...pages.value].map(([path, page]) => ({
-        tags: tags.value.get(path) ?? [],
-        sources: [...parseCiteSources(splitFrontmatter(page.content).body).values()]
-          .map((d) => resolveCitePath(d.path, files))
-          .filter((p): p is string => !!p),
-      })),
-    )
+    const map = new Map<string, string[]>()
+    for (const [path, page] of pages.value) {
+      const resolved = [...parseCiteSources(splitFrontmatter(page.content).body).values()]
+        .map((d) => resolveCitePath(d.path, files))
+        .filter((p): p is string => !!p)
+      if (resolved.length) map.set(path, resolved)
+    }
+    return map
   })
+
+  const sourceTags = computed(() =>
+    deriveSourceTags(
+      [...pages.value.keys()].map((path) => ({
+        tags: tags.value.get(path) ?? [],
+        sources: pageSources.value.get(path) ?? [],
+      })),
+    ),
+  )
+
+  /** What else the KB has about this file — shared tags, shared sources. A
+   *  view over the index, computed on demand and never stored; see
+   *  lib/related for what it deliberately cannot see. */
+  function related(path: string): RelatedResult {
+    return relatedTo({
+      path,
+      backlinks: backlinks(path),
+      candidates: [...pages.value.keys()],
+      tagsOf: (p) => tagsFor(p),
+      sourcesOf: (p) => pageSources.value.get(p) ?? [],
+    })
+  }
 
   /** The tags of anything in the KB: a page's own, or a source's inherited
    *  ones. One question, one answer, whatever kind of file is asked about. */
@@ -482,5 +508,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })
