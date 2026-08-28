@@ -273,6 +273,17 @@ export interface SessionSummary {
   favorite: boolean
 }
 
+/** One row of the agent-facing session listing (the read_session tool):
+ *  enough to pick a conversation by, nothing a read wouldn't also show. */
+export interface AgentSessionRecord {
+  id: string
+  title: string
+  updatedAt: number
+  favorite: boolean
+  /** Messages on the active branch — the transcript a read would return. */
+  messages: number
+}
+
 /** Text files this small are inlined into the message when @-mentioned;
  *  larger ones the agent reads via tools. */
 const INLINE_MENTION_CHARS = 16_000
@@ -669,6 +680,54 @@ export const useChatStore = defineStore('chat', () => {
       name: sessionFileName(s.title, s.createdAt),
       content: renderTranscriptFile({ ...s, uiMessages }),
     }
+  }
+
+  /** The transcript path of a session as it sits in storage: a pre-branching
+   *  record has no leafId and its flat list IS the path; a linked one reads
+   *  down to its leaf. Read-only on purpose — linking a legacy session up
+   *  stays adoptSession's job. */
+  function storedBranch(s: ChatSession): UiMessage[] {
+    return s.leafId === undefined ? s.uiMessages : branchPath(s.uiMessages, s.leafId)
+  }
+
+  /** Every non-empty session in this KB for the agent's read_session listing,
+   *  newest first. IDB snapshots overlaid with the live sessions — an open
+   *  tab's title and recency move mid-turn, and a brand-new session may not
+   *  have been persisted yet. */
+  async function listSessionRecords(): Promise<AgentSessionRecord[]> {
+    const record = (s: ChatSession): AgentSessionRecord => ({
+      id: s.id,
+      title: s.title,
+      updatedAt: s.updatedAt,
+      favorite: s.favorite === true, // pre-favorite records lack the field
+      messages: storedBranch(s).length,
+    })
+    const byId = new Map<string, AgentSessionRecord>()
+    if (kb.name) {
+      for (const s of await idb.listSessions(kb.name)) {
+        byId.set(s.id, record(s as unknown as ChatSession))
+      }
+    }
+    for (const s of [...tabs.value, ...background.values()]) byId.set(s.id, record(s))
+    return [...byId.values()]
+      .filter((r) => r.messages > 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+  }
+
+  /** Render any session in this KB as transcript markdown — an open tab (or a
+   *  detached running session) live, a closed one straight from its IDB
+   *  snapshot, without opening a tab. Null for unknown ids, empty sessions,
+   *  and other KBs' sessions: chats are per-KB knowledge, and a different
+   *  KB's are not this agent's to read. */
+  async function renderSessionById(
+    id: string,
+  ): Promise<{ title: string; content: string } | null> {
+    const open = tabs.value.find((t) => t.id === id) ?? background.get(id)
+    const s = open ?? ((await idb.getSession(id)) as unknown as ChatSession | null)
+    if (!s || s.kb !== kb.name) return null
+    const uiMessages = storedBranch(s)
+    if (!uiMessages.length) return null
+    return { title: s.title, content: renderTranscriptFile({ ...s, uiMessages }) }
   }
 
   /** Close off whatever a turn left mid-flight in one message: a tool still
@@ -1406,6 +1465,8 @@ export const useChatStore = defineStore('chat', () => {
     activateTab,
     closeTab,
     renderSession,
+    listSessionRecords,
+    renderSessionById,
     branchable,
     editing,
     versionsOf,

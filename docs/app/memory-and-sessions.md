@@ -8,6 +8,10 @@ summary: MEMORY.md is what the assistant remembers between chats; it is only eve
 Each chat starts fresh. What carries over is a single file:
 **`MEMORY.md`** in your folder's root.
 
+(Memory is what the assistant carries without being asked. It can also look
+back at your earlier chats in this folder when you ask it to — see
+`working-with-the-agent`.)
+
 If it exists, the assistant reads it at the start of every chat and honours
 what it says. Typical contents:
 

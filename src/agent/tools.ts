@@ -37,6 +37,7 @@ import {
   type HttpToolSpec,
 } from '@/lib/httpTools'
 import { clipWithRecall, storeToolResult } from '@/lib/toolResults'
+import { localDate } from '@/lib/transcript'
 import { syncAfterFsChange } from '@/lib/fileOps'
 import { clipText } from '@/lib/wellFormed'
 import { diffLines, collapseContext, type DiffLine, type HunkLine } from '@/lib/diff'
@@ -221,8 +222,9 @@ const listFiles = defineTool({
 })
 
 /** Serve one window of `content`, telling the model how to read the rest — a
- *  long file is otherwise unreachable past the first MAX_READ_CHARS. */
-function clip(content: string, offset = 0): string {
+ *  long file is otherwise unreachable past the first MAX_READ_CHARS. `tool`
+ *  names the call that continues the read (read_session pages the same way). */
+function clip(content: string, offset = 0, tool = 'read_file'): string {
   const from = Math.max(0, Math.trunc(offset))
   if (from && from >= content.length) {
     return `Error: offset ${from} is past the end of the file (${content.length} chars).`
@@ -231,7 +233,7 @@ function clip(content: string, offset = 0): string {
   const end = from + window.length
   return end >= content.length
     ? window
-    : `${window}\n\n[truncated at ${end} of ${content.length} chars — continue with read_file offset=${end}]`
+    : `${window}\n\n[truncated at ${end} of ${content.length} chars — continue with ${tool} offset=${end}]`
 }
 
 const readFile = defineTool({
@@ -694,6 +696,49 @@ const saveTranscript = defineTool({
     await fs.writeFile(target, r.content)
     await syncAfterFsChange()
     return `Session saved to ${target}`
+  },
+})
+
+/**
+ * Past conversations as readable knowledge. Chats live in the browser's own
+ * storage, not the KB folder, so read_file cannot reach them — this renders
+ * one on demand, as the same markdown save_transcript would write. A view,
+ * never a record: nothing is written anywhere. The durable, tool-neutral form
+ * of a conversation worth keeping is still a saved transcript — suggest
+ * save_transcript when one proves worth returning to.
+ */
+const readSession = defineTool({
+  name: 'read_session',
+  description:
+    "Read an earlier chat session in this knowledge base — past conversations are knowledge too (e.g. 'what did we decide about X last time?'). Call with no arguments to list sessions (newest first), then pass an id to read that session as a markdown transcript. Sessions live in the browser, not the KB folder; to make one a permanent file, use save_transcript.",
+  schema: z.object({
+    id: z
+      .string()
+      .optional()
+      .describe('Session id from the listing. Omit to list all sessions instead.'),
+    offset: z
+      .number()
+      .optional()
+      .describe('Character offset to continue a truncated transcript'),
+  }),
+  describeCall: (a) => (a.id ? `read session ${a.id.slice(0, 8)}` : 'list sessions'),
+  run: async ({ id, offset }, ctx) => {
+    const { useChatStore } = await import('@/stores/chat')
+    const chat = useChatStore()
+    if (!id) {
+      const list = await chat.listSessionRecords()
+      if (!list.length) return 'No chat sessions in this knowledge base yet.'
+      const lines = list.map((r) => {
+        const marks = `${r.favorite ? ' ★' : ''}${r.id === ctx.sessionId ? ' ← this conversation' : ''}`
+        return `- ${localDate(r.updatedAt)} · "${r.title}" · ${r.messages} messages · id: ${r.id}${marks}`
+      })
+      return `${list.length} sessions, newest first:\n${lines.join('\n')}`
+    }
+    const r = await chat.renderSessionById(id)
+    if (!r) {
+      return `Error: no session with id ${id} in this knowledge base. Call read_session with no arguments to list them.`
+    }
+    return clip(r.content, offset, 'read_session')
   },
 })
 
@@ -1783,6 +1828,7 @@ export const TOOLS: ToolSpec[] = [
   kbHealth,
   indexDocument,
   saveTranscript,
+  readSession,
   updatePlan,
   useSkill,
   appHelp,

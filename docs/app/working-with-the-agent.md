@@ -77,6 +77,15 @@ Every chat is kept, and the list icon in the assistant's header lists them —
 newest first, with the one you are reading marked. Click a row to open it; the
 star keeps a chat at hand, and the ✕ deletes it.
 
+The assistant can look through them too. Past chats in this folder are part of
+what it can read: ask "what did we decide about the pricing page last week?"
+and it lists your earlier conversations and reads the relevant one — you do
+not have to have saved it as a file first. Chats belong to their folder, so
+conversations from a different folder stay out of reach. A chat worth
+returning to is still worth saving as a real file (see below): a saved
+transcript is an ordinary note any tool can open, not something only this app
+can see.
+
 The ⤢ button beside it — or **⇧⌘.** — expands the assistant to fill the window. That mode
 carries the list permanently down the left side, with New chat and Search chats
 above it — the shape of a chat app, for when the chat is the work rather

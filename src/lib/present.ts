@@ -50,6 +50,7 @@ const TOOL_ICONS: Record<string, string> = {
   kb_health: 'codicon-pulse',
   index_document: 'codicon-book',
   save_transcript: 'codicon-save',
+  read_session: 'codicon-comment-discussion',
   update_plan: 'codicon-checklist',
   use_skill: 'codicon-lightbulb',
   app_help: 'codicon-question',

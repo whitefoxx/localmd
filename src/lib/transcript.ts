@@ -27,7 +27,9 @@ export function transcriptDirFor(rawLayout: boolean): string {
   return rawLayout ? 'raw/conversations/localmd' : `${INBOX_DIR}/conversations`
 }
 
-function localDate(ts: number): string {
+/** Local (not UTC) YYYY-MM-DD — a chat from last evening must not list as
+ *  tomorrow. Shared with the read_session listing in agent/tools. */
+export function localDate(ts: number): string {
   const d = new Date(ts)
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
