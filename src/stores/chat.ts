@@ -122,6 +122,11 @@ export type MessagePart =
       deleted?: boolean
       dir?: boolean
       restorable?: boolean
+      /** Renaming or relocating, rather than writing. */
+      moved?: boolean
+      /** The agent created this file itself, this session. Absent or false =
+       *  the user's file, which is the case the card is loudest about. */
+      mine?: boolean
       diff: HunkLine[]
       added: number
       removed: number
@@ -1049,6 +1054,8 @@ export const useChatStore = defineStore('chat', () => {
           deleted: e.deleted,
           dir: e.dir,
           restorable: e.restorable,
+          moved: e.moved,
+          mine: e.mine,
           diff: e.diff,
           added: e.added,
           removed: e.removed,

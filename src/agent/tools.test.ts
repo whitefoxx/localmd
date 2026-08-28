@@ -32,6 +32,7 @@ function tool(name: string) {
   return (args: Record<string, unknown>): Promise<string> => spec.run(args, ctx)
 }
 
+const write = tool('write_file')
 const del = tool('delete_path')
 const move = tool('move_path')
 const read = tool('read_file')
@@ -74,7 +75,10 @@ beforeEach(async () => {
 
 describe('delete_path', () => {
   it('deletes a text file and keeps a snapshot the user can restore', async () => {
-    const out = await del({ path: 'wiki/note.md' })
+    // Not a file the agent made, so it asks first whatever the write mode is.
+    const pending = del({ path: 'wiki/note.md' })
+    await decide('wiki/note.md', 'approved')
+    const out = await pending
     expect(out).toContain('Deleted wiki/note.md')
     expect(await fs.exists('wiki/note.md')).toBe(false)
 
@@ -191,15 +195,17 @@ describe('delete_path', () => {
 
 describe('move_path', () => {
   it('moves a file, creating the destination directory', async () => {
-    expect(await move({ from: 'inbox/a.md', to: 'wiki/notes/a.md' })).toBe(
-      'Moved inbox/a.md → wiki/notes/a.md',
-    )
+    const pending = move({ from: 'inbox/a.md', to: 'wiki/notes/a.md' })
+    await decide('inbox/a.md', 'approved')
+    expect(await pending).toBe('Moved inbox/a.md → wiki/notes/a.md')
     expect(await fs.readFile('wiki/notes/a.md')).toBe('A')
     expect(await fs.exists('inbox/a.md')).toBe(false)
   })
 
   it('moves a directory with its contents', async () => {
-    expect(await move({ from: 'inbox/sub', to: 'wiki/sub' })).toContain('directory')
+    const pending = move({ from: 'inbox/sub', to: 'wiki/sub' })
+    await decide('inbox/sub', 'approved')
+    expect(await pending).toContain('directory')
     expect(await fs.readFile('wiki/sub/b.md')).toBe('B')
     expect(await fs.statKind('inbox/sub')).toBe(null)
   })
@@ -296,6 +302,38 @@ describe('search_files', () => {
   })
 })
 
+describe('whose file is it — the gate on delete and move', () => {
+  /** Its own draft is housekeeping: no card, whatever the write mode. */
+  it('deletes a file it created itself without asking', async () => {
+    await write({ path: 'wiki/draft.md', content: 'mine\n' })
+    const out = await del({ path: 'wiki/draft.md' })
+    expect(out).toContain('Deleted wiki/draft.md')
+    expect(useApprovalsStore().pending).toHaveLength(0)
+  })
+
+  it('moves a file it created itself without asking', async () => {
+    await write({ path: 'wiki/draft.md', content: 'mine\n' })
+    expect(await move({ from: 'wiki/draft.md', to: 'wiki/moved.md' })).toContain('Moved')
+    expect(useApprovalsStore().pending).toHaveLength(0)
+  })
+
+  /** Someone else's file is a decision, and the card says whose it is. */
+  it('asks before moving a file it did not create, and says it is yours', async () => {
+    const pending = move({ from: 'inbox/a.md', to: 'wiki/a.md' })
+    await decide('inbox/a.md', 'approved')
+    await pending
+    expect(approvalCard('inbox/a.md')).toMatchObject({ moved: true, mine: false })
+  })
+
+  it('a refused move leaves the file where it was', async () => {
+    const pending = move({ from: 'inbox/a.md', to: 'wiki/a.md' })
+    await decide('inbox/a.md', 'rejected')
+    expect(await pending).toContain('declined')
+    expect(await fs.exists('inbox/a.md')).toBe(true)
+    expect(await fs.exists('wiki/a.md')).toBe(false)
+  })
+})
+
 describe('git_restore', () => {
   beforeEach(async () => {
     await g.init()
@@ -304,7 +342,9 @@ describe('git_restore', () => {
 
   it('reverts an edit and brings back a file deleted after it was committed', async () => {
     await fs.writeFile('wiki/note.md', 'edited\n')
-    await del({ path: 'inbox/a.md' })
+    const deleting = del({ path: 'inbox/a.md' })
+    await decide('inbox/a.md', 'approved')
+    await deleting
 
     const out = await restore({ paths: ['wiki/note.md', 'inbox/a.md'] })
     expect(out).toContain('Restored 2 file(s)')

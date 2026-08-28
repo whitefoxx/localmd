@@ -98,6 +98,12 @@ export default {
     connectScriptHideHelp:
       'This rule will hide the elements below on every matching page load until you remove it (pause or delete it any time in the localmd Connect popup).',
     // ApprovalCard — an ask-first write paused on the user, decided in place
+    approvalMove: 'Wants to move this file',
+    // Whose file this is. The distinction the agent's own drafts and the
+    // user's material deserve: tidying its own is housekeeping, touching
+    // theirs is a decision.
+    approvalYours: 'Your file — the assistant did not create it',
+    approvalMine: 'Created by the assistant in this session',
     approvalWrite: 'Wants to write this file',
     approvalCreate: 'Wants to create this file',
     approvalDelete: 'Wants to delete this file — Reject keeps it.',
@@ -216,6 +222,9 @@ export default {
     connectScriptHideHelp:
       '这条规则会在每次打开匹配页面时隐藏下面的元素，直到你移除它（随时可在 localmd Connect 弹窗里暂停或删除）。',
     // ApprovalCard —— 先询问模式下暂停的写入，就地决定
+    approvalMove: '想移动这个文件',
+    approvalYours: '你的文件——不是助手建的',
+    approvalMine: '助手在本次会话里建的',
     approvalWrite: '想写入这个文件',
     approvalCreate: '想创建这个文件',
     approvalDelete: '想删除这个文件 —— 点「拒绝」就保留。',

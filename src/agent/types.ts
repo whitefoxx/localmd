@@ -51,6 +51,11 @@ export type AgentEvent =
       dir?: boolean
       /** A rejected/undone deletion can put the file back (text snapshot). */
       restorable?: boolean
+      /** Renaming or relocating, rather than writing. */
+      moved?: boolean
+      /** The agent created this file itself, this session — so the card can
+       *  say whose file is at stake. Absent or false = the user's. */
+      mine?: boolean
       diff: HunkLine[]
       added: number
       removed: number

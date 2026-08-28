@@ -42,6 +42,26 @@ export const useReviewStore = defineStore('review', () => {
   const pending = ref<Map<string, PendingChange>>(new Map())
   const panelOpen = ref(false)
 
+  /**
+   * Paths the agent created in this session — the ones it may treat as its
+   * own. A first write with no `before` is the whole test; nothing is stored
+   * on disk, because "which files did the assistant create" is exactly the
+   * kind of bookkeeping that must not end up in someone's folder (see
+   * CLAUDE.md, "Recall is a view or a note, never a record").
+   *
+   * Unlike `pending`, approving a change does not remove it: the question
+   * this answers is not "is there an undecided change" but "whose file is
+   * this". It resets with the KB, which is deliberately conservative — next
+   * session, a page the agent wrote last week is treated as the user's, and
+   * touching it asks first.
+   */
+  const created = ref<Set<string>>(new Set())
+
+  /** Whether the agent made this file itself, this session. */
+  function isAgentCreated(path: string): boolean {
+    return created.value.has(path)
+  }
+
   const changes = computed(() => [...pending.value.values()])
   const count = computed(() => pending.value.size)
 
@@ -63,6 +83,8 @@ export const useReviewStore = defineStore('review', () => {
   }
 
   function recordWrite(path: string, before: string | null, after: string): void {
+    // First write with nothing there before = the agent created this file.
+    if (before === null && !pending.value.has(path)) created.value.add(path)
     upsert(path, before, after, {})
   }
 
@@ -114,6 +136,7 @@ export const useReviewStore = defineStore('review', () => {
 
   /** Forget everything under review, without touching any file. */
   function reset(): void {
+    created.value = new Set()
     pending.value.clear()
     panelOpen.value = false
   }
@@ -128,6 +151,7 @@ export const useReviewStore = defineStore('review', () => {
   return {
     pending,
     panelOpen,
+    isAgentCreated,
     changes,
     count,
     reset,

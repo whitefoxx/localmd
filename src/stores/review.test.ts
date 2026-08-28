@@ -110,3 +110,50 @@ describe('review store — the list belongs to the open folder', () => {
     expect(review.count).toBe(1)
   })
 })
+
+describe('review store — whose file is it', () => {
+  beforeEach(() => setActivePinia(createPinia()))
+
+  it('counts a file the agent wrote from nothing as its own', () => {
+    const review = useReviewStore()
+    review.recordWrite('wiki/new.md', null, 'fresh')
+    expect(review.isAgentCreated('wiki/new.md')).toBe(true)
+  })
+
+  it('does not claim a file that already had content', () => {
+    const review = useReviewStore()
+    review.recordWrite('wiki/theirs.md', 'their words', 'edited')
+    expect(review.isAgentCreated('wiki/theirs.md')).toBe(false)
+  })
+
+  /** Approving is about a pending change; whose file it is does not change
+   *  because the change was accepted. */
+  it('keeps the claim after the change is approved', () => {
+    const review = useReviewStore()
+    review.recordWrite('wiki/new.md', null, 'fresh')
+    review.approve('wiki/new.md')
+    expect(review.isAgentCreated('wiki/new.md')).toBe(true)
+  })
+
+  /** Editing its own file again must not un-claim it — the second write has
+   *  a `before`, which is the user-file signal everywhere else. */
+  it('keeps the claim when it edits its own file afterwards', () => {
+    const review = useReviewStore()
+    review.recordWrite('wiki/new.md', null, 'fresh')
+    review.recordWrite('wiki/new.md', 'fresh', 'revised')
+    expect(review.isAgentCreated('wiki/new.md')).toBe(true)
+  })
+
+  it('claims nothing in a folder it has not written to', () => {
+    expect(useReviewStore().isAgentCreated('wiki/anything.md')).toBe(false)
+  })
+
+  /** Conservative on purpose: next session a page the agent wrote is the
+   *  user's, and touching it asks first. */
+  it('forgets its claims when the KB is reset', () => {
+    const review = useReviewStore()
+    review.recordWrite('wiki/new.md', null, 'fresh')
+    review.reset()
+    expect(review.isAgentCreated('wiki/new.md')).toBe(false)
+  })
+})

@@ -108,6 +108,10 @@ interface AskMeta {
   deleted?: boolean
   dir?: boolean
   restorable?: boolean
+  moved?: boolean
+  /** The agent made this file itself, this session — so the card can say
+   *  whose file is at stake. Absent means the user's. */
+  mine?: boolean
 }
 
 /** Pause on a decision card in the conversation until the user settles it.
@@ -123,7 +127,15 @@ async function askUser(
 ): Promise<ApprovalDecision> {
   if (ctx.signal?.aborted) return 'stopped'
   const id = crypto.randomUUID()
-  ctx.emit?.({ type: 'approval', id, path, ...meta, ...approvalDiff(before, after, !!meta.deleted) })
+  const mine = meta.mine ?? useReviewStore().isAgentCreated(path)
+  ctx.emit?.({
+    type: 'approval',
+    id,
+    path,
+    ...meta,
+    mine,
+    ...approvalDiff(before, after, !!meta.deleted),
+  })
   const approvals = useApprovalsStore()
   const onAbort = (): void => approvals.settle(id, 'stopped')
   ctx.signal?.addEventListener('abort', onAbort, { once: true })
@@ -375,9 +387,13 @@ const deletePath = defineTool({
     const listing = isDir ? await dirListing(target) : null
     const before = isDir ? listing!.text : await textSnapshot(target)
     const restorable = !isDir && before !== null
-    // Ask when the user reviews every write — and always when the deletion is
-    // final, since there is no snapshot to undo it with.
-    if (useSettingsStore().state.writeMode === 'ask' || !restorable) {
+    // Ask when the user reviews every write, when the deletion is final (no
+    // snapshot to undo it with), and ALWAYS when the file is not one the
+    // agent made itself. Deleting your own draft is housekeeping; deleting
+    // something you found in the folder is a decision that belongs to whoever
+    // put it there.
+    const mine = useReviewStore().isAgentCreated(target)
+    if (useSettingsStore().state.writeMode === 'ask' || !restorable || !mine) {
       const decision = await askUser(ctx, target, before, '', {
         deleted: true,
         dir: isDir,
@@ -404,7 +420,7 @@ const movePath = defineTool({
     to: z.string().describe('New KB-relative path, including the new file name'),
   }),
   describeCall: (a) => `move ${a.from} → ${a.to}`,
-  run: async ({ from, to }) => {
+  run: async ({ from, to }, ctx) => {
     const src = cleanPath(from)
     const dest = cleanPath(to)
     const guard = guardPath(src, 'move') ?? guardPath(dest, 'move onto')
@@ -417,6 +433,14 @@ const movePath = defineTool({
     }
     if (await fs.statKind(dest)) {
       return `Error: ${dest} already exists — pick another destination, or delete it first.`
+    }
+    // Moving a file the user put there rearranges THEIR folder — the one
+    // thing this agent is not supposed to do on its own initiative. Its own
+    // drafts it may tidy freely. A rename also breaks the [[wikilinks]] that
+    // resolve by file name, which is not a thing to discover afterwards.
+    if (!useReviewStore().isAgentCreated(src)) {
+      const decision = await askUser(ctx, src, src, dest, { moved: true, dir: kind === 'dir' })
+      if (decision !== 'approved') return notApproved(decision, `moving ${src}`)
     }
     await useFilesStore().renameEntry(src, dest, kind === 'dir')
     refreshGitStatus()

@@ -22,9 +22,15 @@ const pending = computed(() => !props.part.decision)
  *  weight; a plain write is introduced by whether the file exists yet. */
 const headline = computed(() => {
   const p = props.part
+  if (p.moved) return 'chat.approvalMove'
   if (p.deleted) return p.restorable ? 'chat.approvalDelete' : 'chat.approvalDeleteFinal'
   return p.removed > 0 ? 'chat.approvalWrite' : 'chat.approvalCreate'
 })
+
+/** Whose file this is. Said out loud only for the user's own material —
+ *  the assistant's drafts are the unremarkable case, and a line on every
+ *  card would be a line nobody reads. */
+const ownership = computed(() => (props.part.mine ? null : 'chat.approvalYours'))
 
 const decisionLabel = computed(() =>
   props.part.decision === 'approved'
@@ -72,6 +78,10 @@ const decisionIcon = computed(() =>
     >
       {{ $t(headline) }}
     </p>
+    <!-- Whose file this is. Only said for the user's own material: the
+         assistant's drafts are the unremarkable case, and a line on every
+         card is a line nobody reads. -->
+    <p v-if="ownership" class="mt-0.5 text-[11px] text-fg-3">{{ $t(ownership) }}</p>
 
     <div
       v-if="part.diff.length"
