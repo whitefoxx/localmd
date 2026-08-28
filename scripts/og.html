@@ -10,14 +10,19 @@
    byte-identical everywhere, and this image is the copy most people see
    before they see any of the others.
 
-   Light, while the app and the gallery cards are dark: this one is not shown
-   next to them, it is shown inside somebody else's timeline, and it has read
-   as a legible white card there since launch. */
+   Ink, matching the landing page it links to: someone who clicks this card
+   should arrive somewhere that looks like the card. It was light until
+   2026-08-28, back when the landing followed the app's light theme; the
+   landing now commits to ink, and a white card in front of a black page reads
+   as two different products. */
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { width:1200px; height:630px; overflow:hidden; }
 body {
-  background:linear-gradient(160deg,#f7f9fc 0%,#eef2f8 55%,#e7edf6 100%);
-  color:#0d1117;
+  background:
+    radial-gradient(42% 46% at 66% 34%, rgba(96,174,255,.13), transparent 70%),
+    radial-gradient(34% 34% at 26% 76%, rgba(74,222,128,.07), transparent 70%),
+    linear-gradient(160deg,#070a0d 0%,#0a0e13 55%,#070a0d 100%);
+  color:#edf2f6;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -26,13 +31,13 @@ body {
 .mark { display:flex; align-items:center; gap:22px; margin-bottom:44px; }
 .mark svg { width:96px; height:96px; display:block; }
 .word { font-size:76px; font-weight:700; letter-spacing:-.02em; line-height:1; }
-.word .br { color:#b6c2d2; }
-.word .b { color:#0d1117; }
-.word .i { color:#2f7ff0; }
+.word .br { color:#3d4a57; }
+.word .b { color:#edf2f6; }
+.word .i { color:#60aeff; }
 h1 { font-size:40px; line-height:1.28; font-weight:700; letter-spacing:-.015em; max-width:980px; }
-.sub { margin-top:20px; font-size:31px; line-height:1.35; color:#41505f; max-width:960px; }
-.foot { margin-top:52px; font-size:22px; color:#8593a4; }
-.foot b { font-weight:400; color:#8593a4; }
+.sub { margin-top:22px; font-size:29px; line-height:1.4; color:#909ba4; max-width:940px; }
+.foot { margin-top:54px; font-size:21px; color:#6a757e; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+.foot b { font-weight:400; color:#6a757e; }
 </style></head>
 <body>
 <div class="mark">
@@ -46,7 +51,7 @@ h1 { font-size:40px; line-height:1.28; font-weight:700; letter-spacing:-.015em; 
   </svg>
   <div class="word"><span class="br">[[</span><span class="b">local</span><span class="i">md</span><span class="br">]]</span></div>
 </div>
-<h1>An AI knowledge base that runs in your browser and your local folder.</h1>
-<div class="sub">Open a URL, pick a folder, start thinking — nothing to install.</div>
-<div class="foot">No account&nbsp; ·&nbsp; Nothing to install&nbsp; ·&nbsp; Your files stay in your folder</div>
+<h1>An agent lives in your folder,<br>a wiki grows around your files.</h1>
+<div class="sub">It reads the PDFs, EPUBs and notes already in the folder and writes linked Markdown beside them.</div>
+<div class="foot">No install&nbsp; ·&nbsp; No account&nbsp; ·&nbsp; No upload&nbsp; ·&nbsp; No usage caps</div>
 </body></html>
