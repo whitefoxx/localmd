@@ -13,6 +13,7 @@ import {
   escapeHtml,
   extractRole,
   deriveSourceTags,
+  countTags,
 } from './wiki'
 
 describe('parseWikilinks', () => {
@@ -177,5 +178,23 @@ describe('deriveSourceTags', () => {
       { tags: ['llm'], sources: ['raw/a.pdf'] },
     ])
     expect(out.get('raw/a.pdf')).toEqual(['llm'])
+  })
+})
+
+describe('countTags', () => {
+  it('counts files per tag, most used first', () => {
+    expect(countTags([['llm', 'prompting'], ['llm'], ['cooking']])).toEqual([
+      { tag: 'llm', count: 2 },
+      { tag: 'cooking', count: 1 },
+      { tag: 'prompting', count: 1 },
+    ])
+  })
+  it('counts a file once however often it repeats a tag', () => {
+    expect(countTags([['llm', 'llm']])).toEqual([{ tag: 'llm', count: 1 }])
+  })
+  it('keeps near-duplicate spellings apart, as kb_health does', () => {
+    // Order between them is localeCompare's business; that both survive is
+    // the point.
+    expect(countTags([['LLM'], ['llm']]).map((t) => t.tag).sort()).toEqual(['LLM', 'llm'])
   })
 })

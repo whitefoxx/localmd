@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
-import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFrontmatter, deriveSourceTags } from '@/lib/wiki'
+import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFrontmatter, deriveSourceTags, countTags } from '@/lib/wiki'
 import { isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
 import { indexableKind } from '@/lib/docindex'
@@ -370,6 +370,13 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     })
   }
 
+  /** Every tag in the KB with how many files carry it — pages and the
+   *  sources that inherited theirs. What ⌘K offers when you type `tag:` and
+   *  stop: the filter is only useful if you can find out what to put in it. */
+  const allTags = computed(() =>
+    countTags([...tags.value.values(), ...sourceTags.value.values()]),
+  )
+
   /** The tags of anything in the KB: a page's own, or a source's inherited
    *  ones. One question, one answer, whatever kind of file is asked about. */
   function tagsFor(path: string): string[] {
@@ -508,5 +515,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

@@ -11,6 +11,8 @@
  */
 const TYPE_RE = /\btype:(?:"([^"]*)"|(\S+))/i
 const TAG_RE = /\btag:(?:"([^"]*)"|(\S+))/i
+/** `tag:` with nothing after it — the user is asking which tags exist. */
+const BARE_TAG_RE = /\btag:$/i
 
 export interface ParsedSearch {
   typeFilter: string
@@ -38,4 +40,13 @@ export function matchesFilters(
   if (parsed.tagFilter && !(tags ?? []).some((t) => t.toLowerCase().includes(parsed.tagFilter)))
     return false
   return true
+}
+
+/**
+ * Whether the query is asking for the list of tags rather than filtering by
+ * one. Typing the filter is how you find out it exists; typing it with no
+ * value is how you find out what the values are.
+ */
+export function wantsTagList(term: string): boolean {
+  return BARE_TAG_RE.test(term.trimEnd() === term ? term : term.trimEnd())
 }

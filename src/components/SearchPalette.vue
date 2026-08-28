@@ -22,7 +22,7 @@ import { useChatStore, type SessionSummary } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
 import { useCommands, type Command } from '@/composables/useCommands'
 import { fuzzyRank, termPositions, queryTerms } from '@/lib/fuzzy'
-import { parseSearchQuery, matchesFilters } from '@/lib/searchQuery'
+import { parseSearchQuery, matchesFilters, wantsTagList } from '@/lib/searchQuery'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import { openInEditor, revealEditor } from '@/lib/openInEditor'
 import { baseName } from '@/lib/wiki'
@@ -43,7 +43,7 @@ const inputEl = ref<HTMLInputElement | null>(null)
 type Mode = 'search' | 'command' | 'session'
 
 interface Row {
-  kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask'
+  kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask' | 'tag'
   /** Primary text; for files this is the path. */
   label: string
   /** Characters of `label` the query matched, for underlining. */
@@ -125,6 +125,20 @@ function relativeDay(ms: number): string {
   return t('search.daysAgo', { n: days })
 }
 
+/** Typing `tag:` and stopping asks which tags exist — the filter is only
+ *  useful to someone who can find out what to put in it. Picking one fills
+ *  the query in rather than navigating anywhere. */
+const tagRows = computed<Row[]>(() =>
+  index.allTags.map(
+    ({ tag, count }): Row => ({
+      kind: 'tag',
+      label: tag,
+      icon: 'codicon-tag',
+      hint: String(count),
+    }),
+  ),
+)
+
 const searchRows = computed<Row[]>(() => {
   const { typeFilter, tagFilter, text } = parsed.value
   // `tagsFor` answers for sources too — a PDF inherits the tags of the pages
@@ -185,6 +199,7 @@ const searchRows = computed<Row[]>(() => {
 const rows = computed<Row[]>(() => {
   if (mode.value === 'command') return commandRows.value
   if (mode.value === 'session') return sessionRows.value
+  if (wantsTagList(term.value)) return tagRows.value
   const found = searchRows.value
   // The offer to ask instead of search — only with something to ask about,
   // and FIRST. Search results are unbounded: put the offer after them and it
@@ -262,6 +277,13 @@ async function pick(row: Row | undefined): Promise<void> {
   if (!row) return
   if (row.kind === 'ask') {
     askAgent(row.label)
+    return
+  }
+  if (row.kind === 'tag') {
+    // Complete the filter in place; the results are the next keystroke away,
+    // and the palette stays open so a wrong pick costs one backspace.
+    query.value = query.value.replace(/tag:$/i, `tag:${/\s/.test(row.label) ? `"${row.label}"` : row.label} `)
+    inputEl.value?.focus()
     return
   }
   if (row.kind === 'command') {

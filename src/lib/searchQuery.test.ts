@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseSearchQuery, matchesFilters } from './searchQuery'
+import { parseSearchQuery, matchesFilters, wantsTagList } from './searchQuery'
 
 describe('parseSearchQuery', () => {
   it('extracts type and tag filters and leaves the text', () => {
@@ -42,5 +42,21 @@ describe('matchesFilters', () => {
   })
   it('passes everything when no filters are set', () => {
     expect(matchesFilters({ typeFilter: '', tagFilter: '' }, null, undefined)).toBe(true)
+  })
+})
+
+describe('wantsTagList', () => {
+  it('fires on a bare tag: filter', () => {
+    expect(wantsTagList('tag:')).toBe(true)
+    expect(wantsTagList('notes tag:')).toBe(true)
+    expect(wantsTagList('TAG:')).toBe(true)
+  })
+  it('does not fire once a value is being typed', () => {
+    expect(wantsTagList('tag:l')).toBe(false)
+    expect(wantsTagList('tag:llm')).toBe(false)
+  })
+  it('does not fire on an ordinary query', () => {
+    expect(wantsTagList('tagging')).toBe(false)
+    expect(wantsTagList('')).toBe(false)
   })
 })

@@ -191,3 +191,21 @@ export function deriveSourceTags(
   }
   return new Map([...map].map(([k, v]) => [k, [...v].sort()]))
 }
+
+/**
+ * Every tag in use, with how many files carry it — most-used first, then
+ * alphabetical so the order is stable between renders.
+ *
+ * Spellings are counted separately on purpose: `LLM` and `llm` are two rows,
+ * which is the same stance `kb_health` takes when it reports near-duplicates.
+ * Quietly merging them here would hide the thing that check exists to show.
+ */
+export function countTags(entries: Iterable<readonly string[]>): { tag: string; count: number }[] {
+  const counts = new Map<string, number>()
+  for (const list of entries) {
+    for (const tag of new Set(list)) counts.set(tag, (counts.get(tag) ?? 0) + 1)
+  }
+  return [...counts]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+}

@@ -77,7 +77,20 @@ Write `[[page name]]` to link to another page — the name without `.md`. Links
 are what stop a page becoming an island, and they power the graph view.
 
 Pages can also carry a `type:` at the top (`concept`, `source`, `person`, …) if
-you find that useful. It is free-form; there is no fixed list.
+you find that useful. It is free-form; there is no fixed list. The same goes
+for `tags:`.
+
+## Finding things by tag
+
+Search (⌘K) takes two filters as well as words: `type:concept` and `tag:llm`,
+which combine, match part of a word, and ignore case. Type `tag:` and stop and
+it lists every tag in the knowledge base with how many files carry it — pick
+one rather than remembering it.
+
+A PDF or EPUB has no frontmatter of its own, so it inherits the tags of the
+pages that cite it: tag a note about a paper and the paper answers to that tag
+too. Nothing is written anywhere to make that work, so re-tagging the note
+re-tags the paper.
 
 ## The log — what is not a page
 
