@@ -184,7 +184,16 @@ to build our layout around them.
 - Name the source in the page that came out of it — that is also what makes the
   next run's backlog correct.
 - Match the frontmatter the KB's other pages carry (\`type:\`, tags, dates)
-  instead of inventing a convention for the pages you happen to write.
+  instead of inventing a convention for the pages you happen to write. When a
+  KB carries none yet, a page about a single source is worth starting with
+  \`type: source\` and a few tags: those two fields are what the app's own tools
+  read — type chips in the file tree and the graph, \`type:\` and \`tag:\` filters
+  in search, near-duplicate tag hygiene in \`kb_health\`. Reuse tags the KB
+  already uses over minting new spellings of them.
+- A source with no page about it is invisible to all of that, which is why a
+  document nobody has cited offers a "Write a note" button in its viewer. What
+  that produces is an ordinary page: the source declared with
+  \`[[pdf1:path]]\`, the frontmatter above, and a link in from the index.
 
 ## 5. Say what did not fit
 
