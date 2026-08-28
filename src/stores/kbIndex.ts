@@ -9,6 +9,7 @@ import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFrontmatter, deriveSourceTags } from '@/lib/wiki'
 import { isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
+import { indexableKind } from '@/lib/docindex'
 import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
@@ -181,6 +182,25 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   function hasSourceNote(path: string): boolean {
     return declaredSources.value.has(path)
   }
+
+  /**
+   * Documents no page cites yet — material that is in the folder but not in
+   * the knowledge base.
+   *
+   * The same test the viewer's badge makes, asked of the whole KB: a
+   * declaration is a page claiming to have read the document, while naming a
+   * file in passing claims nothing. Deliberately narrower than `kb_health`'s
+   * `unreferencedSources`, which matches any mention — that one answers "has
+   * anything ever named this file", this one answers "has anything read it".
+   */
+  const sourcesWithoutNote = computed(() =>
+    useFilesStore()
+      .allFiles.filter((p) => {
+        const kind = indexableKind(p)
+        return (kind === 'pdf' || kind === 'epub' || kind === 'docx') && !declaredSources.value.has(p)
+      })
+      .sort(),
+  )
 
   /** Stat the sources pages declare with `[[pdfN:path]]`. Only those: a page
    *  citing a document is claiming to have read it, which is what makes "the
@@ -462,5 +482,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, declaredSources, hasSourceNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, tagsFor, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

@@ -18,6 +18,12 @@ export default {
     orphansHeading: 'Orphan pages',
     orphansDesc:
       'Nothing links to them and they link nowhere — unreachable by navigation. Link them from a related page or an index.',
+    unreadHeading: 'Documents with no note',
+    unreadDesc:
+      'PDFs, EPUBs and Word files no page cites yet. They are in the folder but not in the knowledge base — nothing can find them by tag, and nothing links them. Writing a note is what changes that.',
+    unreadAction: 'Write notes for these',
+    unreadPrompt:
+      'These documents are in the knowledge base but no page cites any of them yet:\n\n{list}\n\nWrite a source note for each, following the layout already in use here: `type: source` and a few tags in the frontmatter, a short summary of what it says, a `[[pdf1:path]]` source declaration so citations resolve, and a link in from the index page. Show me the plan before writing anything, and start with three unless I say otherwise — reading them all could be expensive.',
     allClear: 'Nothing found',
     jumpTo: 'Jump to {target} in {path}',
     editScope: 'What gets scanned (settings)',
@@ -35,6 +41,12 @@ export default {
     brokenDesc: '这些页面链向了没有对应文件的目标。点击目标可跳到页面中的位置，修正或删除链接。',
     orphansHeading: '孤立页面',
     orphansDesc: '没有任何页面链向它们，它们也不链向别处——导航无法到达。从相关页面或索引里链接它们。',
+    unreadHeading: '还没有笔记的文档',
+    unreadDesc:
+      '还没有任何页面引用过的 PDF、EPUB 和 Word 文件。它们在文件夹里，但不在知识库里——按 tag 找不到它们，也没有任何链接指向它们。写一篇笔记才会改变这一点。',
+    unreadAction: '为它们写笔记',
+    unreadPrompt:
+      '知识库里有这些文档，但还没有任何页面引用过它们：\n\n{list}\n\n请按这里已有的布局为每一篇写一则源笔记：frontmatter 里写 `type: source` 和几个 tag，正文给一段简短的内容摘要，加上 `[[pdf1:路径]]` 的源声明好让引用能跳转，并从索引页链接过去。动手前先把计划给我看，而且除非我另说，先做三篇——把它们全读一遍可能很贵。',
     allClear: '没有发现',
     jumpTo: '跳到 {path} 中的 {target}',
     editScope: '检测范围设置',

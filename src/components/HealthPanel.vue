@@ -13,6 +13,7 @@ import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
 import { openInEditor, revealEditor } from '@/lib/openInEditor'
+import { t } from '@/i18n'
 
 const ui = useUiStore()
 const index = useKbIndexStore()
@@ -20,6 +21,20 @@ const files = useFilesStore()
 
 const broken = computed(() => index.health.brokenLinks)
 const orphans = computed(() => index.health.orphans)
+/** Documents nothing cites — the whole-KB form of the viewer's badge. */
+const unread = computed(() => index.sourcesWithoutNote)
+
+/** Hand the batch to the agent as an editable draft. Reading a pile of PDFs
+ *  is the expensive kind of run, so this only ever drafts: the prompt asks
+ *  for a plan first and caps the first batch, and the user still has to send
+ *  it. */
+function writeNotes(): void {
+  ui.healthOpen = false
+  ui.agentOpen = true
+  ui.pendingPrompt = t('health.unreadPrompt', {
+    list: unread.value.map((p) => `- ${p}`).join('\n'),
+  })
+}
 
 watch(
   () => ui.healthOpen,
@@ -178,6 +193,38 @@ async function revealBroken(path: string, target: string): Promise<void> {
                 </button>
               </li>
             </ul>
+          </section>
+
+          <!-- Documents with no note. Not a defect — a backlog: the same test
+               the viewer's badge makes, asked of the whole KB. -->
+          <section class="rounded-lg border border-border bg-bg-2/30 p-3">
+            <div class="flex items-center gap-2">
+              <span
+                class="codicon codicon-sm shrink-0"
+                :class="unread.length ? 'codicon-book text-fg-3' : 'codicon-check text-added'"
+              />
+              <h3 class="flex-1 text-sm font-semibold text-fg-0">{{ $t('health.unreadHeading') }}</h3>
+              <span class="rounded-full bg-bg-2 px-2 py-0.5 text-[11px] font-medium tabular-nums text-fg-2">
+                {{ unread.length }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs leading-relaxed text-fg-3">{{ $t('health.unreadDesc') }}</p>
+
+            <div v-if="!unread.length" class="mt-2 text-xs text-fg-3">{{ $t('health.allClear') }}</div>
+            <template v-else>
+              <ul class="mt-2 space-y-1">
+                <li v-for="p in unread" :key="p" class="rounded px-2 py-1.5 hover:bg-bg-2/70">
+                  <button class="group/row flex w-full items-center gap-1.5 text-left" @click="open(p)">
+                    <span class="codicon codicon-sm codicon-file-pdf shrink-0 text-fg-3" />
+                    <span class="break-all text-xs text-accent group-hover/row:underline">{{ p }}</span>
+                  </button>
+                </li>
+              </ul>
+              <button class="btn mt-3 text-xs" @click="writeNotes">
+                <span class="codicon codicon-sm codicon-edit" />
+                {{ $t('health.unreadAction') }}
+              </button>
+            </template>
           </section>
         </div>
       </div>
