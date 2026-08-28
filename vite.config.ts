@@ -49,6 +49,101 @@ function demoIndexWriter(): Plugin {
 }
 
 /**
+ * Put the landing page's own words into the HTML, for readers that do not run
+ * JavaScript.
+ *
+ * The page is a Vue app: fetch it with curl and the body is an empty `<div>`.
+ * Googlebot renders JS and sees everything, but the crawlers this product most
+ * wants — the ones answering "is there a local-first alternative to X" — mostly
+ * do not. They were being offered a title, a paragraph, and a FAQ block.
+ *
+ * So the sections are rendered into a `<noscript>` at build time. Not
+ * hand-copied: a second, hand-maintained version of the marketing copy is a
+ * fact in two places, and the one nobody looks at is the one that goes stale
+ * and starts describing a product that no longer exists. This reads the same
+ * i18n catalogs the page renders from, so it cannot say anything different.
+ *
+ * English only, deliberately — one URL, one canonical, and `<html lang="en">`.
+ */
+function staticLandingCopy(): Plugin {
+  return {
+    name: 'localmd-static-landing-copy',
+    async transformIndexHtml(html) {
+      const [about, openKb] = await Promise.all([
+        import('./src/i18n/locales/about.ts'),
+        import('./src/i18n/locales/openKb.ts'),
+      ])
+      const a = about.default.en as Record<string, string>
+      const k = openKb.default.en as Record<string, string>
+      const esc = (t: string) =>
+        t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const h2 = (t: string) => `      <h2>${esc(t)}</h2>`
+      const p = (t: string) => `      <p>${esc(t)}</p>`
+      const li = (t: string) => `        <li>${esc(t)}</li>`
+      const list = (...items: string[]) => ['      <ul>', ...items.map(li), '      </ul>'].join('\n')
+
+      const body = [
+        `      <h1>${esc(k.headline.replace(/\u00A0/g, ' '))}</h1>`,
+        p(k.subline),
+        p(k.privacy),
+
+        h2(k.howItWorks),
+        list(
+          `${k.step1Title} — ${k.step1Body}`,
+          `${k.step2Title} — ${k.step2Body}`,
+          `${k.step3Title} — ${k.step3Body}`,
+        ),
+
+        h2(a.diff3Title),
+        p(a.diff3Body),
+
+        h2(a.reviewTitle),
+        list(a.review1, a.review2, a.review3),
+
+        h2(a.diff1Title),
+        p(a.diff1Body),
+        h2(a.adaptTitle),
+        p(a.adaptBody),
+        h2(a.diff5Title),
+        p(a.diff5Body),
+
+        h2(a.connectTitle),
+        p(a.connectBody),
+
+        h2(a.believeLabel),
+        list(
+          `${a.believe1Title} — ${a.believe1Body}`,
+          `${a.believe2Title} — ${a.believe2Body}`,
+          `${a.believe3Title} — ${a.believe3Body}`,
+          `${a.believe4Title} — ${a.believe4Body}`,
+        ),
+
+        h2(a.dontLabel),
+        list(a.dont2, a.dont3, a.dont4, a.dont6),
+
+        h2(a.closingTitle),
+        p(a.sourceBody),
+        '      <p>',
+        '        <a href="https://localmd.app/?demo=1">Try the demo (no folder, no key)</a> ·',
+        '        <a href="https://github.com/whitefoxx/localmd">Source on GitHub</a> ·',
+        '        <a href="https://localmd.app/llms.txt">llms.txt</a>',
+        '      </p>',
+      ].join('\n')
+
+      const block = `<noscript>\n    <main>\n${body}\n    </main>\n  </noscript>`
+      const replaced = html.replace(/<noscript>[\s\S]*?<\/noscript>/, block)
+      if (replaced === html) {
+        throw new Error(
+          'staticLandingCopy: no <noscript> block found in index.html to replace. ' +
+            'Without it the page ships nothing for crawlers that do not run JS.',
+        )
+      }
+      return replaced
+    },
+  }
+}
+
+/**
  * Ship pdf.js's image-decoder wasm at a stable URL.
  *
  * pdf.js 6 moved JBIG2 and JPEG 2000 decoding into WebAssembly, and looks the
@@ -143,7 +238,15 @@ function assertEnginePrecached(): Plugin {
       } catch {
         return // no service worker in this build (e.g. PWA disabled) — nothing to assert
       }
-      const assets = await readdir(resolve(dist, 'assets'))
+      // A build that already failed leaves no assets dir. Reporting ENOENT
+      // here would bury whatever actually went wrong under this plugin's
+      // error, which is the opposite of what a guard is for.
+      let assets: string[]
+      try {
+        assets = await readdir(resolve(dist, 'assets'))
+      } catch {
+        return
+      }
       const engine = assets.filter((f) => f.endsWith('.wasm') || f.endsWith('.mjs'))
       if (!engine.length) {
         throw new Error(
@@ -165,6 +268,7 @@ function assertEnginePrecached(): Plugin {
 export default defineConfig({
   plugins: [
     demoIndexWriter(),
+    staticLandingCopy(),
     pdfjsWasmAssets(),
     vue(),
     VitePWA({

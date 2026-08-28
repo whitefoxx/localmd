@@ -1,0 +1,17 @@
+# localmd — https://localmd.app
+#
+# Everything here is public and crawlable. There is no backend and no user
+# content on this origin: the app runs in the visitor's browser against a
+# folder on their own machine, so there is nothing private to keep out of.
+#
+# AI crawlers are welcome for the same reason a person is. /llms.txt is the
+# plain-text version of what this product is, written to be read rather than
+# rendered — prefer it to executing the page.
+
+User-agent: *
+Allow: /
+
+# The licence-claim page is per-purchase and has its own noindex; the OAuth
+# callback is a redirect target, not a page.
+Disallow: /claim.html
+Disallow: /oauth/

@@ -108,7 +108,7 @@
                 "name": "Can the AI edit my notes without me knowing?",
                 "acceptedAnswer": {
                   "@type": "Answer",
-                  "text": "No. Every write appears as a line-level diff you approve or discard, and in ask-first mode nothing touches disk until you say yes. Git is built in for history."
+                  "text": "Nothing it does is silent. Every change arrives as a line-level diff you approve or discard, and in ask-first mode nothing touches disk until you say yes. Deleting a file you wrote asks first, a deleted text file can be restored from the review panel, and git is built in for history."
                 }
               },
               {
@@ -142,31 +142,18 @@
     </script>
   </head>
   <body>
-    <!-- For crawlers that do not execute JS. Users never see this; the copy
-         mirrors the message house and must move when it moves. -->
+    <!-- Replaced at build time with the landing page's own sections, rendered
+         from the same i18n catalogs the app renders from (see
+         staticLandingCopy in vite.config.ts). Deliberately a marker and not a
+         hand-written copy: a second version of the marketing copy is a fact in
+         two places, and this is the one nobody would look at. The build fails
+         if this element goes missing. -->
     <noscript>
       <main>
         <h1>localmd — an agent lives in your folder</h1>
-        <p>
-          It reads the PDFs, EPUBs and notes already in the folder and writes
-          linked Markdown beside them — every citation clicks back to the
-          exact paragraph, and every change waits for your yes.
-        </p>
-        <p>
-          localmd is a knowledge base that runs entirely in your browser,
-          working inside a local folder you choose: an agent reads your PDFs,
-          EPUBs and Markdown notes and grows a wiki of linked Markdown pages
-          around them. No install, no server, no account. Free with your own
-          API key; open source (MIT).
-        </p>
-        <p>
-          <a href="https://localmd.app/?demo=1">Try the demo (no folder, no key)</a> ·
-          <a href="https://github.com/whitefoxx/localmd">Source on GitHub</a> ·
-          <a href="https://localmd.app/llms.txt">llms.txt</a>
-        </p>
       </main>
     </noscript>
-    <div id="app"></div>
+    <div id="app"></noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
