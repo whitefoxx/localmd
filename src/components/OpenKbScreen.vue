@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { isSupported } from '@/lib/fs'
+import { report } from '@/lib/analytics'
 import { t } from '@/i18n'
 import LandingAbout from '@/components/LandingAbout.vue'
 import WikiGrowth from '@/components/WikiGrowth.vue'
@@ -71,6 +72,7 @@ async function copyAddress(): Promise<void> {
 /** Open the in-memory demo KB — see `enterDemo`, which is the same door the
  *  chat panel offers when no model is configured yet. */
 async function openDemo(): Promise<void> {
+  report('demo_open')
   const { enterDemo } = await import('@/demo/bootstrap')
   await enterDemo()
 }

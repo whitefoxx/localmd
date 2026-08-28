@@ -10,6 +10,7 @@ import { usePlanStore } from '@/stores/plan'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { useComposerStore } from '@/stores/composer'
 import { useFileSelectionCapture } from '@/lib/selectionContext'
+import { report } from '@/lib/analytics'
 import { parseCiteSources, type CiteSource } from '@/lib/citations'
 import { importTempFile } from '@/lib/capture'
 import { mentionQueryAt, filterFiles } from '@/lib/mentions'
@@ -181,6 +182,7 @@ const emptyRows = computed(() => [
  *  enterDemo puts that one away properly first. */
 async function tryDemo(): Promise<void> {
   const { enterDemo } = await import('@/demo/bootstrap')
+  report('demo_open')
   await enterDemo()
 }
 

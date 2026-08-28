@@ -61,6 +61,11 @@ between sites, and it says nothing about your folder, your notes or your
 chat. A content blocker that stops it changes nothing about how the app
 works.
 
+One click is counted the same way: opening the demo knowledge base. It happens
+before there is any folder, which is the line — nothing you do inside a folder
+you have opened is ever reported. The count exists because the start screen
+cannot otherwise tell whether the people who arrive ever try it.
+
 That is the complete list. Nothing else is sent in the background, and nothing
 goes anywhere on a schedule.
 
