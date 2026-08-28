@@ -15,12 +15,11 @@ import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { fileStem } from '@/lib/wiki'
+import { buildGraphData, graphDegrees, tagQuery, type GraphDatum } from '@/lib/graphData'
 import { typeColor } from '@/lib/typeColor'
 import { openInEditor } from '@/lib/openInEditor'
 
-interface GraphNode {
-  id: string
-  type?: string | null
+interface GraphNode extends GraphDatum {
   x?: number
   y?: number
   fx?: number | null
@@ -54,6 +53,17 @@ let sim: Simulation<GraphNode, GraphLink> | null = null
  */
 const laying = ref(false)
 const HEAVY_NODES = 25
+
+/**
+ * Whether tags are drawn as nodes of their own.
+ *
+ * Off by default: the link graph answers "what did I connect", and mixing in
+ * a second kind of edge changes the shape of the answer — worth seeing when
+ * you ask for it, wrong to impose on someone who opened the graph to look at
+ * their links. A tag node is not a file; clicking one searches for it rather
+ * than opening anything.
+ */
+const showTags = ref(false)
 
 /**
  * What the chip says, or null for nothing to say.
@@ -113,28 +123,22 @@ async function renderMaybeSlow(): Promise<void> {
 function render(): void {
   const el = host.value
   if (!el) return
+  // Stop the previous run before its elements are thrown away. d3 drives every
+  // simulation from one shared timer loop, so a stale one left ticking against
+  // detached nodes does not merely waste work — it starves the loop the new
+  // simulation is waiting in, and the fresh graph sits frozen on its initial
+  // spiral. Nothing re-rendered a live graph until the tag toggle, which is
+  // why this went unnoticed.
+  sim?.stop()
+  sim = null
   el.innerHTML = ''
   const width = el.clientWidth
   const height = el.clientHeight
 
-  const nodes: GraphNode[] = index.graph.nodes.map((id) => ({ id, type: index.types.get(id) ?? null }))
-  const links: GraphLink[] = index.graph.links.map((l) => ({ ...l }))
-  const degree = new Map<string, number>()
-  // Who lights up with whom. Undirected on purpose: a page you point at and a
-  // page that points at you are equally "connected to this one" when you are
-  // looking at it.
-  const neighbors = new Map<string, Set<string>>()
-  const relate = (a: string, b: string): void => {
-    let set = neighbors.get(a)
-    if (!set) neighbors.set(a, (set = new Set()))
-    set.add(b)
-  }
-  for (const l of index.graph.links) {
-    degree.set(l.source, (degree.get(l.source) ?? 0) + 1)
-    degree.set(l.target, (degree.get(l.target) ?? 0) + 1)
-    relate(l.source, l.target)
-    relate(l.target, l.source)
-  }
+  const built = buildGraphData(index.graph, index.types, index.tags, showTags.value)
+  const nodes: GraphNode[] = built.nodes
+  const links: GraphLink[] = built.links.map((l) => ({ ...l }))
+  const { degree, neighbors } = graphDegrees(built.links)
 
   const svg = select(el)
     .append('svg')
@@ -181,15 +185,27 @@ function render(): void {
     .join('g')
     .attr('cursor', 'pointer')
     .on('click', (_e, d) => {
+      ui.graphOpen = false
+      // A tag is not a file: clicking it asks the question it stands for.
+      if (d.kind === 'tag') {
+        ui.searchFor(tagQuery(d.tag ?? ''))
+        return
+      }
       // The graph is reachable from inside the full-window agent panel, so the
       // file has to be uncovered as well as opened — see lib/openInEditor.
-      ui.graphOpen = false
       void openInEditor(d.id)
     })
 
-  const nodeRadius = (d: GraphNode): number => radiusOf(degree.get(d.id) ?? 0)
+  const nodeRadius = (d: GraphNode): number =>
+    d.kind === 'tag'
+      ? Math.min(11, 4 + 1.6 * Math.sqrt(degree.get(d.id) ?? 0))
+      : radiusOf(degree.get(d.id) ?? 0)
 
+  // Pages are circles; tags are diamonds. Shape rather than colour alone, so
+  // the two kinds stay apart for anyone who cannot rely on hue — and because
+  // colour here already means the page's `type:`.
   node
+    .filter((d) => d.kind === 'page')
     .append('circle')
     .attr('r', nodeRadius)
     .attr('fill', (d) =>
@@ -201,12 +217,25 @@ function render(): void {
     )
 
   node
+    .filter((d) => d.kind === 'tag')
+    .append('rect')
+    .attr('width', (d) => nodeRadius(d) * 1.6)
+    .attr('height', (d) => nodeRadius(d) * 1.6)
+    .attr('x', (d) => -nodeRadius(d) * 0.8)
+    .attr('y', (d) => -nodeRadius(d) * 0.8)
+    .attr('rx', 2)
+    .attr('transform', 'rotate(45)')
+    .attr('fill', 'rgb(var(--c-bg-0))')
+    .attr('stroke', 'rgb(var(--c-added))')
+    .attr('stroke-width', 1.5)
+
+  node
     .append('text')
-    .text((d) => fileStem(d.id))
+    .text((d) => (d.kind === 'tag' ? `#${d.tag}` : fileStem(d.id)))
     .attr('font-size', 10)
     .attr('dx', (d) => nodeRadius(d) + 5)
     .attr('dy', 3)
-    .attr('fill', 'rgb(var(--c-fg-2))')
+    .attr('fill', (d) => (d.kind === 'tag' ? 'rgb(var(--c-added))' : 'rgb(var(--c-fg-2))'))
 
   // --- Focus: point at one node and the rest of the graph steps back ---------
   //
@@ -339,10 +368,7 @@ onMounted(() => {
   void index.refresh()
 })
 
-watch(
-  () => index.graph,
-  () => void renderMaybeSlow(),
-)
+watch([() => index.graph, showTags], () => void renderMaybeSlow())
 
 onBeforeUnmount(() => {
   sim?.stop()
@@ -353,6 +379,17 @@ onBeforeUnmount(() => {
 <template>
   <div class="relative h-full w-full">
     <div ref="host" class="h-full w-full" />
+
+    <!-- Top-left, out of forceCenter's way (see the busy chip below). -->
+    <button
+      class="btn absolute left-4 top-4 text-xs shadow-sm"
+      :class="{ '!text-added !border-added/50': showTags }"
+      :title="$t('graph.showTagsHint')"
+      @click="showTags = !showTags"
+    >
+      <span class="codicon codicon-sm codicon-tag" />
+      {{ $t('graph.showTags') }}
+    </button>
     <!-- Near the top of the graph area, not in its middle: forceCenter pulls
          every node into the centre, so that is the one place a line of text
          cannot be read. Same chip as the PDF reader's. -->

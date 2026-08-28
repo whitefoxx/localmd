@@ -139,6 +139,18 @@ export const useUiStore = defineStore('ui', () => {
    *  handoff rather than shared state. */
   const pendingPrompt = ref('')
 
+  /** A query handed to the search palette from elsewhere — the graph's tag
+   *  nodes use it to turn "what else carries this tag" into a real search the
+   *  user can edit. One-shot, like pendingPrompt: the palette consumes it on
+   *  open and clears it. */
+  const pendingSearch = ref('')
+
+  /** Open the palette on a prepared query. */
+  function searchFor(query: string): void {
+    pendingSearch.value = query
+    searchOpen.value = true
+  }
+
   /** Which Settings pane to land on when the modal is opened from elsewhere —
    *  sending someone to "Settings" and letting them hunt for the right pane is
    *  most of the reason setup feels hard. One-shot, like pendingPrompt. */
@@ -227,6 +239,8 @@ export const useUiStore = defineStore('ui', () => {
     pricingOpen,
     editorTabsVisible,
     pendingPrompt,
+    pendingSearch,
+    searchFor,
     settingsSection,
     openSettings,
     helpOpen,

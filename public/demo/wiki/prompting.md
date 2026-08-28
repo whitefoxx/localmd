@@ -1,3 +1,7 @@
+---
+tags: [prompting, llm]
+---
+
 # Prompting techniques
 
 A holding page for how people get more out of a model without training one.

@@ -101,8 +101,7 @@ Cloudflare Pages 也可以考虑,同样要先验证。
 
 - **GitHub 同步 live 验证**:push/pull 代码与错误路径已测,但真实推送需用户 PAT
   (Settings → Git & GitHub;README 有 token 指南)
-- **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(浏览器可考虑 tesseract.js,
-  精度/体积待评估)
+- **扫描版 PDF 的 OCR**:无文本层的 PDF 索引产出 0 块(见下方专节的完整方案)
 - **EPUB 页内截图**:epub.js 渲染的是 iframe HTML,无现成区域截图;若做,用
   getDisplayMedia(preferCurrentTab)抓帧 + 自绘选框裁剪(每次多一步浏览器确认,
   画质受屏幕分辨率限制)。当前结论:用系统截图(⌘⇧4)+ 聊天粘贴即可
@@ -357,3 +356,47 @@ JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：�
 
 **诚实边界**：ambient 层只覆盖结构性相关(链接/tag/共同引源)；「语义相关但从未链接」
 需要 embedding 或 LLM，另一个成本档位，明确往后排。
+
+
+## 扫描件 OCR:方案已定,暂缓实施(2026-08-28)
+
+**引擎必须是 tesseract.js,不能是视觉模型——这条是几何决定的,不是成本。**
+`inherit.ts` 的不变量建立在**矩形重叠**上(「几何是 ground truth」),`locations.json`
+存的是每个块的 `NormRect[]`,引用点击能落到那一段并高亮也靠这些坐标。tesseract 输出
+逐词/逐行 bounding box → 真坐标 → 高亮准确、重跑时 id 继承照常;视觉模型只回文本,
+没有可靠坐标 → 只能伪造矩形 → 高亮退化成整页闪烁、继承全乱。**视觉模型不能喂索引**,
+它将来至多做「帮我读这一页」的便利功能,那是另一件事。
+
+### Stage 0 · 先把话说清楚(半天,无论后面选什么都欠着)
+
+现状已有一句 `no text layer (scanned?)`,但它只是索引徽章后的尾巴:`index_document`
+的工具结果只报 `0 blocks`,agent 不知道这意味着什么;用户不知道「那我还能干什么」。
+要做的是在 viewer、工具结果、手册三处给一句完整的人话:这是扫描件、索引没有文本可引、
+**但标注/阅读/朗读照常可用**。这一步消掉「静默产出 0」这个最坏的失败模式。
+
+### Stage 1 · tesseract.js(1–2 天)
+
+依赖判断按「默认自己实现」的规矩过了一遍:OCR 引擎「组件非常复杂」✓、「候选库非常
+稳定」✓(Apache-2.0、十年项目、纯 WASM 无后端)。**引,但要把为什么引、什么条件下
+重新评估记进仓库。**
+
+| 事项 | 做法 |
+|---|---|
+| 体积 | 核心 WASM ~2MB + `eng.traineddata` ~10MB(fast 变体 ~4MB)。**绝不进主包**——走 `await import()`,与 pdf.js/epub.js 同一个懒加载模式(`docindex/index.ts` 有先例);语言包按需下载并缓存进 IndexedDB |
+| 触发位置 | 只在 `blockCount === 0` 时;有文本层的 PDF 一行不碰 |
+| 渲染 | pdf.js 渲页成 canvas(viewer 已在做),2–3x 缩放喂给 OCR |
+| 性能 | Intel Mac 纯 CPU 约 2–5 秒/页。**必须跑在 Web Worker 里**,要有进度与取消 |
+| 格式契约 | `INDEX_VERSION` **不动**(读契约未变);**`BUILDER` 必须 bump**。golden fixture 变红时按规矩是「bump BUILDER 并检查继承」,不是重新生成到绿 |
+| id 继承 | 首次 OCR 时旧索引 0 块,无历史 id 冲突;重跑 OCR 走既有 `inherit.ts`——有真坐标,几何匹配天然成立 |
+| 出处标记 | manifest 加 `textSource: 'layer' \| 'ocr'`(新增可选字段,不破读契约)。**引用徽章要显示这是 OCR 转写**——OCR 会错字,而我们承诺的是「点回去看原文」,用户有权知道这段引文是机器认的 |
+| 触发方式 | 手动。徽章显示 `Run OCR · N pages`,点了才跑;超过阈值先问一次 |
+
+### Stage 2 · 只在有人要时做
+
+页范围 OCR(只认在读的章节)、多语言包、视觉模型做「这一页讲什么」的便利路径。
+
+### 两个未决
+
+1. **语言包默认只带英文吗?** 中文扫描件常见,但 `chi_sim` 体积翻倍且 CPU 上更慢。
+   倾向让用户在设置里选语言——「检测到 CJK 再提示」需要先 OCR 才能检测,循环依赖。
+2. Stage 0 是否先独立发一版。

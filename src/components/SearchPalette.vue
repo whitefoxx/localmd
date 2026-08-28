@@ -234,7 +234,10 @@ watch(
   () => ui.searchOpen,
   async (open) => {
     if (open) {
-      query.value = ''
+      // A prepared query (the graph's tag nodes) survives exactly one open,
+      // then the palette is its own again.
+      query.value = ui.pendingSearch
+      ui.pendingSearch = ''
       void index.refresh()
       await nextTick()
       inputEl.value?.focus()

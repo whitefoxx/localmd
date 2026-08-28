@@ -1,3 +1,7 @@
+---
+tags: [prompting, reasoning, llm]
+---
+
 # Chain-of-thought prompting
 
 Notes on the paper that named the technique. The paper itself is in this
