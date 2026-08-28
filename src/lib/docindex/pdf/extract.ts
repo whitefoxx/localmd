@@ -13,7 +13,7 @@ import * as pdfjs from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { installJsShims, jsShimSource, jsShimsNeeded } from '@/lib/polyfills'
 import type { OutlineNode, PdfBlock } from './types'
-import { assembleBlocks, layoutPage, type Line, type RawItem, type TextBounds } from './layout'
+import { assembleBlocks, boundsOf, layoutPage, type Line, type RawItem, type TextBounds } from './layout'
 
 installJsShims()
 pdfjs.GlobalWorkerOptions.workerSrc = shimmedWorkerUrl()
@@ -36,6 +36,20 @@ function shimmedWorkerUrl(): string {
   }
 }
 
+/**
+ * What every `getDocument` here is opened with.
+ *
+ * `wasmUrl` is where pdf.js finds its JBIG2 and JPEG 2000 decoders (vite.config
+ * copies them there). Leaving it out costs nothing on a born-digital PDF and
+ * everything on a scan: those are one large JBIG2 image per page, and pdf.js
+ * responds to a missing decoder by warning to the console and rendering blank
+ * paper. Nothing rejects, so the page that reaches OCR looks like an empty
+ * sheet rather than a failure.
+ */
+const DOC_PARAMS = {
+  wasmUrl: new URL(`${import.meta.env.BASE_URL}pdfjs-wasm/`, location.href).href,
+}
+
 export interface PdfExtractResult {
   title: string
   pageCount: number
@@ -49,7 +63,7 @@ export async function extractPdf(
   fallbackTitle: string,
   onProgress: (page: number, total: number) => void = () => {},
 ): Promise<PdfExtractResult> {
-  const loadingTask = pdfjs.getDocument({ data })
+  const loadingTask = pdfjs.getDocument({ data, ...DOC_PARAMS })
   try {
     const doc = await loadingTask.promise
     const pageSizes: { w: number; h: number }[] = []
@@ -92,6 +106,53 @@ export async function extractPdf(
       /* metadata is optional */
     }
 
+    return { title, pageCount: doc.numPages, pageSizes, blocks, outline }
+  } finally {
+    await loadingTask.destroy()
+  }
+}
+
+/**
+ * The same extraction, but reading the pictures instead of a text layer.
+ *
+ * Only the source of the lines differs: OCR hands back `Line[]` per page and
+ * everything after that — block assembly, heading detection, rects, the
+ * outline, the title — is the code above, unchanged. That is the whole reason
+ * the OCR module returns geometry rather than prose.
+ *
+ * Never called automatically. The caller reaches here only when a text-layer
+ * pass produced nothing AND the user asked for it: recognising a page costs
+ * seconds of CPU, and a few hundred of them is a decision, not a default.
+ */
+export async function extractPdfViaOcr(
+  data: ArrayBuffer,
+  fallbackTitle: string,
+  opts: { lang: string; onProgress?: (page: number, total: number) => void; signal?: AbortSignal },
+): Promise<PdfExtractResult> {
+  const { ocrPdf } = await import('./ocr')
+  const loadingTask = pdfjs.getDocument({ data, ...DOC_PARAMS })
+  try {
+    const doc = await loadingTask.promise
+    const pageSizes: { w: number; h: number }[] = []
+    for (let p = 1; p <= doc.numPages; p++) {
+      const page = await doc.getPage(p)
+      const vp = page.getViewport({ scale: 1 })
+      pageSizes.push({ w: vp.width, h: vp.height })
+      page.cleanup()
+    }
+    const recognised = await ocrPdf(doc as never, opts)
+    const pageLines = recognised.map((r) => r.lines)
+    const pageBounds = pageLines.map((lines) => boundsOf(lines))
+    const blocks = assembleBlocks(pageLines, pageBounds, pageSizes.slice(0, pageLines.length))
+    const outline = await readOutline(doc)
+    let title = fallbackTitle
+    try {
+      const meta = await doc.getMetadata()
+      const t = (meta.info as { Title?: string }).Title
+      if (t && t.trim()) title = t.trim()
+    } catch {
+      /* metadata is optional */
+    }
     return { title, pageCount: doc.numPages, pageSizes, blocks, outline }
   } finally {
     await loadingTask.destroy()

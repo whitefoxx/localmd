@@ -33,7 +33,10 @@ import SourceNoteBadge from '@/components/viewers/SourceNoteBadge.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
-import { loadPdfLocations, loadPdfSpeechSegments } from '@/lib/docindex/pdf'
+import { loadPdfLocations, loadPdfSpeechSegments, pdfTextSource } from '@/lib/docindex/pdf'
+// The list, not the engine: tesseract itself stays behind ocr.ts's own
+// dynamic import and is fetched at the click.
+import { OCR_LANGS } from '@/lib/docindex/pdf/ocr'
 import { useCitationsStore, type AnnotationTarget, type PendingJump } from '@/stores/citations'
 import { sidecarRevision, HIGHLIGHT_COLORS, UNDERLINE_COLOR } from '@/lib/annotations'
 import { useThemeStore } from '@/stores/theme'
@@ -44,7 +47,7 @@ import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { useComposerStore } from '@/stores/composer'
 import { baseName } from '@/lib/wiki'
-import { t } from '@/i18n'
+import { getLocale, t } from '@/i18n'
 import { registerPdfKeyScope, takeoverPdfShortcuts, type ShortcutCommandsApi } from '@/lib/pdfKeys'
 
 const props = defineProps<{ path: string }>()
@@ -1258,9 +1261,78 @@ const indexMsg = ref('')
 // An index from an older algorithm revision: fully usable, rebuild offered
 // via a small badge — never rebuilt uninvited.
 const indexOutdated = ref(false)
+/** The indexed text was recognised off pictures, not read out of the file —
+ *  a standing property of the document, so it is a badge and not a toast. */
+const recognised = ref(false)
 /** The index came back with no blocks: a picture-only PDF. */
 const scanned = ref(false)
 let msgTimer: number | null = null
+
+/* ── Reading the pictures (OCR) ──────────────────────────────────────────── */
+
+/**
+ * Offered on a scan, never run uninvited. Recognition is minutes of this
+ * machine's CPU for a book, and the engine plus its language data are
+ * megabytes — so the module is imported at the click, and the page count and
+ * a time estimate sit on the button that starts it.
+ */
+type OcrStage = 'idle' | 'setup' | 'running'
+const ocrStage = ref<OcrStage>('idle')
+const ocrLang = ref(getLocale() === 'zh' ? 'chi_sim' : 'eng')
+const ocrPage = ref(0)
+const ocrPageCount = ref(0)
+const ocrNote = ref('')
+let ocrAbort: AbortController | null = null
+
+/** Seconds a page costs, measured on an Intel Mac against a 300-DPI Chinese
+ *  scan. Wrong by a factor of two on other hardware and it still answers the
+ *  question the user is actually asking: minutes, or an afternoon? */
+const SECONDS_PER_PAGE = 6
+
+const ocrMinutes = computed(() =>
+  Math.max(1, Math.round((ocrPageCount.value * SECONDS_PER_PAGE) / 60)),
+)
+
+async function startOcr(): Promise<void> {
+  ocrAbort = new AbortController()
+  ocrStage.value = 'running'
+  ocrPage.value = 0
+  ocrNote.value = ''
+  try {
+    const result = await indexDocument(props.path, () => {}, {
+      ocr: {
+        lang: ocrLang.value,
+        onPage: (c) => (ocrPage.value = c),
+        signal: ocrAbort.signal,
+      },
+    })
+    ocrStage.value = 'idle'
+    if (result.blockCount === 0) {
+      ocrNote.value = t('viewers.scanned.empty')
+    } else {
+      // The notice existed to say this document has no text. It now has some.
+      scanned.value = false
+      recognised.value = true
+      indexMsg.value = t('viewers.scanned.done', { n: result.blockCount })
+      msgTimer = window.setTimeout(() => (indexMsg.value = ''), 8000)
+    }
+  } catch (err) {
+    // Back to the setup step, not to the offer: whoever cancelled or hit an
+    // error was standing there a moment ago, and the language they picked is
+    // the thing they are most likely to want to change.
+    ocrStage.value = 'setup'
+    ocrNote.value =
+      (err as Error)?.name === 'AbortError'
+        ? t('viewers.scanned.cancelled')
+        : t('viewers.scanned.failed', { msg: (err as Error).message })
+  } finally {
+    ocrAbort = null
+  }
+}
+
+function cancelOcr(): void {
+  ocrAbort?.abort()
+}
 
 async function runIndex(auto = false, rebuild = false): Promise<void> {
   if (indexState.value === 'parsing') return
@@ -1293,6 +1365,7 @@ async function runIndex(auto = false, rebuild = false): Promise<void> {
     // A scan indexes "successfully" to nothing. That is a fact about the
     // document worth keeping on screen, not a five-second tail on a toast.
     scanned.value = result.blockCount === 0
+    ocrPageCount.value = result.pageCount ?? 0
     if (!result.cached) indexOutdated.value = false
     if (auto && result.cached) {
       indexMsg.value = ''
@@ -1312,6 +1385,7 @@ async function initIndexStatus(): Promise<void> {
   if (await hasIndex(props.path)) {
     indexState.value = 'done'
     indexOutdated.value = (await queryIndexState(props.path)) === 'outdated'
+    recognised.value = (await pdfTextSource(props.path)) === 'ocr'
   } else {
     void runIndex(true)
   }
@@ -1718,6 +1792,16 @@ onBeforeUnmount(() => {
         >
           {{ indexMsg }}
         </div>
+        <!-- Not a button: there is nothing to do about it, only something
+             to know before quoting. -->
+        <span
+          v-if="recognised && indexState !== 'parsing'"
+          class="flex items-center gap-1 rounded border border-border bg-bg-1 px-1.5 py-0.5 text-xs text-fg-3 shadow-sm"
+          :title="$t('viewers.index.recognisedHint')"
+        >
+          <span class="codicon codicon-sm codicon-file-media" />
+          {{ $t('viewers.index.recognised') }}
+        </span>
         <button
           v-if="indexOutdated && indexState !== 'parsing'"
           class="btn text-xs shadow-sm"
@@ -1745,12 +1829,70 @@ onBeforeUnmount(() => {
             <p class="mt-1 text-xs leading-relaxed text-fg-3">{{ $t('viewers.scanned.body') }}</p>
           </div>
           <button
+            v-if="ocrStage !== 'running'"
             class="shrink-0 text-fg-3 hover:text-fg-0"
             :title="$t('viewers.dismiss')"
             @click="scanned = false"
           >
             <span class="codicon codicon-sm codicon-close" />
           </button>
+        </div>
+
+        <!-- Reading the pictures. Three states in the same card, because it
+             is one decision being made in one place: offer, price, progress.
+             The estimate is on the button that spends the time. -->
+        <div class="mt-2 pl-6">
+          <button
+            v-if="ocrStage === 'idle'"
+            class="btn text-xs"
+            @click="ocrStage = 'setup'"
+          >
+            {{ $t('viewers.scanned.offer') }}
+          </button>
+
+          <template v-else-if="ocrStage === 'setup'">
+            <label class="flex items-center gap-2 text-xs text-fg-3">
+              {{ $t('viewers.scanned.language') }}
+              <select v-model="ocrLang" class="input text-xs py-0.5">
+                <option v-for="l in OCR_LANGS" :key="l" :value="l">{{ l }}</option>
+              </select>
+            </label>
+            <p class="mt-1.5 text-[11px] leading-relaxed text-fg-3">
+              {{ $t('viewers.scanned.estimate', { mins: ocrMinutes }) }}
+            </p>
+            <div class="mt-2 flex items-center gap-2">
+              <button class="btn-primary text-xs" @click="startOcr">
+                {{ $t('viewers.scanned.start', { n: ocrPageCount }) }}
+              </button>
+              <button class="btn text-xs" @click="ocrStage = 'idle'">
+                {{ $t('viewers.scanned.cancel') }}
+              </button>
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="flex items-center gap-2">
+              <span class="codicon codicon-sm codicon-loading animate-spin text-fg-3" />
+              <span class="text-xs text-fg-2">
+                {{
+                  ocrPage
+                    ? $t('viewers.scanned.running', { c: ocrPage, t: ocrPageCount })
+                    : $t('viewers.scanned.preparing')
+                }}
+              </span>
+              <button class="btn text-xs ml-auto" @click="cancelOcr">
+                {{ $t('viewers.scanned.cancel') }}
+              </button>
+            </div>
+            <div class="mt-1.5 h-1 rounded bg-bg-2 overflow-hidden">
+              <div
+                class="h-full bg-accent transition-[width] duration-300"
+                :style="{ width: `${ocrPageCount ? (100 * ocrPage) / ocrPageCount : 0}%` }"
+              />
+            </div>
+          </template>
+
+          <p v-if="ocrNote" class="mt-1.5 text-[11px] leading-relaxed text-fg-3">{{ ocrNote }}</p>
         </div>
       </div>
     </div>

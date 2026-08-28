@@ -89,6 +89,13 @@ export interface PdfIndexManifest {
   pageCount: number
   /** Number of extracted text/heading blocks (0 ⇒ probably a scanned PDF). */
   blockCount: number
+  /** Where the text came from. Absent = the PDF's own text layer, which is
+   *  every index written before OCR existed. `ocr` means a machine read the
+   *  pictures: the words are a transcription and can be wrong, which is worth
+   *  saying wherever a quote from them is shown. */
+  textSource?: 'layer' | 'ocr'
+  /** Which Tesseract languages produced it, for `textSource: 'ocr'`. */
+  ocrLang?: string
   /** SHA-256 of the PDF bytes — used to detect when the index is stale. */
   contentHash: string
   parsedAt: string

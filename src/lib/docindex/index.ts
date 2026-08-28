@@ -15,6 +15,8 @@ export interface IndexSummary {
   blockCount: number
   sectionCount: number
   cached: boolean
+  /** PDFs only — what the OCR offer needs to price itself before it starts. */
+  pageCount?: number
 }
 
 export type { IndexPhase, IndexProgress } from './util'
@@ -22,6 +24,14 @@ export type { IndexPhase, IndexProgress } from './util'
 export interface IndexOpts {
   /** Rebuild even when a usable index exists — the user's explicit choice. */
   rebuild?: boolean
+  /** Read a PDF's pages as pictures rather than looking for a text layer.
+   *  Ignored by every other kind, and never set on the app's own behalf: it
+   *  costs seconds of CPU per page and downloads a language pack. */
+  ocr?: {
+    lang: string
+    onPage?: (page: number, total: number) => void
+    signal?: AbortSignal
+  }
 }
 
 /**
@@ -90,7 +100,9 @@ export async function indexDocument(
 
   if (kind === 'pdf') {
     const { parsePdf } = await import('./pdf')
-    const r = await parsePdf(path, onProgress, force)
+    // OCR implies a rebuild: the index it replaces is a fresh, valid,
+    // empty one, and `force` is the only thing that gets past that.
+    const r = await parsePdf(path, onProgress, { force: opts.rebuild || !!opts.ocr, ocr: opts.ocr })
     return {
       kind,
       indexDir: r.indexDir,
@@ -98,6 +110,7 @@ export async function indexDocument(
       blockCount: r.manifest.blockCount,
       sectionCount: r.manifest.sections.length,
       cached: r.cached,
+      pageCount: r.manifest.pageCount,
     }
   }
   if (kind === 'docx') {
