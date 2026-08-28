@@ -234,7 +234,14 @@ MCP 服务器纳入同一套 `kbTrusted` 审批(指纹变了要重新问),UI 上
 
 **明确不做**：间隔重复调度、常驻的待复习清单、任何把状态写进用户文件夹的东西。
 
-## meta 页面的角色解析：名字是默认值，frontmatter 是覆盖，AGENTS.md 是叙述（未做）
+## meta 页面的角色解析：名字是默认值，frontmatter 是覆盖，AGENTS.md 是叙述（部分完成）
+
+> **2026-08-27 夜间：确定性半部已实现。** `extractRole`（wiki.ts）读 frontmatter
+> `kb-role: index|log`；`computeLint` 全程角色感知——staleLogEntries、质量检查豁免、
+> reachability root 均先查角色再按名字兜底；**root 坑已修**（声明的 index 优先于被
+> 挪用的 `index.md`；双重声明取字典序最小；`index.md` 自称 log 时不再被当 root）。
+> 测试：lint.test.ts 新增 5 例 + wiki.test.ts 2 例。**剩**：agent 侧引导（提示词/
+> 冲突时提议别名的流程）、AGENTS.md 叙述约定、手册文档化——键名 `kb-role` 就此定下。
 
 2026-08-27。index 与 log 是**鼓励**新建的 meta 页面：在不动用户任何原有文件的前提下，
 index 给材料补空间结构，log 补时间历史（notes vs. records 的刀见 CLAUDE.md——agent
@@ -282,7 +289,14 @@ lint finding 报出(与 `similarTags` 同类)。永远是建议，不是错误�
 `staleLogEntries` 就是「log 落后了」；循环 = 确定性信号 → 提议 → 批准 → 一个 commit，
 与内容页面同一套。
 
-## tags 升格为索引维度：文献卡、图谱合并、工作集 recall（未做）
+## tags 升格为索引维度：文献卡、图谱合并、工作集 recall（部分完成）
+
+> **2026-08-27 夜间：第 1、2 步已实现。** kbIndex 新增 `tags` computed（path→tags，
+> 内容缓存派生、不落盘）；搜索面板支持 `tag:` 过滤，与 `type:` 组合生效——查询语法
+> 抽成 `lib/searchQuery.ts` 纯函数（parseSearchQuery / matchesFilters）配 6 例测试。
+> 真浏览器阳性验证：demo 页加 tags frontmatter 后 `tag:llm` 命中。**剩**：GraphView
+> 源文档节点与 tag 伪节点（第 3 步）、文献卡模式、工作集 recall；另记一笔——**手册
+> 从未记载 ⌘K 的 `type:`/`tag:` 过滤**，两个一起补进合适的 topic。
 
 2026-08-27 讨论结论。背景：整理散乱 corpus 需要 tag 把文件横向关联起来，但二进制
 (PDF/EPUB)没有 frontmatter 可写；同时 recall 需要「相关旧笔记」的确定性信号。
@@ -293,6 +307,24 @@ lint finding 报出(与 `similarTags` 同类)。永远是建议，不是错误�
 评分、阅读状态将来都住这里。全部现有机器零改动即工作(`similarTags`、搜索、`inbound`、
 图谱节点)。「给 200 个 PDF 打 tag」= 批量生成文献卡，一张计划卡 + 一个 commit。
 **源文件自身的 tag 是派生值**：引用它的页面的 tags 求并集，一个 computed，不存盘。
+
+> **2026-08-28：文献卡的位置与检测入口已定并部分实现。**
+> - **位置不新增目录**：文献卡就是一张普通 wiki 页面，位置服从既有规则（scaffold 库
+>   写进 `wiki/`；用户自己的结构由 agent 按其组织方式归档；没有笔记区的库落 `inbox/`）。
+>   **身份由 frontmatter 承载**（`type: source`，与 saved session 的 `type: chat` 同一
+>   套词汇表），不由路径承载——与 `kb-role` 同一条原则。命名按作品标题，不镜像源文件名
+>   （绑定由正文 `[[pdfN:path]]` 承担，`resolveCitePath` 容忍改名/移动）。
+> - **sources 不进 frontmatter**（用户提议，讨论后否决）：`[[pdfN:path]]` 是**编号绑定**，
+>   正文里每个 `[[N:block]]` 都靠它解析；写成 YAML 列表则顺序决定编号，重排即静默改指，
+>   违反「编号一旦发布永远指向同一段」。frontmatter 只放无编号语义的元数据（type/tags）。
+> - **已实现**：`kbIndex.declaredSources` / `hasSourceNote`（复用 refreshSourceMtimes
+>   本就在算的集合，零新解析）；`SourceNoteBadge.vue` 挂在 PDF/EPUB/DOCX 三个 viewer 的
+>   徽章区，仅在无人引用该源时出现，点击把预填请求交给 `ui.pendingPrompt`（草稿，不自动
+>   发送）；手册 `documents` 新增一节（en+zh）。测试：lint.test.ts 新增 4 例锁住
+>   「提及≠引用」这条判据。真浏览器验过阴性（已引用→无徽章）与阳性（删掉声明→徽章即时
+>   出现→点击落草稿）。
+> - **剩**：`type: source` 的 agent 侧引导（ingest/skill 里让它默认写这个字段）、
+>   PDF 自身 tag 的派生值（引用它的页面 tags 并集）、批量「给 N 个源建卡」的计划卡。
 
 **明确不做**：中心化 `tags.md`(一个事实两个住处，且是全库写入热点，滑向 record)；
 JSON sidecar tag 表(只有本 app 能读。annotations sidecar 不是先例：标注是查看器

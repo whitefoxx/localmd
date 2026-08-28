@@ -13,6 +13,16 @@ export default {
         'The AI index was built by an older version of the app. It still works as it is — click to rebuild with the current one. Citations in your notes keep working either way.',
     },
 
+    // The offer to write a source note. Shown only while no page in the KB
+    // cites this document — an offer, never a nag: the detection is free, the
+    // writing costs tokens, so a click sits between them.
+    sourceNote: {
+      write: 'Write a note',
+      hint: 'No page in this knowledge base cites this document yet. This drafts a request to the assistant — you can edit it before sending.',
+      prompt:
+        'Read {path} and write a source note for it in this knowledge base: a page following the layout already in use here, with `type: source` and a few tags in the frontmatter, a short summary of what it says, and a `[[pdf1:{path}]]` source declaration so citations into it work. Link it from the index page. Show me the plan first if more than one file would change.',
+    },
+
     pdf: {
       loading: 'Opening PDF…',
       loadingSlow: 'Opening PDF — the first one takes longest…',
@@ -144,6 +154,13 @@ export default {
       updateAvailable: '更新索引',
       updateHint:
         'AI 索引由旧版本生成。不更新也能正常使用——点击用当前版本重建。无论是否重建，笔记里已有的引用都不受影响。',
+    },
+
+    sourceNote: {
+      write: '写一篇笔记',
+      hint: '这个知识库里还没有任何页面引用这份文档。点击会给助手起草一条请求——发送前你可以修改。',
+      prompt:
+        '读一下 {path}，在这个知识库里为它写一篇源笔记：按这里已有的布局建页面，frontmatter 里写上 `type: source` 和几个 tag，正文给一段简短的内容摘要，并加上 `[[pdf1:{path}]]` 的源声明，好让引用能跳转。把它从索引页链接过去。如果会改动不止一个文件，先把计划给我看。',
     },
 
     pdf: {

@@ -29,6 +29,7 @@ import {
   type PdfFreeTextAnnoObject,
 } from '@embedpdf/models'
 import NoteDialog from '@/components/NoteDialog.vue'
+import SourceNoteBadge from '@/components/viewers/SourceNoteBadge.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
@@ -1702,7 +1703,7 @@ onBeforeUnmount(() => {
       <!-- top-14: just below the engine's toolbar row, whose right side holds
            its own icons — the badge must not sit on top of them. -->
       <div
-        v-if="docReady && (indexMsg || indexOutdated)"
+        v-if="docReady"
         class="absolute top-14 right-4 z-10 flex items-center gap-2"
       >
         <div
@@ -1721,6 +1722,7 @@ onBeforeUnmount(() => {
           <span class="codicon codicon-sm codicon-refresh" />
           {{ $t('viewers.index.updateAvailable') }}
         </button>
+        <SourceNoteBadge :path="path" />
       </div>
     </div>
 

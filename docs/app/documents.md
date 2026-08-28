@@ -23,6 +23,23 @@ This takes a moment for a long book. Afterwards:
 The index is rebuildable, so it is skipped when pushing to GitHub — no huge
 repositories.
 
+## Turning a document into a note
+
+A document sitting in your folder is material; a note about it is knowledge.
+The app can tell the two apart: while no page in the knowledge base cites a
+document, a small **Write a note** button appears in its viewer, beside the
+index badge.
+
+Clicking it does not write anything. It drafts a request to the assistant —
+read this document, write a page about it, tag it, and declare it as a source
+so citations into it work — and puts that draft in the chat box for you to
+edit, send or discard. The detection is free; the writing costs tokens, so
+there is a click in between.
+
+The button disappears as soon as some page cites the document, which is why
+"cites" and not "mentions" is the test: naming a file in passing claims
+nothing, while a `[[pdf1:…]]` declaration is a page claiming to have read it.
+
 ## When the app improves its indexing
 
 The app's indexing gets better over time. When it has since you indexed a

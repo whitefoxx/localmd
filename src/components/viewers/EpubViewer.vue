@@ -25,6 +25,7 @@ import {
   type EpubAnnotation,
 } from '@/lib/annotations'
 import NoteDialog from '@/components/NoteDialog.vue'
+import SourceNoteBadge from '@/components/viewers/SourceNoteBadge.vue'
 import { t } from '@/i18n'
 
 type MarkStyle = 'highlight' | 'underline'
@@ -1113,6 +1114,7 @@ watch(
           <span class="codicon codicon-sm codicon-refresh" />
           {{ $t('viewers.index.updateAvailable') }}
         </button>
+        <SourceNoteBadge :path="files.currentPath ?? ''" />
         <button
           class="btn text-xs"
           :class="{ '!text-accent': searchOpen }"

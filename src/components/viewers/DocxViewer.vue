@@ -42,6 +42,7 @@ import {
   type MarkStyle,
 } from '@/lib/docxMarks'
 import NoteDialog from '@/components/NoteDialog.vue'
+import SourceNoteBadge from '@/components/viewers/SourceNoteBadge.vue'
 import { t } from '@/i18n'
 
 const files = useFilesStore()
@@ -447,6 +448,7 @@ onBeforeUnmount(() => {
         <span class="codicon codicon-sm codicon-refresh" />
         {{ $t('viewers.index.updateAvailable') }}
       </button>
+      <SourceNoteBadge :path="files.currentPath ?? ''" />
       <button
         v-if="ready"
         class="btn text-xs shadow-sm"
