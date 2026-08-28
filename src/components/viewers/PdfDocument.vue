@@ -1258,6 +1258,8 @@ const indexMsg = ref('')
 // An index from an older algorithm revision: fully usable, rebuild offered
 // via a small badge — never rebuilt uninvited.
 const indexOutdated = ref(false)
+/** The index came back with no blocks: a picture-only PDF. */
+const scanned = ref(false)
 let msgTimer: number | null = null
 
 async function runIndex(auto = false, rebuild = false): Promise<void> {
@@ -1288,13 +1290,16 @@ async function runIndex(auto = false, rebuild = false): Promise<void> {
       { rebuild },
     )
     indexState.value = 'done'
+    // A scan indexes "successfully" to nothing. That is a fact about the
+    // document worth keeping on screen, not a five-second tail on a toast.
+    scanned.value = result.blockCount === 0
     if (!result.cached) indexOutdated.value = false
     if (auto && result.cached) {
       indexMsg.value = ''
     } else {
       indexMsg.value =
         `${result.cached ? t('viewers.pdf.indexAlready') : t('viewers.pdf.indexDone')} · ${t('viewers.pdf.indexSections', { n: result.sectionCount })}` +
-        `${result.blockCount === 0 ? ` · ${t('viewers.pdf.indexNoText')}` : ''}`
+        ''
       msgTimer = window.setTimeout(() => (indexMsg.value = ''), 5000)
     }
   } catch (err) {
@@ -1723,6 +1728,30 @@ onBeforeUnmount(() => {
           {{ $t('viewers.index.updateAvailable') }}
         </button>
         <SourceNoteBadge :path="path" />
+      </div>
+
+      <!-- A scan indexes successfully to nothing, which used to be reported
+           as a five-second "· no text layer" tail on a toast — a fact about
+           the document delivered as if it were a status. It stays until
+           dismissed, says what still works, and never blocks the page. -->
+      <div
+        v-if="docReady && scanned"
+        class="absolute bottom-4 right-4 z-10 max-w-sm rounded-lg border border-border bg-bg-1 p-3 shadow-lg"
+      >
+        <div class="flex items-start gap-2">
+          <span class="codicon codicon-sm codicon-file-media mt-0.5 shrink-0 text-fg-3" />
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-fg-1">{{ $t('viewers.scanned.title') }}</div>
+            <p class="mt-1 text-xs leading-relaxed text-fg-3">{{ $t('viewers.scanned.body') }}</p>
+          </div>
+          <button
+            class="shrink-0 text-fg-3 hover:text-fg-0"
+            :title="$t('viewers.dismiss')"
+            @click="scanned = false"
+          >
+            <span class="codicon codicon-sm codicon-close" />
+          </button>
+        </div>
       </div>
     </div>
 

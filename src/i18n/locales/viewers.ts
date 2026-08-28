@@ -16,6 +16,14 @@ export default {
     // The offer to write a source note. Shown only while no page in the KB
     // cites this document — an offer, never a nag: the detection is free, the
     // writing costs tokens, so a click sits between them.
+    // A scanned PDF is not a broken one, and "0 blocks" said nothing useful
+    // to anybody. This says what happened, what still works, and stops.
+    dismiss: 'Dismiss',
+    scanned: {
+      title: 'No text layer — this looks like a scan',
+      body: 'Every page is a picture, so there is nothing for the index to quote and the assistant cannot cite passages from it. Reading, highlighting, annotating and read-aloud all work as usual, and anything you write about it in your own notes is unaffected.',
+    },
+
     sourceNote: {
       write: 'Write a note',
       hint: 'No page in this knowledge base cites this document yet. This drafts a request to the assistant — you can edit it before sending.',
@@ -154,6 +162,12 @@ export default {
       updateAvailable: '更新索引',
       updateHint:
         'AI 索引由旧版本生成。不更新也能正常使用——点击用当前版本重建。无论是否重建，笔记里已有的引用都不受影响。',
+    },
+
+    dismiss: '知道了',
+    scanned: {
+      title: '没有文本层——这看起来是扫描件',
+      body: '每一页都是图片，索引没有文字可以引用，助手也无法引用其中的段落。阅读、划线、标注和朗读照常可用，你自己在笔记里写的关于它的内容也不受影响。',
     },
 
     sourceNote: {

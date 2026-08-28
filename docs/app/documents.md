@@ -23,6 +23,17 @@ This takes a moment for a long book. Afterwards:
 The index is rebuildable, so it is skipped when pushing to GitHub — no huge
 repositories.
 
+## Scanned documents
+
+Some PDFs are pictures of pages rather than text — anything that came off a
+scanner or a photocopier, and most old papers. There is nothing in the file
+for the index to read, so it comes back empty and the viewer says so: no
+passages to quote, and the assistant cannot cite anything from it.
+
+Everything else still works. You can read it, highlight it, annotate it and
+have it read aloud, and notes you write about it are ordinary notes. What is
+missing is only the part that needs machine-readable text.
+
 ## Turning a document into a note
 
 A document sitting in your folder is material; a note about it is knowledge.

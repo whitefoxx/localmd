@@ -647,11 +647,25 @@ const indexDocument = defineTool({
   run: async ({ path, rebuild }) => {
     const { indexDocument: run } = await import('@/lib/docindex')
     const s = await run(path, undefined, { rebuild })
-    return (
+    const head =
       `${s.cached ? 'Index already fresh' : 'Index generated'} at ${s.indexDir}/ — ` +
-      `"${s.title}", ${s.sectionCount} sections, ${s.blockCount} blocks. ` +
-      `Read ${s.indexDir}/_README.md first, then ${s.indexDir}/toc.md.`
-    )
+      `"${s.title}", ${s.sectionCount} sections, ${s.blockCount} blocks. `
+    // Zero blocks is not a failure and re-running will not change it: the
+    // pages are pictures. Saying so here is what stops the agent retrying,
+    // and what lets it tell the user something true instead of quoting an
+    // empty index.
+    if (s.blockCount === 0) {
+      return (
+        head +
+        'No text could be extracted, which means this document has no text layer — ' +
+        'it is a scan, and every page is an image. Indexing it again will produce the same ' +
+        'result, so do not retry. You cannot quote or cite passages from it. Tell the user ' +
+        'plainly, and offer what still works: they can read, highlight and annotate it in the ' +
+        'viewer, and you can write notes about it from what they tell you. If they have a ' +
+        'vision model configured you may offer to look at specific pages as images.'
+      )
+    }
+    return head + `Read ${s.indexDir}/_README.md first, then ${s.indexDir}/toc.md.`
   },
 })
 
