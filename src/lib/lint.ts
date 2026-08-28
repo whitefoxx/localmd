@@ -17,7 +17,7 @@
  * constraint — a user is free to keep an unread PDF and two spellings of a tag,
  * and a check that cannot say why it fired does not belong.
  */
-import { splitFrontmatter, extractTags, parseWikilinks } from '@/lib/wiki'
+import { splitFrontmatter, extractRole, extractTags, parseWikilinks } from '@/lib/wiki'
 import { parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { isAnnotationsPath } from '@/lib/annotations'
 
@@ -131,7 +131,10 @@ export function isLogPage(path: string): boolean {
   return p === 'log.md' || p.endsWith('/log.md')
 }
 
-/** index.md / log.md at any depth are structural entry points, not content. */
+/** index.md / log.md at any depth are structural entry points, not content.
+ *  Name-based DEFAULT only: inside computeLint a page's frontmatter
+ *  `kb-role:` overrides its name (see the role map there) — these helpers
+ *  answer for callers that have a path but no content. */
 export function isEntryPage(path: string): boolean {
   const p = path.toLowerCase()
   return p === 'index.md' || p.endsWith('/index.md') || isLogPage(path)
@@ -205,6 +208,21 @@ export function computeLint(
   files: readonly string[] = [],
   sourceMtimes: ReadonlyMap<string, number> = new Map(),
 ): LintReport {
+  // A page's structural role: its own `kb-role:` frontmatter wins over its
+  // name — the role travels with the file — and the name stays the
+  // zero-config default. A page whose explicit role contradicts its name
+  // (an `index.md` declaring `kb-role: log`) is what its frontmatter says.
+  const explicitRole = new Map<string, 'index' | 'log' | null>()
+  for (const [path, pg] of pages) explicitRole.set(path, extractRole(pg.content))
+  const roleOf = (path: string): 'index' | 'log' | null => {
+    const declared = explicitRole.get(path)
+    if (declared) return declared
+    if (isLogPage(path)) return 'log'
+    if (isEntryPage(path)) return 'index'
+    return null
+  }
+  const isEntry = (path: string): boolean => roleOf(path) !== null
+
   // Inbound map (self-links excluded).
   const inbound = new Map<string, Set<string>>()
   for (const [path, page] of pages) {
@@ -281,7 +299,7 @@ export function computeLint(
     // either one — and that is the cheap half of a review queue's sweep, which
     // this deliberately stops short of: closing an entry needs a judgement
     // about content, and a check that guesses at meaning does not belong here.
-    if (isLogPage(path)) {
+    if (roleOf(path) === 'log') {
       for (const entry of parseLogEntries(body)) {
         const moved = [
           ...new Set(
@@ -297,9 +315,9 @@ export function computeLint(
       }
     }
 
-    if (isEntryPage(path)) continue // skip page-quality checks for index/log
+    if (isEntry(path)) continue // skip page-quality checks for index/log
 
-    const contentInbound = [...(inbound.get(path) ?? [])].filter((p) => !isEntryPage(p))
+    const contentInbound = [...(inbound.get(path) ?? [])].filter((p) => !isEntry(p))
     const outbound = page.outgoing.filter((t) => t !== path)
     if (contentInbound.length === 0 && outbound.length === 0) orphans.push(path)
     else if (contentInbound.length === 0) weaklyLinked.push(path)
@@ -337,9 +355,22 @@ export function computeLint(
     })
   }
 
-  // Pages you can't reach by navigating from the root index (missing index entry).
+  // Pages you can't reach by navigating from the root index (missing index
+  // entry). A page DECLARING `kb-role: index` outranks the name defaults —
+  // this is what un-traps the KB whose `index.md` is the user's own,
+  // unrelated file: point the role at the real index and the reachability
+  // walk starts there instead. Two declarations tie-break lexicographically
+  // (deterministic, never an error). A name candidate whose own frontmatter
+  // says `log` is not an index.
   const unreachable: string[] = []
-  const root = pages.has('wiki/index.md') ? 'wiki/index.md' : pages.has('index.md') ? 'index.md' : null
+  const declaredIndexes = [...explicitRole]
+    .filter(([, role]) => role === 'index')
+    .map(([path]) => path)
+    .sort()
+  const nameCandidate = ['wiki/index.md', 'index.md'].find(
+    (p) => pages.has(p) && explicitRole.get(p) !== 'log',
+  )
+  const root = declaredIndexes[0] ?? nameCandidate ?? null
   if (root) {
     const seen = new Set<string>([root])
     const queue = [root]
@@ -353,7 +384,7 @@ export function computeLint(
       }
     }
     for (const path of pages.keys()) {
-      if (!seen.has(path) && !isEntryPage(path)) unreachable.push(path)
+      if (!seen.has(path) && !isEntry(path)) unreachable.push(path)
     }
   }
 

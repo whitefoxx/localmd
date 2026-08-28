@@ -89,6 +89,24 @@ export function extractType(content: string): string | null {
 }
 
 /**
+ * Frontmatter `kb-role:` — a page declaring which structural role it plays,
+ * regardless of its filename. Names are the zero-config default (`index.md`,
+ * `log.md`); the marker exists for the collision case: a KB whose `log.md` is
+ * the user's own (a workout log, say) gets its synthesis log under another
+ * name, with `kb-role: log` carrying the role. The role travels with the
+ * file through renames and moves — one fact, one place (docs/TODO.md,
+ * "meta 页面的角色解析"). Unknown values are ignored, not errors: the KB is a
+ * soft constraint.
+ */
+export function extractRole(content: string): 'index' | 'log' | null {
+  const { yaml } = splitFrontmatter(content)
+  if (!yaml) return null
+  const m = yaml.match(/^kb-role:\s*['"]?([^'"\n]+?)['"]?\s*$/m)
+  const v = m?.[1].trim().toLowerCase()
+  return v === 'index' || v === 'log' ? v : null
+}
+
+/**
  * Frontmatter `tags:` values, in both YAML shapes people actually write:
  * `tags: [a, b]` / `tags: a, b` on one line, or a `- item` block under it.
  * Returns them verbatim — case and separators are the caller's business

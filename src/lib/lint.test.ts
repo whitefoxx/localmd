@@ -180,6 +180,44 @@ describe('computeLint — pages their sources moved on from', () => {
   })
 })
 
+describe('declaredSourcePaths as the "has a source note" test', () => {
+  const FILES2 = ['raw/papers/read.pdf', 'raw/books/b.epub']
+
+  /** The viewer's badge asks this question, so the distinction it rests on
+   *  needs a test of its own: naming a file claims nothing, declaring it
+   *  claims to have read it. */
+  it('a page that merely names the file does not count as citing it', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', page(FM + 'I should get around to raw/papers/read.pdf one day.')],
+    ])
+    expect(declaredSourcePaths(kb, FILES2)).toEqual([])
+    // …while unreferencedSources, which matches any mention, is satisfied.
+    expect(computeLint(kb, FILES2).unreferencedSources).not.toContain('raw/papers/read.pdf')
+  })
+
+  it('a declaration counts, whatever the page is called or where it lives', () => {
+    const kb = new Map<string, LintPage>([
+      ['notes/deep/whatever.md', page(FM + 'Notes. [[pdf1:raw/papers/read.pdf]]')],
+    ])
+    expect(declaredSourcePaths(kb, FILES2)).toEqual(['raw/papers/read.pdf'])
+  })
+
+  it('counts an epub declaration too, and de-duplicates across pages', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', page(FM + '[[epub1:raw/books/b.epub]]')],
+      ['wiki/b.md', page(FM + 'also [[epub1:raw/books/b.epub]]')],
+    ])
+    expect(declaredSourcePaths(kb, FILES2)).toEqual(['raw/books/b.epub'])
+  })
+
+  it('a declaration in frontmatter does not count — declarations live in the body', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', page('---\nsources: [[pdf1:raw/papers/read.pdf]]\n---\nbody')],
+    ])
+    expect(declaredSourcePaths(kb, FILES2)).toEqual([])
+  })
+})
+
 describe('computeLint — tag hygiene', () => {
   const tagged = (tags: string): LintPage => page(`---\ntags: ${tags}\n---\nbody`)
 
@@ -299,6 +337,69 @@ describe('the synthesis log', () => {
       ['wiki/a.md', { ...page(FM + 'a\n'.repeat(12)), mtime: AFTER_MAR_1 }],
     ])
     expect(computeLint(freeform).staleLogEntries).toEqual([])
+  })
+})
+
+describe('kb-role — frontmatter overrides the name defaults', () => {
+  const role = (r: string, extra = ''): string => `---\nkb-role: ${r}\n${extra}---\n`
+
+  it('a declared index becomes the reachability root, un-trapping a repurposed index.md', () => {
+    const kb = new Map<string, LintPage>([
+      // The user's own index.md — an unrelated file that links nothing.
+      // Without the declared root below, every content page would be flagged
+      // unreachable off the back of it.
+      ['index.md', page(FM + 'my old bookmarks dump')],
+      ['notes/map.md', page(role('index') + 'the real map', ['notes/a.md'])],
+      ['notes/a.md', page(FM + 'a\n'.repeat(12))],
+      ['notes/b.md', page(FM + 'b\n'.repeat(12), ['notes/a.md'])],
+    ])
+    const r = computeLint(kb)
+    expect(r.unreachable).toEqual(['notes/b.md'])
+  })
+
+  it('keeps the name defaults when nothing declares a role', () => {
+    expect(computeLint(KB).unreachable).toEqual(['wiki/c.md', 'wiki/e.md'])
+  })
+
+  it('a kb-role: log page under any name is the synthesis log', () => {
+    const DAY = 86_400_000
+    const MAR_1 = Date.UTC(2026, 2, 1)
+    const kb = new Map<string, LintPage>([
+      [
+        'notes/kb-journal.md',
+        {
+          content: role('log') + '## 2026-03-01 — [[a]] needs a source\nstill open\n',
+          outgoing: ['notes/a.md'],
+          broken: [],
+        },
+      ],
+      ['notes/a.md', { ...page(FM + 'a\n'.repeat(12)), mtime: MAR_1 + DAY + 1 }],
+    ])
+    const r = computeLint(kb)
+    expect(r.staleLogEntries.map((e) => e.path)).toEqual(['notes/kb-journal.md'])
+    // …and, as a structural page, it is exempt from the quality checks.
+    expect(r.orphans).not.toContain('notes/kb-journal.md')
+    expect(r.thin.map((t) => t.path)).not.toContain('notes/kb-journal.md')
+  })
+
+  it('two declared indexes tie-break to the lexicographically first', () => {
+    const kb = new Map<string, LintPage>([
+      ['b-map.md', page(role('index') + 'later', ['x.md'])],
+      ['a-map.md', page(role('index') + 'first', ['y.md'])],
+      ['x.md', page(FM + 'x\n'.repeat(12))],
+      ['y.md', page(FM + 'y\n'.repeat(12))],
+    ])
+    // Root is a-map.md: y reachable, x not.
+    expect(computeLint(kb).unreachable).toEqual(['x.md'])
+  })
+
+  it('an index.md whose own frontmatter says log is not picked as root', () => {
+    const kb = new Map<string, LintPage>([
+      ['index.md', page(role('log') + '## 2026-03-01 — nothing\n')],
+      ['a.md', page(FM + 'a\n'.repeat(12))],
+    ])
+    // No root at all → the unreachable check stays silent instead of flooding.
+    expect(computeLint(kb).unreachable).toEqual([])
   })
 })
 

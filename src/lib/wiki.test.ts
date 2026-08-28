@@ -11,6 +11,7 @@ import {
   dirName,
   fileStem,
   escapeHtml,
+  extractRole,
 } from './wiki'
 
 describe('parseWikilinks', () => {
@@ -136,5 +137,17 @@ describe('escapeHtml', () => {
     expect(escapeHtml(`<a href="x" title='y'>&</a>`)).toBe(
       '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;',
     )
+  })
+})
+
+describe('extractRole', () => {
+  it('reads kb-role from frontmatter', () => {
+    expect(extractRole('---\nkb-role: index\n---\nbody')).toBe('index')
+    expect(extractRole("---\nkb-role: 'log'\ntitle: x\n---\n")).toBe('log')
+  })
+  it('ignores unknown values, missing keys and missing frontmatter', () => {
+    expect(extractRole('---\nkb-role: hub\n---\n')).toBeNull()
+    expect(extractRole('---\ntitle: x\n---\n')).toBeNull()
+    expect(extractRole('kb-role: index in prose')).toBeNull()
   })
 })
