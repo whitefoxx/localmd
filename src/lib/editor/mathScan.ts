@@ -34,10 +34,13 @@ function overlaps(from: number, to: number, ranges: Protected): boolean {
 export function findInlineMath(text: string, base: number, protectedRanges: Protected): MathSpan[] {
   const out: MathSpan[] = []
   for (let i = 0; i < text.length; i++) {
-    if (text[i] !== '$') continue
+    const latex = text[i] === '\\' && (text[i + 1] === '(' || text[i + 1] === '[')
+    if (text[i] !== '$' && !latex) continue
     const rest = text.slice(i)
-    const block = MATH_RULES.inlineBlock.exec(rest)
-    const m = block ?? MATH_RULES.inline.exec(rest)
+    const block = latex
+      ? MATH_RULES.latexInlineBlock.exec(rest)
+      : MATH_RULES.inlineBlock.exec(rest)
+    const m = block ?? (latex ? MATH_RULES.latexInline.exec(rest) : MATH_RULES.inline.exec(rest))
     if (!m) continue
     const from = base + i
     const to = from + m[0].length
@@ -61,9 +64,11 @@ export function findInlineMath(text: string, base: number, protectedRanges: Prot
 export function findBlockMath(lines: string[]): { fromLine: number; toLine: number; tex: string }[] {
   const out = []
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim() !== '$$') continue
+    const open = lines[i].trim()
+    if (open !== '$$' && open !== '\\[') continue
+    const close = open === '$$' ? '$$' : '\\]'
     for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() !== '$$') continue
+      if (lines[j].trim() !== close) continue
       out.push({ fromLine: i, toLine: j, tex: lines.slice(i + 1, j).join('\n') })
       i = j
       break

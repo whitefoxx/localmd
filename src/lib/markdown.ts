@@ -114,12 +114,26 @@ const INLINE_BLOCK_RULE = /^\$\$([^$]+?)\$\$/
 // Pandoc-style $…$ (see above).
 const INLINE_RULE = /^\$(?!\s)((?:\\.|[^\\\n$])+?)\$(?!\d)/
 
+/* LaTeX-style \(…\) and \[…\] — what many models emit no matter what the
+ * prompt asks for, and delimiters GitHub's markdown also accepts. The cost is
+ * that a rare escaped-bracket pair in prose (`\[TODO\]`) becomes math; the
+ * dollar rules' whitespace guards don't apply because `\( x \)` pads its
+ * content by convention. */
+const LATEX_INLINE_RULE = /^\\\(([^\n]+?)\\\)/
+const LATEX_INLINE_BLOCK_RULE = /^\\\[([^\n]+?)\\\]/
+
 /** The same delimiters, for the editor's live rendering. Shared rather than
  *  re-derived: two sets of math rules would disagree about `$5,那件 $10`, and
  *  the editor and the preview would render the same note differently. */
-export const MATH_RULES = { inlineBlock: INLINE_BLOCK_RULE, inline: INLINE_RULE }
-// A paragraph-level $$ … $$ block, possibly spanning multiple lines.
+export const MATH_RULES = {
+  inlineBlock: INLINE_BLOCK_RULE,
+  inline: INLINE_RULE,
+  latexInlineBlock: LATEX_INLINE_BLOCK_RULE,
+  latexInline: LATEX_INLINE_RULE,
+}
+// A paragraph-level $$ … $$ (or \[ … \]) block, possibly spanning lines.
 const BLOCK_RULE = /^\$\$([\s\S]+?)\$\$\s*(?:\n+|$)/
+const LATEX_BLOCK_RULE = /^\\\[([\s\S]+?)\\\]\s*(?:\n+|$)/
 
 function renderMath(tex: string, displayMode: boolean): string {
   return katex.renderToString(tex.trim(), { throwOnError: false, displayMode })
@@ -137,11 +151,13 @@ const mathExtensions = [
     name: 'blockMath',
     level: 'block' as const,
     start: (src: string) => {
-      const i = src.indexOf('$$')
+      const dollar = src.indexOf('$$')
+      const latex = src.indexOf('\\[')
+      const i = dollar < 0 ? latex : latex < 0 ? dollar : Math.min(dollar, latex)
       return i < 0 ? undefined : i
     },
     tokenizer(src: string): MathToken | undefined {
-      const m = BLOCK_RULE.exec(src)
+      const m = BLOCK_RULE.exec(src) ?? LATEX_BLOCK_RULE.exec(src)
       if (!m) return undefined
       return { type: 'blockMath', raw: m[0], tex: m[1], display: true }
     },
@@ -151,12 +167,15 @@ const mathExtensions = [
     name: 'inlineMath',
     level: 'inline' as const,
     start: (src: string) => {
-      const i = src.indexOf('$')
+      const i = src.search(/\$|\\[([]/)
       return i < 0 ? undefined : i
     },
     tokenizer(src: string): MathToken | undefined {
-      const block = INLINE_BLOCK_RULE.exec(src)
+      const block = INLINE_BLOCK_RULE.exec(src) ?? LATEX_INLINE_BLOCK_RULE.exec(src)
       if (block) return { type: 'inlineMath', raw: block[0], tex: block[1], display: true }
+      const latex = LATEX_INLINE_RULE.exec(src)
+      if (latex && latex[1].trim())
+        return { type: 'inlineMath', raw: latex[0], tex: latex[1], display: false }
       const m = INLINE_RULE.exec(src)
       if (!m || !m[1].trim() || /\s$/.test(m[1])) return undefined
       return { type: 'inlineMath', raw: m[0], tex: m[1], display: false }

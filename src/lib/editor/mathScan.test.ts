@@ -35,6 +35,19 @@ describe('findInlineMath', () => {
   it('finds several spans on one line', () => {
     expect(scan('$a$ and $b$').map((s) => s.tex)).toEqual(['a', 'b'])
   })
+
+  it('finds LaTeX-style \\(…\\) and \\[…\\] (what models emit)', () => {
+    const [inline] = scan('值为 \\( q_1 \\cdot k_1 \\) 分')
+    expect(inline.tex).toBe(' q_1 \\cdot k_1 ')
+    expect(inline.display).toBe(false)
+    const [block] = scan('so \\[ E = mc^2 \\] then')
+    expect(block.tex).toBe(' E = mc^2 ')
+    expect(block.display).toBe(true)
+  })
+
+  it('leaves a lone escaped bracket alone', () => {
+    expect(scan('an escaped \\( paren, no closer')).toEqual([])
+  })
 })
 
 describe('findBlockMath', () => {
@@ -51,5 +64,10 @@ describe('findBlockMath', () => {
 
   it('ignores single-line $$…$$, which is inline math', () => {
     expect(findBlockMath(['$$E = mc^2$$'])).toEqual([])
+  })
+
+  it('spans the lines between \\[ and \\] fences', () => {
+    const lines = ['text', '\\[', 'z_1 = 0.88 v_1 + 0.12 v_2', '\\]', 'more']
+    expect(findBlockMath(lines)).toEqual([{ fromLine: 1, toLine: 3, tex: 'z_1 = 0.88 v_1 + 0.12 v_2' }])
   })
 })

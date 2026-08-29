@@ -138,6 +138,21 @@ describe('math (KaTeX)', () => {
     expect(html).toContain('class="citation"')
     expect(html).toContain('katex')
   })
+  it('renders LaTeX-style \\(…\\) inline math (what models emit)', () => {
+    const html = renderMarkdown('得分是 \\( q_1 \\cdot k_1 = 112 \\),分数很高。', resolver)
+    expect(html).toContain('katex')
+    expect(html).not.toContain('\\( q_1')
+  })
+  it('renders LaTeX-style \\[…\\] as display math, inline and as a block', () => {
+    const inline = renderMarkdown('结论:\\[ E = mc^2 \\]', resolver)
+    expect(inline).toContain('katex-display')
+    const block = renderMarkdown('\\[\n\\frac{q_1 k_1}{\\sqrt{d_k}} = 14\n\\]', resolver)
+    expect(block).toContain('katex-display')
+  })
+  it('leaves a lone escaped paren alone', () => {
+    const html = renderMarkdown('an escaped \\( paren with no closer', resolver)
+    expect(html).not.toContain('katex')
+  })
 })
 
 describe('file paths in code spans', () => {
