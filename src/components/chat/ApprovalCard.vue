@@ -9,6 +9,8 @@
  * read-only record of what was asked and what was answered.
  */
 import { computed } from 'vue'
+import { t } from '@/i18n'
+import { renumberMessage } from '@/lib/renumber'
 import { useApprovalsStore } from '@/stores/approvals'
 import type { MessagePart } from '@/stores/chat'
 
@@ -18,19 +20,26 @@ const approvals = useApprovalsStore()
 
 const pending = computed(() => !props.part.decision)
 
-/** One line describing what is being asked. Deletions carry their own warning
- *  weight; a plain write is introduced by whether the file exists yet. */
+/** What is being asked, in one paragraph. Deletions carry their own warning
+ *  weight; a plain write is introduced by whether the file exists yet. A
+ *  renumber is not a write at all and states its own case — composed by
+ *  lib/renumber, the same sentences the viewers show, so the two can never
+ *  drift into describing the hazard differently. */
 const headline = computed(() => {
   const p = props.part
-  if (p.moved) return 'chat.approvalMove'
-  if (p.deleted) return p.restorable ? 'chat.approvalDelete' : 'chat.approvalDeleteFinal'
-  return p.removed > 0 ? 'chat.approvalWrite' : 'chat.approvalCreate'
+  if (p.renumber) return renumberMessage(p.renumber)
+  if (p.moved) return t('chat.approvalMove')
+  if (p.deleted) return t(p.restorable ? 'chat.approvalDelete' : 'chat.approvalDeleteFinal')
+  return t(p.removed > 0 ? 'chat.approvalWrite' : 'chat.approvalCreate')
 })
 
 /** Whose file this is. Said out loud only for the user's own material —
  *  the assistant's drafts are the unremarkable case, and a line on every
- *  card would be a line nobody reads. */
-const ownership = computed(() => (props.part.mine ? null : 'chat.approvalYours'))
+ *  card would be a line nobody reads. Never on a renumber card: what is at
+ *  stake there is the notes citing the document, not the document. */
+const ownership = computed(() =>
+  props.part.mine || props.part.renumber ? null : 'chat.approvalYours',
+)
 
 const decisionLabel = computed(() =>
   props.part.decision === 'approved'
@@ -58,15 +67,17 @@ const decisionIcon = computed(() =>
       <span
         class="codicon codicon-sm shrink-0"
         :class="
-          part.deleted
-            ? 'codicon-diff-removed text-removed'
-            : part.removed > 0
-              ? 'codicon-diff-modified text-accent'
-              : 'codicon-diff-added text-added'
+          part.renumber
+            ? 'codicon-warning text-removed'
+            : part.deleted
+              ? 'codicon-diff-removed text-removed'
+              : part.removed > 0
+                ? 'codicon-diff-modified text-accent'
+                : 'codicon-diff-added text-added'
         "
       />
       <span class="text-sm font-mono text-fg-1 truncate flex-1" :title="part.path">{{ part.path }}</span>
-      <span v-if="!part.deleted" class="shrink-0 text-xs font-mono tabular-nums">
+      <span v-if="!part.deleted && !part.renumber" class="shrink-0 text-xs font-mono tabular-nums">
         <span class="text-added">+{{ part.added }}</span>
         <span class="text-removed ml-1.5">−{{ part.removed }}</span>
       </span>
@@ -74,9 +85,9 @@ const decisionIcon = computed(() =>
 
     <p
       class="mt-0.5 text-xs leading-relaxed"
-      :class="part.deleted && !part.restorable ? 'text-removed' : 'text-fg-3'"
+      :class="(part.deleted && !part.restorable) || part.renumber ? 'text-removed' : 'text-fg-3'"
     >
-      {{ $t(headline) }}
+      {{ headline }}
     </p>
     <!-- Whose file this is. Only said for the user's own material: the
          assistant's drafts are the unremarkable case, and a line on every
@@ -84,7 +95,7 @@ const decisionIcon = computed(() =>
     <p v-if="ownership" class="mt-0.5 text-[11px] text-fg-3">{{ $t(ownership) }}</p>
 
     <div
-      v-if="part.diff.length"
+      v-if="part.diff.length && !part.renumber"
       class="mt-1.5 max-h-64 overflow-auto rounded bg-bg-2 font-mono text-xs leading-5 selectable"
     >
       <template v-for="(line, i) in part.diff" :key="i">

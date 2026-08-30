@@ -6,6 +6,7 @@ import { useKbIndexStore } from '@/stores/kbIndex'
 import * as fs from '@/lib/fs'
 import { importFileInto } from '@/lib/capture'
 import { indexableKind, indexDocument } from '@/lib/docindex'
+import { checkRenumber, confirmRenumber } from '@/lib/renumber'
 import {
   moveEntry,
   newFileInteractive,
@@ -120,6 +121,11 @@ async function indexDocs(dir: string): Promise<void> {
   for (let i = 0; i < docs.length; i++) {
     indexStatus.value = t('files.indexingN', { i: i + 1, total: docs.length })
     try {
+      // Asked per document, not once for the batch: each one is a different
+      // set of citations at stake, and only the documents actually at risk
+      // interrupt anything (lib/renumber).
+      const warning = await checkRenumber(docs[i])
+      if (warning && !confirmRenumber(warning)) continue
       await indexDocument(docs[i])
     } catch (err) {
       console.error('index failed', docs[i], err)
@@ -135,6 +141,11 @@ async function indexFile(path: string): Promise<void> {
   closeMenu()
   indexStatus.value = t('files.indexing')
   try {
+    const warning = await checkRenumber(path)
+    if (warning && !confirmRenumber(warning)) {
+      indexStatus.value = ''
+      return
+    }
     await indexDocument(path)
   } catch (err) {
     console.error('index failed', path, err)

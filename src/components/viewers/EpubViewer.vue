@@ -14,6 +14,7 @@ import { highlightSentence } from '@/composables/useTtsHighlight'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { resolveHotkey } from '@/lib/hotkeys'
 import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
+import { checkRenumber, confirmRenumber, type RenumberWarning } from '@/lib/renumber'
 import { loadEpubLocations } from '@/lib/docindex/epub'
 import { epubLocation, epubLocations, rememberEpubLocation, rememberEpubLocations } from '@/lib/viewMemory'
 import {
@@ -41,6 +42,9 @@ const composer = useComposerStore()
 const host = ref<HTMLElement | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const indexState = ref<'none' | 'indexing' | 'indexed'>('none')
+/** Set when indexing on open was declined on the user's behalf — the badge
+ *  below is the only way past it (lib/renumber). */
+const renumberWarning = ref<RenumberWarning | null>(null)
 const indexDetail = ref('')
 // Older-algorithm index: usable as is; the badge offers a rebuild.
 const indexOutdated = ref(false)
@@ -218,6 +222,7 @@ async function load(path: string | null): Promise<void> {
   if (!path || !host.value) return
   indexDetail.value = ''
   indexOutdated.value = false
+  renumberWarning.value = null
   if (await hasIndex(path)) {
     indexState.value = 'indexed'
     void queryIndexState(path).then((s) => {
@@ -924,8 +929,30 @@ async function maybeJump(): Promise<void> {
   citations.clear()
 }
 
-async function runIndex(rebuild = false): Promise<void> {
+/** The badge's click: the same question, and a yes runs the held-back build. */
+function decideRenumber(): void {
+  const w = renumberWarning.value
+  if (!w || !confirmRenumber(w)) return
+  renumberWarning.value = null
+  void runIndex(false, true)
+}
+
+async function runIndex(rebuild = false, confirmed = false): Promise<void> {
   if (!docPath || indexState.value === 'indexing') return
+  // EPUB ids come out of the spine and have no carry-forward mechanism, so a
+  // rebuild by a newer algorithm re-points citations already in the user's
+  // notes. Never on the automatic path; on the manual one, only if asked.
+  if (!confirmed) {
+    const warning = await checkRenumber(docPath)
+    if (warning) {
+      if (!rebuild) {
+        renumberWarning.value = warning
+        return
+      }
+      if (!confirmRenumber(warning)) return
+    }
+  }
+  renumberWarning.value = null
   indexState.value = 'indexing'
   try {
     const s = await indexDocument(
@@ -1105,6 +1132,15 @@ watch(
 
       <!-- Right: search · read-aloud · view-annotations -->
       <div class="ml-auto flex items-center gap-2">
+        <button
+          v-if="renumberWarning"
+          class="btn text-xs !text-removed"
+          :title="$t('renumber.badgeHint')"
+          @click="decideRenumber"
+        >
+          <span class="codicon codicon-sm codicon-warning" />
+          {{ $t('renumber.badge') }}
+        </button>
         <button
           v-if="indexOutdated && indexState !== 'indexing'"
           class="btn text-xs"

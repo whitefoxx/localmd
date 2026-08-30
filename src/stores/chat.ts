@@ -1,3 +1,4 @@
+import type { RenumberWarning } from '@/lib/renumber'
 import { defineStore } from 'pinia'
 import { ref, computed, reactive, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -124,6 +125,8 @@ export type MessagePart =
       restorable?: boolean
       /** Renaming or relocating, rather than writing. */
       moved?: boolean
+      /** Not a write: an index build that would reassign cited block ids. */
+      renumber?: RenumberWarning
       /** The agent created this file itself, this session. Absent or false =
        *  the user's file, which is the case the card is loudest about. */
       mine?: boolean
@@ -1114,6 +1117,7 @@ export const useChatStore = defineStore('chat', () => {
           dir: e.dir,
           restorable: e.restorable,
           moved: e.moved,
+          renumber: e.renumber,
           mine: e.mine,
           diff: e.diff,
           added: e.added,

@@ -10,6 +10,7 @@
  *   hang [ms]                a tool call that ignores the abort signal (stop tests)
  *   write <path> <content>   run the real write_file tool, then confirm
  *   delete <path>            run the real delete_path tool (recursive)
+ *   index <path>             run the real index_document tool
  *   plan                     exercise update_plan (3 steps, all done)
  *   anything else            stream a fixed reply
  *
@@ -113,6 +114,11 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
   } else if (script.startsWith('delete ')) {
     const target = script.slice('delete '.length).trim()
     const result = await runTool('delete_path', { path: target, recursive: true }, opts)
+    reply = `Done: ${result}`
+    await streamText(reply, opts.onEvent)
+  } else if (script.startsWith('index ')) {
+    const target = script.slice('index '.length).trim()
+    const result = await runTool('index_document', { path: target }, opts)
     reply = `Done: ${result}`
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('artifact ')) {

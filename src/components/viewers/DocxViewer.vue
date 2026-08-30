@@ -24,6 +24,7 @@ import * as fs from '@/lib/fs'
 import { previewScroll } from '@/lib/viewMemory'
 import { useMarkPopupPosition } from '@/composables/useMarkPopupPosition'
 import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
+import { checkRenumber, confirmRenumber, type RenumberWarning } from '@/lib/renumber'
 import {
   HIGHLIGHT_COLORS,
   UNDERLINE_COLOR,
@@ -56,6 +57,9 @@ const error = ref('')
 const legacy = ref(false)
 const ready = ref(false)
 const indexMsg = ref('')
+/** Set when indexing on open was declined on the user's behalf — the badge is
+ *  the only way past it (lib/renumber). */
+const renumberWarning = ref<RenumberWarning | null>(null)
 const indexFailed = ref(false)
 // Older-algorithm index: usable as is; the badge offers a rebuild.
 const indexOutdated = ref(false)
@@ -135,6 +139,7 @@ function resetState(): void {
   indexMsg.value = ''
   indexFailed.value = false
   indexOutdated.value = false
+  renumberWarning.value = null
   popup.value = null
   noteEditor.value = null
   if (body.value) body.value.innerHTML = ''
@@ -213,8 +218,38 @@ function rebuildIndex(): void {
   if (path) void runIndex(path, loadToken, true)
 }
 
+/** The renumber badge's click: the same question the rebuild path asks, and a
+ *  yes runs the build that was held back. */
+function decideRenumber(): void {
+  const w = renumberWarning.value
+  const path = files.currentPath
+  if (!w || !path || !confirmRenumber(w)) return
+  renumberWarning.value = null
+  void runIndex(path, loadToken, false, true)
+}
+
 /** Index (or, on the badge's click, rebuild) with progress in the pill. */
-async function runIndex(path: string, token: number, rebuild: boolean): Promise<void> {
+async function runIndex(
+  path: string,
+  token: number,
+  rebuild: boolean,
+  confirmed = false,
+): Promise<void> {
+  // DOCX ids come out of the document's own structure with no carry-forward
+  // mechanism, so a build by a newer algorithm re-points citations already in
+  // the user's notes. Never on the automatic path; on the manual one, only if
+  // asked (lib/renumber).
+  if (!confirmed) {
+    const warning = await checkRenumber(path)
+    if (warning) {
+      if (!rebuild) {
+        renumberWarning.value = warning
+        return
+      }
+      if (!confirmRenumber(warning)) return
+    }
+  }
+  renumberWarning.value = null
   indexMsg.value = t('viewers.docx.indexing')
   try {
     const summary = await indexDocument(path, undefined, { rebuild })
@@ -439,6 +474,15 @@ onBeforeUnmount(() => {
       >
         {{ indexMsg }}
       </div>
+      <button
+        v-if="renumberWarning"
+        class="btn text-xs shadow-sm !text-removed"
+        :title="$t('renumber.badgeHint')"
+        @click="decideRenumber"
+      >
+        <span class="codicon codicon-sm codicon-warning" />
+        {{ $t('renumber.badge') }}
+      </button>
       <button
         v-if="indexOutdated"
         class="btn text-xs shadow-sm"

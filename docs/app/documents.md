@@ -85,10 +85,35 @@ ignore it indefinitely.
 Either way, **citations in your notes keep working**. A rebuild recognizes the
 passages it already gave names to and keeps calling them by those names, so a
 citation written last month still lands on the same paragraph after any number
-of rebuilds. The one thing it cannot survive is the document itself being
-replaced with different content — a citation into the old file's pages has
-nothing to point at in the new one (the health check in `knowledge-base` flags
-notes whose source moved on).
+of rebuilds. What makes that possible is a record, kept beside the index, of
+which passage each name belongs to. The one thing it cannot survive is the
+document itself being replaced with different content — a citation into the old
+file's pages has nothing to point at in the new one (the health check in
+`knowledge-base` flags notes whose source moved on).
+
+## Opening the same folder on another machine
+
+The index lives in the hidden `.localmd/` folder, and that folder is left out of
+git on purpose — so a knowledge base you clone onto another computer arrives
+with your notes and without it. Opening a document there would normally index it
+on the spot, and that build has no way of knowing which passage each existing
+citation was written against. It would number the passages afresh: the citations
+would all still open, and some would land on a different paragraph.
+
+So it does not happen quietly. When your notes already cite a document and the
+app cannot promise those citations will survive, **indexing stops** and the
+viewer shows an **Indexing paused** button. Clicking it tells you how many
+citations are at stake and lets you go ahead anyway. The assistant is held to
+the same rule — it asks in the conversation and waits for your answer rather
+than deciding for you.
+
+To keep the citations exact, copy `.localmd/` across from the machine that built
+the index before opening the document. It is an ordinary folder copy; nothing in
+it is machine-specific.
+
+If that machine is gone, going ahead is a perfectly reasonable choice — an index
+you can search is worth more than citations you may never revisit. The pause
+exists so that it is your call and not a surprise.
 
 ## Reading with nothing else on screen
 

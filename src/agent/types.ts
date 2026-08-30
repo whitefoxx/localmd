@@ -1,3 +1,4 @@
+import type { RenumberWarning } from '@/lib/renumber'
 import type { HunkLine } from '@/lib/diff'
 import type { ApprovalDecision } from '@/stores/approvals'
 
@@ -53,6 +54,10 @@ export type AgentEvent =
       restorable?: boolean
       /** Renaming or relocating, rather than writing. */
       moved?: boolean
+      /** Not a write at all: an index build that would reassign block ids the
+       *  user's notes already cite. The card states what is at stake; the
+       *  wording lives in lib/renumber so chat and viewers cannot disagree. */
+      renumber?: RenumberWarning
       /** The agent created this file itself, this session — so the card can
        *  say whose file is at stake. Absent or false = the user's. */
       mine?: boolean

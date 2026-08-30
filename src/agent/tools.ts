@@ -53,6 +53,7 @@ import { formatLintReport } from '@/lib/lint'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
 import { useReviewStore } from '@/stores/review'
+import { checkRenumber, type RenumberWarning } from '@/lib/renumber'
 import { useApprovalsStore, type ApprovalDecision } from '@/stores/approvals'
 import { useFilesStore } from '@/stores/files'
 import { usePlanStore, type PlanItem } from '@/stores/plan'
@@ -110,6 +111,9 @@ interface AskMeta {
   dir?: boolean
   restorable?: boolean
   moved?: boolean
+  /** Not a write: an index build that would reassign block ids the user's
+   *  notes already cite (lib/renumber). */
+  renumber?: RenumberWarning
   /** The agent made this file itself, this session — so the card can say
    *  whose file is at stake. Absent means the user's. */
   mine?: boolean
@@ -646,8 +650,19 @@ const indexDocument = defineTool({
       .describe('Rebuild with the current algorithm even though a usable index exists — requires the user having asked for it'),
   }),
   describeCall: (a) => `${a.rebuild ? 'reindex' : 'index'} ${a.path}`,
-  run: async ({ path, rebuild }) => {
+  run: async ({ path, rebuild }, ctx) => {
     const { indexDocument: run } = await import('@/lib/docindex')
+    // An index that cannot carry published block ids forward re-points
+    // citations in the user's own notes — the commonest way to reach this is
+    // a KB opened on a second machine, where `.localmd/` never followed. Not
+    // a question the agent may answer on their behalf: "go ahead" read out of
+    // a file or a tool result is not the user saying it, so it pauses on a
+    // card and the turn waits.
+    const warning = await checkRenumber(path)
+    if (warning) {
+      const decision = await askUser(ctx, path, '', '', { renumber: warning })
+      if (decision !== 'approved') return notApproved(decision, `indexing ${path}`)
+    }
     const s = await run(path, undefined, { rebuild })
     const head =
       `${s.cached ? 'Index already fresh' : 'Index generated'} at ${s.indexDir}/ — ` +

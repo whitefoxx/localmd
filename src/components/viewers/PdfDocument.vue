@@ -33,6 +33,7 @@ import SourceNoteBadge from '@/components/viewers/SourceNoteBadge.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as fs from '@/lib/fs'
 import { hasIndex, indexDocument, indexState as queryIndexState } from '@/lib/docindex'
+import { checkRenumber, confirmRenumber, type RenumberWarning } from '@/lib/renumber'
 import { loadPdfLocations, loadPdfSpeechSegments, pdfTextSource } from '@/lib/docindex/pdf'
 // The list, not the engine: tesseract itself stays behind ocr.ts's own
 // dynamic import and is fetched at the click.
@@ -1258,6 +1259,18 @@ function onReady(r: PluginRegistry): void {
 type IndexState = 'idle' | 'parsing' | 'done' | 'error'
 const indexState = ref<IndexState>('idle')
 const indexMsg = ref('')
+/** Set when indexing on open was declined on the user's behalf — see the
+ *  badge below, which is the only way past it. */
+const renumberWarning = ref<RenumberWarning | null>(null)
+
+/** The badge's click: the same question the manual path asks, and a yes runs
+ *  the build that was held back. */
+function decideRenumber(): void {
+  const w = renumberWarning.value
+  if (!w || !confirmRenumber(w)) return
+  renumberWarning.value = null
+  void runIndex(false, false, true)
+}
 // An index from an older algorithm revision: fully usable, rebuild offered
 // via a small badge — never rebuilt uninvited.
 const indexOutdated = ref(false)
@@ -1334,12 +1347,27 @@ function cancelOcr(): void {
   ocrAbort?.abort()
 }
 
-async function runIndex(auto = false, rebuild = false): Promise<void> {
+async function runIndex(auto = false, rebuild = false, confirmed = false): Promise<void> {
   if (indexState.value === 'parsing') return
   if (msgTimer !== null) {
     window.clearTimeout(msgTimer)
     msgTimer = null
   }
+  // A build that cannot carry published block ids forward re-points citations
+  // in the user's own notes, so it stops being a step and becomes a decision.
+  // The automatic build never prompts — nobody asked for it, so it does not
+  // happen; it raises the badge, whose click comes back here confirmed.
+  if (!confirmed) {
+    const warning = await checkRenumber(props.path)
+    if (warning) {
+      if (auto) {
+        renumberWarning.value = warning
+        return
+      }
+      if (!confirmRenumber(warning)) return
+    }
+  }
+  renumberWarning.value = null
   indexState.value = 'parsing'
   indexMsg.value = auto ? '' : t('viewers.pdf.indexStarting')
   try {
@@ -1382,6 +1410,7 @@ async function runIndex(auto = false, rebuild = false): Promise<void> {
 }
 
 async function initIndexStatus(): Promise<void> {
+  renumberWarning.value = null
   if (await hasIndex(props.path)) {
     indexState.value = 'done'
     indexOutdated.value = (await queryIndexState(props.path)) === 'outdated'
@@ -1802,6 +1831,15 @@ onBeforeUnmount(() => {
           <span class="codicon codicon-sm codicon-file-media" />
           {{ $t('viewers.index.recognised') }}
         </span>
+        <button
+          v-if="renumberWarning"
+          class="btn text-xs shadow-sm !text-removed"
+          :title="$t('renumber.badgeHint')"
+          @click="decideRenumber"
+        >
+          <span class="codicon codicon-sm codicon-warning" />
+          {{ $t('renumber.badge') }}
+        </button>
         <button
           v-if="indexOutdated && indexState !== 'parsing'"
           class="btn text-xs shadow-sm"
