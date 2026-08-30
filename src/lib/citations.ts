@@ -5,7 +5,7 @@
  *   [[1:b14-3]]                 — inline citation into source #1, block b14-3
  *   [[b14-3]]                   — inline citation, source inferred at click time
  */
-import { escapeHtml } from './wiki'
+import { escapeHtml, splitFrontmatter } from './wiki'
 
 const CITE_SOURCE_RE = /\[\[(pdf|epub|md|docx)(\d+):([^\]]+?)\]\]/g
 const CITE_INLINE_RE = /\[\[(?:(\d+):)?(b\d+-\d+)\]\]/g
@@ -91,4 +91,73 @@ export function citationHtml(inner: string, sources: Map<string, CiteSource>): s
   }
 
   return null
+}
+
+/** One inline citation: the source it names (null for the bare `[[b14-3]]`
+ *  form, whose source is inferred at click time) and the block id. */
+export interface InlineCite {
+  /** The `N` of `[[N:b14-3]]`, or null for the bare form. */
+  num: string | null
+  blockId: string
+}
+
+/** Every inline citation in `body`, in document order. */
+export function parseCiteInline(body: string): InlineCite[] {
+  const out: InlineCite[] = []
+  CITE_INLINE_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = CITE_INLINE_RE.exec(body)) !== null) {
+    out.push({ num: m[1] ?? null, blockId: m[2] })
+  }
+  return out
+}
+
+/** Block ids the KB has already published against one document. */
+export interface PublishedCitations {
+  /** Distinct block ids, sorted. */
+  ids: string[]
+  /** Paths of the pages carrying them, sorted. */
+  pages: string[]
+}
+
+/**
+ * The block ids someone's notes already point at inside `source` — the names
+ * an index rebuild is not free to reassign.
+ *
+ * A block id is a NAME, not a position (see docindex/pdf/inherit): once a page
+ * says `[[1:b14-3]]`, that ordinal belongs to the passage it was written
+ * against. This is the count of what is at stake before a build that cannot
+ * carry the old ids forward, so the question can be put to the user in numbers
+ * rather than in the abstract.
+ *
+ * Bare `[[b14-3]]` citations name no source and are resolved at click time by
+ * searching the indexes. They are counted here only when the page declares
+ * exactly one source and it is this document — anything looser would attribute
+ * another document's ids to this one, and the whole point is a number the user
+ * can trust.
+ */
+export function publishedCitations(
+  pages: Iterable<readonly [string, string]>,
+  files: readonly string[],
+  source: string,
+): PublishedCitations {
+  const ids = new Set<string>()
+  const citing = new Set<string>()
+  for (const [path, content] of pages) {
+    const { body } = splitFrontmatter(content)
+    const declared = parseCiteSources(body)
+    if (declared.size === 0) continue
+    const ours = new Set<string>()
+    for (const [num, s] of declared) {
+      if (resolveCitePath(s.path, files as string[]) === source) ours.add(num)
+    }
+    if (ours.size === 0) continue
+    const bareIsOurs = declared.size === 1
+    for (const { num, blockId } of parseCiteInline(body)) {
+      if (num === null ? !bareIsOurs : !ours.has(num)) continue
+      ids.add(blockId)
+      citing.add(path)
+    }
+  }
+  return { ids: [...ids].sort(), pages: [...citing].sort() }
 }

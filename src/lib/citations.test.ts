@@ -4,6 +4,8 @@ import {
   citationHtml,
   isCitationToken,
   resolveCitePath,
+  parseCiteInline,
+  publishedCitations,
   type CiteSource,
 } from './citations'
 
@@ -101,5 +103,80 @@ describe('resolveCitePath', () => {
   it('matches whole basenames, not suffixes', () => {
     // "notes.docx" must not claim "field-notes.docx".
     expect(resolveCitePath('notes.docx', kb)).toBeNull()
+  })
+})
+
+/**
+ * The count put in front of the user before an index build that cannot carry
+ * old block ids forward (lib/renumber). It has to be a number they can trust:
+ * too low and the warning understates what is at stake, too high and it cries
+ * wolf about another document's ids.
+ */
+describe('publishedCitations', () => {
+  const files = ['raw/papers/x.pdf', 'raw/books/b.epub', 'wiki/note.md', 'wiki/other.md']
+  const page = (path: string, body: string): readonly [string, string] => [path, body] as const
+
+  it('counts the ids cited against one document, and the pages citing them', () => {
+    const pages = [
+      page('wiki/note.md', 'See [[pdf1:raw/papers/x.pdf]] — [[1:b14-3]] and [[1:b2-1]].'),
+      page('wiki/other.md', 'Also [[pdf1:raw/papers/x.pdf]] [[1:b14-3]]'),
+    ]
+    expect(publishedCitations(pages, files, 'raw/papers/x.pdf')).toEqual({
+      ids: ['b14-3', 'b2-1'],
+      pages: ['wiki/note.md', 'wiki/other.md'],
+    })
+  })
+
+  it('does not attribute another source’s ids to this document', () => {
+    const pages = [
+      page(
+        'wiki/note.md',
+        'A [[pdf1:raw/papers/x.pdf]] B [[epub2:raw/books/b.epub]] — [[1:b1-1]] [[2:b9-9]]',
+      ),
+    ]
+    expect(publishedCitations(pages, files, 'raw/books/b.epub').ids).toEqual(['b9-9'])
+  })
+
+  // A bare `[[b14-3]]` names no source and is resolved by searching the
+  // indexes at click time. Claiming it for this document is only defensible
+  // when the page declares one source and it is this one.
+  it('claims bare ids only when the page declares this document alone', () => {
+    const alone = [page('wiki/note.md', '[[pdf1:raw/papers/x.pdf]] [[b7-2]]')]
+    expect(publishedCitations(alone, files, 'raw/papers/x.pdf').ids).toEqual(['b7-2'])
+
+    const ambiguous = [
+      page('wiki/note.md', '[[pdf1:raw/papers/x.pdf]] [[epub2:raw/books/b.epub]] [[b7-2]]'),
+    ]
+    expect(publishedCitations(ambiguous, files, 'raw/papers/x.pdf').ids).toEqual([])
+  })
+
+  // Declared paths are claims, not facts: the model abbreviates and users move
+  // files, so the same repair a click makes applies here (resolveCitePath).
+  it('follows an abbreviated or moved declaration to the real file', () => {
+    const pages = [page('wiki/note.md', '[[pdf1:x.pdf]] [[1:b3-1]]')]
+    expect(publishedCitations(pages, files, 'raw/papers/x.pdf').ids).toEqual(['b3-1'])
+  })
+
+  it('ignores citations that live in frontmatter', () => {
+    const pages = [page('wiki/note.md', '---\nsource: "[[pdf1:raw/papers/x.pdf]] [[1:b1-1]]"\n---\nbody')]
+    expect(publishedCitations(pages, files, 'raw/papers/x.pdf').ids).toEqual([])
+  })
+
+  it('is empty for a document nobody has cited', () => {
+    const pages = [page('wiki/note.md', 'no citations here')]
+    expect(publishedCitations(pages, files, 'raw/papers/x.pdf')).toEqual({ ids: [], pages: [] })
+  })
+})
+
+describe('parseCiteInline', () => {
+  it('separates the numbered form from the bare one', () => {
+    expect(parseCiteInline('[[1:b14-3]] and [[b2-1]]')).toEqual([
+      { num: '1', blockId: 'b14-3' },
+      { num: null, blockId: 'b2-1' },
+    ])
+  })
+
+  it('is not fooled by a wikilink', () => {
+    expect(parseCiteInline('[[some page]] [[b1-1]]')).toEqual([{ num: null, blockId: 'b1-1' }])
   })
 })

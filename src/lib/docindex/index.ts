@@ -3,7 +3,7 @@
  * extension and returns a uniform summary the UI and the agent tool share.
  */
 import * as fs from '@/lib/fs'
-import { indexDirFor, type IndexProgress } from './util'
+import { indexDirFor, sha256Hex, type IndexProgress } from './util'
 import { BUILDER as PDF_BUILDER, INDEX_VERSION as PDF_VERSION } from './pdf/types'
 import { BUILDER as EPUB_BUILDER, INDEX_VERSION as EPUB_VERSION } from './epub/types'
 import { BUILDER as DOCX_BUILDER, INDEX_VERSION as DOCX_VERSION } from './docx/types'
@@ -60,16 +60,22 @@ const CONTRACT: Record<Exclude<ReturnType<typeof indexableKind>, null>, { versio
   md: null, // resolved on demand below
 }
 
+/** The reader/algorithm revisions this build of the app speaks for `kind`. */
+async function contractFor(
+  kind: Exclude<ReturnType<typeof indexableKind>, null>,
+): Promise<{ version: number; builder: number }> {
+  const contract = CONTRACT[kind]
+  if (contract) return contract
+  const m = await import('./md')
+  return { version: m.INDEX_VERSION, builder: m.BUILDER }
+}
+
 export async function indexState(path: string): Promise<DocIndexState> {
   const kind = indexableKind(path)
   if (!kind) return 'absent'
   const raw = await fs.tryReadFile(`${indexDirFor(kind, path)}/manifest.json`)
   if (!raw) return 'absent'
-  let contract = CONTRACT[kind]
-  if (!contract) {
-    const m = await import('./md')
-    contract = { version: m.INDEX_VERSION, builder: m.BUILDER }
-  }
+  const contract = await contractFor(kind)
   try {
     const m = JSON.parse(raw) as { version?: number; builder?: number }
     if (m.version !== contract.version) return 'incompatible'
@@ -154,6 +160,72 @@ export async function hasIndex(path: string): Promise<boolean> {
   const kind = indexableKind(path)
   if (!kind) return false
   return fs.exists(`${indexDirFor(kind, path)}/manifest.json`)
+}
+
+/**
+ * Whether building an index for `path` right now could hand an already-published
+ * block id to a different passage.
+ *
+ * A block id is a name, not a position: `[[1:b14-3]]` in someone's notes is a
+ * promise that the ordinal keeps pointing at the paragraph it was written
+ * against. PDFs keep that promise across rebuilds by inheriting ids from the
+ * previous `locations.json` (pdf/inherit) — but inheritance needs that record
+ * to be here, and to describe these very bytes. When it is not, the build
+ * numbers from scratch, and it does so silently: every citation still resolves,
+ * just possibly to the wrong paragraph.
+ *
+ * That is the whole reason this query exists. The dangerous case is not an
+ * exotic one — it is a knowledge base opened on a second machine, where
+ * `.localmd/` was never copied (it is gitignored, so a `git clone` does not
+ * bring it) and the viewer would otherwise index the document on open without
+ * anyone being asked.
+ *
+ * - `no-record`      nothing here to inherit from: never indexed on this
+ *                    machine, an index from an unreadable format version, or
+ *                    one whose `locations.json` is gone. What the ids were
+ *                    built by is unknowable, so the risk is unknowable.
+ * - `source-changed` the file's bytes are not the ones the ids were made
+ *                    against, so the old coordinates describe pages that no
+ *                    longer exist and inheritance correctly refuses them.
+ * - `no-inheritance` EPUB/DOCX/markdown, whose ids come out of the document's
+ *                    own structure and have no carry-forward mechanism, about
+ *                    to be rebuilt by a NEWER algorithm than made them.
+ * - `null`           the ids survive: a PDF that can inherit, or a rebuild by
+ *                    the same algorithm that assigned them.
+ *
+ * Whether anything is actually AT stake — whether a note cites this document
+ * at all — is a separate question, answered from the page cache by
+ * `publishedCitations` (lib/citations). Both halves are needed before anyone
+ * is worth interrupting; see lib/renumber.
+ *
+ * Costs a hash of the source, so call it when a build is imminent, never to
+ * paint a badge.
+ */
+export type RenumberRisk = 'no-record' | 'source-changed' | 'no-inheritance' | null
+
+export async function renumberRisk(path: string): Promise<RenumberRisk> {
+  const kind = indexableKind(path)
+  if (!kind) return null
+  const dir = indexDirFor(kind, path)
+  const raw = await fs.tryReadFile(`${dir}/manifest.json`)
+  if (!raw) return 'no-record'
+  let manifest: { version?: number; builder?: number; contentHash?: string }
+  try {
+    manifest = JSON.parse(raw) as typeof manifest
+  } catch {
+    return 'no-record'
+  }
+  const contract = await contractFor(kind)
+  if (manifest.version !== contract.version) return 'no-record'
+  // PDF ids are carried forward from locations.json; without it the manifest
+  // alone proves nothing (a half-swept directory reads as "indexed" but has
+  // no record to inherit).
+  if (kind === 'pdf' && !(await fs.exists(`${dir}/locations.json`))) return 'no-record'
+  if (manifest.contentHash !== (await sha256Hex(await fs.readBinary(path)))) {
+    return 'source-changed'
+  }
+  if (kind === 'pdf') return null
+  return (manifest.builder ?? 1) < contract.builder ? 'no-inheritance' : null
 }
 
 export { indexDirFor }
