@@ -127,9 +127,20 @@ Ask the assistant for a health check and it runs the same pass in full. On top
 of those two it reports pages that are nearly empty, pages you cannot reach by
 navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
-there, pages you wrote before a document they cite was last changed, log entries
-whose pages have been edited since, and tags that are the same word spelled two
-ways (`machine-learning` and `Machine Learning`).
+there, pages that cite a document without saying which one, pages you wrote
+before a document they cite was last changed, log entries whose pages have been
+edited since, and tags that are the same word spelled two ways
+(`machine-learning` and `Machine Learning`).
+
+That third-from-last one is worth knowing about, because it is quiet. A page can
+cite passages — "as it says at [1]" — without ever naming the book those numbers
+belong to; the assistant sometimes leaves the naming to the source page it links
+to instead. Passage numbers are counted within each document, so a page like
+that leaves its own citations to be matched by number alone, and several
+documents can answer to the same one. The check names those pages and, where the
+page it links to makes it obvious, the exact line that would fix it — which the
+assistant can offer to add. See `documents` for what happens when you click such
+a citation in the meantime.
 
 That last one is worth a word of caution, because it compares timestamps rather
 than meaning: a file that was only re-saved, re-downloaded by a sync client, or

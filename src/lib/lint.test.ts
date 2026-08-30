@@ -464,3 +464,77 @@ describe('formatLintReport', () => {
     expect(formatLintReport(computeLint(clean))).toContain('No structural issues found.')
   })
 })
+
+/**
+ * A page citing `[[1:b10-62]]` with no `[[epub1:…]]` of its own. It reads as
+ * precise and is not: the number names nothing on the page, so the chip has
+ * only the block id left, and a block id is a name inside ONE document —
+ * every book has a `b10-62`. This is the check that offers the line which
+ * would end the guessing.
+ */
+describe('undeclaredCitations', () => {
+  const SOURCE_PAGE = `${FM}# The book\n\n[[epub1:raw/books/politics.epub]]\n`
+
+  it('reports the number and the line the linked source page implies', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/sources/book.md', page(SOURCE_PAGE)],
+      [
+        'wiki/concepts/salt.md',
+        page(`${FM}Per [[wiki/sources/book]] it says so at [[1:b10-62]].`, [
+          'wiki/sources/book.md',
+        ]),
+      ],
+    ])
+    const r = computeLint(kb, ['raw/books/politics.epub'])
+    expect(r.undeclaredCitations).toEqual([
+      {
+        path: 'wiki/concepts/salt.md',
+        numbers: ['1'],
+        suggested: [{ num: '1', source: { kind: 'epub', path: 'raw/books/politics.epub' } }],
+      },
+    ])
+    expect(formatLintReport(r)).toContain('add [[epub1:raw/books/politics.epub]]')
+  })
+
+  it('says nothing about a page that declares its own source', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/a.md', page(`${FM}[[pdf1:raw/x.pdf]] and [[1:b1-1]]`)],
+    ])
+    expect(computeLint(kb, ['raw/x.pdf']).undeclaredCitations).toEqual([])
+  })
+
+  // A bare [[b1-1]] declares no number to be missing. It has the same problem,
+  // but nothing here can name the fix, and a check that cannot say what to do
+  // is a nag.
+  it('ignores the numberless form', () => {
+    const kb = new Map<string, LintPage>([['wiki/a.md', page(`${FM}see [[b1-1]]`)]])
+    expect(computeLint(kb).undeclaredCitations).toEqual([])
+  })
+
+  it('suggests nothing when no linked page declares that number', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/other.md', page(`${FM}nothing declared here`)],
+      ['wiki/a.md', page(`${FM}[[wiki/other]] says [[2:b1-1]]`, ['wiki/other.md'])],
+    ])
+    const r = computeLint(kb)
+    expect(r.undeclaredCitations).toEqual([
+      { path: 'wiki/a.md', numbers: ['2'], suggested: [] },
+    ])
+    expect(formatLintReport(r)).toContain('ask the user which document')
+  })
+
+  // Two linked source pages both calling their own book "1" is normal —
+  // numbering is per page — so the number means nothing here and inventing an
+  // answer would be the original bug wearing a better hat.
+  it('suggests nothing when two linked pages disagree about the number', () => {
+    const kb = new Map<string, LintPage>([
+      ['wiki/s1.md', page(`${FM}[[epub1:raw/books/one.epub]]`)],
+      ['wiki/s2.md', page(`${FM}[[pdf1:raw/books/two.pdf]]`)],
+      [
+        'wiki/a.md',
+        page(`${FM}[[wiki/s1]] [[wiki/s2]] — [[1:b1-1]]`, ['wiki/s1.md', 'wiki/s2.md']),
+      ],
+    ])
+    expect(computeLint(kb).undeclaredCitations[0].suggested).toEqual([])
+  })
+})

@@ -18,7 +18,13 @@
  * and a check that cannot say why it fired does not belong.
  */
 import { splitFrontmatter, extractRole, extractTags, parseWikilinks } from '@/lib/wiki'
-import { parseCiteSources, resolveCitePath } from '@/lib/citations'
+import {
+  inheritedFromPages,
+  parseCiteInline,
+  parseCiteSources,
+  resolveCitePath,
+  type CiteSource,
+} from '@/lib/citations'
 import { isAnnotationsPath } from '@/lib/annotations'
 
 export interface LintPage {
@@ -50,6 +56,18 @@ export interface LintReport {
   unreferencedSources: string[]
   /** `[[pdfN:path]]` declarations pointing at a file that isn't in the KB. */
   danglingCitations: { path: string; targets: string[] }[]
+  /** Pages citing `[[N:block]]` for a source number they never declare. The
+   *  number then names nothing on the page, and the chip is left to find the
+   *  document by its block id alone — which several documents can answer to.
+   *  `suggested` is the declaration the linked source pages imply, when they
+   *  imply exactly one: the line that would make the page self-contained. */
+  undeclaredCitations: {
+    path: string
+    numbers: string[]
+    /** The exact declarations to add, number included — not a template the
+     *  reader has to finish. Empty when the linked pages imply none. */
+    suggested: { num: string; source: CiteSource }[]
+  }[]
   /** Pages written before a source they cite was last modified — the page may
    *  no longer say what the source says. */
   stalePages: { path: string; sources: string[] }[]
@@ -242,6 +260,7 @@ export function computeLint(
   const selfLinks: string[] = []
   const placeholders: string[] = []
   const danglingCitations: LintReport['danglingCitations'] = []
+  const undeclaredCitations: LintReport['undeclaredCitations'] = []
   const stalePages: LintReport['stalePages'] = []
   const staleLogEntries: LintReport['staleLogEntries'] = []
   /** normalised key → original spelling → how many pages used it. */
@@ -291,6 +310,30 @@ export function computeLint(
       }
       if (missing.length) danglingCitations.push({ path, targets: [...new Set(missing)] })
       if (outrun.length) stalePages.push({ path, sources: [...new Set(outrun)] })
+    }
+
+    // A source number the page never declares. `[[1:b10-62]]` with no
+    // `[[epub1:…]]` above it reads as precise and is not: the number names
+    // nothing here, so the chip has only the block id to go on, and a block id
+    // is a name inside ONE document — every book has a `b10-62`. The app
+    // follows the page's links to a source page to fill the gap
+    // (lib/citations), and asks when that is ambiguous, but the durable fix is
+    // the declaration itself, which is why this reports the line to add rather
+    // than only the complaint.
+    const declaredNums = new Set(parseCiteSources(body).keys())
+    const usedNums = new Set<string>()
+    for (const { num } of parseCiteInline(body)) if (num) usedNums.add(num)
+    const undeclared = [...usedNums].filter((n) => !declaredNums.has(n)).sort()
+    if (undeclared.length) {
+      const inherited = inheritedFromPages(page.outgoing, (p) => pages.get(p)?.content ?? null)
+      undeclaredCitations.push({
+        path,
+        numbers: undeclared,
+        suggested: undeclared.flatMap((num) => {
+          const source = inherited.get(num)
+          return source ? [{ num, source }] : []
+        }),
+      })
     }
 
     // A log entry records something that was true when it was written. Once
@@ -416,6 +459,7 @@ export function computeLint(
     placeholders,
     unreferencedSources,
     danglingCitations,
+    undeclaredCitations,
     stalePages,
     staleLogEntries,
     similarTags,
@@ -464,6 +508,7 @@ export function formatLintReport(r: LintReport): string {
     `${r.noFrontmatter.length} no-frontmatter · ${r.thin.length} thin · ` +
     `${r.unreferencedSources.length} unread sources · ` +
     `${r.danglingCitations.length} with dangling citations · ` +
+    `${r.undeclaredCitations.length} citing an undeclared source · ` +
     `${r.stalePages.length} behind their sources · ` +
     `${r.staleLogEntries.length} to recheck in the log · ` +
     `${r.similarTags.length} tag collisions`
@@ -479,6 +524,23 @@ export function formatLintReport(r: LintReport): string {
   const dangling = r.danglingCitations.length
     ? `\n\nDangling source declarations ([[pdfN:path]] with no such file):\n` +
       capped(r.danglingCitations.map((d) => `${d.path} → ${d.targets.join(', ')}`))
+    : ''
+  const undeclared = r.undeclaredCitations.length
+    ? `\n\nPages citing a source they never declare ([[N:block]] with no [[pdfN:path]] ` +
+      `on the page). The number names nothing there, so the citation is resolved by block ` +
+      `id alone — and block ids are per-document names that several documents answer to. ` +
+      `Where a line is suggested it comes from the source page this one links to; offer to ` +
+      `add it near the top of the page (an ordinary edit, and the user's to approve). Never ` +
+      `invent a declaration for a document the page gives you no reason to name:\n` +
+      capped(
+        r.undeclaredCitations.map(
+          (u) =>
+            `${u.path} → ${u.numbers.map((n) => `[[${n}:…]]`).join(', ')}` +
+            (u.suggested.length
+              ? ` · add ${u.suggested.map((s) => `[[${s.source.kind}${s.num}:${s.source.path}]]`).join(', ')}`
+              : ' · no source page linked — ask the user which document'),
+        ),
+      )
     : ''
   const stale = r.stalePages.length
     ? `\n\nPages older than a source they cite (the source was revised after the page ` +
@@ -508,6 +570,7 @@ export function formatLintReport(r: LintReport): string {
     list('Placeholder links ([[…]])', r.placeholders) +
     list('Sources no page mentions (unread material)', r.unreferencedSources) +
     dangling +
+    undeclared +
     stale +
     logEntries +
     tags
