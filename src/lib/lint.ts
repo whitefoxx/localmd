@@ -76,6 +76,18 @@ export interface LintReport {
   staleLogEntries: { path: string; entry: string; pages: string[] }[]
   /** Tags that differ only in case, separator, or a trailing `s`. */
   similarTags: { variants: { tag: string; count: number }[] }[]
+  /** Index directories under `.localmd/` whose source document is no longer in
+   *  the KB. They keep answering to the block ids of a file nobody can open.
+   *  `renamedTo` is another index's source with the same content hash — the
+   *  same bytes under a new name, which is what a rename looks like from
+   *  inside `.localmd/`. */
+  orphanedIndexes: { dir: string; source: string; renamedTo?: string }[]
+}
+
+/** What an index directory's manifest says about itself (stores/kbIndex). */
+export interface IndexEntry {
+  source: string
+  contentHash?: string
 }
 
 const THIN_LINES = 10
@@ -225,6 +237,7 @@ export function computeLint(
   pages: ReadonlyMap<string, LintPage>,
   files: readonly string[] = [],
   sourceMtimes: ReadonlyMap<string, number> = new Map(),
+  indexes: ReadonlyMap<string, IndexEntry> = new Map(),
 ): LintReport {
   // A page's structural role: its own `kb-role:` frontmatter wins over its
   // name — the role travels with the file — and the name stays the
@@ -447,6 +460,27 @@ export function computeLint(
   staleLogEntries.sort((a, b) => byPath(a.path, b.path))
   similarTags.sort((a, b) => byPath(a.variants[0].tag, b.variants[0].tag))
 
+  // An index outlives the document it was built from: rename or delete the
+  // file and `.localmd/<kind>-index/<slug>/` stays, still holding the sections
+  // and the block ids. Nothing reads a manifest to notice, so a citation goes
+  // on resolving into a book that is not in the folder any more. Reported, not
+  // swept: what lives under `.localmd/` is the app's, but deleting a directory
+  // in someone's folder is still theirs to approve.
+  const orphanedIndexes: LintReport['orphanedIndexes'] = []
+  if (files.length && indexes.size) {
+    const present = new Set(files)
+    const liveByHash = new Map<string, string>()
+    for (const { source, contentHash } of indexes.values()) {
+      if (contentHash && present.has(source)) liveByHash.set(contentHash, source)
+    }
+    for (const [dir, entry] of indexes) {
+      if (present.has(entry.source)) continue
+      const renamedTo = entry.contentHash ? liveByHash.get(entry.contentHash) : undefined
+      orphanedIndexes.push({ dir, source: entry.source, ...(renamedTo ? { renamedTo } : {}) })
+    }
+    orphanedIndexes.sort((a, b) => a.dir.localeCompare(b.dir))
+  }
+
   return {
     pageCount: pages.size,
     brokenLinks,
@@ -463,6 +497,7 @@ export function computeLint(
     stalePages,
     staleLogEntries,
     similarTags,
+    orphanedIndexes,
   }
 }
 
@@ -511,7 +546,8 @@ export function formatLintReport(r: LintReport): string {
     `${r.undeclaredCitations.length} citing an undeclared source · ` +
     `${r.stalePages.length} behind their sources · ` +
     `${r.staleLogEntries.length} to recheck in the log · ` +
-    `${r.similarTags.length} tag collisions`
+    `${r.similarTags.length} tag collisions · ` +
+    `${r.orphanedIndexes.length} indexes whose source is gone`
 
   const broken = r.brokenLinks.length
     ? `\n\nBroken wikilinks (target missing):\n` +
@@ -559,6 +595,22 @@ export function formatLintReport(r: LintReport): string {
       capped(r.similarTags.map((g) => g.variants.map((v) => `${v.tag} (${v.count})`).join(' · ')))
     : ''
 
+  const orphanedIdx = r.orphanedIndexes.length
+    ? `\n\nIndexes whose source document is no longer in the KB. The directory keeps ` +
+      `answering to that document's block ids, so a citation can still resolve into a book ` +
+      `nobody can open. Offer to delete the directory (the user approves it like any other ` +
+      `deletion); never delete one uninvited. Where a rename is named, it is the same bytes ` +
+      `under a new name — but the two indexes number their passages independently, so do NOT ` +
+      `tell the user their old citations will work against the new file:\n` +
+      capped(
+        r.orphanedIndexes.map(
+          (o) =>
+            `${o.dir} → ${o.source} (missing)` +
+            (o.renamedTo ? ` · same bytes as ${o.renamedTo}` : ''),
+        ),
+      )
+    : ''
+
   const body =
     broken +
     list('Orphan pages (no content inbound, no outbound)', r.orphans) +
@@ -573,6 +625,7 @@ export function formatLintReport(r: LintReport): string {
     undeclared +
     stale +
     logEntries +
+    orphanedIdx +
     tags
 
   const tail =

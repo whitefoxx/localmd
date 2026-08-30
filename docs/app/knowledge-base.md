@@ -129,10 +129,22 @@ navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
 there, pages that cite a document without saying which one, pages you wrote
 before a document they cite was last changed, log entries whose pages have been
-edited since, and tags that are the same word spelled two ways
-(`machine-learning` and `Machine Learning`).
+edited since, search indexes built from a document that has since left the
+folder, and tags that are the same word spelled two ways (`machine-learning`
+and `Machine Learning`).
 
-That third-from-last one is worth knowing about, because it is quiet. A page can
+The index one is quiet in a different way. A document's index is a folder of
+its own under `.localmd/`, and it does not go away when you rename or delete the
+document — it sits there still answering to that document's passage numbers,
+which is why a citation into a book you removed months ago can still look
+perfectly alive. The check names those, and when the same file is simply back
+under a new name it says so. Clearing one out is a deletion like any other: the
+assistant offers, you approve. One caveat it will repeat and you should believe:
+a renamed document gets a fresh index, numbered from scratch, so citations
+written against the old one do not start landing in the new file just because
+the bytes match.
+
+The undeclared-source one is worth knowing about, because it is quiet too. A page can
 cite passages — "as it says at [1]" — without ever naming the book those numbers
 belong to; the assistant sometimes leaves the naming to the source page it links
 to instead. Passage numbers are counted within each document, so a page like

@@ -538,3 +538,63 @@ describe('undeclaredCitations', () => {
     expect(computeLint(kb).undeclaredCitations[0].suggested).toEqual([])
   })
 })
+
+/**
+ * An index outlives the document it was built from — rename the PDF and
+ * `.localmd/pdf-index/<slug>/` stays, still holding its block ids. Nothing
+ * read a manifest to notice, so a citation went on resolving into a book that
+ * was no longer in the folder.
+ */
+describe('orphanedIndexes', () => {
+  const KB_FILES = ['raw/books/mao.pdf', 'raw/books/other.epub']
+
+  it('says nothing while every index has its source', () => {
+    const indexes = new Map([['.localmd/pdf-index/mao-abc', { source: 'raw/books/mao.pdf' }]])
+    expect(computeLint(new Map(), KB_FILES, new Map(), indexes).orphanedIndexes).toEqual([])
+  })
+
+  it('names an index whose document is gone', () => {
+    const indexes = new Map([
+      ['.localmd/pdf-index/old-def', { source: 'raw/books/deleted.pdf' }],
+      ['.localmd/pdf-index/mao-abc', { source: 'raw/books/mao.pdf' }],
+    ])
+    const r = computeLint(new Map(), KB_FILES, new Map(), indexes)
+    expect(r.orphanedIndexes).toEqual([
+      { dir: '.localmd/pdf-index/old-def', source: 'raw/books/deleted.pdf' },
+    ])
+    expect(formatLintReport(r)).toContain('raw/books/deleted.pdf (missing)')
+  })
+
+  // The same bytes under a new name. Worth saying — it explains where the file
+  // went — but the two indexes numbered their passages independently, so the
+  // report must not promise the old citations now land in the new one.
+  it('recognises a rename by content hash without promising the ids transfer', () => {
+    const indexes = new Map([
+      [
+        '.localmd/pdf-index/old-def',
+        { source: 'raw/books/mao (7 vols).pdf', contentHash: 'sha-1' },
+      ],
+      ['.localmd/pdf-index/mao-abc', { source: 'raw/books/mao.pdf', contentHash: 'sha-1' }],
+    ])
+    const r = computeLint(new Map(), KB_FILES, new Map(), indexes)
+    expect(r.orphanedIndexes).toEqual([
+      {
+        dir: '.localmd/pdf-index/old-def',
+        source: 'raw/books/mao (7 vols).pdf',
+        renamedTo: 'raw/books/mao.pdf',
+      },
+    ])
+    const text = formatLintReport(r)
+    expect(text).toContain('same bytes as raw/books/mao.pdf')
+    expect(text).toContain('number their passages independently')
+  })
+
+  it('does not call a hash a rename when the other source is also gone', () => {
+    const indexes = new Map([
+      ['.localmd/pdf-index/a', { source: 'raw/books/gone-a.pdf', contentHash: 'sha-1' }],
+      ['.localmd/pdf-index/b', { source: 'raw/books/gone-b.pdf', contentHash: 'sha-1' }],
+    ])
+    const r = computeLint(new Map(), KB_FILES, new Map(), indexes)
+    expect(r.orphanedIndexes.every((o) => o.renamedTo === undefined)).toBe(true)
+  })
+})

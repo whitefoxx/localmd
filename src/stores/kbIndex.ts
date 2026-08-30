@@ -29,6 +29,17 @@ interface CachedPage {
   type: string | null
 }
 
+/** One index directory under `.localmd/`, as its manifest describes itself.
+ *  Kept beside the section cache because the same pass already opens every
+ *  manifest — and an index whose source has gone is only visible from here. */
+export interface IndexEntry {
+  /** The document the index was built from, as the manifest recorded it. */
+  source: string
+  /** Hash of those bytes. Two indexes sharing one is the same file under two
+   *  names — which is what a rename looks like from in here. */
+  contentHash?: string
+}
+
 /** A cached section file from a PDF/EPUB index under .localmd/. */
 interface DocSection {
   mtime: number
@@ -73,6 +84,8 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    *  the page cache because the staleness check compares the two, and the page
    *  half is already here — the index is mtime-keyed to begin with. */
   const sourceMtimes = ref<Map<string, number>>(new Map())
+  /** Index directory → what its manifest says. Rebuilt by refreshDocSections. */
+  const indexes = ref<Map<string, IndexEntry>>(new Map())
   const refreshing = ref(false)
 
   /** Coalesced passes: a request arriving mid-run schedules exactly one more
@@ -222,6 +235,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
   async function refreshDocSections(): Promise<void> {
     const next = new Map(docSections.value)
     const seen = new Set<string>()
+    const inventory = new Map<string, IndexEntry>()
     let changed = false
     for (const kind of ['pdf-index', 'epub-index', 'docx-index']) {
       let tree
@@ -236,11 +250,15 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
         const manifestRaw = await fs.tryReadFile(`${dir.path}/manifest.json`)
         if (!manifestRaw) continue
         let source: string
+        let contentHash: string | undefined
         try {
-          source = (JSON.parse(manifestRaw) as { source: string }).source
+          const m = JSON.parse(manifestRaw) as { source: string; contentHash?: string }
+          source = m.source
+          contentHash = m.contentHash
         } catch {
           continue
         }
+        inventory.set(dir.path, { source, contentHash })
         const sectionPaths = fs
           .collectFiles(dir.children ?? [])
           .filter((p) => /\/sections\/[^/]+\.md$/.test(p))
@@ -274,6 +292,7 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       }
     }
     if (changed) docSections.value = next
+    indexes.value = inventory
   }
 
   /** path → set of pages linking to it. */
@@ -299,7 +318,12 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    *  added or moved since the last content read is judged against what is on
    *  disk now. */
   function lintReport(): LintReport {
-    return computeLint(pages.value, useFilesStore().allFiles, sourceMtimes.value)
+    return computeLint(
+      pages.value,
+      useFilesStore().allFiles,
+      sourceMtimes.value,
+      indexes.value,
+    )
   }
 
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
@@ -527,5 +551,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, indexes, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })
