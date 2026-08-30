@@ -6,6 +6,8 @@ import {
   resolveCitePath,
   parseCiteInline,
   publishedCitations,
+  chooseBlockSource,
+  inheritedCiteSources,
   type CiteSource,
 } from './citations'
 
@@ -178,5 +180,105 @@ describe('parseCiteInline', () => {
 
   it('is not fooled by a wikilink', () => {
     expect(parseCiteInline('[[some page]] [[b1-1]]')).toEqual([{ num: null, blockId: 'b1-1' }])
+  })
+})
+
+/**
+ * Which document a source-less chip belongs to.
+ *
+ * The bug this exists to end: openByBlock took `sources[0]` out of a set whose
+ * order is the section cache's insertion order. In a real KB that sent
+ * 盐铁政策的矛盾分析.md's [[1:b10-62]] into "How to Think Like a
+ * Mathematician" — a legitimate holder of a `b10-62`, because block ids are
+ * per-document names and every book has one.
+ */
+describe('chooseBlockSource', () => {
+  const all = (): boolean => true
+
+  it('refuses to pick when several documents hold the id', () => {
+    const choice = chooseBlockSource(['a.epub', 'b.epub'], { exists: all })
+    expect(choice).toEqual({ kind: 'ambiguous', paths: ['a.epub', 'b.epub'] })
+  })
+
+  it('takes the only candidate', () => {
+    expect(chooseBlockSource(['a.epub'], { exists: all })).toEqual({ kind: 'one', path: 'a.epub' })
+  })
+
+  // Reading a book and clicking a citation into it means this one, whatever
+  // else happens to carry the id.
+  it('prefers the document already open', () => {
+    const choice = chooseBlockSource(['a.epub', 'b.epub'], { current: 'b.epub', exists: all })
+    expect(choice).toEqual({ kind: 'one', path: 'b.epub' })
+  })
+
+  // An index outlives its source: rename or delete the file and the index dir
+  // stays, still answering to the id. Opening that path is a tab for a file
+  // that is not there.
+  it('drops candidates whose file is gone, and says so when none survive', () => {
+    const live = (p: string): boolean => p !== 'gone.pdf'
+    expect(chooseBlockSource(['gone.pdf', 'here.pdf'], { exists: live })).toEqual({
+      kind: 'one',
+      path: 'here.pdf',
+    })
+    expect(chooseBlockSource(['gone.pdf'], { exists: live })).toEqual({ kind: 'none' })
+    expect(chooseBlockSource([], { exists: all })).toEqual({ kind: 'none' })
+  })
+
+  it('ignores a current document that is not a candidate', () => {
+    const choice = chooseBlockSource(['a.epub', 'b.epub'], { current: 'note.md', exists: all })
+    expect(choice.kind).toBe('ambiguous')
+  })
+})
+
+/**
+ * A page that cites `[[1:b10-62]]` without declaring source 1 itself, because
+ * the declaration lives on the `wiki/sources/…` page it links to. That is what
+ * a knowledge base grows into on its own, and it left every chip on those
+ * pages source-less.
+ */
+describe('inheritedCiteSources', () => {
+  const pages: Record<string, string> = {
+    'wiki/sources/qian-mu.md': 'Notes\n\n[[epub1:raw/books/politics.epub]]\n',
+    'wiki/sources/mao.md': 'Notes\n\n[[pdf1:raw/books/mao.pdf]]\n',
+    'wiki/concepts/other.md': 'No declarations here.',
+  }
+  const read = (p: string): string | null => pages[p] ?? null
+  const resolve = (t: string): string | null => {
+    const withExt = t.endsWith('.md') ? t : `${t}.md`
+    return withExt in pages ? withExt : null
+  }
+
+  it('takes the declaration off the source page a note links to', () => {
+    const body = 'See [[wiki/sources/qian-mu]] — it says so at [[1:b10-62]].'
+    expect(inheritedCiteSources(body, resolve, read)).toEqual(
+      new Map([['1', { kind: 'epub', path: 'raw/books/politics.epub' }]]),
+    )
+  })
+
+  // Numbering is per page, so two linked source pages both calling their book
+  // "1" leaves the number meaning nothing here. Refusing is the whole point:
+  // an inherited wrong answer is the bug being fixed, wearing a better hat.
+  it('refuses a number two linked pages disagree about', () => {
+    const body = 'Both [[wiki/sources/qian-mu]] and [[wiki/sources/mao]] — [[1:b1-1]].'
+    expect(inheritedCiteSources(body, resolve, read)).toEqual(new Map())
+  })
+
+  it('ignores links to pages that declare nothing, and unresolvable ones', () => {
+    const body = 'See [[wiki/concepts/other]] and [[nowhere]] — [[1:b1-1]].'
+    expect(inheritedCiteSources(body, resolve, read)).toEqual(new Map())
+  })
+
+  // Only one hop: a source page is a page about a document, not a router.
+  it('does not follow links of links', () => {
+    const deep: Record<string, string> = {
+      ...pages,
+      'wiki/hub.md': 'Go to [[wiki/sources/qian-mu]].',
+    }
+    const body = 'See [[wiki/hub]] — [[1:b1-1]].'
+    const r = (t: string): string | null => {
+      const withExt = t.endsWith('.md') ? t : `${t}.md`
+      return withExt in deep ? withExt : null
+    }
+    expect(inheritedCiteSources(body, r, (p) => deep[p] ?? null)).toEqual(new Map())
   })
 })

@@ -2,6 +2,8 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useCitationsStore } from '@/stores/citations'
+import { useKbIndexStore } from '@/stores/kbIndex'
+import { inheritedCiteSources } from '@/lib/citations'
 import { useCiteQuote } from '@/composables/useCiteQuote'
 import { renderMarkdown } from '@/lib/markdown'
 import { handleCodeCopy } from '@/lib/copyCode'
@@ -14,6 +16,7 @@ import { t } from '@/i18n'
 
 const files = useFilesStore()
 const citations = useCitationsStore()
+const kbIndex = useKbIndexStore()
 /** A wiki page's citation chips carry their quote in the tooltip too — the
  *  chips are the same markup, distilled out of the reply that made them. */
 const quoteOnHover = useCiteQuote()
@@ -47,8 +50,28 @@ watch(
 onMounted(() => void restoreScroll())
 onBeforeUnmount(saveScroll)
 
+/**
+ * Declarations this page did not make itself, taken off the source pages it
+ * links to (lib/citations). A page that links `[[wiki/sources/一本书]]` and
+ * then cites `[[1:b10-62]]` is the convention knowledge bases grow into; read
+ * strictly, that number names nothing and the chip is left to guess which
+ * document it meant at click time. Merged UNDER the page's own declarations,
+ * which always win.
+ */
+const inherited = computed(() =>
+  inheritedCiteSources(
+    files.content,
+    (t) => files.resolveWikilink(t),
+    (p) => kbIndex.pages.get(p)?.content ?? null,
+  ),
+)
+
 const html = computed(() =>
-  renderMarkdown(files.content, { resolve: (t) => files.resolveWikilink(t) }),
+  renderMarkdown(
+    files.content,
+    { resolve: (t) => files.resolveWikilink(t) },
+    { citeSources: inherited.value },
+  ),
 )
 
 // Pictures stored in the KB — the markdown renderer leaves them as

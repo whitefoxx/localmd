@@ -9,7 +9,7 @@ import { ref } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useUiStore } from '@/stores/ui'
-import { resolveCitePath } from '@/lib/citations'
+import { chooseBlockSource, resolveCitePath } from '@/lib/citations'
 
 /** Direct jump target from the annotations page — no doc-index involved.
  *  EPUB sets `cfi`; PDF sets `page` (1-based) + region `rects` (PDF points,
@@ -34,8 +34,21 @@ export interface PendingJump {
 
 let nonce = 0
 
+/** A click that could not be answered: several documents hold the block id, or
+ *  none that still exists does. Rendered by CitationPicker — the click stops
+ *  here and the user settles it, because the alternative is opening a book at
+ *  random and calling it the source. */
+export interface Unresolved {
+  blockId: string
+  /** Documents holding the id, all of which exist. Empty = nothing to open. */
+  paths: string[]
+  /** Set instead of `paths` when a declared path names no file in the KB. */
+  declared?: string
+}
+
 export const useCitationsStore = defineStore('citations', () => {
   const pending = ref<PendingJump | null>(null)
+  const unresolved = ref<Unresolved | null>(null)
 
   /** Set the jump and open the document — `path` is trusted to be real here.
    *  Answers whether the document is now on screen (see files.openFile): a
@@ -59,9 +72,10 @@ export const useCitationsStore = defineStore('citations', () => {
     const resolved = resolveCitePath(path, files.allFiles)
     if (resolved) return jump(resolved, blockId)
     if (blockId) return openByBlock(blockId)
-    // No block to search for either — open the declared path and let the
-    // viewer say "not found"; silence would read as a dead button.
-    return jump(path, null)
+    // Nothing to search for either. Say the file is gone, rather than opening
+    // a tab onto a path that is not there and letting the viewer explain.
+    unresolved.value = { blockId: '', paths: [], declared: path }
+    return false
   }
 
   /** Jump from the annotations page to a highlight's position in the book. */
@@ -73,9 +87,18 @@ export const useCitationsStore = defineStore('citations', () => {
     await files.openFile(path)
   }
 
-  /** Fallback for chips with no resolved source (declaration out of reach, or
-   *  the numberless [[bxx-y]] form): locate the block through the document
-   *  indexes. Block ids repeat across documents, so prefer the current one. */
+  /**
+   * Fallback for chips with no resolved source (declaration out of reach, or
+   * the numberless [[bxx-y]] form): locate the block through the document
+   * indexes.
+   *
+   * Block ids are per-document NAMES, so several documents legitimately hold
+   * the same one and the candidate list is a question, not a ranking. This
+   * used to answer it with `sources[0]` — the first one the section cache
+   * happened to load — which is how a note on Han-dynasty salt policy opened a
+   * book about undergraduate mathematics. The decision now lives in
+   * lib/citations, and when it cannot be made it is handed to the user.
+   */
   async function openByBlock(blockId: string): Promise<boolean> {
     const kbIndex = useKbIndexStore()
     const files = useFilesStore()
@@ -84,13 +107,29 @@ export const useCitationsStore = defineStore('citations', () => {
       await kbIndex.refresh() // index may not be loaded yet
       sources = kbIndex.findBlockSources(blockId)
     }
-    if (!sources.length) return false
-    const path = files.currentPath && sources.includes(files.currentPath)
-      ? files.currentPath
-      : sources[0]
-    // jump, not openCitation: an index can name a since-deleted file, and
-    // repairing THAT would send openCitation back here forever.
-    return jump(path, blockId)
+    const choice = chooseBlockSource(sources, {
+      current: files.currentPath,
+      exists: (p) => files.allFiles.includes(p),
+    })
+    if (choice.kind === 'one') {
+      // jump, not openCitation: the path came out of an index, and repairing
+      // THAT would send openCitation back here forever.
+      return jump(choice.path, blockId)
+    }
+    unresolved.value = { blockId, paths: choice.kind === 'ambiguous' ? choice.paths : [] }
+    return false
+  }
+
+  /** The picker's answer — the one place an ambiguous block id is settled. */
+  async function resolveTo(path: string): Promise<boolean> {
+    const u = unresolved.value
+    unresolved.value = null
+    if (!u) return false
+    return jump(path, u.blockId || null)
+  }
+
+  function dismissUnresolved(): void {
+    unresolved.value = null
   }
 
   /** Called by a viewer once it has handled (or cannot handle) the jump. */
@@ -98,5 +137,5 @@ export const useCitationsStore = defineStore('citations', () => {
     pending.value = null
   }
 
-  return { pending, openCitation, openAnnotation, openByBlock, clear }
+  return { pending, unresolved, openCitation, openAnnotation, openByBlock, resolveTo, dismissUnresolved, clear }
 })

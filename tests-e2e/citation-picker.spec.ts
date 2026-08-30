@@ -1,0 +1,141 @@
+import { test, expect, type Page } from '@playwright/test'
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import JSZip from 'jszip'
+
+/**
+ * A citation chip that names no source used to open whichever document the
+ * section cache had loaded first — silently, and often the wrong book, because
+ * block ids are per-document names and every book has a `b1-1`. It also opened
+ * a tab onto documents that no longer existed, since an index outlives its
+ * source.
+ *
+ * Both now stop at a picker. This drives it in a real browser: the two states
+ * it has, and the fact that neither one navigates on its own.
+ */
+
+/** A one-chapter book, distinguishable by its text. */
+async function makeEpub(title: string, line: string): Promise<Buffer> {
+  const zip = new JSZip()
+  zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
+  zip.file(
+    'META-INF/container.xml',
+    `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`,
+  )
+  zip.file(
+    'OEBPS/content.opf',
+    `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="bookid">urn:uuid:${title}</dc:identifier>
+<dc:title>${title}</dc:title><dc:language>en</dc:language>
+</metadata>
+<manifest>
+<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>
+</manifest>
+<spine><itemref idref="c1"/></spine>
+</package>`,
+  )
+  zip.file(
+    'OEBPS/nav.xhtml',
+    `<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Contents</title></head>
+<body><nav epub:type="toc"><ol><li><a href="c1.xhtml">Chapter 1</a></li></ol></nav></body></html>`,
+  )
+  zip.file(
+    'OEBPS/c1.xhtml',
+    `<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter 1</title></head>
+<body><h1>Chapter 1</h1><p>${line}</p></body></html>`,
+  )
+  return (await zip.generateAsync({ type: 'nodebuffer' })) as Buffer
+}
+
+async function initKb(page: Page): Promise<void> {
+  await page.goto('/?e2e=1')
+  await expect(page.getByText('This folder is empty')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
+}
+
+async function importInto(page: Page, files: string[]): Promise<void> {
+  await page.locator('input[type="file"]').first().setInputFiles(files)
+}
+
+/** The palette finds a document's text only once its index exists, so it is
+ *  also the readiness signal for "this book has been indexed". */
+async function waitIndexed(page: Page, phrase: string): Promise<void> {
+  await page.getByTitle(/^Search \(/).click()
+  const input = page.getByPlaceholder(/Search files and content/)
+  await expect(input).toBeVisible()
+  await input.fill(phrase)
+  await expect(page.locator('[data-palette]').getByText(phrase, { exact: false }).first()).toBeVisible({
+    timeout: 20_000,
+  })
+  await page.keyboard.press('Escape')
+}
+
+const picker = (page: Page) => page.locator('[data-citation-picker]')
+
+test('a block id two books both hold is a question, not a jump', async ({ page }) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-cite-'))
+  const a = path.join(dir, 'alpha-book.epub')
+  const b = path.join(dir, 'beta-book.epub')
+  const note = path.join(dir, 'ambiguous-note.md')
+  await writeFile(a, await makeEpub('Alpha', 'Alphabetical opening passage.'))
+  await writeFile(b, await makeEpub('Beta', 'Betamax opening passage.'))
+  // The note arrives last on purpose: with it already in the folder, indexing
+  // these books would (correctly) stop to ask about renumbering.
+  await writeFile(note, 'It says so at [[b1-1]].\n')
+
+  await initKb(page)
+  await importInto(page, [a, b])
+
+  // Opening a book indexes it; both must be indexed for the id to be ambiguous.
+  await page.locator('aside').getByText('alpha-book.epub', { exact: true }).click()
+  await waitIndexed(page, 'Alphabetical opening passage')
+  await page.locator('aside').getByText('beta-book.epub', { exact: true }).click()
+  await waitIndexed(page, 'Betamax opening passage')
+
+  await importInto(page, [note])
+  await page.locator('aside').getByText('ambiguous-note.md', { exact: true }).click()
+
+  const chip = page.locator('a.citation').first()
+  await expect(chip).toBeVisible({ timeout: 10_000 })
+  await chip.click()
+
+  // Both books, named, with the passage each one holds — and no navigation.
+  await expect(picker(page)).toBeVisible({ timeout: 10_000 })
+  await expect(picker(page)).toContainText('alpha-book.epub')
+  await expect(picker(page)).toContainText('beta-book.epub')
+  await expect(page.locator('main').getByRole('button', { name: /ambiguous-note\.md/ })).toBeVisible()
+
+  // Picking is the only way it navigates.
+  await picker(page).getByText('beta-book.epub').click()
+  await expect(picker(page)).toBeHidden()
+  await expect(page.locator('iframe').first()).toBeVisible({ timeout: 15_000 })
+})
+
+test('a citation whose source is gone says so instead of opening a tab', async ({ page }) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-cite-'))
+  const note = path.join(dir, 'orphan-note.md')
+  await writeFile(note, 'Sources: [[pdf1:raw/books/deleted.pdf]]\n\nIt says so at [[1:b1-1]].\n')
+
+  await initKb(page)
+  await importInto(page, [note])
+  await page.locator('aside').getByText('orphan-note.md', { exact: true }).click()
+
+  const chip = page.locator('a.citation').first()
+  await expect(chip).toBeVisible({ timeout: 10_000 })
+  await chip.click()
+
+  await expect(picker(page)).toBeVisible({ timeout: 10_000 })
+  await expect(picker(page)).toContainText('not in this folder')
+  // No tab was opened for the missing document.
+  await expect(page.locator('main').getByRole('button', { name: /deleted\.pdf/ })).toHaveCount(0)
+})

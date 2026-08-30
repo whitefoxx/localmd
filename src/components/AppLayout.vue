@@ -19,6 +19,7 @@ import ReviewPanel from '@/components/review/ReviewPanel.vue'
 import GitPanel from '@/components/GitPanel.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
 import SearchPalette from '@/components/SearchPalette.vue'
+import CitationPicker from '@/components/CitationPicker.vue'
 import GraphView from '@/components/GraphView.vue'
 import HealthPanel from '@/components/HealthPanel.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
@@ -801,6 +802,7 @@ function closeKb(): void {
     <GitPanel />
     <SettingsModal :open="ui.settingsOpen" @close="ui.settingsOpen = false" />
     <SearchPalette />
+    <CitationPicker />
     <HealthPanel />
     <HelpPanel />
 

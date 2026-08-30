@@ -135,7 +135,20 @@ you do not need the click: **rest the pointer on a citation** and it shows you
 the passage it is citing, above the file it came from.
 
 Citations survive reorganizing. Move a document to another folder and an old
-citation still finds it — by name, or failing that by the cited passage itself.
+citation still finds it by name.
+
+When a citation does not say which document it came from — some pages declare
+their source, some leave it to the page they link to — the app looks the passage
+up in the indexes instead. Passage numbers are counted within each document, so
+several documents can hold the same one; when they do, **you are asked which**,
+with the passage each candidate holds, rather than being sent to whichever
+turned up first. And if the document a citation points at is no longer in the
+folder, it says so instead of opening an empty tab: an index outlives the file
+it was built from, which is why such a citation can still look live.
+
+Declaring the source on the page itself — the `[[pdf1:…]]` line the assistant
+writes when it files a document — is what makes all of this exact, so a page
+that cites a book is worth having one.
 
 The same applies across your knowledge base: references to your own pages become
 links, and references to web pages become normal links, collected into a Sources

@@ -7,7 +7,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import * as fs from '@/lib/fs'
 import { parseWikilinks, parseMarkdownLinks, extractType, extractTags, splitFrontmatter, deriveSourceTags, countTags } from '@/lib/wiki'
-import { isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
+import { chooseBlockSource, isCitationToken, parseCiteSources, resolveCitePath } from '@/lib/citations'
 import { blockPassage } from '@/lib/docindex/util'
 import { indexableKind } from '@/lib/docindex'
 import { relatedTo, type RelatedResult } from '@/lib/related'
@@ -486,9 +486,21 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    *  read yet, a markdown source (no sections on disk to read). The caller
    *  keeps the plain tooltip and asks again later. */
   function blockText(blockId: string, source?: string | null): string | null {
-    const declared = source
-      ? (resolveCitePath(source, useFilesStore().allFiles) ?? source)
-      : null
+    const files = useFilesStore()
+    let declared = source ? (resolveCitePath(source, files.allFiles) ?? source) : null
+    if (!declared) {
+      // A chip that names no source used to take the first document carrying
+      // the id — the same guess the click made, and the reason a tooltip could
+      // quote the wrong book while looking perfectly confident. Quote only
+      // when the id belongs to exactly one document that still exists; the
+      // click asks the user about the rest (lib/citations).
+      const choice = chooseBlockSource(findBlockSources(blockId), {
+        current: files.currentPath,
+        exists: (p) => files.allFiles.includes(p),
+      })
+      if (choice.kind !== 'one') return null
+      declared = choice.path
+    }
     for (const section of docSections.value.values()) {
       if (declared && section.source !== declared) continue
       const text = blockPassage(section.content, blockId)
