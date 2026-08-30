@@ -11,7 +11,13 @@ import { chooseBlockSource, isCitationToken, parseCiteSources, resolveCitePath }
 import { blockPassage } from '@/lib/docindex/util'
 import { indexableKind } from '@/lib/docindex'
 import { relatedTo, type RelatedResult } from '@/lib/related'
-import { computeLint, declaredSourcePaths, type LintReport } from '@/lib/lint'
+import {
+  computeLint,
+  declaredSourcePaths,
+  findOrphanedIndexes,
+  findUndeclaredCitations,
+  type LintReport,
+} from '@/lib/lint'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
@@ -420,6 +426,18 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return { nodes, links }
   })
 
+  /** Index directories left behind by a document that was renamed or removed —
+   *  the Health panel's fourth card, and the same rule the report uses. */
+  const staleIndexes = computed(() => findOrphanedIndexes(indexes.value, useFilesStore().allFiles))
+
+  /** Pages whose citations name a source number the page never declares — the
+   *  panel's fifth card. Scoped like `health`: a directory the user has taken
+   *  out of scanning should not come back through a different card. */
+  const undeclaredCitations = computed(() => {
+    const ignore = useSettingsStore().state.healthIgnore
+    return findUndeclaredCitations(pages.value).filter((u) => !isIgnored(u.path, ignore))
+  })
+
   const health = computed<HealthReport>(() => {
     // Scope reporting to what is not ignored; the link graph itself stays global
     // so an in-scope page linked only from an ignored one isn't a false orphan.
@@ -551,5 +569,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, indexes, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

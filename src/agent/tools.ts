@@ -648,9 +648,15 @@ const indexDocument = defineTool({
       .boolean()
       .optional()
       .describe('Rebuild with the current algorithm even though a usable index exists — requires the user having asked for it'),
+    adoptIdsFrom: z
+      .string()
+      .optional()
+      .describe(
+        'Repair for a RENAMED document: the .localmd index directory of the same file under its old name, whose block-id record this rebuild should inherit so citations written before the rename resolve again. kb_health names the pair ("same bytes as …"). Refused unless that directory was built from these exact bytes. Implies a rebuild; only ever on the user\'s explicit ask.',
+      ),
   }),
   describeCall: (a) => `${a.rebuild ? 'reindex' : 'index'} ${a.path}`,
-  run: async ({ path, rebuild }, ctx) => {
+  run: async ({ path, rebuild, adoptIdsFrom }, ctx) => {
     const { indexDocument: run } = await import('@/lib/docindex')
     // An index that cannot carry published block ids forward re-points
     // citations in the user's own notes — the commonest way to reach this is
@@ -663,7 +669,16 @@ const indexDocument = defineTool({
       const decision = await askUser(ctx, path, '', '', { renumber: warning })
       if (decision !== 'approved') return notApproved(decision, `indexing ${path}`)
     }
-    const s = await run(path, undefined, { rebuild })
+    const s = await run(path, undefined, { rebuild, adoptIdsFrom })
+    if (adoptIdsFrom) {
+      return (
+        `Rebuilt ${path} having adopted the block-id record from ${adoptIdsFrom} — ` +
+        `${s.sectionCount} sections, ${s.blockCount} blocks at ${s.indexDir}/. Ids published ` +
+        `before the rename point at their own passages again. Tell the user to spot-check a ` +
+        `citation or two rather than taking this on trust, and that ${adoptIdsFrom} is now a ` +
+        `spent copy they may delete.`
+      )
+    }
     const head =
       `${s.cached ? 'Index already fresh' : 'Index generated'} at ${s.indexDir}/ — ` +
       `"${s.title}", ${s.sectionCount} sections, ${s.blockCount} blocks. `

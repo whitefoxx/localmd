@@ -120,11 +120,15 @@ never decides an entry is settled — only that something moved under it.
 
 ## Checking the health of your knowledge base
 
-The **pulse icon** in the left bar shows the two things worth clicking on:
-links pointing at a page that does not exist, and pages nothing links to.
+The **pulse icon** in the left bar shows the findings there is something to do
+about: links pointing at a page that does not exist, pages nothing links to,
+documents no page has written about yet, search indexes left behind by a
+document that has been renamed or removed, and pages that cite a document
+without saying which one. The last three come with a button that drafts the
+work for the assistant — you still read it and send it.
 
 Ask the assistant for a health check and it runs the same pass in full. On top
-of those two it reports pages that are nearly empty, pages you cannot reach by
+of those it reports pages that are nearly empty, pages you cannot reach by
 navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
 there, pages that cite a document without saying which one, pages you wrote
@@ -139,10 +143,15 @@ document — it sits there still answering to that document's passage numbers,
 which is why a citation into a book you removed months ago can still look
 perfectly alive. The check names those, and when the same file is simply back
 under a new name it says so. Clearing one out is a deletion like any other: the
-assistant offers, you approve. One caveat it will repeat and you should believe:
-a renamed document gets a fresh index, numbered from scratch, so citations
-written against the old one do not start landing in the new file just because
-the bytes match.
+assistant offers, you approve.
+
+A renamed document gets a fresh index, numbered from scratch, so citations
+written against the old name do not start landing in the new file just because
+the bytes match — but that is repairable, and only when the two really are the
+same file. Ask the assistant to recover the old citations and it hands the old
+index's record of which passage each number named to the new one and rebuilds
+from it. Afterwards, open a couple of the old citations and check they land
+where they should; nothing about this is worth taking on trust.
 
 The undeclared-source one is worth knowing about, because it is quiet too. A page can
 cite passages — "as it says at [1]" — without ever naming the book those numbers

@@ -24,6 +24,20 @@ export type { IndexPhase, IndexProgress } from './util'
 export interface IndexOpts {
   /** Rebuild even when a usable index exists — the user's explicit choice. */
   rebuild?: boolean
+  /**
+   * Take the block-id record of ANOTHER index directory before rebuilding, so
+   * ids published against it resolve again. The repair for a renamed document:
+   * `indexDirFor` keys on the source PATH, so renaming a file sends the next
+   * build to a fresh directory with nothing to inherit from, and it numbers
+   * the passages from scratch — every citation written before the rename then
+   * points somewhere else. Both directories describe the same bytes, which is
+   * the one condition pdf/inherit needs, so handing the old `locations.json`
+   * to the new build is not a trick: it is the inheritance that would have
+   * happened had the name not changed.
+   *
+   * Implies a rebuild, and is never taken on the app's own initiative.
+   */
+  adoptIdsFrom?: string
   /** Read a PDF's pages as pictures rather than looking for a text layer.
    *  Ignored by every other kind, and never set on the app's own behalf: it
    *  costs seconds of CPU per page and downloads a language pack. */
@@ -102,13 +116,18 @@ export async function indexDocument(
 ): Promise<IndexSummary> {
   const kind = indexableKind(path)
   if (!kind) throw new Error(`Not an indexable document: ${path} (pdf/epub/md only)`)
-  const force = { force: opts.rebuild }
+  if (opts.adoptIdsFrom) await adoptIds(kind, path, opts.adoptIdsFrom)
+  const force = { force: opts.rebuild || !!opts.adoptIdsFrom }
 
   if (kind === 'pdf') {
     const { parsePdf } = await import('./pdf')
     // OCR implies a rebuild: the index it replaces is a fresh, valid,
-    // empty one, and `force` is the only thing that gets past that.
-    const r = await parsePdf(path, onProgress, { force: opts.rebuild || !!opts.ocr, ocr: opts.ocr })
+    // empty one, and `force` is the only thing that gets past that. So does
+    // adopting a record — the point of it is the numbering the rebuild does.
+    const r = await parsePdf(path, onProgress, {
+      force: force.force || !!opts.ocr,
+      ocr: opts.ocr,
+    })
     return {
       kind,
       indexDir: r.indexDir,
@@ -226,6 +245,64 @@ export async function renumberRisk(path: string): Promise<RenumberRisk> {
   }
   if (kind === 'pdf') return null
   return (manifest.builder ?? 1) < contract.builder ? 'no-inheritance' : null
+}
+
+/**
+ * Put another index directory's id record where this build will inherit it.
+ *
+ * Everything is verified before a byte is written, because the whole safety of
+ * inheritance is that the prior rects describe THESE pages: the record must be
+ * a format this reader speaks, and its contentHash must be the hash of the
+ * source we are about to index. A mismatch is refused with the reason rather
+ * than quietly doing nothing — a silent no-op here looks exactly like success
+ * and leaves the citations broken.
+ *
+ * Copies `locations.json` only. The target's own manifest already vouches for
+ * the same bytes (that is what was just checked), so it is the record, not the
+ * manifest, that is missing. When the target has no manifest at all — its
+ * directory was cleared — the prior one is planted with `source` corrected to
+ * this file, so a build that dies before writing its own leaves a manifest
+ * that is wrong about nothing.
+ */
+async function adoptIds(
+  kind: Exclude<ReturnType<typeof indexableKind>, null>,
+  path: string,
+  from: string,
+): Promise<void> {
+  if (kind !== 'pdf') {
+    throw new Error(
+      `Adopting block ids is a PDF repair: ${kind.toUpperCase()} ids come from the document's own structure and have no inheritance step to feed (see docindex/${kind}/types.ts).`,
+    )
+  }
+  const dir = from.replace(/\/+$/, '')
+  const rawManifest = await fs.tryReadFile(`${dir}/manifest.json`)
+  if (!rawManifest) throw new Error(`No index manifest at ${dir}/manifest.json`)
+  let prior: { version?: number; contentHash?: string; source?: string }
+  try {
+    prior = JSON.parse(rawManifest) as typeof prior
+  } catch {
+    throw new Error(`${dir}/manifest.json is not readable JSON`)
+  }
+  const contract = await contractFor(kind)
+  if (prior.version !== contract.version) {
+    throw new Error(
+      `${dir} is index version ${String(prior.version)}, which this reader does not speak (expects ${contract.version}) — its ids cannot be verified against this file.`,
+    )
+  }
+  const hash = await sha256Hex(await fs.readBinary(path))
+  if (prior.contentHash !== hash) {
+    throw new Error(
+      `${dir} was built from different bytes than ${path} (${String(prior.contentHash).slice(0, 12)} vs ${hash.slice(0, 12)}). Its coordinates describe pages this file does not have, so inheriting them would pin ids to the wrong passages. Refused.`,
+    )
+  }
+  const locations = await fs.tryReadFile(`${dir}/locations.json`)
+  if (!locations) throw new Error(`${dir} has no locations.json — nothing to adopt`)
+
+  const target = indexDirFor(kind, path)
+  await fs.writeFile(`${target}/locations.json`, locations)
+  if (!(await fs.exists(`${target}/manifest.json`))) {
+    await fs.writeFile(`${target}/manifest.json`, JSON.stringify({ ...prior, source: path }))
+  }
 }
 
 export { indexDirFor }

@@ -139,3 +139,107 @@ test('a citation whose source is gone says so instead of opening a tab', async (
   // No tab was opened for the missing document.
   await expect(page.locator('main').getByRole('button', { name: /deleted\.pdf/ })).toHaveCount(0)
 })
+
+
+/**
+ * An index outlives its document. Deleting the book leaves
+ * `.localmd/epub-index/<slug>/` behind, still holding its block ids — which is
+ * how a citation into a book that is no longer in the folder goes on looking
+ * alive. The Health panel is where that becomes visible.
+ */
+test('the health panel names an index whose document has left the folder', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept()) // the delete confirm
+
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-stale-'))
+  const book = path.join(dir, 'doomed-book.epub')
+  await writeFile(book, await makeEpub('Doomed', 'Doomed opening passage.'))
+
+  await initKb(page)
+  await importInto(page, [book])
+  await page.locator('aside').getByText('doomed-book.epub', { exact: true }).click()
+  await waitIndexed(page, 'Doomed opening passage')
+
+  // The panel is clean while the book is there.
+  const pulse = page.getByTitle(/health/i).or(page.locator('button:has(.codicon-pulse)')).first()
+  await pulse.click()
+  const card = page.locator('section').filter({ hasText: 'Indexes without their document' })
+  await expect(card).toBeVisible({ timeout: 10_000 })
+  await expect(card).toContainText('Nothing found')
+  await page.keyboard.press('Escape')
+
+  // Delete the book; its index stays behind.
+  // The tree row, by the path it carries — the same name also sits in the
+  // Open Files list, and only the tree has a context menu.
+  await page.locator('[data-tree-path$="doomed-book.epub"]').click({ button: 'right' })
+  await page.getByRole('button', { name: /Delete/ }).click()
+  await expect(page.locator('aside').getByText('doomed-book.epub', { exact: true })).toHaveCount(0, {
+    timeout: 10_000,
+  })
+
+  await pulse.click()
+  await expect(card).toContainText('doomed-book.epub', { timeout: 10_000 })
+  await expect(card).toContainText('the document is gone')
+  await expect(card.getByRole('button', { name: 'Sort these out' })).toBeVisible()
+})
+
+/**
+ * The same file under two names, which is what a rename looks like from inside
+ * `.localmd/`: the index directory is keyed on the source PATH, so the renamed
+ * document gets a fresh one and the old directory is left holding the ids every
+ * existing citation was written against.
+ */
+test('a renamed document is recognised by its bytes, not its name', async ({ page }) => {
+  page.on('dialog', (d) => void d.accept())
+
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-rename-'))
+  const bytes = await makeEpub('Twice', 'Identical opening passage.')
+  const before = path.join(dir, 'old-name.epub')
+  const after = path.join(dir, 'new-name.epub')
+  await writeFile(before, bytes)
+  await writeFile(after, bytes)
+
+  await initKb(page)
+  await importInto(page, [before, after])
+  // Index both, so both directories exist — then take the old name away.
+  await page.locator('aside').getByText('old-name.epub', { exact: true }).click()
+  await waitIndexed(page, 'Identical opening passage')
+  await page.locator('aside').getByText('new-name.epub', { exact: true }).click()
+  await page.locator('[data-tree-path$="old-name.epub"]').click({ button: 'right' })
+  await page.getByRole('button', { name: /Delete/ }).click()
+  await expect(page.locator('aside').getByText('old-name.epub', { exact: true })).toHaveCount(0, {
+    timeout: 10_000,
+  })
+
+  const pulse = page.getByTitle(/health/i).or(page.locator('button:has(.codicon-pulse)')).first()
+  await pulse.click()
+  const card = page.locator('section').filter({ hasText: 'Indexes without their document' })
+  await expect(card).toContainText('old-name.epub', { timeout: 10_000 })
+  await expect(card).toContainText('the same file is now')
+  await expect(card).toContainText('new-name.epub')
+})
+
+/**
+ * The quiet one: a page cites [[1:b1-1]] and never says what "1" is, because
+ * the declaration lives on the source page it links to. It looks exactly like
+ * a precise citation, so the panel is where it becomes visible — with the line
+ * that would fix it, taken from that linked page.
+ */
+test('the health panel offers the declaration a page never made', async ({ page }) => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'localmd-undeclared-'))
+  const sourcePage = path.join(dir, 'the-book.md')
+  const note = path.join(dir, 'a-concept.md')
+  await writeFile(sourcePage, '# The book\n\n[[epub1:raw/books/politics.epub]]\n')
+  await writeFile(note, 'Per [[wiki/the-book]] it says so at [[1:b10-62]].\n')
+
+  await initKb(page)
+  await importInto(page, [sourcePage, note])
+
+  const pulse = page.getByTitle(/health/i).or(page.locator('button:has(.codicon-pulse)')).first()
+  await pulse.click()
+  const card = page.locator('section').filter({ hasText: 'Citations with no source named' })
+  await expect(card).toContainText('a-concept.md', { timeout: 10_000 })
+  await expect(card).toContainText('raw/books/politics.epub')
+  // The source page itself declares what it cites, so it is not listed.
+  await expect(card).not.toContainText('the-book.md')
+  await expect(card.getByRole('button', { name: 'Add the missing declarations' })).toBeVisible()
+})

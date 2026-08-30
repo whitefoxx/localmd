@@ -7,14 +7,28 @@ import { INDEX_VERSION, BUILDER } from './pdf/types'
 // questions indexState refuses to.
 const manifests = new Map<string, string>()
 const files = new Map<string, Uint8Array>()
+const written = new Map<string, string>()
 vi.mock('@/lib/fs', () => ({
-  tryReadFile: (path: string) => Promise.resolve(manifests.get(path) ?? null),
-  exists: (path: string) => Promise.resolve(manifests.has(path) || files.has(path)),
+  tryReadFile: (path: string) =>
+    Promise.resolve(manifests.get(path) ?? written.get(path) ?? null),
+  exists: (path: string) =>
+    Promise.resolve(manifests.has(path) || files.has(path) || written.has(path)),
   readBinary: (path: string) =>
     Promise.resolve((files.get(path) ?? new Uint8Array()).buffer as ArrayBuffer),
+  writeFile: (path: string, content: string) => {
+    written.set(path, content)
+    return Promise.resolve()
+  },
 }))
 
-import { indexState, indexableKind, renumberRisk } from './index'
+// The heavy half of a real build. Adoption is about what is on disk when it
+// starts, so the parser is stubbed and only its inputs are asserted.
+const parsePdf = vi.fn()
+vi.mock('./pdf', () => ({
+  parsePdf: (...args: unknown[]) => parsePdf(...args),
+}))
+
+import { indexState, indexableKind, renumberRisk, indexDocument } from './index'
 
 describe('indexState', () => {
   beforeEach(() => manifests.clear())
@@ -160,5 +174,115 @@ describe('renumberRisk', () => {
       contentHash: await hashOfSource(),
     })
     expect(await renumberRisk('raw/b.epub')).toBe('no-inheritance')
+  })
+})
+
+/**
+ * Adopting a renamed document's id record.
+ *
+ * `indexDirFor` keys on the source PATH, so renaming a file sends the next
+ * build to a fresh directory with nothing to inherit from — and it numbers the
+ * passages from scratch, which re-points every citation written before the
+ * rename. Both directories describe the same bytes, which is the one condition
+ * pdf/inherit needs, so the old record can simply be put where the build will
+ * look for it.
+ */
+describe('indexDocument({ adoptIdsFrom })', () => {
+  const BYTES = new TextEncoder().encode('the source bytes')
+  const OLD = '.localmd/pdf-index/old-name-abc'
+
+  beforeEach(() => {
+    manifests.clear()
+    files.clear()
+    written.clear()
+    parsePdf.mockReset()
+    parsePdf.mockResolvedValue({
+      indexDir: '.localmd/pdf-index/new-name-def',
+      manifest: { title: 'T', blockCount: 3, sections: [1], pageCount: 9 },
+      cached: false,
+    })
+    files.set('raw/books/new-name.pdf', BYTES)
+  })
+
+  async function hash(): Promise<string> {
+    const { sha256Hex } = await import('./util')
+    return sha256Hex(BYTES.buffer as ArrayBuffer)
+  }
+
+  function plantPrior(m: Record<string, unknown>): void {
+    manifests.set(`${OLD}/manifest.json`, JSON.stringify(m))
+    manifests.set(`${OLD}/locations.json`, '{"version":1,"pageSizes":[],"blocks":{"b1-1":{}}}')
+  }
+
+  it('copies the record to where the build inherits from, and forces the rebuild', async () => {
+    plantPrior({ version: INDEX_VERSION, contentHash: await hash(), source: 'raw/books/old.pdf' })
+    const { indexDirFor } = await import('./util')
+    const target = indexDirFor('pdf', 'raw/books/new-name.pdf')
+
+    await indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD })
+
+    expect(written.get(`${target}/locations.json`)).toContain('b1-1')
+    // Adoption without a rebuild would be a no-op, so it implies one.
+    expect(parsePdf.mock.calls[0][2]).toMatchObject({ force: true })
+  })
+
+  // A manifest is only planted where the directory has none: the target's own
+  // already vouches for these bytes. And `source` is corrected, so a build that
+  // dies before writing its own leaves a manifest that is wrong about nothing.
+  it('plants a corrected manifest only when the target has none', async () => {
+    plantPrior({ version: INDEX_VERSION, contentHash: await hash(), source: 'raw/books/old.pdf' })
+    const { indexDirFor } = await import('./util')
+    const target = indexDirFor('pdf', 'raw/books/new-name.pdf')
+
+    await indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD })
+    expect(JSON.parse(written.get(`${target}/manifest.json`)!)).toMatchObject({
+      source: 'raw/books/new-name.pdf',
+    })
+
+    written.clear()
+    manifests.set(`${target}/manifest.json`, JSON.stringify({ version: INDEX_VERSION }))
+    await indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD })
+    expect(written.has(`${target}/manifest.json`)).toBe(false)
+  })
+
+  // The entire safety of inheritance is that the stored rects describe THESE
+  // pages. Refusing loudly matters because a silent no-op looks like success
+  // and leaves the citations broken.
+  it('refuses a record built from different bytes', async () => {
+    plantPrior({ version: INDEX_VERSION, contentHash: 'not-the-same', source: 'x.pdf' })
+    await expect(
+      indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD }),
+    ).rejects.toThrow(/different bytes/)
+    expect(parsePdf).not.toHaveBeenCalled()
+  })
+
+  it('refuses a format version it cannot verify', async () => {
+    plantPrior({ version: INDEX_VERSION - 1, contentHash: await hash(), source: 'x.pdf' })
+    await expect(
+      indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD }),
+    ).rejects.toThrow(/does not speak/)
+  })
+
+  it('refuses when there is no record there at all', async () => {
+    await expect(
+      indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD }),
+    ).rejects.toThrow(/No index manifest/)
+
+    manifests.set(
+      `${OLD}/manifest.json`,
+      JSON.stringify({ version: INDEX_VERSION, contentHash: await hash() }),
+    )
+    await expect(
+      indexDocument('raw/books/new-name.pdf', undefined, { adoptIdsFrom: OLD }),
+    ).rejects.toThrow(/no locations\.json/)
+  })
+
+  // EPUB/DOCX/md ids come out of the document's own structure and have no
+  // inheritance step; a record handed to them would be silently ignored.
+  it('refuses for a format with no inheritance to feed', async () => {
+    files.set('raw/books/b.epub', BYTES)
+    await expect(
+      indexDocument('raw/books/b.epub', undefined, { adoptIdsFrom: OLD }),
+    ).rejects.toThrow(/PDF repair/)
   })
 })

@@ -2,11 +2,15 @@
 /**
  * KB health: what the link graph alone can tell you about the wiki.
  *
- * Two findings, each its own card, and the card says three things in a fixed
- * order — what was checked, why it matters, and what it found. The title
- * carries the weight (it is the thing being scanned for) and the count sits
- * beside it as a badge, coloured only when there is something to do: a red 2
- * and a grey 0 are answers you can read without reading.
+ * One finding per card, and the card says three things in a fixed order —
+ * what was checked, why it matters, and what it found. The title carries the
+ * weight (it is the thing being scanned for) and the count sits beside it as a
+ * badge, coloured only when there is something to do: a red 2 and a grey 0 are
+ * answers you can read without reading.
+ *
+ * What earns a card is a finding with something to DO about it. The rest of
+ * `computeLint` reaches the agent through kb_health and stops there — a panel
+ * that listed every check would be a list to scroll past, not to act on.
  */
 import { computed, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'
@@ -23,6 +27,11 @@ const broken = computed(() => index.health.brokenLinks)
 const orphans = computed(() => index.health.orphans)
 /** Documents nothing cites — the whole-KB form of the viewer's badge. */
 const unread = computed(() => index.sourcesWithoutNote)
+/** Indexes whose document has left the folder. They keep answering to its
+ *  block ids, so a citation into a book that is gone still looks alive. */
+const stale = computed(() => index.staleIndexes)
+/** Pages whose citations name a source number the page never declares. */
+const undeclared = computed(() => index.undeclaredCitations)
 
 /** Hand the batch to the agent as an editable draft. Reading a pile of PDFs
  *  is the expensive kind of run, so this only ever drafts: the prompt asks
@@ -33,6 +42,41 @@ function writeNotes(): void {
   ui.agentOpen = true
   ui.pendingPrompt = t('health.unreadPrompt', {
     list: unread.value.map((p) => `- ${p}`).join('\n'),
+  })
+}
+
+/** Hand the repair to the agent as a draft, like the unread batch above: what
+ *  to do differs per entry — a renamed document can have its ids recovered, a
+ *  deleted one only cleaned up — and both end in an action the user approves
+ *  anyway. Drafting says which is which and lets them send it. */
+function fixStale(): void {
+  ui.healthOpen = false
+  ui.agentOpen = true
+  ui.pendingPrompt = t('health.stalePrompt', {
+    list: stale.value
+      .map((s) =>
+        s.renamedTo
+          ? `- ${s.dir} — built from ${s.source}, which is now ${s.renamedTo}`
+          : `- ${s.dir} — built from ${s.source}, which is gone`,
+      )
+      .join('\n'),
+  })
+}
+
+/** Drafts the repair: each page gets the declaration its own links imply, and
+ *  the ones nothing implies are handed back as a question rather than filled
+ *  in with a guess. */
+function declareSources(): void {
+  ui.healthOpen = false
+  ui.agentOpen = true
+  ui.pendingPrompt = t('health.undeclaredPrompt', {
+    list: undeclared.value
+      .map((u) =>
+        u.suggested.length
+          ? `- ${u.path} — add ${u.suggested.map((x) => `[[${x.source.kind}${x.num}:${x.source.path}]]`).join(', ')}`
+          : `- ${u.path} — cites ${u.numbers.map((n) => `[[${n}:…]]`).join(', ')}, source unknown`,
+      )
+      .join('\n'),
   })
 }
 
@@ -223,6 +267,87 @@ async function revealBroken(path: string, target: string): Promise<void> {
               <button class="btn mt-3 text-xs" @click="writeNotes">
                 <span class="codicon codicon-sm codicon-edit" />
                 {{ $t('health.unreadAction') }}
+              </button>
+            </template>
+          </section>
+
+          <!-- Indexes outliving their document. Not a defect in the notes —
+               a leftover of ours: the directory keeps answering to block ids
+               for a file nobody can open. -->
+          <section class="rounded-lg border border-border bg-bg-2/30 p-3">
+            <div class="flex items-center gap-2">
+              <span
+                class="codicon codicon-sm shrink-0"
+                :class="stale.length ? 'codicon-warning text-removed' : 'codicon-check text-added'"
+              />
+              <h3 class="flex-1 text-sm font-semibold text-fg-0">{{ $t('health.staleHeading') }}</h3>
+              <span
+                class="rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums"
+                :class="stale.length ? 'bg-removed/15 text-removed' : 'bg-bg-2 text-fg-3'"
+              >{{ stale.length }}</span>
+            </div>
+            <p class="mt-1 text-xs leading-relaxed text-fg-3">{{ $t('health.staleDesc') }}</p>
+
+            <div v-if="!stale.length" class="mt-2 text-xs text-fg-3">{{ $t('health.allClear') }}</div>
+            <template v-else>
+              <ul class="mt-2 space-y-1">
+                <li v-for="s in stale" :key="s.dir" class="rounded px-2 py-1.5">
+                  <span class="block break-all text-xs text-fg-2">{{ s.source }}</span>
+                  <span class="mt-0.5 block text-[11px] text-fg-3">
+                    {{
+                      s.renamedTo
+                        ? $t('health.staleRenamed', { path: s.renamedTo })
+                        : $t('health.staleGone')
+                    }}
+                  </span>
+                </li>
+              </ul>
+              <button class="btn mt-3 text-xs" @click="fixStale">
+                <span class="codicon codicon-sm codicon-tools" />
+                {{ $t('health.staleAction') }}
+              </button>
+            </template>
+          </section>
+
+          <!-- Citations that name a number the page never defines. Quiet,
+               because they look exactly like the precise kind. -->
+          <section class="rounded-lg border border-border bg-bg-2/30 p-3">
+            <div class="flex items-center gap-2">
+              <span
+                class="codicon codicon-sm shrink-0"
+                :class="undeclared.length ? 'codicon-question text-fg-3' : 'codicon-check text-added'"
+              />
+              <h3 class="flex-1 text-sm font-semibold text-fg-0">
+                {{ $t('health.undeclaredHeading') }}
+              </h3>
+              <span class="rounded-full bg-bg-2 px-2 py-0.5 text-[11px] font-medium tabular-nums text-fg-2">
+                {{ undeclared.length }}
+              </span>
+            </div>
+            <p class="mt-1 text-xs leading-relaxed text-fg-3">{{ $t('health.undeclaredDesc') }}</p>
+
+            <div v-if="!undeclared.length" class="mt-2 text-xs text-fg-3">
+              {{ $t('health.allClear') }}
+            </div>
+            <template v-else>
+              <ul class="mt-2 space-y-1">
+                <li v-for="u in undeclared" :key="u.path" class="rounded px-2 py-1.5 hover:bg-bg-2/70">
+                  <button class="group/row flex w-full items-center gap-1.5 text-left" @click="open(u.path)">
+                    <span class="codicon codicon-sm codicon-file shrink-0 text-fg-3" />
+                    <span class="break-all text-xs text-accent group-hover/row:underline">{{ u.path }}</span>
+                  </button>
+                  <span class="mt-0.5 block break-all text-[11px] text-fg-3">
+                    {{
+                      u.suggested.length
+                        ? $t('health.undeclaredSuggest', { path: u.suggested[0].source.path })
+                        : $t('health.undeclaredUnknown')
+                    }}
+                  </span>
+                </li>
+              </ul>
+              <button class="btn mt-3 text-xs" @click="declareSources">
+                <span class="codicon codicon-sm codicon-edit" />
+                {{ $t('health.undeclaredAction') }}
               </button>
             </template>
           </section>

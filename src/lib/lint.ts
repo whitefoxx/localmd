@@ -233,6 +233,71 @@ function matchLinkTarget(target: string, outgoing: readonly string[]): string | 
  *   "no files" are different answers, and reporting every citation as dangling
  *   because the caller passed nothing would be a lie.
  */
+/**
+ * Index directories whose source document is no longer in the KB, and where
+ * the same bytes now live if they do.
+ *
+ * Exported because the Health panel shows this too, and a finding the panel
+ * and the agent could describe differently is a finding nobody can act on.
+ */
+export function findOrphanedIndexes(
+  indexes: ReadonlyMap<string, IndexEntry>,
+  files: readonly string[],
+): LintReport['orphanedIndexes'] {
+  if (!files.length || !indexes.size) return []
+  const present = new Set(files)
+  // A hash only means "renamed" if the other end of it still exists.
+  const liveByHash = new Map<string, string>()
+  for (const { source, contentHash } of indexes.values()) {
+    if (contentHash && present.has(source)) liveByHash.set(contentHash, source)
+  }
+  const out: LintReport['orphanedIndexes'] = []
+  for (const [dir, entry] of indexes) {
+    if (present.has(entry.source)) continue
+    const renamedTo = entry.contentHash ? liveByHash.get(entry.contentHash) : undefined
+    out.push({ dir, source: entry.source, ...(renamedTo ? { renamedTo } : {}) })
+  }
+  return out.sort((a, b) => a.dir.localeCompare(b.dir))
+}
+
+/**
+ * Pages citing `[[N:block]]` for a source number they never declare.
+ *
+ * `[[1:b10-62]]` with no `[[epub1:…]]` above it reads as precise and is not:
+ * the number names nothing on the page, so the chip has only the block id to
+ * go on, and a block id is a name inside ONE document — every book has a
+ * `b10-62`. The app follows the page's links to a source page to fill the gap
+ * at render time (lib/citations) and asks when that is ambiguous, but the
+ * durable fix is the declaration itself. Hence the suggestion, and hence its
+ * limit: it comes from the pages this one links to, and only where they agree.
+ *
+ * Exported for the same reason as findOrphanedIndexes — the Health panel shows
+ * this, and two descriptions of one finding is one nobody can act on.
+ */
+export function findUndeclaredCitations(
+  pages: ReadonlyMap<string, LintPage>,
+): LintReport['undeclaredCitations'] {
+  const out: LintReport['undeclaredCitations'] = []
+  for (const [path, page] of pages) {
+    const { body } = splitFrontmatter(page.content)
+    const declaredNums = new Set(parseCiteSources(body).keys())
+    const usedNums = new Set<string>()
+    for (const { num } of parseCiteInline(body)) if (num) usedNums.add(num)
+    const undeclared = [...usedNums].filter((n) => !declaredNums.has(n)).sort()
+    if (!undeclared.length) continue
+    const inherited = inheritedFromPages(page.outgoing, (p) => pages.get(p)?.content ?? null)
+    out.push({
+      path,
+      numbers: undeclared,
+      suggested: undeclared.flatMap((num) => {
+        const source = inherited.get(num)
+        return source ? [{ num, source }] : []
+      }),
+    })
+  }
+  return out
+}
+
 export function computeLint(
   pages: ReadonlyMap<string, LintPage>,
   files: readonly string[] = [],
@@ -273,7 +338,6 @@ export function computeLint(
   const selfLinks: string[] = []
   const placeholders: string[] = []
   const danglingCitations: LintReport['danglingCitations'] = []
-  const undeclaredCitations: LintReport['undeclaredCitations'] = []
   const stalePages: LintReport['stalePages'] = []
   const staleLogEntries: LintReport['staleLogEntries'] = []
   /** normalised key → original spelling → how many pages used it. */
@@ -325,29 +389,6 @@ export function computeLint(
       if (outrun.length) stalePages.push({ path, sources: [...new Set(outrun)] })
     }
 
-    // A source number the page never declares. `[[1:b10-62]]` with no
-    // `[[epub1:…]]` above it reads as precise and is not: the number names
-    // nothing here, so the chip has only the block id to go on, and a block id
-    // is a name inside ONE document — every book has a `b10-62`. The app
-    // follows the page's links to a source page to fill the gap
-    // (lib/citations), and asks when that is ambiguous, but the durable fix is
-    // the declaration itself, which is why this reports the line to add rather
-    // than only the complaint.
-    const declaredNums = new Set(parseCiteSources(body).keys())
-    const usedNums = new Set<string>()
-    for (const { num } of parseCiteInline(body)) if (num) usedNums.add(num)
-    const undeclared = [...usedNums].filter((n) => !declaredNums.has(n)).sort()
-    if (undeclared.length) {
-      const inherited = inheritedFromPages(page.outgoing, (p) => pages.get(p)?.content ?? null)
-      undeclaredCitations.push({
-        path,
-        numbers: undeclared,
-        suggested: undeclared.flatMap((num) => {
-          const source = inherited.get(num)
-          return source ? [{ num, source }] : []
-        }),
-      })
-    }
 
     // A log entry records something that was true when it was written. Once
     // ANY page it names has been edited since, the entry is a question worth
@@ -466,20 +507,8 @@ export function computeLint(
   // on resolving into a book that is not in the folder any more. Reported, not
   // swept: what lives under `.localmd/` is the app's, but deleting a directory
   // in someone's folder is still theirs to approve.
-  const orphanedIndexes: LintReport['orphanedIndexes'] = []
-  if (files.length && indexes.size) {
-    const present = new Set(files)
-    const liveByHash = new Map<string, string>()
-    for (const { source, contentHash } of indexes.values()) {
-      if (contentHash && present.has(source)) liveByHash.set(contentHash, source)
-    }
-    for (const [dir, entry] of indexes) {
-      if (present.has(entry.source)) continue
-      const renamedTo = entry.contentHash ? liveByHash.get(entry.contentHash) : undefined
-      orphanedIndexes.push({ dir, source: entry.source, ...(renamedTo ? { renamedTo } : {}) })
-    }
-    orphanedIndexes.sort((a, b) => a.dir.localeCompare(b.dir))
-  }
+  const orphanedIndexes = findOrphanedIndexes(indexes, files)
+  const undeclaredCitations = findUndeclaredCitations(pages)
 
   return {
     pageCount: pages.size,
