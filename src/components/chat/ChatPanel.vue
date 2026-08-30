@@ -346,6 +346,34 @@ const usageTitle = computed(() => {
   return s
 })
 
+/* ── model switcher (composer status line) ─────────────────────────────────
+ * The model name in the action row is the one place someone is already looking
+ * when they wonder what is about to answer, so it is also where they change it.
+ * The menu only ever reassigns the `primary` slot among profiles they already
+ * configured — adding or editing a credential stays in Settings, which the last
+ * row opens. */
+const modelMenuOpen = ref(false)
+
+function toggleModelMenu(): void {
+  // Nothing to choose between: send them where profiles are made instead of
+  // opening an empty menu.
+  if (!settingsStore.state.profiles.length) {
+    ui.openSettings('models')
+    return
+  }
+  modelMenuOpen.value = !modelMenuOpen.value
+}
+
+function pickModel(id: string): void {
+  settingsStore.setSlot('primary', id)
+  modelMenuOpen.value = false
+}
+
+function openModelSettings(): void {
+  modelMenuOpen.value = false
+  ui.openSettings('models')
+}
+
 /* ── tool call loading + timer ──────────────────────────────────────────────
  * External MCP tool calls carry a status/timer; a shared clock ticks once a
  * second while a turn is running so in-flight timers advance without churning
@@ -1448,6 +1476,40 @@ watch(
         </button>
       </div>
 
+      <!-- Model switcher, opening upward from the name in the action row. It
+           reassigns the primary slot among configured profiles only; the last
+           row is the way to Settings for anything else. -->
+      <template v-if="modelMenuOpen">
+        <div class="fixed inset-0 z-10" @click="modelMenuOpen = false" />
+        <div
+          class="absolute bottom-full left-3 mb-1 z-20 min-w-[13rem] max-w-[calc(100%-1.5rem)] max-h-64 overflow-y-auto rounded-md border border-border bg-bg-1 shadow-lg"
+        >
+          <button
+            v-for="p in settingsStore.state.profiles"
+            :key="p.id"
+            class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
+            :class="
+              p.id === settingsStore.primary?.id ? 'bg-accent/15 text-fg-0' : 'text-fg-2 hover:bg-bg-2'
+            "
+            :title="p.label"
+            @click="pickModel(p.id)"
+          >
+            <span
+              class="codicon codicon-sm shrink-0"
+              :class="p.id === settingsStore.primary?.id ? 'codicon-check text-accent' : 'opacity-0'"
+            />
+            <span class="truncate">{{ p.label }}</span>
+          </button>
+          <button
+            class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs text-fg-3 hover:bg-bg-2 hover:text-fg-1 border-t border-border"
+            @click="openModelSettings()"
+          >
+            <span class="codicon codicon-sm codicon-settings-gear shrink-0" />
+            <span class="truncate">{{ $t('chat.manageModels') }}</span>
+          </button>
+        </div>
+      </template>
+
       <!-- The agent is blocked waiting on the user: a key, an extension, a
            choice. Sits above the composer because that is where they are
            already looking. -->
@@ -1636,7 +1698,7 @@ watch(
         <input ref="fileInput" type="file" multiple class="hidden" @change="onPickFiles" />
 
         <!-- Action row (inside the frame) -->
-        <div class="flex items-center gap-2 px-2 pb-2">
+        <div class="flex items-center gap-1 px-2 pb-2">
           <button
             class="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-fg-2 hover:text-fg-0 hover:bg-bg-2 transition-colors"
             :title="$t('chat.attachFiles')"
@@ -1645,20 +1707,40 @@ watch(
           >
             <span class="codicon codicon-add" />
           </button>
-          <span class="text-xs text-fg-3 flex-1 truncate">
+          <span class="text-xs text-fg-3 flex-1 min-w-0 truncate">
             <template v-if="chat.running">
               <span class="text-accent agent-working">{{ $t('chat.agentWorking') }}</span> · {{ $t('chat.steerHint') }}
             </template>
-            <template v-else>
-              {{ settingsStore.primary?.model || $t('chat.notConfigured') }}
-              <span v-if="settingsStore.visionAvailable" :title="$t('chat.visionAvailable')">· 👁</span>
+            <!-- Laid out as a row so the name is the only part that gives:
+                 the badges after it are facts about this session that a long
+                 model id should not be able to push off the edge. -->
+            <span v-else class="flex items-center gap-1 min-w-0">
+              <!-- The model name is also the switcher. Capped, and free to
+                   shrink further in a narrow panel; the full label is in the
+                   tooltip either way. -->
+              <button
+                class="min-w-0 max-w-[9rem] truncate rounded px-1 -ml-1 hover:text-fg-1 hover:bg-bg-2 transition-colors"
+                :class="{ 'text-fg-1 bg-bg-2': modelMenuOpen }"
+                :title="settingsStore.primary?.label || $t('chat.switchModel')"
+                :aria-label="$t('chat.switchModel')"
+                :aria-expanded="modelMenuOpen"
+                @click="toggleModelMenu"
+              >
+                {{ settingsStore.primary?.model || $t('chat.notConfigured') }}
+              </button>
+              <span
+                v-if="settingsStore.visionAvailable"
+                class="shrink-0"
+                :title="$t('chat.visionAvailable')"
+              >· 👁</span>
               <span
                 v-if="chat.sessionUsage.input || chat.sessionUsage.output"
+                class="shrink-0"
                 :title="usageTitle"
               >
                 · ↑{{ fmtTokens(chat.sessionUsage.input) }} ↓{{ fmtTokens(chat.sessionUsage.output) }}
               </span>
-            </template>
+            </span>
           </span>
           <!-- While running: a filled send button appears once there's text to
                interject (steer) — clicking it does NOT stop the turn; the message

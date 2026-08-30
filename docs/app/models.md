@@ -77,7 +77,9 @@ Any current model works. Stronger models follow multi-step instructions more
 reliably and are better at the fiddlier jobs like building a new tool; cheaper
 ones are perfectly good for search, summarizing and filing.
 
-You can change the primary at any time, including mid-project.
+You can change the primary at any time, including mid-project. The quickest
+way is the model name under the message box: click it, and your models drop
+up in a list to pick from. Settings is the last row of that same menu.
 
 ## Cost
 
