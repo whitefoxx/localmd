@@ -45,6 +45,12 @@ export const EXCLUDE = [
   // that belong to the hosted build. The overlay's index.html replaces the
   // matching <head> — see oss/index.html for why it carries none of it.
   'public/llms.txt',
+  // Names our address in its header, points crawlers at an /llms.txt this
+  // build does not ship, and disallows a /claim.html it does not have. A
+  // robots.txt is a statement about one site; served from a fork's domain it
+  // is three wrong statements. Chromium hosts serve none by default and
+  // crawlers read that as allow-all, which is the right answer here.
+  'public/robots.txt',
   // The social card for that same <head>, and the two files that generate it.
   // With no og:/twitter: tags to point at it, all three are orphans. (The
   // landing page's own images are NOT here: those are imported by the app.)
