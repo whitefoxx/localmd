@@ -250,23 +250,37 @@ export function needsBaseUrl(providerId: string): boolean {
   return preset ? !!preset.needsBaseUrl : true
 }
 
-/** Providers whose models natively accept images inline (multimodal), so a
- *  profile on one needs no separate vision slot. OpenAI-compatible endpoints
- *  vary per model, so they are not assumed multimodal. */
-export function isMultimodalProvider(providerId: string): boolean {
-  const kind = sdkKindFor(providerId)
-  return kind === 'anthropic' || kind === 'openai' || kind === 'google' || kind === 'xai'
-}
+/** The three jobs this app has a role for, and therefore the only three things
+ *  a profile is ever asked whether it does. Not a taxonomy of what models exist
+ *  — video, transcription and speech are real and absent on purpose, because
+ *  nothing here would consume the answer. A fourth arrives with a fourth role. */
+export const CAPABILITIES = ['chat', 'vision', 'image'] as const
+export type Capability = (typeof CAPABILITIES)[number]
 
-/** Providers that can fill the image slot: OpenAI (DALL·E), Google (Imagen),
- *  xAI (Grok image), and any OpenAI-compatible endpoint exposing
- *  `/images/generations` (GLM CogView, Qwen, custom). Anthropic / DeepSeek /
- *  Groq have no image generation, so they're excluded — as is OpenRouter,
- *  which proxies chat completions only. */
-export function providerHasImageModel(providerId: string): boolean {
-  if (providerId === 'openrouter') return false
+/**
+ * What a profile on this provider is *assumed* to do when it is first created.
+ *
+ * A guess about other companies' product lines, and one that rots in both
+ * directions: it goes stale the day a provider ships image generation, and it
+ * is already wrong today — every openai-compatible id is marked text-only here
+ * while `qwen-vl-plus` and `glm-4v-plus` sit in this file's own suggestion
+ * lists. A provider id also says nothing whatsoever about a Custom endpoint,
+ * which is the case where someone most needs the answer to be right.
+ *
+ * So it seeds the checkboxes on a new profile and is not consulted again. What
+ * the roles read is the profile's own marks — a fact the user can correct,
+ * rather than a table they would have to wait for us to update.
+ */
+export function defaultCapabilities(providerId: string): Capability[] {
   const kind = sdkKindFor(providerId)
-  return (
-    kind === 'openai' || kind === 'google' || kind === 'xai' || kind === 'openai-compatible'
-  )
+  const caps: Capability[] = ['chat']
+  // Providers whose models take images inline (no separate vision role needed).
+  if (kind === 'anthropic' || kind === 'openai' || kind === 'google' || kind === 'xai') {
+    caps.push('vision')
+  }
+  // Ones with a native image model in their SDK package. OpenAI-compatible
+  // endpoints reach `/images/generations` too, but whether the *model* draws is
+  // a per-model fact no id can answer — so it starts off and the user says.
+  if (kind === 'openai' || kind === 'google' || kind === 'xai') caps.push('image')
+  return caps
 }

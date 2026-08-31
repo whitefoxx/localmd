@@ -56,8 +56,8 @@ describe('toImageModel', () => {
   }
 
   for (const provider of ['anthropic', 'deepseek', 'groq']) {
-    it(`refuses ${provider}, which has no image generation`, async () => {
-      await expect(toImageModel(profile(provider))).rejects.toThrow(/does not support/)
+    it(`refuses ${provider}, whose SDK package has no image model`, async () => {
+      await expect(toImageModel(profile(provider))).rejects.toThrow(/no image model/)
     })
   }
 })

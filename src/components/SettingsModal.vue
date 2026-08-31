@@ -4,8 +4,12 @@ import {
   useSettingsStore,
   newProfileId,
   autoLabel,
+  capabilitiesOf,
+  profileCan,
+  SLOT_CAPABILITY,
   REASONING_EFFORTS,
   type LlmProfile,
+  type Slot,
 } from '@/stores/settings'
 import { useFilesStore } from '@/stores/files'
 import { fuzzyRank } from '@/lib/fuzzy'
@@ -20,8 +24,10 @@ import {
   presetFor,
   needsBaseUrl,
   endpointFor,
-  providerHasImageModel,
+  defaultCapabilities,
+  CAPABILITIES,
   DEFAULT_MAX_TOKENS,
+  type Capability,
 } from '@/lib/providers'
 import {
   HOTKEYS,
@@ -202,10 +208,52 @@ function goSection(id: SectionId): void {
   cancelRecording()
 }
 
-/** Only providers with an AI SDK image model can fill the image-generation slot. */
-const imageCapableProfiles = computed(() =>
-  store.state.profiles.filter((p) => providerHasImageModel(p.provider)),
-)
+/** A role's dropdown lists every profile, marked ones first and the rest under
+ *  a heading that says why they are down there. Nothing is hidden: a mark is the
+ *  user's own guess as much as ours, and a dropdown that silently omitted the
+ *  model they wanted is how "this app doesn't support my provider" starts. */
+function slotOptions(slot: Slot): { marked: LlmProfile[]; unmarked: LlmProfile[] } {
+  const cap = SLOT_CAPABILITY[slot]
+  return {
+    marked: store.state.profiles.filter((p) => profileCan(p, cap)),
+    unmarked: store.state.profiles.filter((p) => !profileCan(p, cap)),
+  }
+}
+
+/** Point a role at a profile. Choosing one that is not marked for the job asks
+ *  once, and a yes writes the mark — so the answer is kept rather than asked
+ *  again on every visit. A no puts the dropdown back where it was: the select
+ *  has already moved by the time we are called, and leaving the store unchanged
+ *  would not move it back on its own. */
+function onSlotChange(slot: Slot, e: Event): void {
+  const el = e.target as HTMLSelectElement
+  const id = el.value
+  const p = store.state.profiles.find((x) => x.id === id)
+  const cap = SLOT_CAPABILITY[slot]
+  if (p && !profileCan(p, cap)) {
+    if (!confirm(t(`settings.markConfirm.${cap}`, { label: p.label }))) {
+      el.value = store.state.slots[slot] ?? ''
+      return
+    }
+    store.upsertProfile({ ...p, capabilities: [...capabilitiesOf(p), cap] })
+  }
+  store.setSlot(slot, id || null)
+}
+
+/** The editor's checkboxes, read and written through the same helper the rest
+ *  of the app uses, so an untouched profile shows its provider's default rather
+ *  than an empty row. */
+function editingCan(c: Capability): boolean {
+  return !!editing.value && capabilitiesOf(editing.value).includes(c)
+}
+function toggleCan(c: Capability): void {
+  const e = editing.value
+  if (!e) return
+  const caps = new Set(capabilitiesOf(e))
+  if (caps.has(c)) caps.delete(c)
+  else caps.add(c)
+  e.capabilities = CAPABILITIES.filter((x) => caps.has(x))
+}
 
 /** Working copy under edit (null = list view). */
 const editing = ref<LlmProfile | null>(null)
@@ -239,6 +287,7 @@ function addProfile(): void {
     baseUrl: '',
     apiKey: '',
     model: 'claude-opus-4-8',
+    capabilities: defaultCapabilities('anthropic'),
     reasoning: undefined,
   }
   editingOrigin.value = JSON.stringify(editing.value)
@@ -256,6 +305,9 @@ function applyProviderPreset(): void {
   if (!preset) return
   e.baseUrl = preset.baseUrl
   e.model = preset.defaultModel
+  // Same reasoning as the two above: a different provider is a different model,
+  // so its defaults replace the last one's rather than being merged with them.
+  e.capabilities = defaultCapabilities(e.provider)
 }
 
 function saveProfile(): void {
@@ -412,6 +464,25 @@ function slotBadges(p: LlmProfile): string[] {
               </div>
 
               <div>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">
+                  {{ $t('settings.capabilities') }}
+                </label>
+                <div class="flex flex-wrap gap-x-5 gap-y-1.5">
+                  <label
+                    v-for="c in CAPABILITIES"
+                    :key="c"
+                    class="flex items-center gap-1.5 text-sm text-fg-1 cursor-pointer"
+                  >
+                    <input type="checkbox" :checked="editingCan(c)" @change="toggleCan(c)" />
+                    {{ $t(`settings.capability.${c}`) }}
+                  </label>
+                </div>
+                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
+                  {{ $t('settings.capabilitiesHelp') }}
+                </p>
+              </div>
+
+              <div>
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.labelOptional') }}</label>
                 <input v-model="editing.label" class="input" :placeholder="autoLabel(editing)" />
               </div>
@@ -562,9 +633,12 @@ function slotBadges(p: LlmProfile): string[] {
                     <select
                       :value="store.state.slots.primary ?? ''"
                       class="input w-64 shrink-0"
-                      @change="store.setSlot('primary', ($event.target as HTMLSelectElement).value || null)"
+                      @change="onSlotChange('primary', $event)"
                     >
-                      <option v-for="p in store.state.profiles" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <option v-for="p in slotOptions('primary').marked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <optgroup v-if="slotOptions('primary').unmarked.length" :label="$t('settings.notMarkedFor')">
+                        <option v-for="p in slotOptions('primary').unmarked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      </optgroup>
                     </select>
                   </div>
                   <div class="flex items-center justify-between gap-4 px-3 py-3">
@@ -572,10 +646,13 @@ function slotBadges(p: LlmProfile): string[] {
                     <select
                       :value="store.state.slots.vision ?? ''"
                       class="input w-64 shrink-0"
-                      @change="store.setSlot('vision', ($event.target as HTMLSelectElement).value || null)"
+                      @change="onSlotChange('vision', $event)"
                     >
                       <option value="">{{ $t('settings.notConfigured') }}</option>
-                      <option v-for="p in store.state.profiles" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <option v-for="p in slotOptions('vision').marked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <optgroup v-if="slotOptions('vision').unmarked.length" :label="$t('settings.notMarkedFor')">
+                        <option v-for="p in slotOptions('vision').unmarked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      </optgroup>
                     </select>
                   </div>
                   <div class="flex items-center justify-between gap-4 px-3 py-3">
@@ -583,10 +660,13 @@ function slotBadges(p: LlmProfile): string[] {
                     <select
                       :value="store.state.slots.image ?? ''"
                       class="input w-64 shrink-0"
-                      @change="store.setSlot('image', ($event.target as HTMLSelectElement).value || null)"
+                      @change="onSlotChange('image', $event)"
                     >
                       <option value="">{{ $t('settings.notConfigured') }}</option>
-                      <option v-for="p in imageCapableProfiles" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <option v-for="p in slotOptions('image').marked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      <optgroup v-if="slotOptions('image').unmarked.length" :label="$t('settings.notMarkedFor')">
+                        <option v-for="p in slotOptions('image').unmarked" :key="p.id" :value="p.id">{{ p.label }}</option>
+                      </optgroup>
                     </select>
                   </div>
                 </div>

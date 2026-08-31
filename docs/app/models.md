@@ -1,6 +1,6 @@
 ---
 title: Models — connecting an AI provider
-summary: Add a provider key to make the assistant work, what the three roles are for, and when you need a separate vision model.
+summary: Add a provider key to make the assistant work, what the three roles are for, and how to tell the app what your model can do.
 ---
 
 # Models — connecting an AI provider
@@ -15,6 +15,12 @@ Set it up in **Settings → Models**.
 
 Click **Add model**, pick a provider, paste the API key, and type the model
 name. Everything else is filled in for you.
+
+**What it can do** is a row of tick boxes under the model name: chat, reads
+pictures, makes pictures. They are ticked to match the provider you picked,
+which is a starting guess and nothing more — a provider tells you very little
+about one of its models, and nothing at all about a custom endpoint. Correct
+them and the roles below follow.
 
 Anthropic, OpenAI, Google, DeepSeek, Zhipu, Qwen, xAI and any
 OpenAI-compatible endpoint all work — including a model running on your own
@@ -59,14 +65,23 @@ Below the list, each role points at one of your models:
 - **Image generation** — optional. Set it and the assistant can create pictures,
   saved into your folder.
 
+Each list puts the models you ticked for that job first. The rest are still
+there, under **Not marked for this** — pick one and you are asked whether to
+tick it, because the ticks are your guess too, and a list that hid the model you
+wanted would be worse than one that asks.
+
+A picture-making model is not a chat model. Setting one as your primary is the
+usual way this goes wrong: every message then goes to an address that only draws,
+and comes back as an error about the address. Give the primary a chat model and
+point the **Image generation** role at the one that draws.
+
 ## Do you need a vision model?
 
-- Using **Claude**? No. It handles images itself.
-- Using a model that already understands images (GPT-4o, qwen-vl, glm-4v)? Point
-  the vision role at that same model.
+- Is your model already ticked for **reads pictures**? Then no — point the
+  vision role at that same model, or leave it empty if it is your primary.
 - Using a text-only model (deepseek-v4-flash, for example)? Point the vision
-  role at a separate model that does images. The assistant will call it when
-  needed.
+  role at a separate model that does read pictures. The assistant will call it
+  when needed.
 
 Without a vision role on a text-only model, it simply cannot see images — and it
 will say so rather than guess from the filename.

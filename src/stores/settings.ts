@@ -17,8 +17,10 @@ import type { CallSettings } from 'ai'
 import {
   presetFor,
   providerIdForBaseUrl,
-  isMultimodalProvider,
+  defaultCapabilities,
+  CAPABILITIES,
   needsBaseUrl,
+  type Capability,
 } from '@/lib/providers'
 import { normalizeMcpServerList, type McpServerConfig } from '@/lib/mcp'
 import { normalizeHttpToolList, type HttpToolSpec } from '@/lib/httpTools'
@@ -68,6 +70,13 @@ export interface LlmProfile {
   baseUrl: string
   apiKey: string
   model: string
+  /** What this profile is willing to be used for — which roles may point at it.
+   *  Seeded from the provider when the profile is created (defaultCapabilities)
+   *  and the user's to change from there; the provider is never asked again.
+   *  Absent only on profiles that never went through normalizeSettings — the
+   *  trial and the e2e mock — where falling back to the provider default is
+   *  exactly right. Read it through capabilitiesOf(), never directly. */
+  capabilities?: Capability[]
   /** Per-request output cap; absent = provider default. */
   maxTokens?: number
   /** Thinking depth; absent = provider default. */
@@ -149,6 +158,24 @@ const STORAGE_KEY = 'localmd:settings'
 
 export function newProfileId(): string {
   return crypto.randomUUID()
+}
+
+/** What this profile may be used for. The one place the provider default is
+ *  allowed to stand in for an answer the profile does not carry. */
+export function capabilitiesOf(p: LlmProfile): Capability[] {
+  return p.capabilities ?? defaultCapabilities(p.provider)
+}
+
+/** Whether this profile is marked for a given job. */
+export function profileCan(p: LlmProfile, cap: Capability): boolean {
+  return capabilitiesOf(p).includes(cap)
+}
+
+/** What pointing a role at a model says about the model. */
+export const SLOT_CAPABILITY: Record<Slot, Capability> = {
+  primary: 'chat',
+  vision: 'vision',
+  image: 'image',
 }
 
 export function autoLabel(p: Pick<LlmProfile, 'provider' | 'model'>): string {
@@ -325,6 +352,10 @@ export function normalizeSettings(raw: unknown): SettingsState {
         apiKey: String(pp.apiKey ?? ''),
         model: String(pp.model ?? ''),
       }
+      const stored = Array.isArray(pp.capabilities)
+        ? (pp.capabilities.filter((c) => CAPABILITIES.includes(c as Capability)) as Capability[])
+        : null
+      if (stored) prof.capabilities = stored
       const maxTokens = Number(pp.maxTokens)
       if (Number.isFinite(maxTokens) && maxTokens > 0) prof.maxTokens = maxTokens
       if (REASONING_EFFORTS.includes(pp.reasoning as ReasoningEffort)) {
@@ -341,6 +372,23 @@ export function normalizeSettings(raw: unknown): SettingsState {
       if (typeof want === 'string' && profiles.some((p) => p.id === want)) slots[slot] = want
     }
     if (!slots.primary && profiles.length) slots.primary = profiles[0].id
+    // Profiles written before this field existed. A role assignment is a
+    // statement the user already made, and a better one than the provider
+    // table because it is about *this* model — reading it back is how an image
+    // profile configured last year keeps working without anyone touching it.
+    for (const p of profiles) {
+      if (p.capabilities) continue
+      const filled = (Object.keys(SLOT_CAPABILITY) as Slot[])
+        .filter((s) => slots[s] === p.id)
+        .map((s) => SLOT_CAPABILITY[s])
+      // Someone who gave a profile the image role and no other set it up to
+      // draw. Handing it 'chat' as well — which the provider default does for
+      // everything — would leave it in the primary list, which is precisely the
+      // mix-up this field exists to prevent.
+      const imageOnly = filled.includes('image') && !filled.includes('chat')
+      const caps = new Set([...(imageOnly ? [] : defaultCapabilities(p.provider)), ...filled])
+      p.capabilities = CAPABILITIES.filter((c) => caps.has(c))
+    }
     return { profiles, slots, ...extras(obj) }
   }
 
@@ -461,13 +509,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const vision = computed(() => byId(state.slots.vision))
   /** Image-generation slot (optional): the model the generate_image tool runs on. */
   const image = computed(() => byId(state.slots.image))
-  /** Images can go straight into the primary's messages: multimodal providers
-   *  (Anthropic/OpenAI/Google/xAI) take them inline; an OpenAI-compatible
-   *  primary qualifies when the user also assigned it to the vision slot. */
+  /** Images can go straight into the primary's messages — true when the primary
+   *  is marked as reading them, and also when it is what the vision role points
+   *  at, since pointing a role at a model is itself saying it can do the job. */
   const visionInline = computed(() => {
     const p = primary.value
     if (!p) return false
-    return isMultimodalProvider(p.provider) || vision.value?.id === p.id
+    return profileCan(p, 'vision') || vision.value?.id === p.id
   })
   /** Some way to understand images exists (inline or sub-call). */
   const visionAvailable = computed(() => visionInline.value || !!vision.value)

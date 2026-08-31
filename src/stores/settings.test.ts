@@ -62,6 +62,78 @@ describe('normalizeSettings — multi-profile shape', () => {
     expect(s.slots.primary).toBe('a')
   })
 
+  it('seeds capabilities from the provider when a profile predates the field', () => {
+    const s = normalizeSettings({
+      profiles: [
+        { id: 'a', provider: 'anthropic', baseUrl: '', apiKey: 'k', model: 'm' },
+        { id: 'b', provider: 'deepseek', baseUrl: '', apiKey: 'k', model: 'm' },
+      ],
+      slots: { primary: 'a' },
+    })
+    expect(s.profiles[0].capabilities).toEqual(['chat', 'vision'])
+    expect(s.profiles[1].capabilities).toEqual(['chat'])
+  })
+
+  it('reads a role assignment as a mark the user already made', () => {
+    // The provider table calls every openai-compatible endpoint text-only, so
+    // without this an image profile configured before the field existed would
+    // drop out of its own role on the next load.
+    const s = normalizeSettings({
+      profiles: [
+        { id: 'a', provider: 'deepseek', baseUrl: '', apiKey: 'k', model: 'm' },
+        { id: 'b', provider: 'custom', baseUrl: 'https://x/v1', apiKey: 'k', model: 'draws' },
+        { id: 'c', provider: 'qwen', baseUrl: '', apiKey: 'k', model: 'qwen-vl-plus' },
+      ],
+      slots: { primary: 'a', image: 'b', vision: 'c' },
+    })
+    expect(s.profiles[1].capabilities).toContain('image')
+    expect(s.profiles[2].capabilities).toContain('vision')
+  })
+
+  it('does not call an image-role profile a chat model as well', () => {
+    // The mix-up this whole field exists for: a draw-only endpoint sitting in
+    // the primary list, where every message it is sent comes back as an error
+    // about the address.
+    const s = normalizeSettings({
+      profiles: [
+        { id: 'a', provider: 'deepseek', baseUrl: '', apiKey: 'k', model: 'm' },
+        { id: 'b', provider: 'custom', baseUrl: 'https://x/v1', apiKey: 'k', model: 'draws' },
+      ],
+      slots: { primary: 'a', image: 'b' },
+    })
+    expect(s.profiles[1].capabilities).toEqual(['image'])
+  })
+
+  it('keeps a model that is both primary and image-capable in both lists', () => {
+    const s = normalizeSettings({
+      profiles: [{ id: 'a', provider: 'openai', baseUrl: '', apiKey: 'k', model: 'm' }],
+      slots: { primary: 'a', image: 'a' },
+    })
+    expect(s.profiles[0].capabilities).toEqual(['chat', 'vision', 'image'])
+  })
+
+  it('keeps stored capabilities verbatim, including an empty list', () => {
+    const s = normalizeSettings({
+      profiles: [
+        { id: 'a', provider: 'openai', baseUrl: '', apiKey: 'k', model: 'm', capabilities: [] },
+        {
+          id: 'b',
+          provider: 'openai',
+          baseUrl: '',
+          apiKey: 'k',
+          model: 'm',
+          capabilities: ['image', 'nonsense'],
+        },
+      ],
+      slots: { primary: 'a' },
+    })
+    // Not re-seeded from the provider: the user unticked them on purpose. The
+    // primary slot does not write 'chat' back either — only a profile with no
+    // stored answer at all is given one.
+    expect(s.profiles[0].capabilities).toEqual([])
+    expect(s.profiles[1].capabilities).toEqual(['image'])
+  })
+
   it('drops invalid maxTokens and keeps valid ones', () => {
     const s = normalizeSettings({
       profiles: [

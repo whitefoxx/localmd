@@ -50,6 +50,10 @@ export default {
     baseUrlHelp:
       'The API root, not one of its endpoints — /chat/completions and /images/generations are added for you.',
     baseUrlResolved: 'A chat request goes to',
+    capabilities: 'What it can do',
+    capability: { chat: 'Chat', vision: 'Reads images', image: 'Generates images' },
+    capabilitiesHelp:
+      'Which roles below may point at this model. Ticked to match the provider when you added it — correct it if your model does more, or less.',
 
     // Models list
     profilesHeading: 'Model profiles',
@@ -59,6 +63,12 @@ export default {
     slotsHeading: 'Model roles',
     slot: { primary: 'Primary', vision: 'Vision', image: 'Image generation' },
     notConfigured: 'Not set',
+    notMarkedFor: 'Not marked for this',
+    markConfirm: {
+      chat: '“{label}” is not marked as a chat model. Use it as the primary anyway, and mark it?',
+      vision: '“{label}” is not marked as reading images. Use it for this role anyway, and mark it?',
+      image: '“{label}” is not marked as generating images. Use it for this role anyway, and mark it?',
+    },
     visionHelp:
       'Leave empty if your primary model already reads pictures — most do. If it does not, point this at one that does and the agent will use it whenever something needs looking at.',
     imageHelp:
@@ -332,6 +342,10 @@ export default {
       '选好厂商，填上 API key 和模型名。key 只存在这个浏览器里，直接发给该厂商。跑在你自己机器上的模型也可以。',
     baseUrlHelp: '填 API 根地址，不要填具体端点 —— /chat/completions 和 /images/generations 会自动接上。',
     baseUrlResolved: '对话请求会发到',
+    capabilities: '这个模型能做什么',
+    capability: { chat: '对话', vision: '能看图', image: '能生图' },
+    capabilitiesHelp:
+      '下面哪些角色可以指向这个模型。添加时按厂商默认勾好了——如果你的模型能做的更多或更少，在这里改。',
 
     // Models list
     profilesHeading: '模型 Profiles',
@@ -341,6 +355,12 @@ export default {
     slotsHeading: '模型分工',
     slot: { primary: '主模型', vision: '视觉理解', image: '图像生成' },
     notConfigured: '未配置',
+    notMarkedFor: '未标记为可做这件事',
+    markConfirm: {
+      chat: '「{label}」没有标记为对话模型。仍然把它设为主模型，并标记上吗？',
+      vision: '「{label}」没有标记为能看图。仍然用它填这个角色，并标记上吗？',
+      image: '「{label}」没有标记为能生图。仍然用它填这个角色，并标记上吗？',
+    },
     visionHelp:
       '主模型本来就能看图就留空 —— 多数都能。不能看图的话，指向一个能看图的模型，需要看图时 agent 会去用它。',
     imageHelp: '可选。配好之后 agent 就能生成图片并存进知识库。',

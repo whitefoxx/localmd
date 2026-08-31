@@ -66,10 +66,12 @@ export async function toLanguageModel(profile: LlmProfile): Promise<LanguageMode
   }
 }
 
-/** Build an AI SDK image-generation model for a profile whose provider supports
- *  one (see providerHasImageModel). OpenAI/Google/xAI use their native image
- *  model; every OpenAI-compatible endpoint (GLM CogView, Qwen, Custom) uses the
- *  openai-compatible `/images/generations` image model. Throws otherwise. */
+/** Build an AI SDK image-generation model. OpenAI/Google/xAI use their native
+ *  image model; every OpenAI-compatible endpoint (GLM CogView, Qwen, Custom)
+ *  uses the openai-compatible `/images/generations` one. Throws otherwise —
+ *  which is a statement about the SDK package, not about the provider; whether
+ *  a *model* draws is the profile's own `capabilities` mark, decided in
+ *  Settings and never guessed from a provider id. */
 export async function toImageModel(profile: LlmProfile): Promise<ImageModel> {
   const { apiKey, model } = profile
   switch (sdkKindFor(profile.provider)) {
@@ -94,6 +96,14 @@ export async function toImageModel(profile: LlmProfile): Promise<ImageModel> {
       }).imageModel(model)
     }
     default:
-      throw new Error(`provider ${profile.provider} does not support image generation`)
+      // Not a claim about the provider's product line — those go stale, and this
+      // one cannot: `@ai-sdk/<kind>` either exposes an image model or it does
+      // not. So say which fact this is, and name the way past it, because the
+      // way past it does not need a release from us.
+      throw new Error(
+        `no image model in the @ai-sdk/${sdkKindFor(profile.provider)} package. ` +
+          `If ${profile.provider} generates images over an OpenAI-compatible endpoint, ` +
+          `add it again as Custom with that base URL.`,
+      )
   }
 }
