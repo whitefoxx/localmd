@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 import { readFile, readdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 /**
@@ -69,9 +70,10 @@ function staticLandingCopy(): Plugin {
   return {
     name: 'localmd-static-landing-copy',
     async transformIndexHtml(html) {
-      const [about, openKb] = await Promise.all([
+      const [about, openKb, links] = await Promise.all([
         import('./src/i18n/locales/about.ts'),
         import('./src/i18n/locales/openKb.ts'),
+        import('./src/lib/links.ts'),
       ])
       const a = about.default.en as Record<string, string>
       const k = openKb.default.en as Record<string, string>
@@ -81,6 +83,7 @@ function staticLandingCopy(): Plugin {
       const p = (t: string) => `      <p>${esc(t)}</p>`
       const li = (t: string) => `        <li>${esc(t)}</li>`
       const list = (...items: string[]) => ['      <ul>', ...items.map(li), '      </ul>'].join('\n')
+      const hasLlmsTxt = existsSync(fileURLToPath(new URL('./public/llms.txt', import.meta.url)))
 
       const body = [
         `      <h1>${esc(k.headline.replace(/\u00A0/g, ' '))}</h1>`,
@@ -123,10 +126,17 @@ function staticLandingCopy(): Plugin {
 
         h2(a.closingTitle),
         p(a.sourceBody),
+        // Relative, and from the edition seam. This block is served from
+        // wherever the build was deployed, so an absolute address here would
+        // have every copy of the page point a crawler at ours. `llms.txt` is
+        // linked only by a build that ships one — the open-source export drops
+        // it, and a link to a 404 is worse than no link.
         '      <p>',
-        '        <a href="https://localmd.app/?demo=1">Try the demo (no folder, no key)</a> ·',
-        '        <a href="https://github.com/whitefoxx/localmd">Source on GitHub</a> ·',
-        '        <a href="https://localmd.app/llms.txt">llms.txt</a>',
+        `        <a href="/?demo=1">${esc(k.demo)}</a> ·`,
+        `        <a href="${links.SOURCE_URL}">Source on GitHub</a>${
+          hasLlmsTxt ? ' ·' : ''
+        }`,
+        ...(hasLlmsTxt ? ['        <a href="/llms.txt">llms.txt</a>'] : []),
         '      </p>',
       ].join('\n')
 
