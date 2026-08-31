@@ -19,3 +19,13 @@ export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd/issues'
  *  deploys its own build should point this at itself, which is the whole reason
  *  this file is the edition's and not the app's. */
 export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'
+
+/** localmd Connect on the Chrome Web Store — listed 2026-08.
+ *
+ *  Published under the hosted service's name, which is why the address is an
+ *  edition's fact and not the app's. It is pointed at the same listing here on
+ *  purpose: the extension is free, and it talks to whatever origin the user
+ *  authorizes in it, so a self-hosted build works with it once you add your own
+ *  address to its list. A fork that ships its own extension repoints this. */
+export const CONNECT_STORE_URL =
+  'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh'

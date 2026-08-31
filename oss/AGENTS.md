@@ -42,6 +42,41 @@ branch.
   user's own organization. AGENTS.md inside a knowledge base is where that
   KB's structure is described — offer to write one that documents *their*
   layout; don't impose ours.
+- **The agent adds; it does not rearrange.** What stops someone from opening a
+  folder they have let get messy is not "the AI will be wrong", it is "the AI
+  will move something, or delete it". The default posture is therefore
+  additive: the agent writes *new* files that point inward at untouched
+  material — topic and entity pages, `log.md`, wikilinks, `[[1:b14-3]]` block
+  citations — and at most proposes a reorganization, never performs one
+  unasked. New files are the encouraged half of that posture, not a tolerated
+  one: an index page gives the material spatial structure, `log.md` gives it a
+  history — structure added *beside* the user's own, never carved into it. The
+  line that may not be crossed is writing a *record*: a cache, a queue, any
+  file whose correctness the machinery must maintain. A note survives being
+  hand-edited, moved or deleted; a record left to a human starts to lie
+  (`docs/llm-wiki-prior-art.md` rejected the navigation-cache layer and the
+  review queue for exactly this, and only this). Tags have two permitted homes
+  and one forbidden one: the frontmatter of pages the agent itself wrote (the
+  default), or — as a batch the user approves, in one commit — the frontmatter
+  of pages they wrote. Never a sidecar tag store only this app can read: tags
+  no other tool can see are a database hidden inside someone's folder, and the
+  whole promise is that leaving costs nothing.
+  Today this is a rule we keep, not an invariant we can claim. What enforces it
+  is review — the write snapshot and diff, ask-first mode, restorable text
+  deletes, `.git` off limits, git underneath — while `delete_path` and
+  `move_path` reach anything the user granted. Until a write guard makes it
+  structural, copy may say the agent *asks*; it may not say the agent *cannot*.
+  That gap is exactly what this reader is listening for.
+- **Recall is a view or a note, never a record.** Surfacing an old note at the
+  right moment must not write machine state into someone's folder — the
+  reasoning that rejected nashsu's review queue and nvk's navigation-cache
+  layer (`docs/llm-wiki-prior-art.md`). The computed signals already exist in
+  `computeLint`, derived from `kbIndex` with no page reads:
+  `unreferencedSources` (material sitting unread), `stalePages`,
+  `staleLogEntries`, `weaklyLinked` — render them on demand, never persist
+  them. A finding worth *keeping* does have a durable home: a dated `log.md`
+  entry, a note like any other. A view costs nothing to abandon; a note
+  survives being hand-edited; a record does neither.
 - **Minimal and manual over clever and automatic.** Prefer a manual action + a
   native dialog over background automation; prefer deterministic tools
   (kb_health) over LLM passes; confirm before token-heavy operations. Ship the
@@ -193,6 +228,12 @@ pipeline (`docs/token-optimization.md` has the full log):
   `npm run test:e2e`
 - e2e runs ONLY through Playwright (`npm run test:e2e`) — never open `?e2e=1` in
   a real browser profile.
+- **A pre-push hook runs typecheck + vitest + e2e** (`.githooks/pre-push`,
+  installed by `npm install` via `prepare`, or `npm run hooks:install`). e2e is
+  in there and the fast checks are not: two specs sat red for three days until
+  someone happened to look, with typecheck and vitest green over them the whole
+  time — what they asserted was browser behaviour, and only the browser knew.
+  `git push --no-verify` skips it when you genuinely mean to.
 - **Verify browser-facing work in a real browser.** typecheck and vitest cannot
   see the three things this app actually lives on: CORS, the Chrome-extension
   transports, and the File System Access API. Drive the running dev server by
