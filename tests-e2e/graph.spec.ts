@@ -55,8 +55,18 @@ test('the hovered node is raised above everything else the hover raises', async 
   expect(target).not.toBeNull()
 
   // Dimmed, and the focused node is the LAST thing in the raised-nodes layer.
-  await expect(layers.nth(0)).toHaveAttribute('style', /opacity:\s*0\.2/)
-  await expect(layers.nth(1)).toHaveAttribute('style', /opacity:\s*0\.3/)
+  // The property, not the numbers: both layers step back, and links go further
+  // down than nodes because a thin line at the same opacity still reads as a
+  // line (DIM_LINKS / DIM_NODES in GraphView). Pinning the literals is what
+  // left this red for three days after they were deliberately deepened.
+  const dim = async (n: number): Promise<number> =>
+    Number(await layers.nth(n).evaluate((el) => (el as SVGGElement).style.opacity))
+  await expect
+    .poll(() => dim(0), { message: 'links dim' })
+    .toBeGreaterThan(0)
+  const [links, nodes_] = [await dim(0), await dim(1)]
+  expect(links).toBeLessThan(nodes_)
+  expect(nodes_).toBeLessThan(1)
   const topmost = await page.evaluate(() => {
     const layerEls = [...document.querySelectorAll('svg > g > g')]
     const last = layerEls[3].lastElementChild as (SVGGElement & { __data__: { id: string } }) | null

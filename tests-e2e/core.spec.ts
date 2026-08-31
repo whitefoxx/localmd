@@ -46,7 +46,9 @@ test('agent write shows up in review and can be approved', async ({ page }) => {
   await expect(reviewBadge).toBeHidden()
 })
 
-test('agent delete is undoable from the review panel', async ({ page }) => {
+test('agent delete asks for a user file, then is undoable from the review panel', async ({
+  page,
+}) => {
   await page.getByRole('button', { name: /Initialize knowledge base/ }).click()
   const tree = page.locator('aside')
   await expect(tree.getByText('index.md', { exact: true }).first()).toBeVisible()
@@ -54,6 +56,12 @@ test('agent delete is undoable from the review panel', async ({ page }) => {
   const input = page.getByPlaceholder(/Ask the agent/)
   await input.fill('delete wiki/index.md')
   await input.press('Enter')
+
+  // The write gate stops here first: this file is the user's, not one the
+  // assistant wrote this session, so the turn pauses on a card that says so
+  // rather than deleting and offering an undo afterwards.
+  await expect(page.getByText('the assistant did not create it')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Approve', exact: true }).click()
 
   // Gone from the tree, and recorded as a restorable deletion.
   await expect(tree.getByText('index.md', { exact: true }).first()).toBeHidden({ timeout: 10_000 })
