@@ -44,7 +44,7 @@ check** — the private repo has moved, and the handful of files that stand in f
 their private counterparts have not moved with it. Those files are invisible to
 every test in this repo, because this repo never builds with them.
 
-Before running the export, look for drift in these four places, in this order.
+Before running the export, look for drift in these six places, in this order.
 
 ### 1. The overlay has fallen behind the files it replaces
 
@@ -61,16 +61,22 @@ Then, for each overlay file, compare its **exported surface** against the privat
 one — not its prose:
 
 ```bash
-for f in gate ui trial; do
-  diff <(grep -oE 'export (const|function|interface|type) [A-Za-z_]+' src/edition/$f.ts | sort) \
-       <(grep -oE 'export (const|function|interface|type) [A-Za-z_]+' oss/src/edition/$f.ts | sort)
+for f in oss/src/edition/*.ts; do
+  n=$(basename $f)
+  diff <(grep -oE 'export (const|function|interface|type) [A-Za-z_]+' src/edition/$n | sort) \
+       <(grep -oE 'export (const|function|interface|type) [A-Za-z_]+' $f | sort) \
+    && echo "$n ok"
 done
 diff <(grep -oE 'export const [A-Z_]+' src/lib/links.ts | sort) \
      <(grep -oE 'export const [A-Z_]+' oss/src/lib/links.ts | sort)
 ```
 
-A missing export is a typecheck failure in the export and the script will catch
-it. A missing *non-code* element may not be — see the next item.
+A missing *name* is real drift, and a typecheck failure in the export. A
+differing *keyword* is not: `gate.ts` declares `restrictedToolResult` as a
+`const` in one edition and a `function` in the other, which the grep reports
+and TypeScript does not care about, because the call signature is what crosses
+the seam. A missing *non-code* element may not show up here at all — see the
+next item.
 
 ### 2. A build step depends on something only the private file has
 
