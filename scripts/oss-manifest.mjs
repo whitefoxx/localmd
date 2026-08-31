@@ -74,6 +74,7 @@ export const EXCLUDE = [
   'oss/',
   'scripts/export-oss.mjs',
   'scripts/oss-manifest.mjs',
+  'docs/oss-export.md', // the runbook for the above, and a log of our exports
 ]
 
 /**
