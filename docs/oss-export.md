@@ -116,7 +116,19 @@ things a fork's domain would make false.
 Code that merely *mentions* the paid tier stays. `src/edition/` is what makes it
 answer differently, and the i18n catalogs ship whole on purpose.
 
-### 5. The working agreements have diverged
+### 5. A dependency is now only one edition's
+
+If the overlay replaces the only file that imported a package, the package
+should leave `package.json` and the lockfile too — `PACKAGE_PATCH.removeDeps`
+does both. This is not tidiness: someone auditing what the build talks to reads
+the dependency list, and a package installed but unused answers that question
+wrongly. `@vercel/analytics` is the standing example.
+
+The reverse also holds. Before adding a vendor import to core, ask whether both
+editions want it; if only one does, it belongs behind `src/edition/`, which is
+what makes the overlay sufficient and the dependency removable.
+
+### 6. The working agreements have diverged
 
 `oss/AGENTS.md` is a rewrite of `CLAUDE.md`, not a copy — it drops what is ours
 (the build-in-public section, the private knowledge base) and adds an "Editions"
@@ -203,6 +215,8 @@ exactly as it was.
 | `staticLandingCopy: no <noscript> block found` | overlay drift in `index.html` — case 2 |
 | leak gate hit | either the file belongs in `EXCLUDE`, or the value should never have been written down |
 | `package.json has no "X" script to remove` | `PACKAGE_PATCH.removeScripts` is stale |
+| `package.json has no "X" dependency to remove` | `PACKAGE_PATCH.removeDeps` is stale |
+| `X is still required by …` | something else in the lockfile needs a dependency `removeDeps` drops; take it out of the list |
 
 ## Log
 
@@ -211,4 +225,5 @@ Record each export here, so the next one has a `$LAST` to diff against.
 | Date | From | Notes |
 |---|---|---|
 | 2026-08-26 | `5e2607b` | first publication |
+| 2026-08-31 | `6a330d7` | Analytics became an edition question. `@vercel/analytics` left the open-source build entirely — seam, `package.json` and lockfile — so "this build reports nothing" is checkable from the dependency list rather than by reading modules. `removeDeps` is the new machinery; a FORBID pattern proves it each time, and caught prose in `oss/README.md` explaining the absence by name on the first run. |
 | 2026-08-31 | `1a734d9` | 43 commits. Four kinds of drift, one of each: `CONNECT_STORE_URL` missing from the overlay's links seam (typecheck), the `<noscript>` marker missing from `oss/index.html` (build), `staticLandingCopy` hardcoding `localmd.app` into every fork's landing page (silent), and `robots.txt` newly excluded. The first three were fixed in this repo, not worked around in the export. |
