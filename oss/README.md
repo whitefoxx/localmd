@@ -101,8 +101,8 @@ The hosted build at [localmd.app](https://localmd.app) adds four things that
 have no business in a copy you run yourself — a free trial that spends our API
 budget, a paid tier, a browser extension published under our name, and an
 anonymous page-view count for that one deployment. The first three are what
-pays for the work; the last is why `@vercel/analytics` is absent from this
-repository's `package.json` rather than merely unused in it. The core is free forever either way; running your own copy is a fully
+pays for the work; the last is why this repository's `package.json` has no
+analytics dependency in it at all, rather than one that ships unused. The core is free forever either way; running your own copy is a fully
 supported way to use localmd, and if you do, everything works.
 
 `src/edition/` is the seam where the two differ — four small files, and no
