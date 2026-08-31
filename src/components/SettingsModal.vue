@@ -39,18 +39,20 @@ const { locale, setLocale } = useI18n()
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-// Esc closes the modal while it's open (unless we're mid-recording — see below).
-function onKey(e: KeyboardEvent): void {
-  if (e.key === 'Escape' && props.open) emit('close')
-}
+// Esc is not ours: App.vue's layer chain owns it and closes this modal by
+// flipping the flag we are open on. A listener here is dead — it runs after that
+// capture-phase one, and Vue's flush lands between the two, so `open` is already
+// false by the time a bubble-phase window listener is called — and two owners
+// for one key is how a single press ends up closing two layers anyway. What we
+// register instead is the question the chain asks on the way out.
 onMounted(() => {
-  window.addEventListener('keydown', onKey)
+  ui.setSettingsBeforeClose(leaveEditor)
   // Capture phase so the recorder intercepts the combo before the app's global
   // shortcut handler (and CodeMirror etc.) can act on it.
   window.addEventListener('keydown', onRecordKey, true)
 })
 onUnmounted(() => {
-  window.removeEventListener('keydown', onKey)
+  ui.setSettingsBeforeClose(null)
   window.removeEventListener('keydown', onRecordKey, true)
 })
 
@@ -194,8 +196,8 @@ const sectionTitle = computed(() => {
   return n ? t(n.labelKey) : ''
 })
 function goSection(id: SectionId): void {
+  if (!leaveEditor()) return // leaving the models pane closes an in-progress edit
   section.value = id
-  editing.value = null // leaving the models pane cancels an in-progress edit
   cancelRecording()
 }
 
@@ -208,6 +210,13 @@ const imageCapableProfiles = computed(() =>
 const editing = ref<LlmProfile | null>(null)
 const isExistingProfile = computed(
   () => !!editing.value && store.state.profiles.some((p) => p.id === editing.value!.id),
+)
+/** The working copy as the editor opened it. A form nobody typed into is not
+ *  worth a question on the way out, so "did you mean to lose this?" is asked
+ *  against real input rather than against having opened the editor at all. */
+const editingOrigin = ref('')
+const editingDirty = computed(
+  () => !!editing.value && JSON.stringify(editing.value) !== editingOrigin.value,
 )
 /** What Save itself requires — one source, so the button's disabled state and
  *  the back arrow below can never drift apart. */
@@ -223,10 +232,12 @@ function addProfile(): void {
     model: 'claude-opus-4-8',
     reasoning: undefined,
   }
+  editingOrigin.value = JSON.stringify(editing.value)
 }
 
 function editProfile(p: LlmProfile): void {
   editing.value = { ...p }
+  editingOrigin.value = JSON.stringify(editing.value)
 }
 
 function applyProviderPreset(): void {
@@ -248,13 +259,29 @@ function saveProfile(): void {
   editing.value = null
 }
 
-/** The header's ← reads as "I'm done here", and on a form this long Save can
- *  sit below the fold — so back commits the edit instead of dropping it. Cancel
- *  stays as the one deliberate way to throw an edit away. A profile Save itself
- *  would refuse (no key, no model) can only be discarded. */
-function closeEditor(): void {
-  if (profileValid.value) saveProfile()
-  else editing.value = null
+/** Every way out of the editor runs through here — the header's ←, the sidebar,
+ *  and the modal's own × / Esc / backdrop — and answers whether the caller may
+ *  proceed. The ← reads as "I'm done here", and on a form this long Save can sit
+ *  below the fold, so leaving commits the edit instead of dropping it; that has
+ *  to hold at every exit, or which control you happened to reach for decides
+ *  whether your key survives. Cancel stays the one deliberate way to throw an
+ *  edit away. A profile Save itself would refuse (no key, no model) can still
+ *  only be discarded — but a half-filled one is minutes of pasting, so it asks
+ *  before going, rather than vanishing without a word. */
+function leaveEditor(): boolean {
+  if (!editing.value) return true
+  if (profileValid.value) {
+    saveProfile()
+    return true
+  }
+  if (editingDirty.value && !confirm(t('settings.discardProfile'))) return false
+  editing.value = null
+  return true
+}
+
+/** The modal's own exits take the editor with them, so they answer for it too. */
+function requestClose(): void {
+  if (leaveEditor()) emit('close')
 }
 
 function slotBadges(p: LlmProfile): string[] {
@@ -271,7 +298,7 @@ function slotBadges(p: LlmProfile): string[] {
     <div
       v-if="open"
       class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
-      @click.self="emit('close')"
+      @click.self="requestClose()"
     >
       <div
         class="w-[720px] max-w-[95vw] h-[620px] max-h-[88vh] rounded-xl border border-border bg-bg-1 shadow-2xl flex overflow-hidden"
@@ -282,7 +309,7 @@ function slotBadges(p: LlmProfile): string[] {
             <button
               class="w-7 h-7 flex items-center justify-center rounded-md text-fg-3 hover:text-fg-0 hover:bg-bg-3 transition-colors"
               :title="$t('layout.closeEsc')"
-              @click="emit('close')"
+              @click="requestClose()"
             >
               <span class="codicon codicon-close" />
             </button>
@@ -317,7 +344,7 @@ function slotBadges(p: LlmProfile): string[] {
               v-if="editing"
               class="codicon codicon-arrow-left text-fg-3 hover:text-fg-0 cursor-pointer mr-2"
               :title="$t('settings.back')"
-              @click="closeEditor"
+              @click="leaveEditor()"
             />
             <h2 class="text-base font-semibold text-fg-0">
               {{ editing ? (isExistingProfile ? $t('settings.editProfile') : $t('settings.addProfile')) : sectionTitle }}

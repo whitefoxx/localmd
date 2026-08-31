@@ -15,6 +15,8 @@ export default {
     back: 'Back',
     addProfile: 'Add model',
     editProfile: 'Edit model',
+    discardProfile:
+      'This model has not been saved — it still needs an API key and a model name. Discard what you entered?',
 
     // General
     language: 'Language',
@@ -295,6 +297,7 @@ export default {
     back: '返回',
     addProfile: '添加模型',
     editProfile: '编辑模型',
+    discardProfile: '这个模型还没保存——它还缺 API key 和模型名。要丢弃已填的内容吗？',
 
     // General
     language: '语言',

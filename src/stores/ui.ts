@@ -126,6 +126,24 @@ export const useUiStore = defineStore('ui', () => {
   const searchOpen = ref(false)
   const healthOpen = ref(false)
   const settingsOpen = ref(false)
+  /** Settings can be showing a half-typed model profile, and Esc belongs to the
+   *  layer chain in App.vue rather than to the modal (a window listener there
+   *  runs in the capture phase, so by the time a bubble-phase one in the modal
+   *  sees the same key its `open` prop has already been flipped false — the
+   *  modal cannot answer for itself on the way out). So the chain asks first,
+   *  and a false answer leaves the layer open. Plain closers — the ×, the
+   *  backdrop — go through the modal directly and never come here.
+   *
+   *  A `let` rather than a ref on purpose: nothing renders from it. */
+  let settingsBeforeClose: (() => boolean) | null = null
+  /** Installed by the Settings modal for as long as it is mounted. */
+  function setSettingsBeforeClose(fn: (() => boolean) | null): void {
+    settingsBeforeClose = fn
+  }
+  /** Whether the Settings layer may close now. Nothing installed = yes. */
+  function maySettingsClose(): boolean {
+    return settingsBeforeClose ? settingsBeforeClose() : true
+  }
   /** The paid-tier explainer. Lives here rather than in the start screen so the
    *  Licence pane can open it too — someone who already has a folder open never
    *  sees the start screen, and they are exactly who would go looking. */
@@ -241,6 +259,8 @@ export const useUiStore = defineStore('ui', () => {
     epubTocOpen,
     healthOpen,
     settingsOpen,
+    setSettingsBeforeClose,
+    maySettingsClose,
     pricingOpen,
     editorTabsVisible,
     pendingPrompt,

@@ -103,7 +103,13 @@ function closeTopLayer(): void {
   if (ui.helpOpen) ui.helpOpen = false
   else if (ui.searchOpen) ui.searchOpen = false
   else if (ui.pricingOpen) ui.pricingOpen = false
-  else if (ui.settingsOpen) ui.settingsOpen = false
+  // Asks rather than tells: this layer can be holding unsaved input, and it is
+  // the only one that knows (see maySettingsClose). The condition stays plain
+  // `settingsOpen` — folding the question into it would let a "no" fall through
+  // to the next branch and close whatever is underneath instead.
+  else if (ui.settingsOpen) {
+    if (ui.maySettingsClose()) ui.settingsOpen = false
+  }
   else if (git.panelOpen) git.panelOpen = false
   else if (review.panelOpen) review.panelOpen = false
   else if (ui.healthOpen) ui.healthOpen = false
