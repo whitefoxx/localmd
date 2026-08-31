@@ -240,6 +240,12 @@ agent pipeline (docs/token-optimization.md has the full log):
   `npm run test:e2e`
 - e2e runs ONLY through Playwright (`npm run test:e2e`) — never open `?e2e=1`
   in a real browser profile.
+- **A pre-push hook runs typecheck + vitest + e2e** (`.githooks/pre-push`,
+  installed by `npm install` via `prepare`, or `npm run hooks:install`). e2e is
+  in there and the fast checks are not: two specs sat red from 2026-08-28 until
+  someone happened to look, with typecheck and vitest green over them the whole
+  time — what they asserted was browser behaviour, and only the browser knew.
+  `git push --no-verify` skips it when you genuinely mean to.
 - **Verify browser-facing work in a real browser.** typecheck and vitest cannot
   see the three things this app actually lives on: CORS, the Chrome-extension
   transports, and the File System Access API. Drive the running dev server

@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# Everything that has to be true before code leaves this machine.
+#
+# e2e is in here and the fast checks are not enough on their own: the two specs
+# that sat red from 2026-08-28 until they were noticed had typecheck and vitest
+# green over them the whole time. What they were asserting was browser
+# behaviour, and only the browser knew.
+#
+# Installed by `npm run hooks:install` (which `npm install` runs for you).
+# Genuinely need to push past a red suite? `git push --no-verify`.
+
+set -e
+
+echo "pre-push: typecheck"
+npm run --silent typecheck
+
+echo "pre-push: unit tests"
+npm run --silent test
+
+echo "pre-push: e2e (a couple of minutes; --no-verify skips all of this)"
+npm run --silent test:e2e

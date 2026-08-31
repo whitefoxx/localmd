@@ -10,6 +10,8 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "prepare": "git config core.hooksPath .githooks || true",
     "docs:sync": "node scripts/sync-doc-hashes.ts",
     "shoot:landing": "node scripts/shoot-landing.mjs",
     "shoot:diagram": "node scripts/shoot-diagram.mjs",
