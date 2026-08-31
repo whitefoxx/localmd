@@ -221,6 +221,28 @@ export function sdkKindFor(providerId: string): SdkKind {
   return presetFor(providerId)?.sdk ?? 'openai-compatible'
 }
 
+/** What `@ai-sdk/openai-compatible` appends to a base URL when it calls. A fact
+ *  about the SDK rather than about the settings form, kept here so the form can
+ *  show the address a request will really reach instead of asking someone to
+ *  picture it: pasting a full endpoint into a field labelled "Base URL" is the
+ *  mistake everyone makes once, and it surfaces as the provider's own 404 for a
+ *  path nobody typed.
+ *
+ *  Shown, never corrected. A base URL legitimately carries a path — a gateway's
+ *  `/openai/v1`, an Azure deployment — so a rule that trimmed the tails we
+ *  recognise would sooner or later rewrite input that was already right, and do
+ *  it silently. Displaying the join lets the user see the mistake and keeps the
+ *  field theirs. */
+export const COMPAT_ENDPOINTS = {
+  chat: '/chat/completions',
+  image: '/images/generations',
+} as const
+
+/** The URL a call on this base actually reaches. */
+export function endpointFor(baseUrl: string, kind: keyof typeof COMPAT_ENDPOINTS): string {
+  return `${baseUrl.trim().replace(/\/+$/, '')}${COMPAT_ENDPOINTS[kind]}`
+}
+
 /** Whether this provider needs a user-supplied base URL (Custom, or an unknown
  *  legacy id). Dedicated + preset-URL providers hide the field. */
 export function needsBaseUrl(providerId: string): boolean {

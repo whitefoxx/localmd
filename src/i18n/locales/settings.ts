@@ -47,6 +47,9 @@ export default {
     defaultPlaceholder: 'Default',
     profileHelp:
       'Pick a provider, paste its API key and the model name. The key stays in this browser and goes straight to that provider. A model on your own machine works too.',
+    baseUrlHelp:
+      'The API root, not one of its endpoints — /chat/completions and /images/generations are added for you.',
+    baseUrlResolved: 'A chat request goes to',
 
     // Models list
     profilesHeading: 'Model profiles',
@@ -327,6 +330,8 @@ export default {
     defaultPlaceholder: '默认',
     profileHelp:
       '选好厂商，填上 API key 和模型名。key 只存在这个浏览器里，直接发给该厂商。跑在你自己机器上的模型也可以。',
+    baseUrlHelp: '填 API 根地址，不要填具体端点 —— /chat/completions 和 /images/generations 会自动接上。',
+    baseUrlResolved: '对话请求会发到',
 
     // Models list
     profilesHeading: '模型 Profiles',

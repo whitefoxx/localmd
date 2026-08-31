@@ -19,6 +19,7 @@ import {
   SELECTABLE_PROVIDERS,
   presetFor,
   needsBaseUrl,
+  endpointFor,
   providerHasImageModel,
   DEFAULT_MAX_TOKENS,
 } from '@/lib/providers'
@@ -218,6 +219,14 @@ const editingOrigin = ref('')
 const editingDirty = computed(
   () => !!editing.value && JSON.stringify(editing.value) !== editingOrigin.value,
 )
+/** Where a chat call on the base URL as typed would actually land. The one
+ *  endpoint rather than both: seeing the join happen at all is what tells you a
+ *  pasted `/v1/images/generations` has become `/v1/images/generations/chat/…`,
+ *  and a second line for the image path buys nothing for the field's own width. */
+const baseUrlPreview = computed(() =>
+  editing.value?.baseUrl.trim() ? endpointFor(editing.value.baseUrl, 'chat') : '',
+)
+
 /** What Save itself requires — one source, so the button's disabled state and
  *  the back arrow below can never drift apart. */
 const profileValid = computed(() => !!editing.value?.apiKey && !!editing.value.model)
@@ -369,6 +378,13 @@ function slotBadges(p: LlmProfile): string[] {
               <div v-if="needsBaseUrl(editing.provider)">
                 <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">Base URL</label>
                 <input v-model="editing.baseUrl" class="input" placeholder="https://api.example.com/v1" />
+                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
+                  {{ $t('settings.baseUrlHelp') }}
+                </p>
+                <p v-if="baseUrlPreview" class="mt-1 text-xs text-fg-3 leading-relaxed break-all">
+                  {{ $t('settings.baseUrlResolved') }}
+                  <span class="font-mono text-fg-2">{{ baseUrlPreview }}</span>
+                </p>
               </div>
 
               <div>
