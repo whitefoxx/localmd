@@ -53,8 +53,8 @@ Only these, and only when the relevant thing happens:
 - **To a tool's service** — only the request that tool makes, only when it runs.
 - **To GitHub** — only when you push.
 
-One thing happens without you asking: loading the app counts an anonymous
-visit — which page, where you arrived from, and rough facts about the browser
+One thing happens without you asking, and only on the copy served from
+localmd.app: loading the app counts an anonymous visit — which page, where you arrived from, and rough facts about the browser
 (country, device, browser name). It is measured by the host that serves the
 site, with no cookie and no identifier that follows you between visits or
 between sites, and it says nothing about your folder, your notes or your
@@ -65,6 +65,11 @@ One click is counted the same way: opening the demo knowledge base. It happens
 before there is any folder, which is the line — nothing you do inside a folder
 you have opened is ever reported. The count exists because the start screen
 cannot otherwise tell whether the people who arrive ever try it.
+
+Neither happens on a copy you or someone else runs: the open-source build has
+no counting code in it at all, so there is nothing left switched off that could
+be switched on. Whoever hosts it can still read their own web server's logs,
+the same as for any website.
 
 That is the complete list. Nothing else is sent in the background, and nothing
 goes anywhere on a schedule.

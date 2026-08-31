@@ -20,9 +20,11 @@ gave it a key for. Nothing is uploaded, because there is nowhere to upload to.
 **That last sentence is the reason this repository exists.** "Your files are not
 uploaded" is a claim, and claims about privacy are worth exactly as much as your
 willingness to take someone's word for it. Here you can read the code, run it
-yourself, and watch the network tab. Every feature the hosted build has is in
-here — what is not is the free trial, which spends our API budget and needs a
-server to meter it. See [Two editions](#two-editions).
+yourself, and watch the network tab — and this build has nothing to see there:
+no analytics, no page-view counter, no dependency that could carry one. Every
+feature the hosted build has is in here; what is not is the free trial, which
+spends our API budget and needs a server to meter it. See
+[Two editions](#two-editions).
 
 Bugs and ideas → the [issues](https://github.com/whitefoxx/localmd/issues) on
 this repository.
@@ -95,13 +97,15 @@ This repository is the **open-source edition**, and it is the whole application:
 the agent, the tools, the document indexes, git and GitHub sync, MCP servers,
 the browser extension bridge. Everything here is free, in both senses.
 
-The hosted build at [localmd.app](https://localmd.app) adds three things that
-cannot live in a repository — a free trial that spends our API budget, a paid
-tier, and a browser extension published under our name. Those are what pays for
-the work. The core is free forever either way; running your own copy is a fully
+The hosted build at [localmd.app](https://localmd.app) adds four things that
+have no business in a copy you run yourself — a free trial that spends our API
+budget, a paid tier, a browser extension published under our name, and an
+anonymous page-view count for that one deployment. The first three are what
+pays for the work; the last is why `@vercel/analytics` is absent from this
+repository's `package.json` rather than merely unused in it. The core is free forever either way; running your own copy is a fully
 supported way to use localmd, and if you do, everything works.
 
-`src/edition/` is the seam where the two differ — three small files, and no
+`src/edition/` is the seam where the two differ — four small files, and no
 other code in the tree knows which build it is in. `CONTEXT.md` explains the
 vocabulary.
 

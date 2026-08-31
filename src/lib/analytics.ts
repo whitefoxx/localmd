@@ -15,17 +15,31 @@
  *
  * PROD only, like the page view: dev traffic and the e2e suite are not
  * anybody's funnel.
+ *
+ * Whether any of it leaves at all is not this file's answer — see
+ * `src/edition/analytics.ts`. The rules above are the same in an edition that
+ * reports nothing; only the transport goes.
  */
-import { track } from '@vercel/analytics'
+import { startReporting, reportEvent } from '@/edition/analytics'
 
 /** Names are a closed set on purpose — see the module comment before adding
  *  one, and update the privacy topic in the same commit. */
 type Event = 'demo_open'
 
+/** Begin whatever counting this edition does. Called once, at boot. */
+export function start(): void {
+  if (!import.meta.env.PROD) return
+  try {
+    startReporting()
+  } catch {
+    // Counting is never worth breaking the thing being counted.
+  }
+}
+
 export function report(event: Event): void {
   if (!import.meta.env.PROD) return
   try {
-    track(event)
+    reportEvent(event)
   } catch {
     // Counting is never worth breaking the thing being counted.
   }

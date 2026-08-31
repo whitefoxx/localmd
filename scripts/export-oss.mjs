@@ -137,6 +137,13 @@ for (const s of PACKAGE_PATCH.removeScripts) {
   delete pkg.scripts[s]
   note(`− script: ${s}`)
 }
+for (const dep of PACKAGE_PATCH.removeDeps) {
+  if (!pkg.dependencies?.[dep]) {
+    die(`package.json has no "${dep}" dependency to remove — the patch is stale`)
+  }
+  delete pkg.dependencies[dep]
+  note(`− dependency: ${dep}`)
+}
 writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
 note(`name: ${pkg.name} · license: ${pkg.license}`)
 
@@ -145,6 +152,30 @@ const lockPath = join(TREE, 'package-lock.json')
 const lock = JSON.parse(readFileSync(lockPath, 'utf8'))
 lock.name = pkg.name
 if (lock.packages?.['']) lock.packages[''].name = pkg.name
+
+// A dropped dependency has to leave the lockfile too, or `npm ci` refuses the
+// pair outright — and a reader who checks the dependency list deserves to find
+// the same answer in both files. Nested installs under it go with it; anything
+// still requiring it aborts, because pruning that would describe a tree npm
+// cannot reproduce.
+for (const dep of PACKAGE_PATCH.removeDeps) {
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    delete lock.packages?.['']?.[section]?.[dep]
+  }
+  for (const key of Object.keys(lock.packages ?? {})) {
+    if (key === `node_modules/${dep}` || key.startsWith(`node_modules/${dep}/`)) {
+      delete lock.packages[key]
+    }
+  }
+  const stillNeeded = Object.entries(lock.packages ?? {})
+    .filter(([key, meta]) => key !== '' && meta.dependencies?.[dep])
+    .map(([key]) => key)
+  if (stillNeeded.length) {
+    die(`${dep} is still required by ${stillNeeded.join(', ')}.\n  Removing it would leave a lockfile npm cannot install from — take it out of removeDeps.`)
+  }
+  note(`− locked: ${dep}`)
+}
+
 writeFileSync(lockPath, JSON.stringify(lock, null, 2) + '\n')
 note('package-lock.json name kept in step')
 

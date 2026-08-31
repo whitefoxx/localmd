@@ -160,7 +160,7 @@ a price on the landing page. Another edition has none of those and is not a
 cut-down hosted: it is the same core with the seam answered differently.
 Everything that differs lives in `src/edition/` — `gate.ts` (is anything
 **restricted**), `trial.ts` (is there a model to lend), `ui.ts` (are there screens
-about money). Two rules keep it a seam rather than a set of branches: nothing
+about money), `analytics.ts` (does anything get counted). Two rules keep it a seam rather than a set of branches: nothing
 outside `src/edition/` may import a file only one edition has, and no type
 crossing the seam may be one only one edition can name. Core asks the seam; it
 never asks which edition it is in.

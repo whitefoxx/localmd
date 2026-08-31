@@ -111,6 +111,13 @@ export const FORBID = [
   { pattern: /gist\.githubusercontent\.com/, why: 'the slot-count gist' },
   { pattern: /tally\.so/, why: 'the early-access form' },
   { pattern: /sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/, why: 'an API key' },
+  // Also the check that `removeDeps` below actually worked: package.json and
+  // the lockfile are text files like any other, so a dependency that failed to
+  // come out is caught here rather than by a reader of the public repo.
+  {
+    pattern: /@vercel\/analytics/,
+    why: 'the hosted build’s page-view counter — this edition reports nothing, and says so by not depending on it',
+  },
 ]
 
 /**
@@ -128,4 +135,14 @@ export const PACKAGE_PATCH = {
   },
   /** Scripts whose file the export drops. */
   removeScripts: ['sign-key', 'shoot:og'],
+  /**
+   * Dependencies this edition has no importer for, because the only file that
+   * imported one is replaced by the overlay.
+   *
+   * Dropped from the lockfile too, and that is the point rather than tidiness:
+   * someone auditing what this build talks to reads the dependency list, and a
+   * package that is installed but unused answers that question wrongly. "It
+   * reports nothing" should be checkable without reading every module.
+   */
+  removeDeps: ['@vercel/analytics'],
 }

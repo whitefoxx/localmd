@@ -22,7 +22,8 @@ intentional Chinese in the tree: the `zh` values in i18n catalogs
 
 `src/edition/` is the seam between this build and the hosted one at
 localmd.app — `gate.ts` (is anything restricted), `trial.ts` (is there a model
-to lend), `ui.ts` (are there screens about money). No other code in the tree
+to lend), `ui.ts` (are there screens about money), `analytics.ts` (does anything
+get counted — in this build, no). No other code in the tree
 knows which build it is in, and two rules keep it that way: nothing outside
 `src/edition/` imports a file only one edition has, and no type crossing the
 seam is one only one edition can name. If a change needs core code to ask which
