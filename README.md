@@ -71,9 +71,14 @@ Custom gateways often refuse browser CORS; the providers' own endpoints work.
 
 `npm run build` writes a folder of static files. Serve it over https from
 anywhere that serves static files — there is nothing to configure, no
-environment to set and no server to keep running. `netlify.toml` is included so
-Netlify does not have to guess the build command; every other host wants
-`npm run build` and `dist`.
+environment to set and no server to keep running. Whatever your host asks for,
+the answer is `npm run build` and `dist`.
+
+No host-specific config files ship here. localmd.app runs on Vercel, which is
+also what `api/` is written for — the small proxy behind the no-key trial. That
+directory is the one part that is not just static files, and a deployment
+without it simply has no trial; everyone brings their own key, which is the
+normal path anyway.
 
 (No Dockerfile, on purpose: a container whose whole job is serving a folder of
 files is more moving parts than a build plus any static host, not fewer.)
