@@ -1,9 +1,17 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * The palette (⌘K) and its four modes: fuzzy file search, `>` commands,
- * `@` chats, and ⇧Enter to hand the query to the agent.
+ * The palette (⌘K) and its five modes: fuzzy file search, `>` commands,
+ * `@` chats, `:` to jot a line into today's capture page (or, alone, to open
+ * it), and ⇧Enter to hand the query to the agent.
  */
+
+/** Today as the app files it — local calendar day, never UTC. */
+function today(): string {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?e2e=1')
@@ -20,7 +28,7 @@ async function openPalette(page: Page): Promise<void> {
 }
 
 function palette(page: Page) {
-  return page.getByPlaceholder(/Search files and content|Run a command|Find a chat/)
+  return page.getByPlaceholder(/Search files and content|Run a command|Find a chat|Jot a line/)
 }
 
 /** Result rows, scoped to the panel — the same names live in the file tree. */
@@ -157,4 +165,73 @@ test('the offer to ask leads the list, without taking Enter from the top hit', a
   await palette(page).press('Enter')
   await expect(palette(page)).toBeHidden()
   await expect(page.locator('main').getByRole('button', { name: 'AGENTS.md' })).toBeVisible()
+})
+
+test(': writes a line into today’s page and stays open for the next one', async ({ page }) => {
+  await openPalette(page)
+  await palette(page).fill(':')
+  // Where a jot lands is on screen BEFORE anything is written — a capture
+  // surface that writes somewhere unstated is one you stop trusting.
+  await expect(page.locator('[data-palette]')).toContainText(`raw/daily/${today()}.md`)
+
+  await palette(page).fill(': oat milk')
+  await expect(results(page).filter({ hasText: 'oat milk' })).toBeVisible()
+  await page.keyboard.press('Enter')
+
+  // Still open, and it says where that one went, so a second line costs
+  // nothing but typing it.
+  await expect(page.locator('[data-palette]')).toContainText(`Saved to raw/daily/${today()}.md`)
+  await palette(page).fill(': and a second thought')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('[data-palette]')).toContainText('Saved to')
+
+  // Both lines are in today's page, in the order they were made.
+  await palette(page).fill(today())
+  await results(page)
+    .filter({ hasText: `raw/daily/${today()}.md` })
+    .first()
+    .click()
+  await expect(page.locator('main')).toContainText('oat milk')
+  await expect(page.locator('main')).toContainText('and a second thought')
+})
+
+test('a jot survives being made while today’s page is open with unsaved edits', async ({
+  page,
+}) => {
+  // The one path where a plain file write would lose the jot: the buffer on
+  // screen is dirty, and its next autosave would put the pre-jot text back.
+  await openPalette(page)
+  await palette(page).fill(': first')
+  await page.keyboard.press('Enter')
+  await palette(page).fill(today())
+  await results(page)
+    .filter({ hasText: `raw/daily/${today()}.md` })
+    .first()
+    .click()
+
+  await page.getByRole('button', { name: 'Edit' }).click()
+  await page.locator('.cm-content').click()
+  await page.keyboard.press('End')
+  await page.keyboard.type('\n- typed by hand')
+
+  await openPalette(page)
+  await palette(page).fill(': jotted from the palette')
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Escape')
+
+  await expect(page.locator('.cm-content')).toContainText('typed by hand')
+  await expect(page.locator('.cm-content')).toContainText('jotted from the palette')
+})
+
+test(': alone opens today’s page in edit mode, making it if today has none', async ({ page }) => {
+  await openPalette(page)
+  await palette(page).fill(':')
+  // The row names the file it is about to open — including before it exists.
+  await expect(results(page)).toContainText(`raw/daily/${today()}.md`)
+  await page.keyboard.press('Enter')
+
+  // Straight into the editor, not the reading view: the point of opening it is
+  // to write in it.
+  await expect(page.locator('.cm-content')).toContainText(today())
+  await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
 })

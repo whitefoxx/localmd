@@ -1,11 +1,16 @@
 <script setup lang="ts">
 /**
- * The palette (⌘K / ⌘P). One input, four things behind it, chosen by a prefix:
+ * The palette (⌘K / ⌘P). One input, five things behind it, chosen by a prefix:
  *
  *   (none)  files and content — filenames fuzzy-ranked, content substring
  *   >       commands (see composables/useCommands)
  *   @       agent conversations, by title
+ *   :       jot a line into today's capture page — or, alone, open it (lib/daily)
  *   ⇧Enter  hand whatever is typed to the agent
+ *
+ * `:` earns a prefix where the others earn one: it is a *write*, and the
+ * palette is the only surface reachable without leaving what you were doing —
+ * which is the whole of why a passing thought gets written down at all.
  *
  * The last one has no prefix on purpose. Prefixes have to be learned, and the
  * moment someone wants the agent is usually the moment a search came back
@@ -20,11 +25,15 @@ import { useKbIndexStore, type SearchHit } from '@/stores/kbIndex'
 import { useCitationsStore } from '@/stores/citations'
 import { useChatStore, type SessionSummary } from '@/stores/chat'
 import { useSettingsStore } from '@/stores/settings'
+import { useFilesStore } from '@/stores/files'
 import { useCommands, type Command } from '@/composables/useCommands'
 import { fuzzyRank, termPositions, queryTerms } from '@/lib/fuzzy'
 import { parseSearchQuery, matchesFilters, wantsTagList } from '@/lib/searchQuery'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
 import { openInEditor, revealEditor } from '@/lib/openInEditor'
+import { usesRawLayout } from '@/lib/capture'
+import { todayIso, resolveDailyPath } from '@/lib/daily'
+import { jotToday, openTodayPage } from '@/lib/jot'
 import { baseName } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
 import { t } from '@/i18n'
@@ -34,16 +43,17 @@ const index = useKbIndexStore()
 const citations = useCitationsStore()
 const chat = useChatStore()
 const settings = useSettingsStore()
+const files = useFilesStore()
 const commands = useCommands()
 
 const query = ref('')
 const selected = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 
-type Mode = 'search' | 'command' | 'session'
+type Mode = 'search' | 'command' | 'session' | 'jot'
 
 interface Row {
-  kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask' | 'tag'
+  kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask' | 'tag' | 'jot' | 'jotOpen'
   /** Primary text; for files this is the path. */
   label: string
   /** Characters of `label` the query matched, for underlining. */
@@ -66,8 +76,16 @@ interface Row {
 // `type:` / `tag:` filters plus free text — the grammar and matching live in
 // lib/searchQuery so they are testable as pure functions.
 
+// A leading `:` is unambiguous: the `type:` / `tag:` filters are word-bounded,
+// so a colon never opens a search query.
 const mode = computed<Mode>(() =>
-  query.value.startsWith('>') ? 'command' : query.value.startsWith('@') ? 'session' : 'search',
+  query.value.startsWith('>')
+    ? 'command'
+    : query.value.startsWith('@')
+      ? 'session'
+      : query.value.startsWith(':')
+        ? 'jot'
+        : 'search',
 )
 /** The query with any mode prefix removed. */
 const term = computed(() =>
@@ -139,6 +157,24 @@ const tagRows = computed<Row[]>(() =>
   ),
 )
 
+/* Where a jot would land. Resolved when the palette opens rather than after
+ * the write, because the target is the one thing about this mode a person
+ * cannot guess — and a capture surface that writes somewhere unstated is one
+ * you stop trusting with anything you would mind losing. */
+const rawLayout = ref(false)
+const jotTarget = computed(() => resolveDailyPath(todayIso(), files.allFiles, rawLayout.value))
+/** Where the last jot went, shown while the input is empty again — the palette
+ *  stays open so several lines can go in one after another. */
+const jotted = ref('')
+
+const jotRows = computed<Row[]>(() =>
+  term.value.trim()
+    ? [{ kind: 'jot', label: term.value.trim(), icon: 'codicon-add', hint: '↵' }]
+    // `:` with nothing after it is not an empty search — it is the other half
+    // of the mode: open the page itself and write in it.
+    : [{ kind: 'jotOpen', label: jotTarget.value, icon: 'codicon-go-to-file', hint: '↵' }],
+)
+
 const searchRows = computed<Row[]>(() => {
   const { typeFilter, tagFilter, text } = parsed.value
   // `tagsFor` answers for sources too — a PDF inherits the tags of the pages
@@ -199,6 +235,7 @@ const searchRows = computed<Row[]>(() => {
 const rows = computed<Row[]>(() => {
   if (mode.value === 'command') return commandRows.value
   if (mode.value === 'session') return sessionRows.value
+  if (mode.value === 'jot') return jotRows.value
   if (wantsTagList(term.value)) return tagRows.value
   const found = searchRows.value
   // The offer to ask instead of search — only with something to ask about,
@@ -219,7 +256,9 @@ const placeholder = computed(() =>
     ? t('search.commandPlaceholder')
     : mode.value === 'session'
       ? t('search.sessionPlaceholder')
-      : t('search.placeholder'),
+      : mode.value === 'jot'
+        ? t('search.jotPlaceholder')
+        : t('search.placeholder'),
 )
 
 /** Split text into matched / unmatched runs so the matched characters can be
@@ -258,9 +297,13 @@ watch(
       // then the palette is its own again.
       query.value = ui.pendingSearch
       ui.pendingSearch = ''
+      jotted.value = ''
       void index.refresh()
       await nextTick()
       inputEl.value?.focus()
+      // After the focus: the input is usable on the first frame, and the
+      // answer is only needed once something is typed.
+      rawLayout.value = await usesRawLayout()
     }
   },
 )
@@ -273,10 +316,35 @@ function askAgent(text: string): void {
   ui.pendingPrompt = text.trim()
 }
 
+/** Append the typed line to today's capture page and stay open for the next
+ *  one. Nothing navigates and nothing closes: a jot may not cost you the file
+ *  you were reading, or it stops being worth making. */
+async function openToday(): Promise<void> {
+  ui.searchOpen = false
+  ui.graphOpen = false
+  await openTodayPage()
+}
+
+async function doJot(): Promise<void> {
+  const path = await jotToday(term.value)
+  if (!path) return
+  query.value = ':'
+  jotted.value = path
+  inputEl.value?.focus()
+}
+
 async function pick(row: Row | undefined): Promise<void> {
   if (!row) return
   if (row.kind === 'ask') {
     askAgent(row.label)
+    return
+  }
+  if (row.kind === 'jot') {
+    await doJot()
+    return
+  }
+  if (row.kind === 'jotOpen') {
+    await openToday()
     return
   }
   if (row.kind === 'tag') {
@@ -389,6 +457,14 @@ function onKeydown(e: KeyboardEvent): void {
               <span class="shrink-0 text-fg-3">{{ $t('search.askAgent') }}</span>
               <span class="truncate text-fg-2">{{ row.label }}</span>
             </template>
+            <template v-else-if="row.kind === 'jot'">
+              <span class="shrink-0 text-fg-3">{{ $t('search.jotPrefix') }}</span>
+              <span class="truncate text-fg-2">{{ row.label }}</span>
+            </template>
+            <template v-else-if="row.kind === 'jotOpen'">
+              <span class="shrink-0 text-fg-3">{{ $t('search.jotOpen') }}</span>
+              <span class="truncate text-fg-2">{{ row.label }}</span>
+            </template>
             <template v-else>
               <span class="truncate text-fg-0">
                 <span
@@ -413,7 +489,12 @@ function onKeydown(e: KeyboardEvent): void {
               {{ row.type }}
             </span>
           </button>
-          <div v-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">
+          <!-- Where the last jot went, while the input is empty again: a
+               write with no receipt is one you go and check on. -->
+          <div v-if="mode === 'jot' && jotted && !term" class="px-4 py-3 text-sm text-fg-3">
+            {{ $t('search.jotSaved', { path: jotted }) }}
+          </div>
+          <div v-else-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">
             {{ $t('search.noResults') }}
           </div>
           <div
@@ -422,6 +503,7 @@ function onKeydown(e: KeyboardEvent): void {
           >
             <span><span class="font-mono text-fg-2">&gt;</span> {{ $t('search.hintCommands') }}</span>
             <span><span class="font-mono text-fg-2">@</span> {{ $t('search.hintSessions') }}</span>
+            <span><span class="font-mono text-fg-2">:</span> {{ $t('search.hintJot') }}</span>
             <span><span class="font-mono text-fg-2">⇧↵</span> {{ $t('search.hintAsk') }}</span>
           </div>
         </div>
