@@ -92,6 +92,43 @@ pages that cite it: tag a note about a paper and the paper answers to that tag
 too. Nothing is written anywhere to make that work, so re-tagging the note
 re-tags the paper.
 
+## Today's page — before you know where it goes
+
+Not everything arrives knowing where it belongs. A thought on the way to
+something else, a link worth keeping, a sentence you do not want to lose:
+deciding which page it goes on is usually more work than the thought itself,
+which is how most of them get lost.
+
+So there is one place that needs no decision — today. Press ⌘K, type `:`, write
+the line, press Enter. It lands in a file named for today's date, in
+`raw/daily/` if your folder has a `raw/` and `inbox/daily/` if it does not, as a
+plain bullet: no title to think of, nothing to fill in. The palette stays open,
+so a second line costs only typing it, and whatever you were reading stays where
+it was. Press `:` with nothing after it to open today's page itself and sit down
+in it.
+
+Only the days you actually wrote something have a file. Nothing is created
+because you opened the app.
+
+These pages are **material, not notes**. They sit with the rest of what you
+captured, and the assistant reads them the way it reads a dropped article —
+pulling what is worth keeping into real pages that link back to the day it came
+from. A jot is not where a thought ends; it is how the thought gets into the
+folder at all.
+
+If you already keep daily notes — from another app, or just your own folder of
+dated files — the app writes into the folder you already use, as long as the
+files are named `YYYY-MM-DD.md`. It finds them by name, so moving them later
+breaks nothing.
+
+Opening a knowledge base lands you here: today's page if there is one, otherwise
+your index page. If you have neither, nothing opens — a folder with no home page
+is not given one.
+
+The log below runs the other direction. Today's page is what *you* put in before
+it has a home; the log is what the assistant worked out about the pages you
+already have.
+
 ## The log — what is not a page
 
 Some of what comes out of reading is not a page. Two notes end up disagreeing.

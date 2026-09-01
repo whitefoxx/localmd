@@ -111,6 +111,10 @@ to reach anything:
   chat, switch theme, open settings. Commands that have a keyboard
   shortcut show it, so the palette teaches them as you go.
 - **Start with `@`** to find a past chat by title.
+- **Start with `:`** to write a line straight into today's page — something you
+  want down before it goes, without deciding where it belongs first. Enter files
+  it and the palette stays open for the next line; nothing you were reading
+  moves. Press `:` with nothing after it to open today's page itself.
 - **Press ⇧Enter** at any point to hand what you typed to the assistant instead
   of searching for it. It arrives in the message box as a draft, so you can add
   to it before sending — useful exactly when a search comes back with nothing,
