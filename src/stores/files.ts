@@ -6,6 +6,7 @@ import { fileStem, dirName } from '@/lib/wiki'
 import { fileKind } from '@/lib/filetypes'
 import { isAnnotationsPath } from '@/lib/annotations'
 import { readTabs, writeTabs } from '@/lib/tabsMemory'
+import { landingPath } from '@/lib/landing'
 import { coalesce } from '@/lib/async'
 import type { TreeNode } from '@/lib/fs'
 
@@ -187,20 +188,26 @@ export const useFilesStore = defineStore('files', () => {
    * Reopen the tabs persisted for the current KB, dropping any whose file no
    * longer exists, then focus the previously-active tab. Call once after the
    * tree has loaded; it also enables tab persistence for this session.
+   *
+   * With nothing to restore — a KB opened here for the first time, or one
+   * whose tabs were all closed — it falls back to `landingPath` rather than
+   * leaving an empty pane. That is the only thing this function decides for
+   * itself; everything else is what was open last time.
    */
   async function restoreTabs(): Promise<void> {
     const kb = currentKbName()
     const saved = kb ? readTabs(kb) : null
+    let active: string | null = null
     if (saved) {
       const exist = new Set(allFiles.value)
       const survivors = saved.tabs.filter((p) => exist.has(p))
       openTabs.value = survivors
-      const active =
-        saved.active && survivors.includes(saved.active) ? saved.active : (survivors[0] ?? null)
-      if (active) {
-        currentPath.value = null // force a load even if it equals a stale value
-        await openFile(active)
-      }
+      active = saved.active && survivors.includes(saved.active) ? saved.active : (survivors[0] ?? null)
+    }
+    if (!active) active = landingPath(allFiles.value)
+    if (active) {
+      currentPath.value = null // force a load even if it equals a stale value
+      await openFile(active)
     }
     tabsReady = true
   }

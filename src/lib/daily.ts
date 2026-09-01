@@ -57,7 +57,25 @@ const dirOf = (path: string): string =>
   path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
 
 /**
- * Where a given day's captures live.
+ * The capture page a day already has, or null when nothing was written that
+ * day. Shallowest wins when the same name exists twice — deterministic, and
+ * never an error: a KB is allowed to be untidy.
+ *
+ * Separate from `resolveDailyPath` because the difference matters to callers
+ * that must not bring a file into being by asking about it: what the app opens
+ * on startup is one of those, and what makes a folder of these worth keeping
+ * is that a day nobody wrote anything has no page in it.
+ */
+export function findDailyPath(date: string, files: readonly string[]): string | null {
+  const name = `${date}.md`
+  const existing = files.filter((p) => p === name || p.endsWith(`/${name}`))
+  if (!existing.length) return null
+  return [...existing].sort((a, b) => depth(a) - depth(b) || a.localeCompare(b))[0]
+}
+
+/**
+ * Where a given day's captures live — the answer a write needs, which always
+ * has one.
  *
  * In order: the file itself if it already exists (wherever it is), then the
  * directory this KB already keeps dated pages in — most populated first, so
@@ -70,10 +88,8 @@ export function resolveDailyPath(
   rawLayout: boolean,
 ): string {
   const name = `${date}.md`
-  const existing = files.filter((p) => p === name || p.endsWith(`/${name}`))
-  if (existing.length) {
-    return [...existing].sort((a, b) => depth(a) - depth(b) || a.localeCompare(b))[0]
-  }
+  const existing = findDailyPath(date, files)
+  if (existing) return existing
 
   const byDir = new Map<string, number>()
   for (const p of files) {

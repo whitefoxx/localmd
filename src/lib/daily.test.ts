@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { todayIso, dailyDateOf, isDailyPath, resolveDailyPath, appendJot } from './daily'
+import {
+  todayIso,
+  dailyDateOf,
+  isDailyPath,
+  findDailyPath,
+  resolveDailyPath,
+  appendJot,
+} from './daily'
 
 describe('todayIso', () => {
   it('reads the local calendar day, not the UTC one', () => {
@@ -26,6 +33,14 @@ describe('dailyDateOf', () => {
     expect(dailyDateOf('wiki/2026-09.md')).toBeNull()
     expect(dailyDateOf('log.md')).toBeNull()
     expect(isDailyPath('raw/daily/2026-09-01.txt')).toBe(false)
+  })
+})
+
+describe('findDailyPath', () => {
+  it('answers only for a day that already has a page — asking may not create one', () => {
+    const files = ['wiki/index.md', 'raw/daily/2026-08-31.md']
+    expect(findDailyPath('2026-08-31', files)).toBe('raw/daily/2026-08-31.md')
+    expect(findDailyPath('2026-09-01', files)).toBeNull()
   })
 })
 

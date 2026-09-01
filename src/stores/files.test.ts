@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
+import { todayIso } from '@/lib/daily'
 import { useFilesStore } from './files'
 
 describe('files store — revealPath (tree follows the active file)', () => {
@@ -143,5 +144,49 @@ describe('files store — text is decided by the bytes, not the extension', () =
 
     expect(files.unreadable).toBe(null)
     expect(files.content).toBe('now text\n')
+  })
+})
+
+describe('files store — what a KB opens on with no tabs to restore', () => {
+  const today = todayIso()
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    fs.setRoot(createMemoryRoot())
+  })
+
+  it("lands on today's capture page when the day already has one", async () => {
+    await fs.writeFile('wiki/index.md', '# Index')
+    await fs.writeFile(`raw/daily/${today}.md`, `# ${today}\n\n- something\n`)
+    const files = useFilesStore()
+    await files.refreshTree()
+
+    await files.restoreTabs()
+
+    expect(files.currentPath).toBe(`raw/daily/${today}.md`)
+  })
+
+  it('lands on the index while today is still unwritten — and creates nothing', async () => {
+    await fs.writeFile('wiki/index.md', '# Index')
+    await fs.writeFile('raw/daily/2020-01-01.md', '# 2020-01-01')
+    const files = useFilesStore()
+    await files.refreshTree()
+
+    await files.restoreTabs()
+
+    expect(files.currentPath).toBe('wiki/index.md')
+    expect(await fs.exists(`raw/daily/${today}.md`)).toBe(false)
+  })
+
+  it('leaves the pane empty for a folder that has neither', async () => {
+    // A folder of PDFs has no home page, and inventing one for it would be the
+    // app grafting its own layout onto someone's folder.
+    await fs.writeFile('papers/x.md', '# X')
+    const files = useFilesStore()
+    await files.refreshTree()
+
+    await files.restoreTabs()
+
+    expect(files.currentPath).toBeNull()
   })
 })
