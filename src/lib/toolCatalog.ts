@@ -6,11 +6,10 @@
  * the app assumed.
  *
  * The exception is the entries marked `bundled` — today Jina and Parallel, the
- * web-search pair. Those are free forever and sit beside read_file rather than
- * being connections to pay for, because a knowledge base that cannot look
- * anything up is not a working product to hand someone. Everything else here
- * reaches past the user's own folder and model, which is what a paid tier
- * covers where an edition has one (see `@/edition/gate`).
+ * web-search pair. Those sit beside read_file rather than being something you
+ * go and set up, because a knowledge base that cannot look anything up is not
+ * a working product to hand someone. Everything else here reaches past the
+ * user's own folder and model, and is a connection they choose to make.
  *
  * Every endpoint below was probed for browser CORS before being listed. That
  * matters more than it sounds: a browser-only app can't reach an API that
@@ -410,7 +409,7 @@ export const RETIRED_PACKS: Record<string, HttpToolSpec[]> = {
  * Three entries, each earning its place by being wanted before the user knows
  * what they want: localmd Connect because it makes everything else more likely
  * to work (the browser bridge, the adapter marketplace, site scripts — the
- * product's own paid companion, not a third-party recommendation), and two web
+ * product's own companion, not a third-party recommendation), and two web
  * searches that fail differently. Anything past that is the user's choice to
  * make, with the agent's help — see docs/app/tools.md.
  */
@@ -451,20 +450,14 @@ export const CATALOG: CatalogEntry[] = [
 ]
 
 /**
- * Catalog entries whose tools ship with the app, free forever ("bundled" — NOT
- * "built-in", which CONTEXT.md reserves for tools native to the agent code).
+ * Catalog entries whose tools ship ready to use ("bundled" — NOT "built-in",
+ * which CONTEXT.md reserves for tools native to the agent code).
  *
  * A named set rather than "the entries currently in the catalog", because the
  * catalog is an editorial list that will be added to and pruned, and pinning
- * the free tier to it would mean the free tier changed every time someone had
- * an opinion about a recommendation. Membership here is a decision about what
- * is free; a test keeps it in lockstep with the `bundled` flags above.
- * Expected to grow — moving a paid tool here is one entry plus one flag.
- *
- * It sits with the catalog rather than with the gate that reads it because it
- * is a fact about what SHIPS, not about what is licensed. `stores/tools.ts`
- * asks it which entries stay active regardless, and that question keeps the
- * same answer wherever there is no gate at all.
+ * "works with no setup" to it would mean that changed every time someone had
+ * an opinion about a recommendation. A test keeps this in lockstep with the
+ * `bundled` flags above. Expected to grow.
  */
 export const BUNDLED_TOOL_SOURCES: readonly string[] = ['jina', 'parallel']
 

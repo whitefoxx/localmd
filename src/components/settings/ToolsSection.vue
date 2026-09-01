@@ -29,8 +29,6 @@ import { useSettingsStore, newProfileId } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useToolsStore } from '@/stores/tools'
 import { useUiStore } from '@/stores/ui'
-import { gate } from '@/edition/gate'
-import { HAS_PAID_TIER } from '@/edition/ui'
 import { sortedCatalog, CATALOG, type CatalogEntry } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { serverSecretRefs } from '@/lib/mcp'
@@ -51,9 +49,9 @@ const tools = useToolsStore()
 const ui = useUiStore()
 
 const catalogEntries = sortedCatalog()
-/* The page's two groups mirror the pricing line, so what a row costs is legible
- * from where it sits: bundled tools ship free; everything below them reaches an
- * outside service and belongs to the paid tier. */
+/* The page's two groups say how far a row reaches: bundled tools ship with the
+ * app and need no setup; everything below them reaches an outside service the
+ * user connected. */
 const bundledEntries = catalogEntries.filter((e) => e.bundled)
 const connectionEntries = catalogEntries.filter((e) => !e.bundled)
 const RESERVED = new Set(TOOLS.map((x) => x.name))
@@ -264,14 +262,6 @@ function isKbTool(spec: HttpToolSpec): boolean {
   return tools.kbActive.some((s) => s.id === spec.id)
 }
 
-/** What a paid row's status reads while there is no licence. Server rows say it
- *  through their connect error already; this is for the rows with no connection
- *  to fail — a grey tool count next to a tool that will refuse every call would
- *  be the list quietly lying. */
-function lockedStatus(): { label: string; labelCls: string; dotCls: null } {
-  return { label: t('settings.rowNeedsLicence'), labelCls: 'text-amber-500', dotCls: null }
-}
-
 const installedRows = computed<InstalledRow[]>(() => {
   const rows: InstalledRow[] = []
 
@@ -281,7 +271,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: t(`settings.catalog.${e.id}.title`),
       source: 'preset',
       kind: e.server ? (e.kind === 'extension' ? 'extension' : 'mcp') : null,
-      ...(gate.restricted && !e.bundled && !e.server ? lockedStatus() : entryStatus(e)),
+      ...entryStatus(e),
       target: { name: 'entry', id: e.id },
     })
   }
@@ -292,7 +282,7 @@ const installedRows = computed<InstalledRow[]>(() => {
       title: g.bundle ?? g.tools[0].name,
       source: isKbTool(g.tools[0]) ? 'kb' : 'yours',
       kind: null,
-      ...(gate.restricted ? lockedStatus() : staticCount(g.tools.length)),
+      ...staticCount(g.tools.length),
       target: { name: 'group', key: groupKey(g) },
     })
   }
@@ -1303,21 +1293,12 @@ function removeDetail(): void {
 
   <!-- ═══ Main ═══ -->
   <div v-else class="space-y-5">
-    <!-- ▸ Bundled tools — ship with the app, free forever. Their own group so
-         the pricing line is legible from the page itself: what sits here costs
-         nothing, everything below reaches an outside service and is paid. -->
+    <!-- ▸ Bundled tools — ship with the app and need no setup. Their own group
+         so the reach is legible from the page itself: what sits here is ready,
+         everything below reaches an outside service. -->
     <div>
-      <!-- Free / paid as a pill rather than a clause: the whole point of the
-           two groups is the price line between them, and it was set in the
-           same grey as everything around it. -->
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.bundledGroup') }}</span>
-        <span
-          v-if="HAS_PAID_TIER"
-          class="rounded-full bg-added/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-added"
-        >
-          {{ $t('settings.priceFree') }}
-        </span>
       </span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">{{ $t('settings.bundledDesc') }}</p>
       <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
@@ -1343,28 +1324,14 @@ function removeDetail(): void {
       </div>
     </div>
 
-    <!-- ▸ Connections — everything that reaches an outside service; the paid
-         tier as one visible surface. When locked the group stays fully visible
-         with one hint, because a paid feature that hides just looks missing. -->
+    <!-- ▸ Connections — everything that reaches an outside service, as one
+         visible surface. -->
     <div>
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.connectionsGroup') }}</span>
-        <span
-          v-if="HAS_PAID_TIER"
-          class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent"
-        >
-          {{ $t('settings.pricePaid') }}
-        </span>
       </span>
       <p class="mt-1 mb-2 text-xs text-fg-3 leading-relaxed">
-        {{ $t('settings.connectionsDesc')
-        }}<template v-if="HAS_PAID_TIER"> {{ $t('settings.connectionsLicence') }}</template>
-      </p>
-      <p v-if="gate.restricted" class="mb-2 text-xs text-amber-500 leading-relaxed">
-        {{ $t('settings.connectionsLocked') }}
-        <button class="underline hover:text-fg-0" @click="ui.settingsSection = 'licence'">
-          {{ $t('settings.nav.licence') }}
-        </button>
+        {{ $t('settings.connectionsDesc') }}
       </p>
 
       <div class="rounded-lg border border-border divide-y divide-border overflow-hidden">
@@ -1411,8 +1378,6 @@ function removeDetail(): void {
         <p class="mt-0.5 text-xs text-fg-3 leading-relaxed">{{ $t('settings.connectDesc') }}</p>
         <button
           class="btn text-xs mt-2"
-          :disabled="gate.restricted"
-          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="askAgent"
         >{{ $t('settings.connectAction') }}</button>
       </div>
@@ -1481,27 +1446,13 @@ function removeDetail(): void {
     <!-- ▸ Advanced — the manual versions of the two doors above. Folded, and
          each opens its own page, so main stays a list. -->
     <div>
-      <!-- Both doors below are licence-gated (disabled, above), so the group
-           wears the same Paid pill as Connections. Without it the pricing line
-           read as "everything under Connections", and these sat outside it. -->
       <span class="flex items-center gap-2">
         <span class="text-xs uppercase tracking-wide text-fg-3">{{ $t('settings.advanced') }}</span>
-        <span
-          v-if="HAS_PAID_TIER"
-          class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent"
-        >
-          {{ $t('settings.pricePaid') }}
-        </span>
       </span>
       <p class="mt-1 text-xs text-fg-3 leading-relaxed">{{ $t('settings.advancedDesc') }}</p>
-      <!-- Locked at the door, not at save: letting someone fill in a whole
-           form before telling them it needs a licence would be worse than
-           either hiding or refusing. -->
       <div class="mt-1.5 rounded-lg border border-border divide-y divide-border overflow-hidden">
         <button
           class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="gate.restricted"
-          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newTool"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addManually') }}</span>
@@ -1510,8 +1461,6 @@ function removeDetail(): void {
         </button>
         <button
           class="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-2 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="gate.restricted"
-          :title="gate.restricted ? $t('settings.connectionsLocked') : undefined"
           @click="newServer"
         >
           <span class="text-sm text-fg-1">{{ $t('settings.addServer') }}</span>

@@ -16,21 +16,25 @@
  * PROD only, like the page view: dev traffic and the e2e suite are not
  * anybody's funnel.
  *
- * Whether any of it leaves at all is not this file's answer — see
- * `src/edition/analytics.ts`. The rules above are the same in an edition that
- * reports nothing; only the transport goes.
+ * The beacon is same-origin by construction: a copy of localmd you host
+ * yourself reports to your origin, not ours, and there is nothing here that
+ * phones home to localmd.app. docs/app/storage-and-privacy.md says so and
+ * must keep saying so.
+ *
+ * The `@vercel/analytics/vue` entry is not usable here: it imports vue-router
+ * at module scope, and this app is a single page with no router.
  */
-import { startReporting, reportEvent } from '@/edition/analytics'
+import { inject, track } from '@vercel/analytics'
 
 /** Names are a closed set on purpose — see the module comment before adding
  *  one, and update the privacy topic in the same commit. */
 type Event = 'demo_open'
 
-/** Begin whatever counting this edition does. Called once, at boot. */
+/** Begin counting page views. Called once, at boot. */
 export function start(): void {
   if (!import.meta.env.PROD) return
   try {
-    startReporting()
+    inject()
   } catch {
     // Counting is never worth breaking the thing being counted.
   }
@@ -39,7 +43,7 @@ export function start(): void {
 export function report(event: Event): void {
   if (!import.meta.env.PROD) return
   try {
-    reportEvent(event)
+    track(event)
   } catch {
     // Counting is never worth breaking the thing being counted.
   }

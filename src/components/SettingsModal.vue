@@ -16,7 +16,6 @@ import { fuzzyRank } from '@/lib/fuzzy'
 import { DEFAULT_HEALTH_IGNORE } from '@/lib/scanScope'
 import { useUiStore } from '@/stores/ui'
 import { useThemeStore } from '@/stores/theme'
-import { LICENCE_SECTION } from '@/edition/ui'
 import ToolsSection from '@/components/settings/ToolsSection.vue'
 import {
   ALL_PROVIDERS,
@@ -168,7 +167,7 @@ function onRecordKey(e: KeyboardEvent): void {
 }
 
 /** Left-nav sections (ChatGPT-style). */
-type SectionId = 'general' | 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git' | 'licence'
+type SectionId = 'general' | 'models' | 'agent' | 'hotkeys' | 'health' | 'tools' | 'git'
 const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
   { id: 'general', labelKey: 'settings.nav.general', icon: 'codicon-globe' },
   { id: 'models', labelKey: 'settings.nav.models', icon: 'codicon-sparkle' },
@@ -177,11 +176,6 @@ const NAV: { id: SectionId; labelKey: string; icon: string }[] = [
   { id: 'health', labelKey: 'settings.nav.health', icon: 'codicon-pulse' },
   { id: 'tools', labelKey: 'settings.nav.tools', icon: 'codicon-plug' },
   { id: 'git', labelKey: 'settings.nav.git', icon: 'codicon-github' },
-  // Absent, entry and all, in an edition with no paid tier — a nav row leading
-  // to a pane that does not exist is worse than no row.
-  ...(LICENCE_SECTION
-    ? [{ id: 'licence' as const, labelKey: 'settings.nav.licence', icon: 'codicon-key' }]
-    : []),
 ]
 const section = ref<SectionId>('models')
 
@@ -906,11 +900,6 @@ function slotBadges(p: LlmProfile): string[] {
                 >{{ $t('settings.githubTokenLink') }}</a>{{ $t('settings.githubHelp') }}
               </p>
             </div>
-
-            <component
-              :is="LICENCE_SECTION"
-              v-else-if="section === 'licence' && LICENCE_SECTION"
-            />
           </div>
         </div>
       </div>

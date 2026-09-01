@@ -16,19 +16,6 @@ import { useSetupStore } from '@/stores/setup'
 import { KB_TOOLS_CONFIG_PATH } from '@/lib/httpTools'
 import { TOOLS, type ToolCtx } from './tools'
 
-// manage_tools is a paid tool, and its dry run goes through the restricted
-// path. That is asserted where it belongs (licence.test.ts); here it would only
-// mean every case below returns the same "needs a licence" string and tests
-// nothing.
-// The gate is mocked open, not switched off through the licence it happens to
-// be backed by: `@/edition/gate` is what the code under test imports, so this
-// says the same thing in an edition that has no licence module at all.
-vi.mock('@/edition/gate', () => ({
-  gate: { restricted: false },
-  toolRestricted: () => false,
-  restrictedToolResult: (name: string) => `Error: ${name} is restricted.`,
-}))
-
 globalThis.localStorage ??= {
   getItem: () => null,
   setItem: () => {},

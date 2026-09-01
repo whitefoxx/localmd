@@ -153,7 +153,6 @@ describe('normalizeSettings — multi-profile shape', () => {
       gitName: '',
       gitEmail: '',
       githubToken: '',
-      licenceKey: '',
       writeMode: 'auto',
       agentMultiTab: false,
       agentMaxTabs: 3,
@@ -308,7 +307,7 @@ describe('persistable — what reaches localStorage', () => {
   const base = { ...normalizeSettings({}), profiles: [], slots: {} }
   const own = { id: 'own', label: 'Mine', provider: 'anthropic', baseUrl: '', apiKey: 'sk-real', model: 'm' }
   // Shaped like a lent profile — an id, a short-lived token, `ephemeral` — but
-  // deliberately not naming any edition's endpoint: what is under test is the
+  // deliberately not naming the trial's real endpoint: what is under test is the
   // flag, and a fixture that carries a real address makes a shared test belong
   // to one build.
   const lent = {

@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { useGitStore } from '@/stores/git'
 import { useFilesStore } from '@/stores/files'
-import { gate } from '@/edition/gate'
 import { readHeadText } from '@/lib/git'
 import { GIT_DECOR } from '@/lib/gitStatus'
 import { diffLines, collapseContext, type HunkLine } from '@/lib/diff'
@@ -136,8 +135,7 @@ function fmtTime(ms: number): string {
             <span class="text-xs text-fg-3 truncate">{{ git.remote.owner }}/{{ git.remote.repo }}</span>
             <button
               class="btn text-xs"
-              :disabled="!!git.busy || gate.restricted"
-              :title="gate.restricted ? $t('git.needsLicence') : undefined"
+              :disabled="!!git.busy"
               @click="git.sync('pull')"
             >
               <span class="codicon codicon-sm codicon-arrow-down mr-1" />{{ $t('git.pull') }}
@@ -148,13 +146,11 @@ function fmtTime(ms: number): string {
                  not be. -->
             <button
               class="btn text-xs"
-              :disabled="!!git.busy || gate.restricted"
+              :disabled="!!git.busy"
               :title="
-                gate.restricted
-                  ? $t('git.needsLicence')
-                  : git.unpushed.length
-                    ? $t('git.pushTitle', { n: git.unpushed.length, branch: git.branch ?? '' })
-                    : undefined
+                git.unpushed.length
+                  ? $t('git.pushTitle', { n: git.unpushed.length, branch: git.branch ?? '' })
+                  : undefined
               "
               @click="git.sync('push')"
             >

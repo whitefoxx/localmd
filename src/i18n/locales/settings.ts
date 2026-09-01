@@ -9,7 +9,6 @@ export default {
       health: 'KB health',
       tools: 'Tools',
       git: 'Git & GitHub',
-      licence: 'Licence',
     },
     privacyNote: 'API keys and tokens stay in this browser only — sent straight to the provider, never through any other server.',
     back: 'Back',
@@ -112,16 +111,11 @@ export default {
     // External tools — recommended catalog
     recommended: 'Recommended tools',
     bundledGroup: 'Bundled tools',
-    priceFree: 'Free',
-    pricePaid: 'Paid',
     bundledDesc:
-      'These ship with the app and cost nothing, ever. Today that is web search and page reading; the set can grow.',
+      'These ship with the app and need no setup. Today that is web search and page reading; the set can grow.',
     connectionsGroup: 'Connections',
     connectionsDesc:
       'Anything that reaches a service outside this browser.',
-    connectionsLicence: 'One licence covers all of it.',
-    connectionsLocked: 'Adding and using connections needs a licence —',
-    rowNeedsLicence: 'Needs a licence',
     connectTitle: 'Connect something',
     connectDesc:
       "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
@@ -277,23 +271,6 @@ export default {
     githubHelp:
       ': set Repository access to Only select repositories (just your KB repo), Permissions → Contents to Read and write, then paste the github_pat_… into the field above. See the README “Git & GitHub sync” section for the full steps. Sync is fast-forward-only; resolve conflicts in the terminal.',
 
-    // Licence
-    licenceKeyLabel: 'Licence key',
-    licencePlaceholder: 'LMD1.…',
-    licenceCovers:
-      'Everything else is free and always will be — web search, subagents, your own skills, and local git included. A licence covers what reaches past your folder and your model: the localmd Connect browser extension, MCP servers, tools built against outside services, and syncing with GitHub.',
-    licenceOffline:
-      'Checked here in your browser, against a key built into the app. Nothing is sent anywhere, and there is no account.',
-    licenceNone: 'No licence. The features above are locked.',
-    licenceNoneYet: 'No licence — and nothing is locked yet, because the paid tier is not live.',
-    licenceValid: 'Active — thank you.',
-    licenceValidUntil: 'Active · {days} days left',
-    licenceLastDay: 'Active · last day',
-    licenceExpired: 'This licence ran out on {date}. Nothing in your folder changed.',
-    licenceBad: "This key isn't valid. Check for a truncated paste — a key is one long line.",
-    licenceUnverifiable: 'Could not check this key ({reason}). This is our problem, not yours — nothing is wrong with your key.',
-    licenceRemove: 'Remove',
-    licenceHolder: 'Licensed to {to} — the name is part of the key itself.',
   },
   zh: {
     nav: {
@@ -304,7 +281,6 @@ export default {
       health: 'KB 健康',
       tools: '外部工具',
       git: 'Git & GitHub',
-      licence: '许可',
     },
     privacyNote: 'API key 与 token 只存在本浏览器，直连服务商，不经其他服务器。',
     back: '返回',
@@ -403,14 +379,9 @@ export default {
     // External tools — recommended catalog
     recommended: '推荐工具',
     bundledGroup: '自带工具',
-    priceFree: '免费',
-    pricePaid: '付费',
-    bundledDesc: '随应用附带，永远不收费。目前是网页搜索和读网页；这个集合以后会变多。',
+    bundledDesc: '随应用附带，开箱即用。目前是网页搜索和读网页；这个集合以后会变多。',
     connectionsGroup: '外部接入',
     connectionsDesc: '所有连到这个浏览器之外的服务的能力。',
-    connectionsLicence: '一份许可全都涵盖。',
-    connectionsLocked: '添加和使用外部接入需要许可 ——',
-    rowNeedsLicence: '需要许可',
     connectTitle: '接入一个服务',
     connectDesc:
       '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
@@ -560,21 +531,5 @@ export default {
     githubHelp:
       '：Repository access 选 Only select repositories（只勾知识库仓库），Permissions → Contents 设为 Read and write，生成后把 github_pat_… 粘贴到上面。详细步骤见 README「Git 与 GitHub 同步」。同步 fast-forward-only，冲突时回终端处理。',
 
-    // Licence
-    licenceKeyLabel: '许可 key',
-    licencePlaceholder: 'LMD1.…',
-    licenceCovers:
-      '其余部分永远免费 —— 网页搜索、子 agent、你自己的 skill、本机 git 都在内。许可覆盖的是伸到你的文件夹和你的模型之外的那些：localmd Connect 浏览器扩展、MCP server、针对外部服务造的工具，以及跟 GitHub 同步。',
-    licenceOffline: '就在你的浏览器里校验，对照应用里内置的一把公钥。不会发往任何地方，也没有账号。',
-    licenceNone: '没有许可，上面这些功能处于锁定状态。',
-    licenceNoneYet: '没有许可 —— 但目前什么都没锁，因为付费层还没上线。',
-    licenceValid: '已激活 —— 谢谢。',
-    licenceValidUntil: '已激活 · 还剩 {days} 天',
-    licenceLastDay: '已激活 · 今天是最后一天',
-    licenceExpired: '这个许可已于 {date} 到期。你文件夹里的东西没有任何变化。',
-    licenceBad: '这串 key 无效。先看看是不是粘贴时被截断了 —— 一个 key 是完整的一行。',
-    licenceUnverifiable: '没能校验这串 key（{reason}）。这是我们这边的问题，不是你的 key 有问题。',
-    licenceRemove: '移除',
-    licenceHolder: '授权给 {to} —— 这个名字是 key 本身的一部分。',
   },
 }

@@ -144,10 +144,6 @@ export const useUiStore = defineStore('ui', () => {
   function maySettingsClose(): boolean {
     return settingsBeforeClose ? settingsBeforeClose() : true
   }
-  /** The paid-tier explainer. Lives here rather than in the start screen so the
-   *  Licence pane can open it too — someone who already has a folder open never
-   *  sees the start screen, and they are exactly who would go looking. */
-  const pricingOpen = ref(false)
   /** Show the editor tab bar. When hidden, files open via the Open Files list. */
   const editorTabsVisible = ref(true)
 
@@ -261,7 +257,6 @@ export const useUiStore = defineStore('ui', () => {
     settingsOpen,
     setSettingsBeforeClose,
     maySettingsClose,
-    pricingOpen,
     editorTabsVisible,
     pendingPrompt,
     graphType,

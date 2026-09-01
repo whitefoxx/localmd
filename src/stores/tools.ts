@@ -41,7 +41,6 @@ import { parseExtensionFetch } from '@/lib/connectRelay'
 import { useSettingsStore } from '@/stores/settings'
 import { useMcpStore } from '@/stores/mcp'
 import { useKbStore } from '@/stores/kb'
-import { gate, restrictedToolResult } from '@/edition/gate'
 import * as fs from '@/lib/fs'
 
 const TRUST_KEY = 'localmd:kb-tools-trust:v1'
@@ -98,20 +97,15 @@ export const useToolsStore = defineStore('tools', () => {
 
   /** Everything the agent may call this session.
    *
-   *  Everything except the bundled tools reaches past the user's own folder and
-   *  model — a service the KB folder named, a tool authored against someone's
-   *  API — so it waits on a licence. Bundled ones are appended last so the
-   *  shadowing order among the paid ones is unchanged from when they were the
-   *  whole list. */
+   *  Bundled ones are appended last, so the shadowing order among the rest is
+   *  unchanged from when they were the whole list. */
   const specs = computed<HttpToolSpec[]>(() => {
-    const licensed = gate.restricted
-      ? []
-      : [
-          ...(kbTrusted.value ? kbTools.value : []),
-          ...settings.state.httpTools,
-          ...catalogTools.value,
-        ]
-    return dedupeByName([...licensed, ...bundledTools.value])
+    const authored = [
+      ...(kbTrusted.value ? kbTools.value : []),
+      ...settings.state.httpTools,
+      ...catalogTools.value,
+    ]
+    return dedupeByName([...authored, ...bundledTools.value])
   })
 
   /* ── deferral (mirrors stores/mcp.ts, stricter policy) ──
@@ -380,13 +374,6 @@ export const useToolsStore = defineStore('tools', () => {
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<string> {
-    // `specs` already withholds licensed tools from the agent, but this is the
-    // execution point and takes an arbitrary spec: the editor's Test button and
-    // the agent's dry run both arrive here with a spec that was never in that
-    // list. Gating the list alone would leave a way to run one anyway.
-    if (!bundledToolIds.value.has(spec.id) && gate.restricted) {
-      return restrictedToolResult(spec.name)
-    }
     return runHttpTool(spec, args, {
       resolveSecret: (id) => settings.state.toolSecrets[id],
       direct,

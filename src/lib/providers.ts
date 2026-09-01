@@ -13,7 +13,7 @@
  * Google/xAI/Groq are offered for BYO-key use but their browser-CORS behavior
  * is not individually verified here.
  */
-import { TRIAL } from '@/edition/trial'
+import { TRIAL_PRESET } from '@/lib/trial'
 
 
 /**
@@ -41,7 +41,7 @@ export interface ProviderPreset {
   sdk: SdkKind
   /** Kept out of the provider picker. Not a secret — just not something a user
    *  can usefully choose, because its "key" is a session token this app mints
-   *  (see edition/trial.ts, the only preset that sets this). Picking it by hand
+   *  (see lib/trial.ts, the only preset that sets this). Picking it by hand
    *  would only produce a profile that cannot authenticate. */
   internal?: boolean
   /** Only meaningful for 'openai-compatible'; baked into the package otherwise.
@@ -174,8 +174,9 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
 
 /** Every provider a profile can use, dedicated packages first.
  *
- *  The trial rides in from the edition rather than sitting in a table above:
- *  it names an endpoint of ours, so an edition with no trial server behind it
+ *  The trial sits apart from the table above because it names an endpoint of
+ *  ours rather than a provider anyone can point at; a deployment with no trial
+ *  server behind it
  *  has no such provider at all rather than one that 404s. It is still registered
  *  here
  *  and not only offered in the picker — `SELECTABLE_PROVIDERS` filters it out
@@ -183,7 +184,7 @@ const DEDICATED_PRESETS: ProviderPreset[] = [
 export const ALL_PROVIDERS: ProviderPreset[] = [
   ...DEDICATED_PRESETS,
   ...OPENAI_COMPAT_PRESETS,
-  ...(TRIAL ? [TRIAL.preset] : []),
+  TRIAL_PRESET,
 ]
 
 /** The ones worth offering in the picker — everything a user can actually

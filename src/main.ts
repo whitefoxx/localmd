@@ -37,9 +37,9 @@ const updateSW = registerSW({
 // An anonymous page view for the deployed site, and the only thing this app
 // sends without the user asking for it (docs/app/storage-and-privacy.md says
 // so, and must keep saying so). One call at boot is the whole story: this is a
-// single page with no router. Whether it reaches anyone is the edition's
-// answer, and PROD-only is enforced inside — dev traffic and the e2e suite,
-// which runs against the dev server, are not anybody's funnel.
+// single page with no router. The beacon is same-origin, so a copy you host
+// yourself reports to your own origin; PROD-only is enforced inside, because
+// dev traffic and the e2e suite are not anybody's funnel.
 startAnalytics()
 
 // E2E mode: in-memory KB + mock provider (see src/e2e/bootstrap.ts).

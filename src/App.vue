@@ -14,7 +14,6 @@ import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import NarrowScreenNotice from '@/components/NarrowScreenNotice.vue'
 import TtsBar from '@/components/TtsBar.vue'
-import { PRICING_DIALOG } from '@/edition/ui'
 import UpdateBanner from '@/components/UpdateBanner.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
 import { keepsNativeMenu } from '@/lib/nativeMenu'
@@ -102,7 +101,6 @@ function closeTopLayer(): void {
   const chat = useChatStore()
   if (ui.helpOpen) ui.helpOpen = false
   else if (ui.searchOpen) ui.searchOpen = false
-  else if (ui.pricingOpen) ui.pricingOpen = false
   // Asks rather than tells: this layer can be holding unsaved input, and it is
   // the only one that knows (see maySettingsClose). The condition stays plain
   // `settingsOpen` — folding the question into it would let a "no" fall through
@@ -189,10 +187,6 @@ onBeforeUnmount(() => {
          behind it that has no narrow form. -->
     <NarrowScreenNotice v-if="kb.isOpen" />
     <TtsBar />
-    <!-- Mounted at the root, not inside the start screen: the Licence pane
-         opens it too, and by then the start screen is gone. Absent entirely in
-         an edition with nothing to sell. -->
-    <component :is="PRICING_DIALOG" v-if="PRICING_DIALOG" />
     <!-- Also root-level: which screen is up decides whether a waiting build is
          offered or just applied (main.ts), not where the offer is drawn. -->
     <UpdateBanner />

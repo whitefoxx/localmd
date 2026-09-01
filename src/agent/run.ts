@@ -46,7 +46,6 @@ import { isContextOverflow } from '@/lib/providerError'
 import { dropLoneSurrogatesDeep } from '@/lib/wellFormed'
 import { syncAfterFsChange } from '@/lib/fileOps'
 import { STOPPED_RESULT } from '@/lib/present'
-import { toolRestricted, restrictedToolResult } from '@/edition/gate'
 import { loadKbImage, visionDescribe, type KbImage } from './vision'
 import { generateKbImage } from './imagegen'
 import type { SystemPromptParts } from './prompt'
@@ -156,13 +155,6 @@ export async function runTurn(opts: RunTurnOptions): Promise<ModelMessage[]> {
         let ok = false
         let out = ''
         try {
-          // Refused here rather than by withholding the tool: the registered
-          // list is part of the cache prefix, and the attempt belongs in the
-          // transcript so the user sees what the agent wanted to do.
-          if (toolRestricted(t.name)) {
-            out = restrictedToolResult(t.name)
-            return out
-          }
           const signal = abortSignal ?? opts.signal
           const result = await untilAborted(t.run(input, { ...ctx, signal }), signal)
           ok = !(typeof result === 'string' && result.startsWith('Error'))

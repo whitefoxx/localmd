@@ -19,25 +19,26 @@ describe('agent-writable settings', () => {
   })
 
   /**
-   * The name regex above is a spelling check; these two are the behaviour. The
-   * shortest path past the paid gate is an agent that can read or write its own
-   * licence, and a field called something innocent would sail through a name
-   * test. So: no field returns the value, and no field can be made to set it.
+   * The name regex above is a spelling check; these two are the behaviour. A
+   * credential-carrying field named something innocent would sail through a
+   * name test, so: no field returns the value, and no field can be made to set
+   * it. `githubToken` stands in for every secret the settings object holds —
+   * it is the one that can push to someone's repositories.
    */
-  it('never reveals the licence key, whatever a field is called', () => {
+  it('never reveals a stored credential, whatever a field is called', () => {
     const s = fresh()
-    s.licenceKey = 'LMD1.sentinel.value'
+    s.githubToken = 'ghp_sentinel_value'
     for (const f of WRITABLE) {
-      expect(String(f.read(s)), `${f.key} leaks the licence`).not.toContain('sentinel')
+      expect(String(f.read(s)), `${f.key} leaks the token`).not.toContain('sentinel')
     }
     expect(describeWritable()).not.toContain('sentinel')
   })
 
-  it('cannot be talked into setting a licence key', () => {
+  it('cannot be talked into setting a credential', () => {
     for (const f of WRITABLE) {
       const s = fresh()
-      f.write(s, 'LMD1.forged.key')
-      expect(s.licenceKey, `${f.key} wrote the licence`).toBe('')
+      f.write(s, 'ghp_forged_token')
+      expect(s.githubToken, `${f.key} wrote the token`).toBe('')
     }
   })
 

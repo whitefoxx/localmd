@@ -19,6 +19,7 @@
  * reports, in plain words, when the answer is no.
  */
 import type { LlmProfile } from '@/stores/settings'
+import type { ProviderPreset } from '@/lib/providers'
 
 const STORAGE_KEY = 'localmd:trial-session'
 const VISITOR_KEY = 'localmd:trial-visitor'
@@ -148,4 +149,36 @@ export function forgetTrial(): void {
   } catch {
     /* nothing to forget */
   }
+}
+
+/**
+ * The provider preset the trial registers as.
+ *
+ * On our own origin, so no CORS question arises, and the key on the wire is a
+ * session token that expires within the hour rather than anything of the
+ * user's. The endpoint decides the model; the value here only fills the
+ * profile's label.
+ *
+ * The path is recorded here, but the profile that actually reaches the SDK
+ * carries the absolute form — see `trialBaseUrl` above, and do not "simplify"
+ * that back to this string: the OpenAI-compatible provider resolves nothing,
+ * and a site-relative base throws before the request.
+ *
+ * It stays `internal` for the reason it always did: its "key" is a session
+ * token this app mints, so picking it by hand would only produce a profile
+ * that cannot authenticate.
+ */
+export const TRIAL_PRESET: ProviderPreset = {
+  id: 'trial',
+  label: 'Free trial',
+  sdk: 'openai-compatible',
+  baseUrl: '/api/trial/v1',
+  defaultModel: 'deepseek-chat',
+  internal: true,
+}
+
+/** An ephemeral profile on a session, reusing the tab's own until it is nearly
+ *  expired. Throws `TrialUnavailable` when the trial has nothing left to lend. */
+export async function lendTrialProfile(): Promise<LlmProfile> {
+  return trialProfile(await trialSession())
 }

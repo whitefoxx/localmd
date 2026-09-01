@@ -64,8 +64,8 @@ async function copyAddress(): Promise<void> {
 
 <template>
   <Teleport to="body">
-    <!-- Above the pricing dialog (z-60), the top layer otherwise: this is a
-         standing note about the whole window, not part of any one panel. -->
+    <!-- The top layer: this is a standing note about the whole window, not
+         part of any one panel. -->
     <div
       v-if="ui.narrowNoticeOpen"
       ref="bar"

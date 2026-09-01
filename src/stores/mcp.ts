@@ -49,10 +49,9 @@ import {
   relayExtensionId,
   extensionWire,
 } from '@/lib/connectRelay'
-import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS, CATALOG } from '@/lib/toolCatalog'
+import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
-import { gate } from '@/edition/gate'
 import * as fs from '@/lib/fs'
 
 export interface McpServerState {
@@ -95,16 +94,6 @@ const EXTENSION_TRANSPORT_MISSING =
  *  naming plainly: this is someone else's config asking for your credential. */
 const KB_SECRET_REFUSED =
   'This server came with the knowledge base folder and asks for one of your saved keys. Folder config cannot spend your keys — add the server yourself under Settings → Tools if you trust it.'
-
-/** A row that reaches a service the user connected, without a licence for it. */
-const LICENCE_REQUIRED =
-  'Connecting outside services is part of the paid tier — Settings → Licence. The bundled web search stays free.'
-
-/** Matched on URL, not name: a row calling itself "parallel" must not inherit
- *  the bundled entry's free status. */
-function isBundledServer(raw: McpServerConfig): boolean {
-  return CATALOG.some((e) => e.bundled && e.server?.url === raw.url)
-}
 
 /** A row that names a key nobody has entered yet. Naming the ids matters: the
  *  row is the only place that knows WHICH key, and without it the user is left
@@ -506,14 +495,6 @@ export const useMcpStore = defineStore('mcp', () => {
       patch(raw.id, { status: 'error', error: KB_SECRET_REFUSED, tools: [] })
       return
     }
-    // Deliberately AFTER the secret check and before any network call. A row
-    // that would have spent the reader's key must be told that, not handed a
-    // billing message — the security reason is the more important thing to say,
-    // and it stays true whether or not a licence ever arrives.
-    if (!isBundledServer(raw) && gate.restricted) {
-      patch(raw.id, { status: 'error', error: LICENCE_REQUIRED, tools: [] })
-      return
-    }
     // Secrets are substituted here, not at install: the row holds references,
     // so entering or rotating a key takes effect on the next connect with
     // nothing to re-add.
@@ -654,15 +635,6 @@ export const useMcpStore = defineStore('mcp', () => {
     args: Record<string, unknown>,
     signal?: AbortSignal,
   ): Promise<string> {
-    // Checked at CALL time as well as at connect time, and the difference is a
-    // real hole rather than belt-and-braces: a server connected while licensed
-    // stays connected, so a key that expires or is removed mid-session would
-    // otherwise leave every one of its tools callable for the rest of the
-    // session. Connect-time alone gates who may start, not who may continue.
-    const config = servers.value.find((s) => s.config.id === serverId)?.config
-    if ((!config || !isBundledServer(config)) && gate.restricted) {
-      return `Error: ${LICENCE_REQUIRED}`
-    }
     try {
       const client = clients.get(serverId)
       if (!client) throw new Error(`MCP server not connected: ${serverId}`)
@@ -706,15 +678,6 @@ export const useMcpStore = defineStore('mcp', () => {
     () => [JSON.stringify(settings.state.mcpServers), kb.name] as const,
     () => void refresh(),
     { immediate: true },
-  )
-
-  // Licence state is an input to whether a row may connect, so a key arriving
-  // or lapsing has to re-run the same decision. Without this the rows keep
-  // whatever status they had — green and unreachable, or red after the key that
-  // would have fixed them was pasted.
-  watch(
-    () => gate.restricted,
-    () => void refresh(),
   )
 
   /**

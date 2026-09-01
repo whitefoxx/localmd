@@ -3,8 +3,6 @@ export default {
   en: {
     pull: 'Pull',
     push: 'Push',
-    needsLicence:
-      'Syncing with GitHub needs a licence — Settings → Licence. Committing, diffing and history stay free.',
     refresh: 'Refresh',
     notRepo: "This folder isn't a git repository yet. Initialize one to track changes and commit.",
     initRepo: 'Initialize repository',
@@ -32,7 +30,6 @@ export default {
   zh: {
     pull: 'Pull',
     push: 'Push',
-    needsLicence: '跟 GitHub 同步需要许可 —— 设置 → 许可。提交、看 diff、翻历史都仍然免费。',
     refresh: '刷新',
     notRepo: '这个文件夹还不是 git 仓库。初始化后即可跟踪改动并提交。',
     initRepo: '初始化仓库',

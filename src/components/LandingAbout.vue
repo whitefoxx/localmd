@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { t } from '@/i18n'
-import { PRICING_BLOCK } from '@/edition/ui'
 import { SELECTABLE_PROVIDERS } from '@/lib/providers'
 import { CONNECT_STORE_URL, FEEDBACK_URL, SOURCE_URL } from '@/lib/links'
 import ConnectFlow from '@/components/ConnectFlow.vue'
@@ -293,10 +292,7 @@ const donts = computed(() => [
       </details>
     </section>
 
-    <!-- ── Act two: sources beyond the disk ─────────────────────────────
-         Named because it is the paid tier's clearest picture. The wording is
-         the message house's: free to install, paid to connect, writes ask
-         first. -->
+    <!-- ── Act two: sources beyond the disk ───────────────────────────── -->
     <section class="landing-grain relative border-t border-border bg-bg-1">
       <div class="landing-wrap grid items-center gap-x-16 gap-y-12 py-24 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div>
@@ -327,13 +323,6 @@ const donts = computed(() => [
           <ConnectFlow />
         </div>
       </div>
-    </section>
-
-    <!-- ── 4 · Free and paid ────────────────────────────────────────────
-         The free promise stands even in editions with nothing to sell; the
-         pricing block follows it where the edition has one. -->
-    <section v-if="PRICING_BLOCK" class="border-t border-border">
-      <component :is="PRICING_BLOCK" />
     </section>
 
     <!-- ── What we believe ──────────────────────────────────────────────── -->
