@@ -50,6 +50,7 @@ import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import { confirmConnectCall, noteConnectResult } from '@/agent/connectGuard'
 import { noteOpenedTab } from '@/agent/connectJanitor'
 import { formatLintReport } from '@/lib/lint'
+import { parseKbQuery, runQuery, formatQueryResult } from '@/lib/kbQuery'
 import { slugify } from '@/lib/docindex/util'
 import type { AgentEvent } from '@/agent/types'
 import { useReviewStore } from '@/stores/review'
@@ -635,6 +636,48 @@ const kbHealth = defineTool({
     const kb = useKbIndexStore()
     await kb.refresh()
     return formatLintReport(kb.lintReport())
+  },
+})
+
+/** The whole grammar, spent only when the model asks for it or gets it wrong.
+ *  Always-on description bytes are paid on every step of every turn; a syntax
+ *  table is exactly the kind of text that belongs in a tool result instead. */
+const QUERY_SYNTAX = `Filters, space-separated (quote values containing spaces):
+  type:paper           frontmatter type, substring
+  tag:llm              frontmatter tag, substring; repeat the filter to AND
+  fm:status=draft      frontmatter field, exact; also != > >= < <=
+  fm:rating>=4         numbers compare as numbers, ISO dates as dates
+  fm:deadline          the field exists at all
+  path:wiki/           path substring
+  role:index|log       structural role (kb-role:, else the filename)
+  links-to:X           links out to a page whose path contains X
+  linked-by:X          linked to from a page whose path contains X
+  cites:X.pdf          declares X as a source
+  orphan:true|false    nothing links to it
+  broken:true|false    has a link that resolves to no file
+  age:<30d  age:>6m    touched within / untouched for (d w m y)
+  modified:<2026-01-01 before that date (use > for after)
+  sort:-modified       path title modified inbound, or any frontmatter field
+                       ("-" is descending; fm.x forces the frontmatter reading)
+  limit:20             cap the rows; the true total is still reported
+  columns:rating,status  extra frontmatter values to show per row
+Anything that is not a filter is a full-text term over page bodies.`
+
+const queryKb = defineTool({
+  name: 'query_kb',
+  description:
+    'Ask the page index a structured question: which pages match, sorted how, capped at how many. Computed from the cached index with NO file reads, so it is cheap and complete — prefer it over search_files (which reads every text file) for anything structural. Filters look like "type:paper tag:llm fm:status=draft path:wiki/ orphan:true age:>6m sort:-modified limit:20"; anything that is not a filter is a full-text term. Send an empty query for the full syntax. What comes back is a VIEW: report it, and never write the result into a page as a stored list — a materialized query is a record that starts to lie as soon as the KB moves on.',
+  schema: z.object({
+    query: z.string().describe('Filter tokens and/or free text; empty returns the syntax'),
+  }),
+  describeCall: (a) => `query ${a.query || '(syntax)'}`,
+  run: async ({ query }) => {
+    if (!query.trim()) return QUERY_SYNTAX
+    const { query: parsed, errors } = parseKbQuery(query, Date.now())
+    if (errors.length) return `Could not read the query:\n  ${errors.join('\n  ')}\n\n${QUERY_SYNTAX}`
+    const kb = useKbIndexStore()
+    await kb.refresh()
+    return formatQueryResult(runQuery(kb.queryPages, parsed), parsed.columns)
   },
 })
 
@@ -1856,6 +1899,7 @@ export const TOOLS: ToolSpec[] = [
   createArtifact,
   searchFiles,
   kbHealth,
+  queryKb,
   indexDocument,
   saveTranscript,
   readSession,

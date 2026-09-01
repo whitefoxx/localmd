@@ -48,6 +48,7 @@ const TOOL_ICONS: Record<string, string> = {
   create_artifact: 'codicon-file-code',
   search_files: 'codicon-search',
   kb_health: 'codicon-pulse',
+  query_kb: 'codicon-filter',
   index_document: 'codicon-book',
   save_transcript: 'codicon-save',
   read_session: 'codicon-comment-discussion',

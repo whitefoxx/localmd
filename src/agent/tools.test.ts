@@ -302,6 +302,63 @@ describe('search_files', () => {
   })
 })
 
+describe('query_kb', () => {
+  const query = tool('query_kb')
+
+  beforeEach(async () => {
+    await fs.writeFile(
+      'wiki/attention.md',
+      '---\ntype: paper\ntags: [llm-agents, transformers]\nstatus: draft\nrating: 9\n---\n# Attention\n[[note]]\n',
+    )
+    await fs.writeFile(
+      'wiki/scaling.md',
+      '---\ntype: paper\ntags: [llm]\nstatus: published\nrating: 10\n---\n# Scaling\nbody\n',
+    )
+    await fs.writeFile('wiki/index.md', '# Index\n[[attention]]\n')
+    await useFilesStore().refreshTree()
+  })
+
+  it('hands back the syntax rather than a guess when asked for nothing', async () => {
+    const out = await query({ query: '' })
+    expect(out).toContain('age:<30d')
+    expect(out).toContain('sort:-modified')
+  })
+
+  it('says what it could not read, and shows the syntax with it', async () => {
+    const out = await query({ query: 'age:30d limit:abc' })
+    expect(out).toMatch(/Could not read the query/)
+    expect(out).toContain('age:')
+    expect(out).toContain('limit:')
+    // The help travels with the error, so a fix costs no extra call.
+    expect(out).toContain('full-text term')
+  })
+
+  it('filters on frontmatter the index never had to parse before', async () => {
+    expect(await query({ query: 'fm:status=draft' })).toContain('wiki/attention.md')
+    expect(await query({ query: 'fm:status=draft' })).not.toContain('wiki/scaling.md')
+    // Numbers compare as numbers: string order would rank "9" above "10".
+    expect(await query({ query: 'fm:rating>=10' })).toContain('wiki/scaling.md')
+    expect(await query({ query: 'fm:rating>=10' })).not.toContain('wiki/attention.md')
+  })
+
+  it('answers structural questions with no file reads', async () => {
+    const typed = await query({ query: 'type:paper sort:path' })
+    expect(typed).toContain('2 matches')
+    expect(await query({ query: 'role:index' })).toContain('wiki/index.md')
+    expect(await query({ query: 'links-to:attention' })).toContain('wiki/index.md')
+  })
+
+  it('caps the rows but still reports the true total', async () => {
+    expect(await query({ query: 'type:paper limit:1' })).toContain('1 of 2 matches')
+  })
+
+  it('flags vocabulary the KB does not have instead of an empty answer', async () => {
+    const out = await query({ query: 'tag:llmm' })
+    expect(out).toContain('No pages match.')
+    expect(out).toContain('tag:llmm')
+  })
+})
+
 describe('whose file is it — the gate on delete and move', () => {
   /** Its own draft is housekeeping: no card, whatever the write mode. */
   it('deletes a file it created itself without asking', async () => {

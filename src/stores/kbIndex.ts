@@ -23,6 +23,7 @@ import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 import { isIgnored } from '@/lib/scanScope'
+import type { QueryPage } from '@/lib/kbQuery'
 import { isDailyPath } from '@/lib/daily'
 
 interface CachedPage {
@@ -414,6 +415,27 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     return tags.value.get(path) ?? sourceTags.value.get(path) ?? []
   }
 
+  /**
+   * The snapshot `kbQuery` runs over — every indexed page with the facts a
+   * filter can ask about, and nothing read from disk to build it.
+   *
+   * One shape for all three callers of the query grammar (the agent tool, an
+   * in-note block, the palette), so the same question cannot mean different
+   * things depending on who asked it. Scope is settled here too: `pages` is
+   * already the scanned set, which is why a query never has to know that
+   * `.localmd/` index sections exist.
+   */
+  const queryPages = computed<QueryPage[]>(() =>
+    [...pages.value.entries()].map(([path, page]) => ({
+      path,
+      content: page.content,
+      outgoing: page.outgoing,
+      broken: page.broken,
+      mtime: page.mtime,
+      sources: pageSources.value.get(path),
+    })),
+  )
+
   const graph = computed(() => {
     const nodes = [...pages.value.keys()]
     const links: { source: string; target: string }[] = []
@@ -575,5 +597,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, queryPages, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })
