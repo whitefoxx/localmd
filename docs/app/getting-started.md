@@ -138,20 +138,11 @@ key from a provider, and they bill you directly at their prices. Nothing is
 added on top, and nothing here caps how much you use it — that is between you
 and them. See `keys`.
 
-**The app is free**, with no limit on how many files, documents or chats
-you keep. That part does not change.
-
-One part is paid, and the line is this: everything you can do with your own
-folder and your own model is free — including web search, reading documents,
-skills, and git on your own machine. Paid is what reaches past those: the
-browser extension, servers and services you connect, tools built against them
-(`tools`), and syncing with GitHub (`git-and-github`). It is a one-time
-purchase, yours for good, with no account and no subscription — a key you paste
-into **Settings → Licence**, checked in your browser against nothing and nobody.
-
-It is not on sale yet, so today the way to unlock those parts is a free early
-slot — the start screen has the details. Until you have a key, they stay
-locked; everything else in this manual works without one.
+**The app itself is free**, all of it, with no limit on how many files,
+documents or chats you keep. There is no paid tier, no account and nothing to
+unlock: web search, reading documents, skills, git, the browser extension, the
+servers and services you connect and the tools built against them are all
+simply there. It is open source, so you can also run your own copy.
 
 ## When something is wrong
 

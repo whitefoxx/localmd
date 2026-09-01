@@ -49,7 +49,7 @@ another for counting purposes, which you can clear like anything else it
 stores. See `storage-and-privacy`.
 
 Two things stay off during the trial, because they are not ours to lend: your
-own provider account, and anything in the paid tier (see `tools`).
+own provider account, and the connections you set up yourself (see `tools`).
 
 ## Keeping what you make
 

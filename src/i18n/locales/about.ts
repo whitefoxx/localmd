@@ -49,13 +49,12 @@ export default {
     showCapNote: 'Your own Markdown — the citation chips are plain text in the file',
     showCapPdf: 'The source PDF, opened at the exact paragraph it came from',
 
-    // Act two: the sources that are not on disk. Wording is bound by the
-    // message house — the extension is free to INSTALL, using it from the app
-    // is the paid tier, and write actions always ask first.
+    // Act two: the sources that are not on disk. Write actions always ask
+    // first, and the copy has to keep saying so.
     connectLabel: 'beyond your disk',
     connectTitle: 'Ask your browser tabs like files in your folder.',
     connectBody:
-      'localmd Connect is a companion Chrome extension that lets the agent use your own logged-in browser — open tabs, read pages, click — with ready-made actions for 30+ sites (arXiv, Hacker News, Reddit, YouTube…). What it brings back lands in your folder as sources, citable like any PDF. The extension is free to install; using it from the app is part of the paid tier, and anything that writes to a real site asks you first.',
+      'localmd Connect is a companion Chrome extension that lets the agent use your own logged-in browser — open tabs, read pages, click — with ready-made actions for 30+ sites (arXiv, Hacker News, Reddit, YouTube…). What it brings back lands in your folder as sources, citable like any PDF. Anything that writes to a real site asks you first.',
     connectLink: 'localmd Connect on the Chrome Web Store',
 
     believeLabel: 'What we believe',
@@ -123,7 +122,7 @@ export default {
     connectLabel: '盘外的源',
     connectTitle: '像问文件夹里的文件一样，问你的浏览器标签页。',
     connectBody:
-      'localmd Connect 是配套的 Chrome 扩展，让 agent 使用你自己已登录的浏览器——开标签页、读页面、点击，外加 30+ 个站点的现成动作（arXiv、Hacker News、Reddit、YouTube……）。它取回的东西落进你的文件夹，像任何 PDF 一样可引用。扩展本身免费安装；从 app 里连接使用属于付费层，而任何会写到真实网站的动作都会先问你。',
+      'localmd Connect 是配套的 Chrome 扩展，让 agent 使用你自己已登录的浏览器——开标签页、读页面、点击，外加 30+ 个站点的现成动作（arXiv、Hacker News、Reddit、YouTube……）。它取回的东西落进你的文件夹，像任何 PDF 一样可引用。任何会写到真实网站的动作都会先问你。',
     connectLink: 'Chrome 商店里的 localmd Connect',
 
     believeLabel: '我们相信什么',

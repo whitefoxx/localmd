@@ -33,8 +33,8 @@ browser's File System Access API.
   Chrome extension (localmd Connect) that lets the agent use the user's own
   logged-in browser — 30+ sites, ~300 ready-made actions.
 - Open source under MIT: https://github.com/whitefoxx/localmd. The hosted app
-  at localmd.app runs the same code plus a free trial allowance, a licence
-  check and a paid tier.
+  at localmd.app is that repository, deployed, plus a free trial allowance so
+  a first visit needs no key.
 - A built-in demo knowledge base (https://localmd.app/?demo=1) opens with no
   folder and no key: three linked notes and a real 43-page paper with working
   citations, plus a small free model allowance for a few questions.
@@ -54,13 +54,13 @@ browser's File System Access API.
 - LLM endpoints must allow browser CORS; the bundled presets are verified,
   many self-hosted gateways are not.
 
-## Pricing
+## Price
 
-Everything you can do with your own folder and your own model is free, with no
-usage caps — web search included; you pay your provider directly at their
-prices. Paid is what reaches past them: the localmd Connect browser extension,
-MCP servers, and GitHub sync — a one-time $20 licence, verified offline, with
-no account. Not on sale yet; the start screen offers free early-access slots.
+The app is free, all of it, and open source. There is no paid tier, no account
+and no usage caps — web search, the browser extension, MCP servers, tools built
+against any API, and GitHub sync are all simply included. The only money
+involved is the model: you bring your own API key and pay that provider
+directly at their prices. localmd adds nothing on top and meters nothing.
 
 ## Compared with
 

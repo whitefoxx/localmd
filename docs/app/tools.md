@@ -13,21 +13,19 @@ This is deliberate: what it can reach is always something you chose.
 
 Everything lives in **Settings → Tools**.
 
-## Two groups, and only one costs anything
+## Two groups
 
-The Tools page is split the same way the pricing is, so where a row sits tells
-you what it costs:
+The Tools page is split by how far a row reaches:
 
-- **Bundled tools — free.** These ship with the app and never cost anything.
-  Today that is web search and page reading — two of them, because they fail
+- **Bundled tools.** These ship with the app and are ready immediately. Today
+  that is web search and page reading — two of them, because they fail
   differently: one needs no connection and answers quickly; the other finds
   better material and returns more of it. Between them you rarely have nothing.
   This set can grow over time.
-- **Connections — paid.** Everything that reaches an outside service: the
-  localmd Connect browser extension, MCP servers, and tools built against an
-  API. One licence covers all of it (**Settings → Licence**; the start screen
-  explains the price and the free early slots). Until you have a key, this
-  group is visible but locked.
+- **Connections.** Everything that reaches an outside service: the localmd
+  Connect browser extension, MCP servers, and tools built against an API.
+  These are the ones you set up, and what they can reach is whatever you gave
+  them.
 
 **localmd Connect** deserves a paragraph of its own: it is the companion
 extension made for this app, and the one install that makes most *other*
@@ -38,7 +36,7 @@ hundred **site adapters** — ready-made extractors for popular sites (Twitter,
 Zhihu, Reddit, YouTube, …) that the assistant finds and runs in one step,
 instead of hand-driving the page — and **site scripts**, persistent rules that
 fix a page on every visit: hide the ads, restyle a section, run a snippet.
-Worth setting up first, once you have a key.
+Worth setting up first.
 
 There is no long list of recommendations. Keeping one would mean deciding on
 your behalf which services are worth having, and re-checking those decisions
@@ -46,8 +44,6 @@ forever — services change their terms, their limits and their addresses. What
 this app has instead is a way to add anything, in a minute, by asking.
 
 ## Adding anything else: just ask
-
-This — like everything in the Connections group — needs a licence.
 
 Tell the assistant what you want to reach — "search Hacker News", "read my
 Readwise highlights", "look things up in my Notion". It works out how that
