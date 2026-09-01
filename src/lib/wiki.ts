@@ -138,6 +138,54 @@ export function extractTags(content: string): string[] {
   return out
 }
 
+/**
+ * Any frontmatter field, in the same three YAML shapes `extractTags` accepts:
+ * `k: v`, `k: [a, b]` / `k: a, b`, or a `- item` block under `k:`.
+ *
+ * Returns null when the field is absent, which is a different answer from an
+ * empty list — the existence test (`fm:field` with no comparison) is the
+ * caller that has to tell those apart.
+ *
+ * A scalar comes back as a one-element list so no caller has to branch:
+ * `authors: alice` and `authors: [alice, bob]` answer the same question the
+ * same way. `extractTags` stays its own function rather than calling this one
+ * — it runs over every page on every index refresh and owes nothing to the
+ * general case.
+ *
+ * Deliberately not a YAML parser. This app has no YAML dependency and does not
+ * want one: nested maps, anchors and block scalars are not things a query
+ * filter can usefully compare, and a half-parser that quietly mangled them
+ * would be worse than one that plainly cannot see them.
+ */
+export function extractField(content: string, name: string): string[] | null {
+  const { yaml } = splitFrontmatter(content)
+  if (!yaml) return null
+  const key = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = yaml.match(new RegExp(`^${key}:[ \\t]*(.*)$`, 'm'))
+  if (!m) return null
+  const unquote = (s: string): string => s.trim().replace(/^['"]|['"]$/g, '').trim()
+
+  const inline = m[1].trim()
+  if (inline) {
+    // Only the bracketed form is a list. A bare `summary: one thing, then
+    // another` is a scalar whose comma belongs to the prose — splitting it
+    // would turn one sentence into two bogus values. (`tags:` accepts the
+    // unbracketed list, which is exactly why `extractTags` is its own
+    // function and not a call into this one.)
+    if (!(inline.startsWith('[') && inline.endsWith(']'))) return [unquote(inline)]
+    return inline.slice(1, -1).split(',').map(unquote).filter(Boolean)
+  }
+
+  const out: string[] = []
+  for (const line of yaml.slice(m.index! + m[0].length).replace(/^\n/, '').split('\n')) {
+    const item = line.match(/^[ \t]*-[ \t]*(.+)$/)
+    if (!item) break // first non-item line ends the block
+    const value = unquote(item[1])
+    if (value) out.push(value)
+  }
+  return out
+}
+
 /** Cross-platform basename. */
 export function baseName(p: string): string {
   return p.split('/').pop() ?? p

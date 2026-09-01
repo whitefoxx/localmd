@@ -4,6 +4,7 @@ import {
   parseMarkdownLinks,
   extractType,
   extractTags,
+  extractField,
   splitLink,
   splitFrontmatter,
   extractTitle,
@@ -122,6 +123,42 @@ describe('extractTags', () => {
     expect(extractTags('# plain')).toEqual([])
     expect(extractTags('---\ntitle: x\n---\nbody')).toEqual([])
     expect(extractTags('---\ntags:\n---\nbody')).toEqual([])
+  })
+})
+
+describe('extractField', () => {
+  it('reads a scalar as a one-element list', () => {
+    expect(extractField('---\nstatus: draft\n---\nbody', 'status')).toEqual(['draft'])
+    expect(extractField('---\nrating: 9\n---\nbody', 'rating')).toEqual(['9'])
+  })
+
+  it('keeps a comma inside a scalar', () => {
+    // The unbracketed list form belongs to `tags:`, not to every field: a
+    // summary is one value that happens to contain punctuation.
+    expect(extractField('---\nsummary: one thing, then another\n---\nb', 'summary')).toEqual([
+      'one thing, then another',
+    ])
+  })
+
+  it('reads the bracketed list and the block list', () => {
+    expect(extractField('---\nauthors: [alice, "bob jones"]\n---\nb', 'authors')).toEqual([
+      'alice',
+      'bob jones',
+    ])
+    expect(extractField('---\nauthors:\n  - alice\n  - bob\ntitle: x\n---\nb', 'authors')).toEqual(
+      ['alice', 'bob'],
+    )
+  })
+
+  it('separates absent from empty', () => {
+    expect(extractField('---\ntitle: x\n---\nb', 'status')).toBeNull()
+    expect(extractField('# no frontmatter', 'status')).toBeNull()
+    expect(extractField('---\nstatus:\n---\nb', 'status')).toEqual([])
+  })
+
+  it('does not match a key in the body or a longer key', () => {
+    expect(extractField('---\ntitle: x\n---\nstatus: not frontmatter', 'status')).toBeNull()
+    expect(extractField('---\nstatus-note: x\n---\nb', 'status')).toBeNull()
   })
 })
 
