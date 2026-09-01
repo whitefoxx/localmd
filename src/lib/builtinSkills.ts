@@ -143,6 +143,15 @@ Two things it cannot tell you, so ask rather than guess:
 - When the user pointed at something specific — an @-mention, "the three PDFs I
   just dropped" — that is the job, and the backlog is not.
 
+The same call reports \`undistilledCaptures\`: days the user jotted things into
+and nothing has been written out of yet. Those are material too, and they are
+the user's own words rather than someone else's document — read them the same
+way, and cite the day with a \`[[wikilink]]\` in whatever you write, which is
+what marks it compiled. Two rules specific to them: a capture page is never
+edited or deleted to tidy it up (writing a page from it does not consume it),
+and some of what is there belongs nowhere — a line about dinner is not a
+failure to compile, so leave it and say nothing.
+
 An empty backlog with nothing named is a normal outcome: say so and stop.
 
 ## 2. Learn where things go — and what this KB is for

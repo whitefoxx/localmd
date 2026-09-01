@@ -23,6 +23,7 @@ import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 import { isIgnored } from '@/lib/scanScope'
+import { isDailyPath } from '@/lib/daily'
 
 interface CachedPage {
   mtime: number
@@ -453,6 +454,11 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
       // Index/log pages are entry points, not orphans.
       const stem = path.toLowerCase()
       if (stem.endsWith('/index.md') || stem === 'index.md' || stem.endsWith('/log.md')) continue
+      // Neither is a day's jottings: a capture page is material, and nothing is
+      // expected to link to it until someone writes it up. Calling it an orphan
+      // puts a red count on the one thing here that must never cost anything to
+      // do (computeLint skips it for the same reason).
+      if (isDailyPath(path)) continue
       const page = pages.value.get(path)!
       if (!inbound.value.has(path) && !page.outgoing.length) orphans.push(path)
     }

@@ -26,6 +26,7 @@ import {
   type CiteSource,
 } from '@/lib/citations'
 import { isAnnotationsPath } from '@/lib/annotations'
+import { isDailyPath, dailyDateOf } from '@/lib/daily'
 
 export interface LintPage {
   content: string
@@ -74,6 +75,10 @@ export interface LintReport {
   /** Dated log entries whose subject pages have been edited since — whatever
    *  the entry recorded may already have been dealt with. */
   staleLogEntries: { path: string; entry: string; pages: string[] }[]
+  /** Capture pages nothing has been written out of yet — a day's jottings that
+   *  no ordinary page links back to. The newest day is never listed: it is the
+   *  one still being written in. */
+  undistilledCaptures: string[]
   /** Tags that differ only in case, separator, or a trailing `s`. */
   similarTags: { variants: { tag: string; count: number }[] }[]
   /** Index directories under `.localmd/` whose source document is no longer in
@@ -340,6 +345,8 @@ export function computeLint(
   const danglingCitations: LintReport['danglingCitations'] = []
   const stalePages: LintReport['stalePages'] = []
   const staleLogEntries: LintReport['staleLogEntries'] = []
+  /** Dated capture pages, collected for the one question they are asked. */
+  const captureDays: string[] = []
   /** normalised key → original spelling → how many pages used it. */
   const tagsByKey = new Map<string, Map<string, number>>()
 
@@ -412,6 +419,16 @@ export function computeLint(
       }
     }
 
+    // A day's jottings are material, not a page about a topic. Every check
+    // below asks whether a note is well formed and connected — has frontmatter,
+    // has enough lines, has something pointing at it — and that is not a
+    // question two lines written in passing may be asked. Ask it and the answer
+    // is always no, which teaches someone that writing things down produces
+    // complaints. They get one question of their own instead, after the loop.
+    if (isDailyPath(path)) {
+      captureDays.push(path)
+      continue
+    }
     if (isEntry(path)) continue // skip page-quality checks for index/log
 
     const contentInbound = [...(inbound.get(path) ?? [])].filter((p) => !isEntry(p))
@@ -440,6 +457,21 @@ export function computeLint(
       }
     }
   }
+
+  // Capture pages nothing has been written out of yet. What marks a day as
+  // compiled is an ordinary link back to it, written by whoever did the
+  // compiling — so this list clears itself as the work happens, and needs no
+  // record of its own to stay true (the reasoning that rejected a review queue,
+  // docs/llm-wiki-prior-art.md). A link from another capture page does not
+  // count: one day mentioning another is not either of them being written up.
+  //
+  // The newest day is exempt. It is the one still being added to, and a backlog
+  // that includes what you wrote five minutes ago is one you learn to ignore.
+  const newestDay = captureDays.map((p) => dailyDateOf(p) ?? '').sort().pop() ?? ''
+  const undistilledCaptures = captureDays
+    .filter((p) => dailyDateOf(p) !== newestDay)
+    .filter((p) => ![...(inbound.get(p) ?? [])].some((src) => !isDailyPath(src)))
+    .sort()
 
   const similarTags: LintReport['similarTags'] = []
   for (const spellings of tagsByKey.values()) {
@@ -481,7 +513,7 @@ export function computeLint(
       }
     }
     for (const path of pages.keys()) {
-      if (!seen.has(path) && !isEntry(path)) unreachable.push(path)
+      if (!seen.has(path) && !isEntry(path) && !isDailyPath(path)) unreachable.push(path)
     }
   }
 
@@ -525,6 +557,7 @@ export function computeLint(
     undeclaredCitations,
     stalePages,
     staleLogEntries,
+    undistilledCaptures,
     similarTags,
     orphanedIndexes,
   }
@@ -619,6 +652,17 @@ export function formatLintReport(r: LintReport): string {
       `and close an entry only when the user agrees it is closed):\n` +
       capped(r.staleLogEntries.map((e) => `${e.path} · ${e.entry} → ${e.pages.join(', ')}`))
     : ''
+  const captures = r.undistilledCaptures.length
+    ? `\n\nDays jotted down but never written up — capture pages no ordinary page ` +
+      `links back to. Read them and pull what is worth keeping into pages, citing the ` +
+      `day with a [[wikilink]] so the link back is what marks it done (that is also ` +
+      `what removes it from this list). Some of it is a shopping list and belongs ` +
+      `nowhere — leaving a day here is a fine outcome. NEVER edit or delete a capture ` +
+      `page to tidy it up: it is the user's own record of what they thought, and ` +
+      `writing a page from it does not consume it. Today's page is not listed while it ` +
+      `is still being added to:\n` + capped(r.undistilledCaptures)
+    : ''
+
   const tags = r.similarTags.length
     ? `\n\nNear-duplicate tags (same tag, different spellings — most-used first):\n` +
       capped(r.similarTags.map((g) => g.variants.map((v) => `${v.tag} (${v.count})`).join(' · ')))
@@ -654,6 +698,7 @@ export function formatLintReport(r: LintReport): string {
     undeclared +
     stale +
     logEntries +
+    captures +
     orphanedIdx +
     tags
 

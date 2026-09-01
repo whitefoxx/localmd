@@ -170,9 +170,17 @@ navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
 there, pages that cite a document without saying which one, pages you wrote
 before a document they cite was last changed, log entries whose pages have been
-edited since, search indexes built from a document that has since left the
-folder, and tags that are the same word spelled two ways (`machine-learning`
-and `Machine Learning`).
+edited since, days you jotted into that nothing has been written out of yet,
+search indexes built from a document that has since left the folder, and tags
+that are the same word spelled two ways (`machine-learning` and `Machine
+Learning`).
+
+Today's pages are left out of the page checks entirely. No frontmatter, two
+lines, nothing linking to them — none of that is a fault in a day's jottings,
+and a check that said otherwise would be teaching you not to write things down.
+The one thing they are asked is whether anything has been written out of them
+yet, and even that skips the most recent day, which is the one you are still
+adding to.
 
 The index one is quiet in a different way. A document's index is a folder of
 its own under `.localmd/`, and it does not go away when you rename or delete the

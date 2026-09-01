@@ -598,3 +598,55 @@ describe('orphanedIndexes', () => {
     expect(r.orphanedIndexes.every((o) => o.renamedTo === undefined)).toBe(true)
   })
 })
+
+describe('computeLint — capture pages', () => {
+  // Three days jotted into, and one page written out of the middle one.
+  const KB_DAYS = new Map<string, LintPage>([
+    ['wiki/index.md', page(FM + 'body', ['wiki/dinner.md'])],
+    ['wiki/dinner.md', page(FM + 'a\n'.repeat(12), ['raw/daily/2026-08-30.md'])],
+    ['raw/daily/2026-08-29.md', page('# 2026-08-29\n\n- something')],
+    ['raw/daily/2026-08-30.md', page('# 2026-08-30\n\n- pasta', ['raw/daily/2026-08-29.md'])],
+    ['raw/daily/2026-08-31.md', page('# 2026-08-31\n\n- one line')],
+  ])
+  const r = computeLint(KB_DAYS)
+
+  it('never asks a day of jottings whether it is a well-formed page', () => {
+    // No frontmatter, two lines, nothing pointing at it — every one of these
+    // would fire, and firing is what teaches someone that writing things down
+    // produces complaints.
+    const reported = [
+      ...r.orphans,
+      ...r.weaklyLinked,
+      ...r.noFrontmatter,
+      ...r.unreachable,
+      ...r.thin.map((t) => t.path),
+    ]
+    expect(reported.filter((p) => p.includes('/daily/'))).toEqual([])
+    // …while the ordinary pages around them are judged as before: dinner.md is
+    // linked only from the index, which is what weakly-linked means.
+    expect(r.weaklyLinked).toEqual(['wiki/dinner.md'])
+  })
+
+  it('lists the days nothing has been written out of', () => {
+    // 08-30 has a page linking back, so it is compiled. 08-31 is the newest
+    // day and is never listed. 08-29 is named only by another capture page,
+    // which is not it being written up.
+    expect(r.undistilledCaptures).toEqual(['raw/daily/2026-08-29.md'])
+  })
+
+  it('clears an entry the moment a page links back, with no record kept', () => {
+    const compiled = new Map(KB_DAYS)
+    compiled.set(
+      'wiki/leftovers.md',
+      page(FM + 'x\n'.repeat(12), ['raw/daily/2026-08-29.md']),
+    )
+    expect(computeLint(compiled).undistilledCaptures).toEqual([])
+  })
+
+  it('says nothing at all about a KB with one day in it', () => {
+    const oneDay = new Map<string, LintPage>([
+      ['raw/daily/2026-08-31.md', page('# 2026-08-31\n\n- first thing I ever jotted')],
+    ])
+    expect(computeLint(oneDay).undistilledCaptures).toEqual([])
+  })
+})
