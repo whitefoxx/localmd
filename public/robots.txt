@@ -11,7 +11,5 @@
 User-agent: *
 Allow: /
 
-# The licence-claim page is per-purchase and has its own noindex; the OAuth
-# callback is a redirect target, not a page.
-Disallow: /claim.html
+# The OAuth callback is a redirect target, not a page.
 Disallow: /oauth/

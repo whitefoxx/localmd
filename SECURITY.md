@@ -33,10 +33,9 @@ own. What holds:
 
 ## Not vulnerabilities
 
-- **Patching the build to unlock something.** Nothing here is gated;
-  the hosted one verifies a licence offline and deliberately does not try to be
-  tamper-proof. Its own source says so. Time spent making a bundle
-  untamperable is time taken from the people who paid.
+- **Patching the build to unlock something.** There is nothing gated to unlock.
+  Every feature is in this repository, free, and you are welcome to change any
+  of it — that is what the licence is for.
 - **Reading your own API key out of your own browser's storage.** That is where
   you put it, and there is nowhere else for a page with no backend to keep it.
 - **Sending your text to a model provider.** That is the app working. What it
