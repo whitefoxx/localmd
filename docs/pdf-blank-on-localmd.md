@@ -1,7 +1,7 @@
 # PDFs are slow on localmd.app but not in dev (fixed)
 
-> 2026-08-20. Reported as "线上 PDF 半天加载不出来" with a console warning
-> about `unload` — which was a red herring. The fix is confirmed on the
+> 2026-08-20. Reported as "PDFs take forever to load on the live site", with
+> a console warning about `unload` — which was a red herring. The fix is confirmed on the
 > deployed site, including in the condition that produced the report.
 
 ## Symptom

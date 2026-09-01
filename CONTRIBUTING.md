@@ -6,12 +6,9 @@ slow — that is a bandwidth limit, not disinterest.
 ## Where things go
 
 Here — bug reports, feature requests, questions and patches all belong on this
-repository's issues. There is no second tracker to guess between.
-
-(The hosted build at localmd.app has its own, at
-[localmd.app-feedback](https://github.com/whitefoxx/localmd.app-feedback), for
-reports about that deployment specifically — its trial, its licence, its
-uptime. Anything about the software itself belongs here.)
+repository's issues. There is no second tracker to guess between, and that
+includes anything about the hosted build at localmd.app: it is this repository,
+deployed.
 
 ## Running it
 
@@ -80,9 +77,3 @@ Contributions are licensed under the MIT terms in [LICENSE](LICENSE), the same
 as the rest of the repository. [TRADEMARK.md](TRADEMARK.md) covers the one thing
 the licence does not: the name.
 
-## The two editions
-
-`src/edition/` is the seam between this build and the hosted one at
-localmd.app — three small files, and no other code in the tree knows which build
-it is in. If a patch needs core code to ask which edition it is running as, the
-seam is missing something; extend the seam rather than adding the branch.

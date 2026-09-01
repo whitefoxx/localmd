@@ -130,50 +130,29 @@ page, unrelated to any index above.
 
 **Built-in tool**:
 A tool defined natively in the agent code (`ToolSpec`) — read_file, write_file, etc.
-Always free; the word says where the code lives, nothing about pricing.
+The word says where the code lives, nothing else.
 _Avoid_: capability, function, native tool. Never use it for catalog entries —
 that is **bundled**.
 
 **Bundled tool**:
-A catalog entry that ships with the app and is free forever (`bundled` flag +
+A catalog entry that ships with the app and needs no setup (`bundled` flag +
 `BUNDLED_TOOL_SOURCES` — a test keeps the two in lockstep). Today the web-search
-pair (jina, parallel); the set is expected to grow. Bundled is a pricing/shipping
-fact about an *external* tool — it does not make the tool built-in.
+pair (jina, parallel); the set is expected to grow. Bundled is a shipping fact
+about an *external* tool — it does not make the tool built-in.
 _Avoid_: built-in (reserved for native code), default, preset.
 
 **Connection**:
 The user-facing word for everything that reaches an outside service — the
 localmd Connect extension, MCP servers, user- or agent-authored HTTP tools,
-GitHub sync, sign-ins. The paid tier is exactly the connections. The extension
-itself is free to *install*; using it from the app is a connection.
-_Avoid_: integration, external services (as a category name), paid tools.
+GitHub sync, sign-ins. What unites them is that each one is something the user
+chose to reach, and what it can reach is whatever they gave it.
+_Avoid_: integration, external services (as a category name).
 
 **External tool**:
 A tool provided by an MCP server, namespaced `mcp__<server>__<tool>`. "MCP tool" is an
 acceptable synonym. Orthogonal to bundled/connection: parallel is external *and*
 bundled.
 _Avoid_: plugin, integration tool.
-
-**Edition**:
-Which build this is. Hosted is localmd.app — a paid tier, a licence, a free trial,
-a price on the landing page. Another edition has none of those and is not a
-cut-down hosted: it is the same core with the seam answered differently.
-Everything that differs lives in `src/edition/` — `gate.ts` (is anything
-**restricted**), `trial.ts` (is there a model to lend), `ui.ts` (are there screens
-about money), `analytics.ts` (does anything get counted). Two rules keep it a seam rather than a set of branches: nothing
-outside `src/edition/` may import a file only one edition has, and no type
-crossing the seam may be one only one edition can name. Core asks the seam; it
-never asks which edition it is in.
-_Avoid_: tier (that is what a licence buys, not what a build is), flavour,
-variant, build type, "the free version" (an edition is not a downgrade).
-
-**Licence**:
-The paid tier's key (`LMD1.…`), verified offline against a public key in the bundle.
-`unlocks`/`active` say whether a valid key is present; **restricted** is the question
-gates ask (`ENFORCE_LICENCE && !active`) — keep the two apart. Only an **edition**
-with a paid tier has one at all, which is why a gate asks `@/edition/gate` and
-never imports this.
-_Avoid_: license (spelling; code and UI use -ce), subscription, account.
 
 **Deferred tool**:
 A tool registered but withheld from the model until `enable_tools` activates it,

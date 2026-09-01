@@ -18,18 +18,6 @@ intentional Chinese in the tree: the `zh` values in i18n catalogs
 (`src/i18n/locales/*`), `LOCALE_NAMES`, and the CJK regex/fixture data in lib
 (annotations / markdown / tts / pdf extraction).
 
-## Editions
-
-`src/edition/` is the seam between this build and the hosted one at
-localmd.app — `gate.ts` (is anything restricted), `trial.ts` (is there a model
-to lend), `ui.ts` (are there screens about money), `analytics.ts` (does anything
-get counted — in this build, no). No other code in the tree
-knows which build it is in, and two rules keep it that way: nothing outside
-`src/edition/` imports a file only one edition has, and no type crossing the
-seam is one only one edition can name. If a change needs core code to ask which
-edition it is, the seam is missing something — extend the seam, don't add the
-branch.
-
 ## Product principles
 
 - **The KB is a soft constraint.** Every convention — layout, frontmatter,
@@ -242,9 +230,10 @@ pipeline (`docs/token-optimization.md` has the full log):
   works, `fetch` it from the page origin; before claiming a feature works, click
   the path a user would rather than only the store beneath it. This is not
   ceremony: shaping real API responses once caught a placeholder-regex bug that
-  a fully green suite did not, and an exported `ComputedRef` once made every
-  installed tool row claim it needed a licence while typecheck, 1141 unit tests
-  and 52 e2e runs stayed green. Restore any real settings you mutate while
+  a fully green suite did not, and an exported `ComputedRef` once put the wrong
+  status on every installed tool row — a template unwraps a ref and plain script
+  does not, and TypeScript cannot tell those apart inside a truthiness test —
+  while typecheck, 1141 unit tests and 52 e2e runs stayed green. Restore any real settings you mutate while
   testing. One trap when the KB under test is the **demo**: it lives in memory,
   so any source edit made while that tab is open triggers HMR, re-seeds it and
   silently throws away the KB state set up to test. Finish the browser pass

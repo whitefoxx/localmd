@@ -6,21 +6,21 @@
  * the manual), and a link that is right in three places and stale in the fourth
  * is worse than one that is wrong everywhere: nobody notices.
  *
- * Where reports go is an edition's own fact, not the software's: this build
- * sends them to the hosted service's tracker, and another sends them wherever
- * its own code lives. The open-source edition replaces this file.
+ * If you deploy your own copy, this is the file to point somewhere else.
  */
 
-/** Public issue tracker for the hosted service. A repository with no code in
- *  it, so a visitor can see what is already known before writing anything. */
-export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd.app-feedback'
+/** Issue tracker: this repository's own, so a report lands where the people
+ *  who could fix it already are. */
+export const FEEDBACK_URL = 'https://github.com/whitefoxx/localmd/issues'
 
-/** Where the code is. The same address in both editions today — a fork that
- *  deploys its own build should point this at itself, which is the whole reason
- *  this file is the edition's and not the app's. */
+/** Where the code is. A fork that deploys its own build should point this at
+ *  itself — the landing page and the help panel both read it. */
 export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'
 
-/** localmd Connect on the Chrome Web Store — listed 2026-08. The landing and
- *  the tool catalog both point here; one fact, one place. */
+/** localmd Connect on the Chrome Web Store — listed 2026-08. The landing page
+ *  and the tool catalog both point here; one fact, one place.
+ *
+ *  It is free, and it talks to whatever origin you authorize in it, so a copy
+ *  you host yourself works with it once you add your own address to its list. */
 export const CONNECT_STORE_URL =
   'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh'

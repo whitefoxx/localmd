@@ -33,7 +33,7 @@ own. What holds:
 
 ## Not vulnerabilities
 
-- **Patching the build to unlock something.** This edition has nothing gated;
+- **Patching the build to unlock something.** Nothing here is gated;
   the hosted one verifies a licence offline and deliberately does not try to be
   tamper-proof. Its own source says so. Time spent making a bundle
   untamperable is time taken from the people who paid.

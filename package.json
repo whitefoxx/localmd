@@ -1,7 +1,13 @@
 {
-  "name": "localmd-app",
+  "name": "localmd",
   "version": "0.1.0",
-  "private": true,
+  "description": "An AI knowledge base that runs in your browser and your local folder.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whitefoxx/localmd.git"
+  },
+  "homepage": "https://localmd.app",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,8 +21,7 @@
     "docs:sync": "node scripts/sync-doc-hashes.ts",
     "shoot:landing": "node scripts/shoot-landing.mjs",
     "shoot:diagram": "node scripts/shoot-diagram.mjs",
-    "shoot:og": "node scripts/shoot-og.mjs",
-    "sign-key": "node scripts/sign-key.mjs"
+    "shoot:og": "node scripts/shoot-og.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.15",

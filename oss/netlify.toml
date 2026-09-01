@@ -1,7 +1,0 @@
-# Netlify's auto-detection usually gets a Vite project right, but "usually" is
-# not a good enough answer for someone deploying this for the first time. Four
-# lines make it deterministic. Any other static host wants the same two facts:
-# build with `npm run build`, serve `dist`.
-[build]
-  command = "npm run build"
-  publish = "dist"
