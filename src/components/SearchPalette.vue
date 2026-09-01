@@ -379,6 +379,12 @@ async function pick(row: Row | undefined): Promise<void> {
 }
 
 function onKeydown(e: KeyboardEvent): void {
+  // While an IME is composing, these keys are ITS keys: Enter commits the
+  // candidate, the arrows move through the list, Escape abandons it. Acting on
+  // them here jots half a sentence someone was still writing — which is the
+  // one way this mode can lose text. Blink/Gecko set `isComposing`; WebKit has
+  // shipped versions that only set the legacy 229, so check both.
+  if (e.isComposing || e.keyCode === 229) return
   if (e.key === 'Escape') {
     ui.searchOpen = false
   } else if (e.key === 'ArrowDown') {

@@ -235,3 +235,24 @@ test(': alone opens today’s page in edit mode, making it if today has none', a
   await expect(page.locator('.cm-content')).toContainText(today())
   await expect(page.getByRole('button', { name: 'Preview' })).toBeVisible()
 })
+
+test('Enter while an IME is composing does not jot the half-written line', async ({ page }) => {
+  await openPalette(page)
+  await palette(page).fill(': 这句话还没写完')
+
+  // What a Chinese IME sends when Enter commits a candidate: a keydown the
+  // composition owns. Playwright's press() cannot set isComposing, so the
+  // event is dispatched as the browser would send it.
+  await page.locator('[data-palette] input').evaluate((el) => {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }))
+  })
+
+  // Nothing written, nothing closed — the sentence is still there to finish.
+  await expect(page.locator('[data-palette]')).toBeVisible()
+  await expect(page.locator('[data-palette]')).not.toContainText('Saved to')
+  await expect(palette(page)).toHaveValue(': 这句话还没写完')
+
+  // And a real Enter still jots, so the guard denies the IME's key only.
+  await page.keyboard.press('Enter')
+  await expect(page.locator('[data-palette]')).toContainText(`Saved to raw/daily/${today()}.md`)
+})
