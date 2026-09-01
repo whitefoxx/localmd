@@ -93,8 +93,17 @@ reliably and are better at the fiddlier jobs like building a new tool; cheaper
 ones are perfectly good for search, summarizing and filing.
 
 You can change the primary at any time, including mid-project. The quickest
-way is the model name under the message box: click it, and your models drop
-up in a list to pick from. Settings is the last row of that same menu.
+way is the model name under the message box: click it, and your models drop up
+in a list to pick from. It sorts them exactly as the role lists above do —
+models ticked for chatting first, the rest under **Not marked for this**, and a
+question before an unmarked one is used — so a picture-making model cannot
+become your primary by a single stray click. Settings is the last row of that
+same menu.
+
+The eye beside the name is the same control for the vision role: it shows
+whether anything can read a picture right now, and clicking it is where you
+choose which model does. **Not set** is the first option, for when your primary
+reads pictures by itself.
 
 ## Cost
 
