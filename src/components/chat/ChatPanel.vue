@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useChatStore, type Attachment, type UiMessage } from '@/stores/chat'
-import { useSettingsStore } from '@/stores/settings'
+import {
+  useSettingsStore,
+  SLOT_CAPABILITY,
+  profileCan,
+  capabilitiesOf,
+  type Slot,
+  type LlmProfile,
+} from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import { useSetupStore } from '@/stores/setup'
 import SetupCard from '@/components/chat/SetupCard.vue'
@@ -348,29 +355,68 @@ const usageTitle = computed(() => {
 
 /* ── model switcher (composer status line) ─────────────────────────────────
  * The model name in the action row is the one place someone is already looking
- * when they wonder what is about to answer, so it is also where they change it.
- * The menu only ever reassigns the `primary` slot among profiles they already
- * configured — adding or editing a credential stays in Settings, which the last
- * row opens. */
-const modelMenuOpen = ref(false)
+ * when they wonder what is about to answer, so it is also where they change it
+ * — and the eye beside it is the same control for the vision role.
+ *
+ * One menu, parameterized by slot, because the two differ only in which role
+ * they fill. It reassigns among profiles the user already configured; adding or
+ * editing a credential stays in Settings, which the last row opens.
+ *
+ * Which slot is open is the state, so the menu can say what it is filling. Two
+ * controls raise the same panel and it looks identical once up — without the
+ * heading, the vision menu reads as a model switcher that mysteriously did not
+ * switch the model. */
+const modelMenuSlot = ref<Slot | null>(null)
 
-function toggleModelMenu(): void {
+function openModelMenu(slot: Slot): void {
   // Nothing to choose between: send them where profiles are made instead of
   // opening an empty menu.
   if (!settingsStore.state.profiles.length) {
     ui.openSettings('models')
     return
   }
-  modelMenuOpen.value = !modelMenuOpen.value
+  modelMenuSlot.value = modelMenuSlot.value === slot ? null : slot
 }
 
-function pickModel(id: string): void {
-  settingsStore.setSlot('primary', id)
-  modelMenuOpen.value = false
+/** The open menu's profiles, split exactly as Settings splits them.
+ *
+ *  Nothing is hidden, and that is the same decision made there: a mark is the
+ *  user's own guess as much as ours, and a menu that silently omitted the model
+ *  they wanted is how "this app doesn't support my provider" starts. What the
+ *  split buys is that an image-generation profile is no longer offered as the
+ *  primary as though it were an ordinary chat model — it sits below the line
+ *  and costs a question. */
+const modelMenuOptions = computed<{ marked: LlmProfile[]; unmarked: LlmProfile[] }>(() => {
+  const slot = modelMenuSlot.value
+  if (!slot) return { marked: [], unmarked: [] }
+  const cap = SLOT_CAPABILITY[slot]
+  const profiles = settingsStore.state.profiles
+  return {
+    marked: profiles.filter((p) => profileCan(p, cap)),
+    unmarked: profiles.filter((p) => !profileCan(p, cap)),
+  }
+})
+
+/** Point a role at a profile. Choosing one that is not marked for the job asks
+ *  once, and a yes writes the mark — so the answer is kept rather than asked
+ *  again on every visit. A no changes nothing at all, which is the whole
+ *  difference from a menu that just assigns whatever was clicked. */
+function pickModel(slot: Slot, id: string | null): void {
+  const profile = id ? settingsStore.state.profiles.find((x) => x.id === id) : null
+  const cap = SLOT_CAPABILITY[slot]
+  if (profile && !profileCan(profile, cap)) {
+    if (!confirm(t(`settings.markConfirm.${cap}`, { label: profile.label }))) return
+    settingsStore.upsertProfile({
+      ...profile,
+      capabilities: [...capabilitiesOf(profile), cap],
+    })
+  }
+  settingsStore.setSlot(slot, id)
+  modelMenuSlot.value = null
 }
 
 function openModelSettings(): void {
-  modelMenuOpen.value = false
+  modelMenuSlot.value = null
   ui.openSettings('models')
 }
 
@@ -1476,30 +1522,96 @@ watch(
         </button>
       </div>
 
-      <!-- Model switcher, opening upward from the name in the action row. It
-           reassigns the primary slot among configured profiles only; the last
-           row is the way to Settings for anything else. -->
-      <template v-if="modelMenuOpen">
-        <div class="fixed inset-0 z-10" @click="modelMenuOpen = false" />
+      <!-- Model switcher, opening upward from the action row. Raised by the
+           model name for the primary role and by the eye for vision; it fills
+           whichever slot asked for it, among configured profiles only, and the
+           last row is the way to Settings for anything else. -->
+      <template v-if="modelMenuSlot">
+        <div class="fixed inset-0 z-10" @click="modelMenuSlot = null" />
         <div
           class="absolute bottom-full left-3 mb-1 z-20 min-w-[13rem] max-w-[calc(100%-1.5rem)] max-h-64 overflow-y-auto rounded-md border border-border bg-bg-1 shadow-lg"
         >
+          <!-- Says which role is being filled. Both entry points raise a panel
+               that is otherwise identical, so without this the vision menu
+               reads as a model switcher that did not switch the model. -->
+          <div
+            class="px-2 py-1.5 text-[11px] uppercase tracking-wide text-fg-3 border-b border-border"
+          >
+            {{ $t('chat.pickForSlot', { slot: $t(`settings.slot.${modelMenuSlot}`) }) }}
+          </div>
+
+          <!-- Vision is the role that may be empty: most primary models read
+               images themselves, and there has to be a way back to that. -->
           <button
-            v-for="p in settingsStore.state.profiles"
-            :key="p.id"
+            v-if="modelMenuSlot === 'vision'"
             class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
             :class="
-              p.id === settingsStore.primary?.id ? 'bg-accent/15 text-fg-0' : 'text-fg-2 hover:bg-bg-2'
+              settingsStore.state.slots.vision
+                ? 'text-fg-2 hover:bg-bg-2'
+                : 'bg-accent/15 text-fg-0'
             "
-            :title="p.label"
-            @click="pickModel(p.id)"
+            @click="pickModel('vision', null)"
           >
             <span
               class="codicon codicon-sm shrink-0"
-              :class="p.id === settingsStore.primary?.id ? 'codicon-check text-accent' : 'opacity-0'"
+              :class="settingsStore.state.slots.vision ? 'opacity-0' : 'codicon-check text-accent'"
+            />
+            <span class="truncate">{{ $t('settings.notConfigured') }}</span>
+          </button>
+
+          <button
+            v-for="p in modelMenuOptions.marked"
+            :key="p.id"
+            class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
+            :class="
+              p.id === settingsStore.state.slots[modelMenuSlot]
+                ? 'bg-accent/15 text-fg-0'
+                : 'text-fg-2 hover:bg-bg-2'
+            "
+            :title="p.label"
+            @click="pickModel(modelMenuSlot, p.id)"
+          >
+            <span
+              class="codicon codicon-sm shrink-0"
+              :class="
+                p.id === settingsStore.state.slots[modelMenuSlot]
+                  ? 'codicon-check text-accent'
+                  : 'opacity-0'
+              "
             />
             <span class="truncate">{{ p.label }}</span>
           </button>
+
+          <!-- Listed, not hidden — but below a line that says why, and picking
+               one asks before it counts. Same bargain as Settings. -->
+          <template v-if="modelMenuOptions.unmarked.length">
+            <div class="px-2 py-1 text-[11px] text-fg-3 border-t border-border">
+              {{ $t('settings.notMarkedFor') }}
+            </div>
+            <button
+              v-for="p in modelMenuOptions.unmarked"
+              :key="p.id"
+              class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs"
+              :class="
+                p.id === settingsStore.state.slots[modelMenuSlot]
+                  ? 'bg-accent/15 text-fg-0'
+                  : 'text-fg-3 hover:bg-bg-2 hover:text-fg-2'
+              "
+              :title="p.label"
+              @click="pickModel(modelMenuSlot, p.id)"
+            >
+              <span
+                class="codicon codicon-sm shrink-0"
+                :class="
+                  p.id === settingsStore.state.slots[modelMenuSlot]
+                    ? 'codicon-check text-accent'
+                    : 'opacity-0'
+                "
+              />
+              <span class="truncate">{{ p.label }}</span>
+            </button>
+          </template>
+
           <button
             class="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs text-fg-3 hover:bg-bg-2 hover:text-fg-1 border-t border-border"
             @click="openModelSettings()"
@@ -1717,22 +1829,47 @@ watch(
             <span v-else class="flex items-center gap-1 min-w-0">
               <!-- The model name is also the switcher. Capped, and free to
                    shrink further in a narrow panel; the full label is in the
-                   tooltip either way. -->
+                   tooltip either way.
+
+                   No negative margin: the row above it clips (`truncate`), so
+                   pulling the button left by its own padding hid the left half
+                   of its rounded hover pill. It sits where it lays out, and
+                   centres its own text rather than inheriting whatever a bare
+                   button does with it. -->
               <button
-                class="min-w-0 max-w-[9rem] truncate rounded px-1 -ml-1 hover:text-fg-1 hover:bg-bg-2 transition-colors"
-                :class="{ 'text-fg-1 bg-bg-2': modelMenuOpen }"
+                class="min-w-0 max-w-[9rem] inline-flex items-center justify-center rounded px-1 py-0.5 hover:text-fg-1 hover:bg-bg-2 transition-colors"
+                :class="{ 'text-fg-1 bg-bg-2': modelMenuSlot === 'primary' }"
                 :title="settingsStore.primary?.label || $t('chat.switchModel')"
                 :aria-label="$t('chat.switchModel')"
-                :aria-expanded="modelMenuOpen"
-                @click="toggleModelMenu"
+                :aria-expanded="modelMenuSlot === 'primary'"
+                @click="openModelMenu('primary')"
               >
-                {{ settingsStore.primary?.model || $t('chat.notConfigured') }}
+                <span class="truncate">{{
+                  settingsStore.primary?.model || $t('chat.notConfigured')
+                }}</span>
               </button>
-              <span
-                v-if="settingsStore.visionAvailable"
-                class="shrink-0"
-                :title="$t('chat.visionAvailable')"
-              >· 👁</span>
+              <!-- The eye says whether anything can read an image, and is also
+                   where that is chosen. Shown even when nothing is set — dimmed
+                   rather than absent, because a control that appears only once
+                   the thing is configured cannot be how you configure it. -->
+              <span class="shrink-0" aria-hidden="true">·</span>
+              <button
+                class="shrink-0 inline-flex items-center rounded px-1 py-0.5 hover:bg-bg-2 transition-colors"
+                :class="[
+                  settingsStore.visionAvailable ? '' : 'opacity-40 hover:opacity-100',
+                  modelMenuSlot === 'vision' ? 'bg-bg-2' : '',
+                ]"
+                :title="
+                  settingsStore.visionAvailable
+                    ? $t('chat.visionAvailable')
+                    : $t('chat.visionNotSet')
+                "
+                :aria-label="$t('chat.switchVisionModel')"
+                :aria-expanded="modelMenuSlot === 'vision'"
+                @click="openModelMenu('vision')"
+              >
+                👁
+              </button>
               <span
                 v-if="chat.sessionUsage.input || chat.sessionUsage.output"
                 class="shrink-0"
