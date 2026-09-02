@@ -216,14 +216,20 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    * file in passing claims nothing. Deliberately narrower than `kb_health`'s
    * `unreferencedSources`, which matches any mention — that one answers "has
    * anything ever named this file", this one answers "has anything read it".
+   *
+   * Both halves come off `documents` on purpose. "290 of 340" is one sentence
+   * built from two numbers, and two separate ideas of what counts as a
+   * document would make it a sentence that quietly lies.
    */
+  const documents = computed(() =>
+    useFilesStore().allFiles.filter((p) => {
+      const kind = indexableKind(p)
+      return kind === 'pdf' || kind === 'epub' || kind === 'docx'
+    }),
+  )
+
   const sourcesWithoutNote = computed(() =>
-    useFilesStore()
-      .allFiles.filter((p) => {
-        const kind = indexableKind(p)
-        return (kind === 'pdf' || kind === 'epub' || kind === 'docx') && !declaredSources.value.has(p)
-      })
-      .sort(),
+    documents.value.filter((p) => !declaredSources.value.has(p)).sort(),
   )
 
   /** Stat the sources pages declare with `[[pdfN:path]]`. Only those: a page
@@ -662,5 +668,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, queryPages, filterValues, healthFlags, linkSuggestions, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, queryPages, filterValues, healthFlags, linkSuggestions, documents, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

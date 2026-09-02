@@ -32,6 +32,10 @@ export default {
     scaffoldSkip: 'Not now',
     selectFile: 'Select a file to start',
     selectFileHint: 'or find one with',
+    // The blank screen of a folder full of documents, saying the one true
+    // thing about it that nobody has to open anything to learn.
+    unreadDocs: 'Nothing has been written yet about {unread} of the {total} documents in this folder.',
+    unreadDocsAct: 'See which',
     graph: 'Graph',
     graphHint: 'Click a node to see what it is',
     graphTypeFilter: 'Show only this type',
@@ -74,6 +78,8 @@ export default {
     scaffoldSkip: '先不用',
     selectFile: '选择一个文件开始',
     selectFileHint: '或者用这个快捷键找一个：',
+    unreadDocs: '这个文件夹里的 {total} 份文档，有 {unread} 份还没有任何笔记写到过。',
+    unreadDocsAct: '看看是哪些',
     graph: '图谱',
     graphHint: '点击节点看看它是什么',
     graphTypeFilter: '只看这一类',

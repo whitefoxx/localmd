@@ -155,6 +155,12 @@ const graphLegend = computed(() => {
 
 const dragging = ref(false)
 
+/** Documents nothing has been written about. The empty state is the only
+ *  screen where this is worth saying: everywhere else there is something the
+ *  person came for, and a count of what they have not read yet would be in
+ *  the way of it. */
+const unreadDocs = computed(() => kbIndex.sourcesWithoutNote.length)
+
 /* First-run scaffold offer for truly-empty folders. */
 const scaffoldDismissed = ref(false)
 const scaffolding = ref(false)
@@ -750,6 +756,19 @@ function goToGraphHit(i = graphHit.value): void {
                   <kbd
                     class="mx-0.5 rounded border border-border bg-bg-2 px-1 py-0.5 font-sans text-[11px] text-fg-2"
                   >{{ searchHotkey }}</kbd>
+                </div>
+                <!-- A folder of documents has no home page, and inventing one
+                     for it would be grafting our layout onto someone's folder
+                     (see lib/landing). What it does have is a fact worth
+                     knowing before anything is opened, and this is the one
+                     screen with room to say it. Not a nag: it fills a blank,
+                     it does not interrupt, and it is a view of the index —
+                     nothing here is written down. -->
+                <div v-if="unreadDocs" class="mt-3 max-w-sm text-xs leading-relaxed">
+                  {{ $t('layout.unreadDocs', { unread: unreadDocs, total: kbIndex.documents.length }) }}
+                  <button class="ml-1 text-accent hover:underline" @click="ui.healthOpen = true">
+                    {{ $t('layout.unreadDocsAct') }}
+                  </button>
                 </div>
               </div>
             </div>

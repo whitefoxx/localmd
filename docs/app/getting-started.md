@@ -85,6 +85,12 @@ it off and the new version is used the next time you open the app anyway.
 - **Middle** — whatever you are reading or editing.
 - **Right** — the assistant.
 
+When there is nothing to reopen, the middle stays empty — except in a folder
+that already holds documents, where it says how many of them nothing has been
+written about yet and offers to show you which. That is one of the health
+check's findings, said early, because it is the one worth knowing before you
+have opened anything: see `knowledge-base`.
+
 You can drag the edges to resize, and hide the side panels entirely.
 
 On a screen too narrow to hold all three at once — a phone, or a very small
