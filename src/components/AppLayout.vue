@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -9,6 +9,8 @@ import { useUiStore } from '@/stores/ui'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useSettingsStore } from '@/stores/settings'
 import { activeBindings, formatBinding, HOTKEY_BY_ID } from '@/lib/hotkeys'
+import { fuzzyRank } from '@/lib/fuzzy'
+import { fileStem } from '@/lib/wiki'
 import * as fs from '@/lib/fs'
 import FileTree from '@/components/FileTree.vue'
 import EditorTabs from '@/components/EditorTabs.vue'
@@ -370,6 +372,35 @@ function closeKb(): void {
     kbIndex.reset()
     kb.close()
   })
+}
+
+/**
+ * Finding a node by name.
+ *
+ * The graph is the one view where a page you can name is genuinely hard to
+ * point at — it is somewhere in a cloud of dots, possibly off screen, possibly
+ * behind the card. So this does not filter the picture: it goes to the page,
+ * which is the same thing the card's own "find it" button does. Pages only;
+ * a tag is a question rather than a place, and ⌘K's `tag:` already answers it.
+ *
+ * Matched on the stem AND the path, so `wiki/entities/ada` is reachable both
+ * by what it is called and by where it lives.
+ */
+const graphHit = ref(0)
+const graphHits = computed<string[]>(() =>
+  ui.graphQuery.trim()
+    ? fuzzyRank(ui.graphQuery, [...kbIndex.graph.nodes], (p) => `${fileStem(p)} ${p}`)
+        .slice(0, 12)
+        .map((r) => r.item)
+    : [],
+)
+watch(graphHits, () => (graphHit.value = 0))
+
+function goToGraphHit(i = graphHit.value): void {
+  const id = graphHits.value[i]
+  if (!id) return
+  ui.graphGoTo = id
+  ui.graphQuery = ''
 }
 </script>
 
@@ -776,6 +807,40 @@ function closeKb(): void {
             />
             <span class="text-fg-3 whitespace-nowrap">{{ $t('layout.currentFile') }}</span>
           </span>
+        </div>
+        <!-- Find a page by name. In the bar for the same reason the toggle is:
+             a box floating over the canvas sits on top of whatever lands under
+             it, and this one has a list that drops down as well. -->
+        <div class="relative shrink-0">
+          <input
+            v-model="ui.graphQuery"
+            class="w-40 rounded border border-border bg-bg-0 px-2 py-1 text-xs text-fg-0 outline-none placeholder:text-fg-3 focus:border-accent"
+            :placeholder="$t('graph.searchPlaceholder')"
+            @keydown.down.prevent="graphHit = Math.min(graphHit + 1, graphHits.length - 1)"
+            @keydown.up.prevent="graphHit = Math.max(graphHit - 1, 0)"
+            @keydown.enter.prevent="goToGraphHit()"
+          />
+          <ul
+            v-if="ui.graphQuery.trim() && graphHits.length"
+            class="absolute right-0 top-full z-50 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-bg-1 py-1 shadow-lg"
+          >
+            <li v-for="(hit, i) in graphHits" :key="hit">
+              <button
+                class="flex w-full items-center gap-2 px-2 py-1 text-left"
+                :class="i === graphHit ? 'bg-accent/15' : 'hover:bg-bg-2'"
+                @click="goToGraphHit(i)"
+              >
+                <span class="truncate text-xs text-fg-1">{{ fileStem(hit) }}</span>
+                <span class="ml-auto shrink-0 truncate text-[10px] text-fg-3">{{ hit }}</span>
+              </button>
+            </li>
+          </ul>
+          <p
+            v-else-if="ui.graphQuery.trim()"
+            class="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border border-border bg-bg-1 px-2 py-2 text-xs text-fg-3 shadow-lg"
+          >
+            {{ $t('graph.searchNone') }}
+          </p>
         </div>
         <!-- Beside the legend rather than floating over the canvas: it is a
              control on what the graph draws, which is what this bar is for,

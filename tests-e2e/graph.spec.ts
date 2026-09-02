@@ -596,6 +596,61 @@ test.describe('picking a node', () => {
     expect(await width()).toBe(docked)
   })
 
+  test('a page can be found by name, and Esc gives the box up before the graph', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      const { useFilesStore } = await import('/src/stores/files.ts')
+      const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+      await useFilesStore().createFile('wiki/needle.md', '# Needle\n\nIn a haystack.\n')
+      await useKbIndexStore().refresh()
+    })
+    const box = page.getByPlaceholder('Find a page…')
+    await box.click()
+    await box.fill('needle')
+    // The dropdown row, named by both halves it shows — the tree and the tab
+    // bar also hold a "needle" button, since creating the file opened it.
+    await expect(page.getByRole('button', { name: 'needle wiki/needle.md' })).toBeVisible()
+
+    await settled(page)
+    await box.press('Enter')
+    expect(await shown(page)).toBe('wiki/needle.md')
+    expect(
+      await page.evaluate(async () => {
+        const { useUiStore } = await import('/src/stores/ui.ts')
+        const ui = useUiStore()
+        return { pinned: ui.graphSelected, query: ui.graphQuery, request: ui.graphGoTo }
+      }),
+    ).toEqual({ pinned: 'wiki/needle.md', query: '', request: '' })
+
+    // Found means brought into view, the same as the card's own button.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const svg = document.querySelector('svg')!.getBoundingClientRect()
+          const card = document.querySelector('[data-preview]')!.getBoundingClientRect()
+          const el = [...document.querySelectorAll('svg > g > g > g')].find(
+            (e) => (e as unknown as { __data__: { id: string } }).__data__.id === 'wiki/needle.md',
+          )!
+          const dot = el.querySelector('circle')!.getBoundingClientRect()
+          return (
+            Math.abs(dot.left + dot.width / 2 - svg.left - (card.left - svg.left) / 2) < 40 &&
+            Math.abs(dot.top + dot.height / 2 - svg.top - svg.height / 2) < 40
+          )
+        }),
+      )
+      .toBe(true)
+
+    await box.click()
+    await box.fill('zzzznothing')
+    await expect(page.getByText('No page here goes by that name.')).toBeVisible()
+
+    // Esc gives up the half-typed search first — the graph is a layer below it.
+    await page.keyboard.press('Escape')
+    await expect(page.getByText('No page here goes by that name.')).toBeHidden()
+    await expect(page.getByText('Click a node to see what it is')).toBeVisible()
+  })
+
   test('the card is the way out: its button opens the file', async ({ page }) => {
     const { hub } = await pickable(page)
     await at(page, hub, 'click')

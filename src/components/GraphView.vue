@@ -57,7 +57,7 @@ let refit: (() => void) | null = null
 let stopTypeWatch: (() => void) | null = null
 /** Bring a node into the part of the frame the card is not covering. Set by
  *  render(), which owns the zoom behaviour it has to move. */
-let centerOn: ((id: string) => void) | null = null
+let centerOn: ((id: string) => Promise<void>) | null = null
 /** Push the selection state at the current drawing — dimming and ring. Set by
  *  render(), because everything it needs is built there and thrown away with
  *  it; the watch at the bottom of this file is the only caller. */
@@ -200,7 +200,7 @@ const canLocate = computed(
 function locate(): void {
   if (!previewId.value) return
   pin(previewId.value)
-  centerOn?.(previewId.value)
+  void centerOn?.(previewId.value)
 }
 
 function clearSelection(): void {
@@ -398,7 +398,12 @@ function render(): void {
    * The scale is left alone. Zoom is the user's; this is being asked where to
    * look, not how close.
    */
-  centerOn = (id: string): void => {
+  centerOn = async (id: string): Promise<void> => {
+    // The card may only be about to exist — whoever called this just pinned
+    // the node, and Vue has not rendered the card yet. Its left edge is the
+    // measurement below, and measuring before it is there reads the whole
+    // frame as free, which centres the node underneath where the card lands.
+    await nextTick()
     const d = nodesById.value.get(id)
     const svgEl = svg.node()
     if (!d || !svgEl || d.x === undefined || d.y === undefined) return
@@ -792,6 +797,18 @@ onMounted(() => {
 })
 
 watch([() => index.graph, () => ui.graphTags], () => void renderMaybeSlow())
+// The header bar's search, answered where the drawing is. Consumed and cleared,
+// so asking for the same node twice in a row works the second time too.
+watch(
+  () => ui.graphGoTo,
+  (id) => {
+    if (!id) return
+    ui.graphGoTo = ''
+    if (!nodesById.value.has(id)) return
+    pin(id)
+    void centerOn?.(id)
+  },
+)
 // Esc unpins from App.vue's layer chain, which knows the selection and not the
 // card; the card follows it down rather than being left describing nothing.
 // Declared first so that, within the same synchronous flush, the card is
@@ -814,6 +831,7 @@ onBeforeUnmount(() => {
   stopTypeWatch = null
   ui.graphType = null
   ui.graphTags = false
+  ui.graphQuery = ''
   editing.value = false
   expanded.value = false
   clearSelection()

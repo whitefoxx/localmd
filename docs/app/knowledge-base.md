@@ -120,6 +120,12 @@ part of the window the card is not covering, so it is somewhere you can
 actually look at it. Your zoom is left alone: you asked where to look, not how
 close.
 
+Once a folder has more than a few dozen pages, the hard part is finding the one
+you can already name. The **search box** in the bar along the top does that: type
+part of a name or part of its folder, pick from the list, and the graph goes
+there — pinned and brought into view, exactly as if you had found the dot
+yourself and clicked it. Esc gives the box up before it closes anything else.
+
 **Tags**, in the bar along the top, adds a second kind of dot: one per tag,
 joined to every page carrying it. A tag has no file to show, so its card lists
 what carries it — click one of those to look at it, or search the tag to see

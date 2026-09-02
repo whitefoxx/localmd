@@ -14,6 +14,8 @@ export default {
     showTagsHint:
       'Draw each tag as a node joined to every page carrying it. Click one to see what it holds.',
     previewLocate: 'Find it on the graph',
+    searchPlaceholder: 'Find a page…',
+    searchNone: 'No page here goes by that name.',
     previewOpen: 'Open this file',
     previewSearchTag: 'Search for this tag',
     previewBack: 'Back to the page you came from',
@@ -35,6 +37,8 @@ export default {
     showTags: '标签',
     showTagsHint: '把每个 tag 画成一个节点，连向所有带它的页面。点一下看看它下面有什么。',
     previewLocate: '在图上定位它',
+    searchPlaceholder: '找一个页面……',
+    searchNone: '这里没有叫这个名字的页面。',
     previewOpen: '打开这个文件',
     previewSearchTag: '搜索这个标签',
     previewBack: '回到刚才那一页',

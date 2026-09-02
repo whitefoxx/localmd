@@ -177,6 +177,17 @@ export const useUiStore = defineStore('ui', () => {
    */
   const graphSelected = ref<string | null>(null)
 
+  /** What is typed into the graph's search box. Here rather than in the layout
+   *  because Esc unwinds layers in App.vue, and a half-typed search is a layer:
+   *  clearing it is what Esc means to someone with the caret still in it. */
+  const graphQuery = ref('')
+
+  /** A node the graph has been asked to go to — pinned and brought into view,
+   *  exactly as if it had been clicked and then found. One-shot, like
+   *  `pendingSearch`: GraphView consumes it and clears it. Lives here because
+   *  the search box is in the layout's header bar and the drawing is not. */
+  const graphGoTo = ref('')
+
   /** A query handed to the search palette from elsewhere — the graph's tag
    *  nodes use it to turn "what else carries this tag" into a real search the
    *  user can edit. One-shot, like pendingPrompt: the palette consumes it on
@@ -281,6 +292,8 @@ export const useUiStore = defineStore('ui', () => {
     graphType,
     graphTags,
     graphSelected,
+    graphQuery,
+    graphGoTo,
     pendingSearch,
     searchFor,
     settingsSection,
