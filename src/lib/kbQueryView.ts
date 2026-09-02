@@ -16,7 +16,7 @@
  * existing click handler opens them. A second click path would be a second
  * thing to keep in step with what opening a page means.
  */
-import { parseKbQuery, runQuery, type QueryPage, type QueryRow } from '@/lib/kbQuery'
+import { parseKbQuery, runQuery, FILTER_HELP, type QueryPage, type QueryRow } from '@/lib/kbQuery'
 import { escapeHtml } from '@/lib/wiki'
 import { t } from '@/i18n'
 
@@ -59,9 +59,18 @@ export function renderQueryBlock(
 ): string {
   const { query, errors } = parseKbQuery(queryText, now)
   if (errors.length) {
+    // The agent gets the whole grammar back when it writes a bad query; there
+    // was no reason the person writing one in their own note should get less.
+    // Spent only here, where someone is already stuck — a syntax table on
+    // every working block would be furniture.
+    const keys = FILTER_HELP.map(
+      (f) => `<code>${escapeHtml(`${f.key}:${f.example}`)}</code>`,
+    ).join(' ')
     return (
       note('kb-query-error', t('query.badQuery')) +
-      `<ul class="kb-query-errors">${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+      `<ul class="kb-query-errors">${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>` +
+      note('kb-query-keys', t('query.canWrite')) +
+      `<p class="kb-query-keys-list">${keys}</p>`
     )
   }
 

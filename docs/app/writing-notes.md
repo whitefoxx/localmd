@@ -98,7 +98,7 @@ That one asks for papers tagged llm that nothing has touched in six months,
 newest first. What you see is a table of the pages that match; click one to
 open it.
 
-The filters are the ones the search box takes, and more of them: `type:` and
+The filters are the ones the search box takes — the same grammar in both places — `type:` and
 `tag:`, `path:wiki/` for a folder, `fm:status=draft` for any other field you
 keep at the top of a page, `age:<30d` or `modified:<2026-01-01` for time,
 `orphan:true` for pages nothing links to, `broken:true` for pages with a dead

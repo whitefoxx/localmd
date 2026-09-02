@@ -5,6 +5,10 @@ export default {
     commandPlaceholder: 'Run a command…',
     sessionPlaceholder: 'Find a chat…',
     jotPlaceholder: 'Jot a line into today’s page…',
+    // Shown beside a filter whose values are neither the grammar's nor the
+    // knowledge base's to list — a date, a number — where the shape of what
+    // goes there is the most that can be offered.
+    filterShape: 'for example',
     noResults: 'No results',
     askAgent: 'Ask the agent:',
     hintCommands: 'commands',
@@ -23,6 +27,7 @@ export default {
     commandPlaceholder: '执行命令…',
     sessionPlaceholder: '查找对话…',
     jotPlaceholder: '随手记一行到今天的页面…',
+    filterShape: '例如',
     noResults: '没有结果',
     askAgent: '问助手：',
     hintCommands: '命令',

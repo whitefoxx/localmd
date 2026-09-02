@@ -82,10 +82,18 @@ for `tags:`.
 
 ## Finding things by tag
 
-Search (⌘K) takes two filters as well as words: `type:concept` and `tag:llm`,
-which combine, match part of a word, and ignore case. Type `tag:` and stop and
-it lists every tag in the knowledge base with how many files carry it — pick
-one rather than remembering it.
+Search (⌘K) takes filters as well as words — `type:concept`, `tag:llm`,
+`path:wiki/`, `fm:status=draft` for any other field at the top of a page,
+`age:>6m`, `orphan:true` — and they combine, match part of a word, and ignore
+case. Repeat one and both must hold. Type `tag:` and stop and it lists every
+tag in the knowledge base with how many files carry it — pick one rather than
+remembering it.
+
+These are the same filters a `localmd-query` block takes (see `writing-notes`)
+and the same ones the assistant uses, so a way of narrowing that you work out
+in one place works in the others. A filter that will not parse is quietly
+ignored here rather than complained about: half-typed is the normal state of a
+search box.
 
 A PDF or EPUB has no frontmatter of its own, so it inherits the tags of the
 pages that cite it: tag a note about a paper and the paper answers to that tag

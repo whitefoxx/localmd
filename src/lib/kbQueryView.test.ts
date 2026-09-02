@@ -81,6 +81,19 @@ describe('renderQueryBlock', () => {
     expect(html).not.toContain('<table')
   })
 
+  it('says what a query CAN ask for, but only to someone already stuck', () => {
+    // The agent gets the grammar back when it writes a bad query; a person
+    // writing one in their own note should not get less. On a working block
+    // it would be furniture, so it appears on the error path and nowhere else.
+    const broken = render('age:30d')
+    expect(broken).toContain('What a query can ask for')
+    expect(broken).toContain('fm:status=draft')
+    expect(broken).toContain('orphan:true')
+
+    expect(render('type:paper')).not.toContain('What a query can ask for')
+    expect(render('tag:llmm')).not.toContain('What a query can ask for')
+  })
+
   it('escapes page titles and paths — a note is untrusted text', () => {
     const html = render('type:paper path:script')
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')

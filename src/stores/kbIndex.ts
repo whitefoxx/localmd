@@ -24,6 +24,7 @@ import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 import { isIgnored } from '@/lib/scanScope'
 import type { QueryPage } from '@/lib/kbQuery'
+import { frontmatterKeys } from '@/lib/wiki'
 import { isDailyPath } from '@/lib/daily'
 
 interface CachedPage {
@@ -436,6 +437,42 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     })),
   )
 
+  /**
+   * What can follow a filter, when the answer is this knowledge base's own
+   * vocabulary rather than the grammar's — the generalisation of the tag list
+   * ⌘K has always shown for a bare `tag:`.
+   *
+   * `fm` is the one that earns this on its own: which frontmatter fields
+   * exist is a fact about someone's notes that no documentation could ever
+   * state, so the folder has to answer for itself.
+   */
+  function filterValues(key: string): { value: string; count: number }[] {
+    const tally = (values: Iterable<string>): { value: string; count: number }[] => {
+      const counts = new Map<string, number>()
+      for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+      return [...counts]
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+    }
+    if (key === 'tag') return allTags.value.map(({ tag, count }) => ({ value: tag, count }))
+    if (key === 'type') return tally(types.value.values())
+    if (key === 'fm') {
+      return tally([...pages.value.values()].flatMap((p) => frontmatterKeys(p.content)))
+    }
+    if (key === 'path') {
+      // Every directory that holds something, deepest included: `path:` is how
+      // you scope to a corner of the KB, and the useful corners are rarely the
+      // top level alone.
+      const dirs: string[] = []
+      for (const p of useFilesStore().allFiles) {
+        const parts = p.split('/')
+        for (let i = 1; i < parts.length; i++) dirs.push(parts.slice(0, i).join('/') + '/')
+      }
+      return tally(dirs)
+    }
+    return []
+  }
+
   const graph = computed(() => {
     const nodes = [...pages.value.keys()]
     const links: { source: string; target: string }[] = []
@@ -597,5 +634,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, queryPages, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, queryPages, filterValues, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

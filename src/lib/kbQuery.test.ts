@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { parseKbQuery, runQuery, formatQueryResult, type QueryPage } from './kbQuery'
+import {
+  parseKbQuery,
+  runQuery,
+  formatQueryResult,
+  hasFilters,
+  sourceMatches,
+  bareFilterKey,
+  FILTER_HELP,
+  type QueryPage,
+} from './kbQuery'
 
 const NOW = Date.parse('2026-09-01T00:00:00Z')
 const DAY = 86_400_000
@@ -246,6 +255,104 @@ describe('runQuery', () => {
     const bare: QueryPage[] = [{ path: 'a.md', content: 'just text', outgoing: [], broken: [] }]
     expect(runQuery(bare, parseKbQuery('', NOW).query).total).toBe(1)
     expect(runQuery(bare, parseKbQuery('type:paper', NOW).query).rows).toEqual([])
+  })
+})
+
+describe('bareFilterKey', () => {
+  const key = (s: string): string | null => bareFilterKey(s)?.key ?? null
+
+  it('is the filter with no value — how you find out what can go in it', () => {
+    expect(key('tag:')).toBe('tag')
+    expect(key('type:paper tag:')).toBe('tag')
+    expect(key('tag:   ')).toBe('tag')
+    expect(key('tag:llm')).toBe(null)
+    expect(key('')).toBe(null)
+  })
+
+  it('answers for every key, not just the one that always did', () => {
+    expect(key('fm:')).toBe('fm')
+    expect(key('path:')).toBe('path')
+    expect(key('age:')).toBe('age')
+    expect(key('LINKED-BY:')).toBe('linked-by')
+  })
+
+  it('is not fooled by a word that merely ends in a colon', () => {
+    expect(key('nosuchfilter:')).toBe(null)
+    expect(key('http://example.com')).toBe(null)
+    expect(key('note:')).toBe(null)
+    // Mid-value colons are not a trailing bare key.
+    expect(key('fm:status=')).toBe(null)
+    expect(key('age:<')).toBe(null)
+  })
+})
+
+describe('FILTER_HELP', () => {
+  it('is the only list of valid keys, so parseable implies discoverable', () => {
+    // A key that parses but is not here could never be found by anyone; a key
+    // here that does not parse would be advertised and then rejected.
+    for (const { key: k, example } of FILTER_HELP) {
+      const { query, errors } = parseKbQuery(`${k}:${example}`, NOW)
+      expect(errors, `${k}:${example}`).toEqual([])
+      // It has to actually set something — a key that parses to an empty
+      // query is one the grammar quietly ignores.
+      expect(
+        hasFilters(query) || query.sort !== undefined || query.limit !== undefined ||
+          query.columns !== undefined,
+        `${k}:${example}`,
+      ).toBe(true)
+    }
+  })
+
+  it('offers the knowledge base its own vocabulary where only it can know', () => {
+    const fromKb = FILTER_HELP.filter((f) => f.fromKb).map((f) => f.key)
+    expect(fromKb).toEqual(['tag', 'type', 'path', 'fm'])
+  })
+})
+
+describe('hasFilters', () => {
+  it('separates narrowing from shaping and from plain words', () => {
+    const q = (s: string): boolean => hasFilters(parseKbQuery(s, NOW).query)
+    expect(q('just some words')).toBe(false)
+    expect(q('')).toBe(false)
+    // Shaping is not narrowing: sorting and capping nothing is still nothing.
+    expect(q('sort:-modified limit:20 columns:rating')).toBe(false)
+    expect(q('type:paper')).toBe(true)
+    expect(q('tag:llm')).toBe(true)
+    expect(q('orphan:true')).toBe(true)
+    expect(q('age:<30d')).toBe(true)
+    expect(q('fm:status')).toBe(true)
+  })
+})
+
+describe('sourceMatches', () => {
+  // A document is not a page: no frontmatter, no links, no body of ours. What
+  // it does have is the tags of the pages citing it, which is why `tag:llm` in
+  // the palette has always found the paper as well as the notes on it.
+  const match = (s: string, path = 'raw/papers/attention.pdf', tags = ['llm-agents']): boolean =>
+    sourceMatches(parseKbQuery(s, NOW).query, path, tags)
+
+  it('answers the questions a document can answer', () => {
+    expect(match('tag:llm')).toBe(true)
+    expect(match('path:papers/')).toBe(true)
+    expect(match('tag:llm path:papers/')).toBe(true)
+  })
+
+  it('declines the ones it cannot', () => {
+    // Not "documents are exempt" — a PDF has no `status:` to compare, so a
+    // query asking for one is not asking about documents at all.
+    expect(match('fm:status=draft')).toBe(false)
+    expect(match('tag:llm fm:status=draft')).toBe(false)
+    expect(match('type:paper')).toBe(false)
+    expect(match('orphan:true')).toBe(false)
+    expect(match('links-to:index')).toBe(false)
+    expect(match('age:<30d')).toBe(false)
+  })
+
+  it('never matches on an empty query, and still has to actually match', () => {
+    expect(match('')).toBe(false)
+    expect(match('sort:-modified limit:5')).toBe(false)
+    expect(match('tag:nothinglikethis')).toBe(false)
+    expect(match('path:books/')).toBe(false)
   })
 })
 

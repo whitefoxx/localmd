@@ -794,6 +794,15 @@
 .md-preview .kb-query-warn {
   @apply text-xs text-fg-3;
 }
+.md-preview .kb-query-keys {
+  @apply mt-2 text-sm text-fg-2;
+}
+.md-preview .kb-query-keys-list {
+  @apply my-1 flex flex-wrap gap-x-2 gap-y-1;
+}
+.md-preview .kb-query-keys-list code {
+  @apply text-xs;
+}
 .md-preview hr {
   @apply my-4 border-border;
 }

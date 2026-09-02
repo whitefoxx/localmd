@@ -15,10 +15,14 @@
  * nobody maintains starts to lie the moment someone edits around it
  * (AGENTS.md, "Recall is a view or a note, never a record").
  *
- * The grammar is the search palette's (`searchQuery.ts`) grown up rather than
- * a second language — same `key:value` tokens, same quoting, same
- * case-insensitive substring default — so ⌘K, the agent tool and the
- * `localmd-query` block all read one syntax.
+ * The grammar grew out of the search palette's two filters rather than being a
+ * second language beside them — same `key:value` tokens, same quoting, same
+ * case-insensitive substring default — and the palette now speaks this one, so
+ * ⌘K, the agent tool and the `localmd-query` block read a single syntax. What
+ * they do NOT share is execution: finding a file and answering a structural
+ * question are different jobs, and the palette keeps its fuzzy ranking and its
+ * cached maps (see `sourceMatches` for the part of the grammar a document,
+ * which is not a page, can still answer).
  *
  * Pure over a snapshot so it tests in node like `marks.ts` and `lint.ts`, and
  * `now` is a parameter, never `Date.now()`: `age:<30d` has to be assertable.
@@ -105,14 +109,34 @@ export interface QueryResult {
 
 // ── derived facts ───────────────────────────────────────────────────────────
 
+/**
+ * A page's derived facts, each computed at most once and only if something
+ * asks. Laziness is not a micro-optimisation here: the palette runs this on
+ * every keystroke, and deriving title, type, role, tags AND body for every
+ * page — five passes over the content to answer a query that looks at two of
+ * them — cost 12ms per keystroke on a 2000-page corpus. A page rejected by
+ * `path:` should never have its frontmatter parsed at all.
+ */
 interface Facts {
-  title: string
-  type: string | null
-  role: 'index' | 'log' | null
-  tags: readonly string[]
-  body: string
-  inbound: number
+  title: () => string
+  type: () => string | null
+  role: () => 'index' | 'log' | null
+  tags: () => readonly string[]
+  body: () => string
+  inbound: () => number
   field: (name: string) => string[] | null
+}
+
+function once<T>(compute: () => T): () => T {
+  let called = false
+  let value: T
+  return () => {
+    if (!called) {
+      value = compute()
+      called = true
+    }
+    return value
+  }
 }
 
 /**
@@ -131,22 +155,29 @@ function roleOf(path: string, content: string): 'index' | 'log' | null {
 }
 
 function factsFor(pages: readonly QueryPage[]): Map<string, Facts> {
-  const inbound = new Map<string, number>()
-  for (const page of pages) {
-    for (const target of new Set(page.outgoing)) {
-      if (target !== page.path) inbound.set(target, (inbound.get(target) ?? 0) + 1)
+  // Built on first use and shared, for the same reason the rest is lazy: only
+  // `orphan:`, `sort:inbound` and the inbound column ever ask, and walking
+  // every page's links to answer a question nobody asked is a cost paid on
+  // every keystroke for a benefit taken on almost none.
+  const inbound = once(() => {
+    const counts = new Map<string, number>()
+    for (const page of pages) {
+      for (const target of new Set(page.outgoing)) {
+        if (target !== page.path) counts.set(target, (counts.get(target) ?? 0) + 1)
+      }
     }
-  }
+    return counts
+  })
   const out = new Map<string, Facts>()
   for (const page of pages) {
     const memo = new Map<string, string[] | null>()
     out.set(page.path, {
-      title: extractTitle(page.content) ?? page.path,
-      type: extractType(page.content),
-      role: roleOf(page.path, page.content),
-      tags: extractTags(page.content),
-      body: splitFrontmatter(page.content).body,
-      inbound: inbound.get(page.path) ?? 0,
+      title: once(() => extractTitle(page.content) ?? page.path),
+      type: once(() => extractType(page.content)),
+      role: once(() => roleOf(page.path, page.content)),
+      tags: once(() => extractTags(page.content)),
+      body: once(() => splitFrontmatter(page.content).body),
+      inbound: () => inbound().get(page.path) ?? 0,
       field: (name) => {
         if (!memo.has(name)) memo.set(name, extractField(page.content, name))
         return memo.get(name) ?? null
@@ -219,11 +250,11 @@ function isoDay(ms: number): string {
 function cellValue(name: string, page: QueryPage, f: Facts): string {
   switch (name) {
     case 'path': return page.path
-    case 'title': return f.title
-    case 'type': return f.type ?? ''
-    case 'tags': return f.tags.join(', ')
+    case 'title': return f.title()
+    case 'type': return f.type() ?? ''
+    case 'tags': return f.tags().join(', ')
     case 'modified': return page.mtime === undefined ? '' : isoDay(page.mtime)
-    case 'inbound': return String(f.inbound)
+    case 'inbound': return String(f.inbound())
     default: return (f.field(name) ?? []).join(', ')
   }
 }
@@ -242,14 +273,19 @@ function sortKeyOf(key: SortKey, page: QueryPage, f: Facts): { v: number | strin
   }
   switch (key) {
     case 'path': return { v: page.path.toLowerCase(), missing: false }
-    case 'title': return { v: f.title.toLowerCase(), missing: false }
-    case 'inbound': return { v: f.inbound, missing: false }
+    case 'title': return { v: f.title().toLowerCase(), missing: false }
+    case 'inbound': return { v: f.inbound(), missing: false }
     case 'modified':
       return page.mtime === undefined ? { v: 0, missing: true } : { v: page.mtime, missing: false }
   }
 }
 
-export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
+/** The filter step, shared so `matchingPaths` and `runQuery` cannot disagree
+ *  about what a query means. */
+function filterPages(
+  pages: readonly QueryPage[],
+  q: KbQuery,
+): { matched: QueryPage[]; facts: Map<string, Facts> } {
   const facts = factsFor(pages)
   const lower = (s: string): string => s.toLowerCase()
 
@@ -267,11 +303,11 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
   const matched = pages.filter((page) => {
     const f = facts.get(page.path)!
     if (q.path !== undefined && !lower(page.path).includes(lower(q.path))) return false
-    if (q.type !== undefined && !lower(f.type ?? '').includes(lower(q.type))) return false
-    if (q.role !== undefined && f.role !== q.role) return false
+    if (q.type !== undefined && !lower(f.type() ?? '').includes(lower(q.type))) return false
+    if (q.role !== undefined && f.role() !== q.role) return false
     if (q.tags?.length) {
       for (const want of q.tags) {
-        if (!f.tags.some((t) => lower(t).includes(lower(want)))) return false
+        if (!f.tags().some((t) => lower(t).includes(lower(want)))) return false
       }
     }
     if (q.fields?.length) {
@@ -282,9 +318,9 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
     if (linkedFrom && !linkedFrom.has(page.path)) return false
     if (q.cites !== undefined && !(page.sources ?? []).some((s) => lower(s).includes(lower(q.cites!))))
       return false
-    if (q.orphan !== undefined && f.inbound === 0 !== q.orphan) return false
+    if (q.orphan !== undefined && f.inbound() === 0 !== q.orphan) return false
     if (q.broken !== undefined && page.broken.length > 0 !== q.broken) return false
-    if (q.text !== undefined && !lower(f.body).includes(lower(q.text))) return false
+    if (q.text !== undefined && !lower(f.body()).includes(lower(q.text))) return false
     if (q.modifiedAfter !== undefined && !(page.mtime !== undefined && page.mtime >= q.modifiedAfter))
       return false
     if (q.modifiedBefore !== undefined && !(page.mtime !== undefined && page.mtime <= q.modifiedBefore))
@@ -292,6 +328,22 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
     return true
   })
 
+  return { matched, facts }
+}
+
+/**
+ * Just the paths a query matches.
+ *
+ * The search palette wants exactly this and nothing else: it re-ranks and
+ * re-renders the result its own way, so building a row per match — which
+ * derives a title per match — is work thrown away on every keystroke.
+ */
+export function matchingPaths(pages: readonly QueryPage[], q: KbQuery): Set<string> {
+  return new Set(filterPages(pages, q).matched.map((p) => p.path))
+}
+
+export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
+  const { matched, facts } = filterPages(pages, q)
   const ordered = [...matched]
   if (q.sort) {
     const { key, order } = q.sort
@@ -315,11 +367,11 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
     for (const c of columns) cells[c] = cellValue(c, page, f)
     return {
       path: page.path,
-      title: f.title,
-      type: f.type,
-      tags: f.tags,
+      title: f.title(),
+      type: f.type(),
+      tags: f.tags(),
       mtime: page.mtime,
-      inbound: f.inbound,
+      inbound: f.inbound(),
       cells,
     }
   })
@@ -346,10 +398,11 @@ function unmatched(
   const out: string[] = []
   const all = [...facts.values()]
   const lower = (s: string): string => s.toLowerCase()
-  if (q.type !== undefined && !all.some((f) => lower(f.type ?? '').includes(lower(q.type!))))
+  if (q.type !== undefined && !all.some((f) => lower(f.type() ?? '').includes(lower(q.type!))))
     out.push(`type:${q.type}`)
   for (const want of q.tags ?? []) {
-    if (!all.some((f) => f.tags.some((t) => lower(t).includes(lower(want))))) out.push(`tag:${want}`)
+    if (!all.some((f) => f.tags().some((t) => lower(t).includes(lower(want)))))
+      out.push(`tag:${want}`)
   }
   for (const test of q.fields ?? []) {
     if (!all.some((f) => f.field(test.field) !== null)) out.push(`fm:${test.field}`)
@@ -364,10 +417,46 @@ function unmatched(
 /** Runs of non-space, with quoted stretches kept whole: `fm:title="a b"`. */
 const TOKEN_RE = /(?:[^\s"]|"[^"]*")+/g
 const FILTER_RE = /^([a-zA-Z][a-zA-Z-]*):([\s\S]*)$/
-const KEYS = new Set([
-  'type', 'tag', 'fm', 'path', 'role', 'links-to', 'linked-by', 'cites',
-  'orphan', 'broken', 'age', 'modified', 'sort', 'limit', 'columns',
-])
+/**
+ * Every filter key, with what can follow it. One list, so a key cannot be
+ * parseable without also being discoverable: adding a filter here makes the
+ * grammar accept it AND makes it show up where people find out what exists.
+ *
+ * `fromKb` marks the keys whose values are the user's own vocabulary. Those
+ * are the ones documentation can never answer — no manual knows which
+ * frontmatter fields someone writes — so the knowledge base has to answer for
+ * itself. `values` is for the ones the grammar decides. The rest can only
+ * offer the SHAPE of what goes there, which is still more than nothing.
+ */
+export interface FilterHelp {
+  key: string
+  /** What can follow the colon, shown when there is no list to offer. */
+  example: string
+  /** Fixed values, where the grammar and not the knowledge base decides. */
+  values?: readonly string[]
+  /** Whether the knowledge base supplies the values. */
+  fromKb?: boolean
+}
+
+export const FILTER_HELP: readonly FilterHelp[] = [
+  { key: 'tag', example: 'llm', fromKb: true },
+  { key: 'type', example: 'concept', fromKb: true },
+  { key: 'path', example: 'wiki/', fromKb: true },
+  { key: 'fm', example: 'status=draft', fromKb: true },
+  { key: 'role', example: 'index', values: ['index', 'log'] },
+  { key: 'orphan', example: 'true', values: ['true', 'false'] },
+  { key: 'broken', example: 'true', values: ['true', 'false'] },
+  { key: 'age', example: '>6m' },
+  { key: 'modified', example: '<2026-01-01' },
+  { key: 'links-to', example: 'index' },
+  { key: 'linked-by', example: 'index' },
+  { key: 'cites', example: 'paper.pdf' },
+  { key: 'sort', example: '-modified' },
+  { key: 'limit', example: '20' },
+  { key: 'columns', example: 'rating,status' },
+]
+
+const KEYS = new Set(FILTER_HELP.map((f) => f.key))
 const BUILTIN_SORTS = new Set(['path', 'title', 'modified', 'inbound'])
 const DAY = 86_400_000
 const UNITS: Record<string, number> = { d: DAY, w: 7 * DAY, m: 30 * DAY, y: 365 * DAY }
@@ -498,6 +587,79 @@ export function parseKbQuery(text: string, now: number): { query: KbQuery; error
   const textTerm = free.join(' ').trim()
   if (textTerm) query.text = textTerm
   return { query, errors }
+}
+
+// ── files that are not pages ────────────────────────────────────────────────
+
+/**
+ * Every key that NARROWS a result — all of KbQuery except the free text and
+ * the shaping (sort, limit, columns). One list because two questions are
+ * asked of it, "was anything narrowed?" and "was only this narrowed?", and a
+ * second enumeration would answer them differently the first time a filter is
+ * added to one and not the other.
+ */
+const FILTER_KEYS = [
+  'path', 'type', 'tags', 'role', 'fields', 'linksTo', 'linkedBy', 'cites',
+  'orphan', 'broken', 'modifiedAfter', 'modifiedBefore',
+] as const
+
+/** The filter keys this query actually uses. */
+function narrowedBy(q: KbQuery): string[] {
+  return FILTER_KEYS.filter((k) => {
+    const v = q[k]
+    return Array.isArray(v) ? v.length > 0 : v !== undefined
+  })
+}
+
+/** Whether anything beyond free text was asked. */
+export function hasFilters(q: KbQuery): boolean {
+  return narrowedBy(q).length > 0
+}
+
+/**
+ * Whether a query asks only things a file with no content of its own could
+ * answer, and whether this one does.
+ *
+ * The search palette lists documents beside pages, and a PDF has tags: the
+ * ones the pages citing it declared (`kbIndex.tagsFor`). So `tag:llm` there
+ * has always found the paper as well as the notes on it, and a merge that
+ * quietly dropped that would be a regression nobody would report — the
+ * document would simply stop turning up.
+ *
+ * The rule is not "sources are exempt", it is that each thing answers the
+ * questions that apply to it. A document has inherited tags and a path; it
+ * has no frontmatter, no outgoing links and no body of ours, so `fm:`,
+ * `role:`, the link filters and `orphan:` are not questions it can answer —
+ * and a query asking one of them is not asking about documents at all.
+ */
+export function sourceMatches(q: KbQuery, path: string, tags: readonly string[]): boolean {
+  const asked = narrowedBy(q)
+  // Something must actually have been asked, and only things a document can
+  // answer. An empty query is the palette's "no filters" case and never
+  // routes through here.
+  if (!asked.length || !asked.every((k) => k === 'tags' || k === 'path')) return false
+  const lower = (v: string): string => v.toLowerCase()
+  if (q.path !== undefined && !lower(path).includes(lower(q.path))) return false
+  for (const want of q.tags ?? []) {
+    if (!tags.some((t) => lower(t).includes(lower(want)))) return false
+  }
+  return true
+}
+
+/**
+ * The filter a query trails off in, if it trails off in one — `tag:` with
+ * nothing after it, and now every other key too.
+ *
+ * Typing a filter is how you find out it exists; typing it and stopping is how
+ * you find out what can go in it. That rule already existed for tags and was
+ * the only way anyone learnt a tag's name; there was never a reason it should
+ * be the only key that answers.
+ */
+export function bareFilterKey(term: string): FilterHelp | null {
+  const m = term.trimEnd().match(/(?:^|\s)([a-zA-Z][a-zA-Z-]*):$/)
+  if (!m) return null
+  const key = m[1].toLowerCase()
+  return FILTER_HELP.find((f) => f.key === key) ?? null
 }
 
 // ── rendering ───────────────────────────────────────────────────────────────

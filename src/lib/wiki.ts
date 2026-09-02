@@ -186,6 +186,25 @@ export function extractField(content: string, name: string): string[] | null {
   return out
 }
 
+/**
+ * The field names a page declares at the top level of its frontmatter.
+ *
+ * Top level only: a nested key or a `- item` is part of a value, not a field
+ * anyone can filter on. What this feeds is the answer to "what can I put after
+ * `fm:`" — a question no manual can answer, because the vocabulary is whatever
+ * the person writing the notes decided it was.
+ */
+export function frontmatterKeys(content: string): string[] {
+  const { yaml } = splitFrontmatter(content)
+  if (!yaml) return []
+  const out: string[] = []
+  for (const line of yaml.split('\n')) {
+    const m = line.match(/^([A-Za-z][A-Za-z0-9_-]*):/)
+    if (m) out.push(m[1])
+  }
+  return out
+}
+
 /** Cross-platform basename. */
 export function baseName(p: string): string {
   return p.split('/').pop() ?? p
