@@ -386,3 +386,41 @@ export function groupSuggestions(
     }))
     .sort((a, b) => b.mentions.length - a.mentions.length || a.to.localeCompare(b.to))
 }
+
+/** How many targets a report lists, and how many mentions per target. Both are
+ *  caps on the TEXT, never on the work: the counts above them are the real
+ *  totals, and the "+N more" lines say so — a report that quietly showed the
+ *  first twenty would read as "there are twenty". */
+const MAX_TARGETS = 20
+const MAX_MENTIONS = 8
+
+/**
+ * Render for the agent, as part of the kb_health result.
+ *
+ * By target, because that is what there is to propose: one page, one decision,
+ * one batch of edits somebody says yes to once. Listing it by source instead
+ * would be the same information arranged as thirty separate questions.
+ */
+export function formatLinkSuggestions(groups: readonly LinkSuggestionGroup[]): string {
+  if (!groups.length) return ''
+  const mentions = groups.reduce((n, g) => n + g.mentions.length, 0)
+  const lines = groups.slice(0, MAX_TARGETS).map((g) => {
+    const where = g.mentions.slice(0, MAX_MENTIONS).map((m) => `${m.from}:${m.line}`)
+    if (g.mentions.length > MAX_MENTIONS) {
+      where.push(`+${g.mentions.length - MAX_MENTIONS} more`)
+    }
+    return `  ${g.to} ← "${g.name}" · ${g.mentions.length}: ${where.join(', ')}`
+  })
+  if (groups.length > MAX_TARGETS) {
+    lines.push(`  … +${groups.length - MAX_TARGETS} more pages named this way`)
+  }
+  return (
+    `\n\nPages named without a link — ${mentions} mentions of ${groups.length} pages. ` +
+    `Each line is a page, then everywhere its name is written in prose without linking ` +
+    `to it. Matched on the characters alone, with no idea what either page is about, so ` +
+    `read the line before believing it: a word can be a page's name and not be about ` +
+    `that page. Offer ONE target at a time, as a batch the user approves in one answer — ` +
+    `adding links to somebody's pages is an edit, and edits are theirs to say yes to:\n` +
+    lines.join('\n')
+  )
+}

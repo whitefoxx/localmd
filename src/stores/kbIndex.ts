@@ -18,6 +18,7 @@ import {
   findUndeclaredCitations,
   type LintReport,
 } from '@/lib/lint'
+import { suggestLinks, type LinkSuggestion } from '@/lib/connect'
 import { fuzzyRank, excerptAround, queryTerms, hasAllTerms } from '@/lib/fuzzy'
 import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
@@ -347,6 +348,21 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
    */
   const healthFlags = computed<HealthSets>(() => healthSets(lintReport()))
 
+  /**
+   * Pages that name another page and do not link to it (`lib/connect`).
+   *
+   * Cached and lazy for the same reason as `healthFlags`, and it matters more
+   * here: this is a scan of every page's text against every page's name, about
+   * 0.4s on two thousand pages. A computed pays that when the graph changes
+   * and never when nobody asks — which is most sessions, because the one thing
+   * that asks is the health tool.
+   *
+   * Deliberately NOT part of `lintReport`. That report says what is wrong; this
+   * proposes work, and a page with fifty of these is not fifty times unhealthier
+   * than a page with none — it is better connected to a KB that has more in it.
+   */
+  const linkSuggestions = computed<LinkSuggestion[]>(() => suggestLinks(pages.value))
+
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
    *  chips, graph node coloring, and the search palette's `type:` filter. */
   const types = computed(() => {
@@ -646,5 +662,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, queryPages, filterValues, healthFlags, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, queryPages, filterValues, healthFlags, linkSuggestions, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

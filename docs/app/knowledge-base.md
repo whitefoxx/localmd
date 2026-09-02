@@ -321,6 +321,28 @@ Deeper questions — "do any of these pages contradict each other?" — do need 
 assistant to read your content, so ask for those directly and it will suggest a
 scope rather than reading everything.
 
+### Links you meant to make
+
+The same pass looks for the opposite of a broken link: a page that writes the
+name of another page and never links to it. Twelve notes mention attention, you
+have a page called Attention, and not one of them points at it — so the page
+exists and nothing leads to it, which from the inside of a knowledge base feels
+much the same as never having written it.
+
+This is matched on the words alone. Nothing here knows what either page is
+about; it knows that these characters are the title of that one. So it stays
+out of code blocks, out of links you already made and out of the frontmatter,
+and it passes over a name that two pages share, because it would have to guess
+which you meant. What comes back is a list to read, not a change to accept — a
+word can be a page's name without being about that page, and you are the one
+who can tell.
+
+The assistant offers them one page at a time: everything that mentions
+Attention, in a single answer you say yes or no to. That is one decision
+instead of twelve, and it is the point rather than a convenience. A heap of
+suggestions you have to approve one by one would be the work it was supposed to
+save you, handed back with someone else's name on it.
+
 ## Related
 
 Getting set up: `getting-started`. How the assistant works with your files:

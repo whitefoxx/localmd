@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { suggestLinks, groupSuggestions } from './connect'
+import { suggestLinks, groupSuggestions, formatLinkSuggestions } from './connect'
 import type { LintPage } from './lint'
 
 const page = (content: string, outgoing: string[] = []): LintPage => ({
@@ -231,5 +231,39 @@ describe('groupSuggestions', () => {
       ['wiki/attention.md', 'Attention', 2],
       ['wiki/scaling.md', 'Scaling', 1],
     ])
+  })
+})
+
+describe('formatLinkSuggestions', () => {
+  const group = (to: string, n: number) => ({
+    to,
+    name: to,
+    mentions: Array.from({ length: n }, (_, i) => ({
+      from: `wiki/p${i}.md`,
+      to,
+      term: to,
+      line: i + 1,
+      excerpt: 'x',
+    })),
+  })
+
+  it('says nothing at all when there is nothing to say', () => {
+    expect(formatLinkSuggestions([])).toBe('')
+  })
+
+  it('leads with the totals and lists the target, not the mention', () => {
+    const out = formatLinkSuggestions([group('wiki/a.md', 2), group('wiki/b.md', 1)])
+    expect(out).toContain('3 mentions of 2 pages')
+    expect(out).toContain('wiki/a.md ← "wiki/a.md" · 2: wiki/p0.md:1, wiki/p1.md:2')
+  })
+
+  it('says how much it did not list, on both axes', () => {
+    // A cap that shows the first twenty and stops reads as "there are twenty".
+    const out = formatLinkSuggestions(
+      Array.from({ length: 25 }, (_, i) => group(`wiki/t${i}.md`, 12)),
+    )
+    expect(out).toContain('+4 more')
+    expect(out).toContain('+5 more pages named this way')
+    expect(out).toContain('300 mentions of 25 pages')
   })
 })
