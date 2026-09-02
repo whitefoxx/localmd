@@ -104,6 +104,14 @@ a picture says what the file is rather than trying to show it, and the button
 underneath still opens it properly. A link to a page that does not exist does
 nothing: looking around should not create files.
 
+The card reads a page; it can also **write** one. The pencil turns it into a
+plain text editor over the same buffer the main editor uses, saving as you go,
+so the file cannot be open in both places with two different ideas of what it
+says. While you are writing, moving the pointer over the graph no longer
+changes the subject — a card that swapped pages out from under the cursor
+would be unusable. The other button gives the card most of the window when a
+360px column is not enough room, and hands it back afterwards.
+
 Follow links far enough and the page in the card is one the graph is dimming —
 it is drawn, but at an opacity that reads as absent, so you cannot see where it
 sits. **Find it on the graph** appears then. It does what clicking that node would

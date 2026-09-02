@@ -536,6 +536,66 @@ test.describe('picking a node', () => {
       .toEqual({ centredInFreeHalf: true, clearOfTheCard: true, centredDown: true })
   })
 
+  test('the card can be written in, through the editor’s own buffer', async ({ page }) => {
+    const { hub, neighbor } = await pickable(page)
+    await at(page, hub, 'click')
+    await page.getByTitle('Write in this file').click()
+
+    const box = page.locator('[data-preview] textarea')
+    await expect(box).toBeVisible()
+    await box.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type('\n\nWritten from the graph.')
+
+    // The pointer must not swap the subject out from under a caret.
+    await at(page, neighbor, 'mouseenter')
+    expect(await shown(page)).toBe(hub)
+
+    // One buffer, one autosave — not a second write path of the card's own.
+    const state = async (): Promise<{ path: string | null; dirty: boolean; text: boolean }> =>
+      page.evaluate(async () => {
+        const { useFilesStore } = await import('/src/stores/files.ts')
+        const f = useFilesStore()
+        return {
+          path: f.currentPath,
+          dirty: f.saveState !== 'saved',
+          text: f.content.includes('Written from the graph.'),
+        }
+      })
+    expect(await state()).toMatchObject({ path: hub, text: true })
+    await expect.poll(async () => (await state()).dirty).toBe(false)
+    expect(
+      await page.evaluate(async (p) => {
+        const fs = await import('/src/lib/fs.ts')
+        return (await fs.readFile(p)).includes('Written from the graph.')
+      }, hub),
+    ).toBe(true)
+
+    // Reading it again shows what was just written, not the index's snapshot.
+    await page.getByTitle('Stop writing').click()
+    await expect(page.locator('[data-preview] .md-preview')).toContainText(
+      'Written from the graph.',
+    )
+  })
+
+  test('the card can take the frame, and give it back', async ({ page }) => {
+    const { hub } = await pickable(page)
+    await at(page, hub, 'click')
+    const width = async (): Promise<number> =>
+      (await page.locator('[data-preview]').boundingBox())!.width
+
+    const docked = await width()
+    await page.getByTitle('Fill the window').click()
+    const filled = await width()
+    expect(filled).toBeGreaterThan(docked)
+    // Bigger, but not the whole view: the graph stays visible around it.
+    const frame = (await page.locator('svg').boundingBox())!
+    expect(filled).toBeLessThan(frame.width - 80)
+
+    await page.getByTitle('Back to the side').click()
+    expect(await width()).toBe(docked)
+  })
+
   test('the card is the way out: its button opens the file', async ({ page }) => {
     const { hub } = await pickable(page)
     await at(page, hub, 'click')

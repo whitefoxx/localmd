@@ -16,7 +16,13 @@ import { useKbImages } from '@/composables/useKbImages'
 import { fileStem } from '@/lib/wiki'
 import type { GraphPreview } from '@/lib/graphData'
 
-const props = defineProps<{ preview: GraphPreview; canGoBack: boolean; canLocate: boolean }>()
+const props = defineProps<{
+  preview: GraphPreview
+  canGoBack: boolean
+  canLocate: boolean
+  editing: boolean
+  expanded: boolean
+}>()
 const emit = defineEmits<{
   /** Read a link's target here, without moving the graph. */
   (e: 'follow', path: string): void
@@ -24,6 +30,12 @@ const emit = defineEmits<{
   (e: 'back'): void
   /** Aim the graph at this page — what clicking its node would have done. */
   (e: 'locate'): void
+  /** Write in this file rather than read it. */
+  (e: 'edit', path: string): void
+  /** Stop writing. */
+  (e: 'done'): void
+  /** Take the frame, or give it back. */
+  (e: 'resize'): void
   /** Leave the graph and open this file in the editor. */
   (e: 'open', path: string): void
   /** Search the knowledge base for this tag. */
@@ -135,6 +147,27 @@ function onClick(e: MouseEvent): void {
           {{ preview.path }}
         </div>
       </div>
+      <!-- A page can be written in. A tag has no file, and a PDF has no text
+           this could put a caret into — both are read here or nowhere. -->
+      <button
+        v-if="preview.kind === 'page'"
+        class="shrink-0"
+        :class="editing ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
+        :title="editing ? $t('graph.previewDone') : $t('graph.previewEdit')"
+        @click="editing ? emit('done') : emit('edit', preview.path)"
+      >
+        <span class="codicon codicon-sm" :class="editing ? 'codicon-preview' : 'codicon-edit'" />
+      </button>
+      <button
+        class="shrink-0 text-fg-3 hover:text-fg-0"
+        :title="expanded ? $t('graph.previewShrink') : $t('graph.previewExpand')"
+        @click="emit('resize')"
+      >
+        <span
+          class="codicon codicon-sm"
+          :class="expanded ? 'codicon-screen-normal' : 'codicon-screen-full'"
+        />
+      </button>
       <button
         class="shrink-0 text-fg-3 hover:text-fg-0"
         :title="$t('graph.previewClose')"
@@ -144,7 +177,20 @@ function onClick(e: MouseEvent): void {
       </button>
     </div>
 
-    <div ref="body" class="panel-scroll min-h-0 flex-1 px-3 py-2" @click="onClick">
+    <!-- The same buffer the editor writes: typing here goes through the store's
+         own autosave, so nothing here has a second way to reach the disk. -->
+    <textarea
+      v-if="editing && preview.kind === 'page'"
+      class="mx-auto min-h-0 w-full max-w-3xl flex-1 resize-none bg-transparent px-3 py-2 font-mono text-[13px] leading-relaxed text-fg-1 outline-none"
+      spellcheck="false"
+      :value="files.content"
+      @input="files.onEdited(($event.target as HTMLTextAreaElement).value)"
+    />
+    <!-- Filling the window is for reading a whole page, so the column stops
+         where a line stops being readable and the headings go back to the
+         reading view's scale — `md-compact` exists for a 360px card. -->
+    <div v-else ref="body" class="panel-scroll min-h-0 flex-1" @click="onClick">
+      <div class="mx-auto w-full max-w-3xl px-3 py-2">
       <!-- A tag has no file to show, so it shows what carries it. Clicking one
            re-aims the graph at that page rather than leaving for it: you came
            here to look around, and the button below is what leaving is for. -->
@@ -177,14 +223,21 @@ function onClick(e: MouseEvent): void {
 
       <template v-else>
         <!-- eslint-disable-next-line vue/no-v-html -->
-        <div class="md-preview md-compact text-sm" v-html="html" />
+        <div class="md-preview" :class="expanded ? '' : 'md-compact text-sm'" v-html="html" />
         <p v-if="preview.truncated" class="mt-3 border-t border-border pt-2 text-xs text-fg-3">
           {{ $t('graph.previewTruncated') }}
         </p>
       </template>
+      </div>
     </div>
 
-    <div class="shrink-0 space-y-1.5 border-t border-border px-3 py-2">
+    <div
+      v-if="editing"
+      class="shrink-0 border-t border-border px-3 py-2 text-center text-xs text-fg-3"
+    >
+      {{ files.saveState === 'saved' ? $t('graph.previewSaved') : $t('graph.previewSaving') }}
+    </div>
+    <div v-else class="shrink-0 space-y-1.5 border-t border-border px-3 py-2">
       <!-- Only while this page is somewhere you cannot see. A dimmed node and
            its mark are drawn at an opacity that reads as absent, so "where is
            this" is a real question here and nowhere else. -->

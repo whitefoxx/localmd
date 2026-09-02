@@ -111,10 +111,25 @@ const hoverId = ref<string | null>(null)
  *  the index alone — no file read, nothing to await, nothing to go stale. */
 const previewNode = ref<GraphDatum | null>(null)
 
+/**
+ * Whether the card is being written in, and whether it has taken the frame.
+ *
+ * Editing pins the card harder than a click does: the pointer must not swap
+ * the subject out from under a caret, so hovering is ignored entirely until it
+ * is put away.
+ */
+const editing = ref(false)
+const expanded = ref(false)
+
 const preview = computed<GraphPreview | null>(() =>
   previewNode.value
     ? graphPreview(previewNode.value, {
-        content: (path) => index.pages.get(path)?.content ?? null,
+        // The open buffer wins over the index's copy. They are the same text
+        // until someone types, and after that the index is a snapshot of a
+        // file that has moved on — which is what the card would otherwise
+        // show you the moment you edited in it.
+        content: (path) =>
+          path === files.currentPath ? files.content : (index.pages.get(path)?.content ?? null),
         tagged: (tag) => [...index.tags].filter(([, l]) => l.includes(tag)).map(([p]) => p).sort(),
       })
     : null,
@@ -132,6 +147,8 @@ function show(id: string | null): void {
 }
 
 function goto(id: string | null): void {
+  // A new subject is not the one being written in.
+  editing.value = false
   previewId.value = id
   // A link can leave the graph: wikilinks resolve to any file, and the graph
   // draws only markdown pages. The card describes the path either way — it is
@@ -197,6 +214,19 @@ function clearSelection(): void {
 function openFromCard(path: string): void {
   ui.graphOpen = false
   void openInEditor(path)
+}
+
+/**
+ * Write in the card.
+ *
+ * Through the same buffer the editor uses — `openFile` then `onEdited` — and
+ * not a second write path of its own. One buffer means one autosave, and it
+ * means the file cannot be open in the editor with unsaved changes while this
+ * quietly writes an older copy over them. The tab it opens is the honest
+ * consequence: the file IS open now.
+ */
+async function startEdit(path: string): Promise<void> {
+  if (await files.openFile(path)) editing.value = true
 }
 
 /** A tag has no file to open, so its card offers the question it stands for
@@ -647,6 +677,7 @@ function render(): void {
       // what the pin lit up: a dimmed node is not part of the answer on screen,
       // so pointing at one says nothing rather than swapping the card to a page
       // the pointer was merely passing over.
+      if (editing.value) return
       if (ui.graphSelected && lit.value.has(d.id)) show(d.id)
     })
     // A drag keeps its node: the pointer routinely outruns the node it is
@@ -783,6 +814,8 @@ onBeforeUnmount(() => {
   stopTypeWatch = null
   ui.graphType = null
   ui.graphTags = false
+  editing.value = false
+  expanded.value = false
   clearSelection()
   hoverId.value = null
   applyFocus = null
@@ -809,16 +842,26 @@ onBeforeUnmount(() => {
     <div
       v-if="preview"
       ref="cardFrame"
-      class="pointer-events-none absolute right-4 top-4 bottom-4 z-10 flex w-[360px] max-w-[calc(100%-2rem)] flex-col items-stretch"
+      class="pointer-events-none absolute z-10 flex flex-col items-stretch"
+      :class="
+        expanded
+          ? 'inset-y-8 left-8 right-8 mx-auto max-w-4xl'
+          : 'right-4 top-4 bottom-4 w-[360px] max-w-[calc(100%-2rem)]'
+      "
     >
       <GraphPreviewCard
         :preview="preview"
         :can-go-back="trail.length > 0"
         :can-locate="canLocate"
-        class="max-h-full"
+        :editing="editing"
+        :expanded="expanded"
+        :class="expanded ? 'min-h-0 flex-1' : 'max-h-full'"
         @follow="follow"
         @back="back"
         @locate="locate"
+        @edit="startEdit"
+        @done="editing = false"
+        @resize="expanded = !expanded"
         @open="openFromCard"
         @search="searchTag"
         @select="pin"
