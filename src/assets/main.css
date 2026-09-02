@@ -816,6 +816,20 @@
   @apply block w-full max-w-sm rounded border border-dashed border-border px-3 py-6 text-center text-xs text-fg-3;
 }
 
+/* A task list box. Inert everywhere by default — a box that toggles its own
+   appearance and writes nothing is worse than one that does not move — and
+   live only where a surface has wired the click up by carrying
+   `md-interactive`. Not the `disabled` attribute: a disabled input is sent no
+   clicks at all, so nothing could ever tick one. */
+.md-preview .task-check {
+  @apply mr-1 align-middle accent-accent;
+  pointer-events: none;
+}
+.md-preview.md-interactive .task-check {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 /* The same page, read at a glance rather than read: the graph's preview card
    is a 360px column, and a heading scaled for the reading view is a billboard
    in it. Only the vertical scale changes — the markup, the colours and the

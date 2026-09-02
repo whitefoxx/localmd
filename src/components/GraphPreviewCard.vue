@@ -95,6 +95,13 @@ useKbImages(
  */
 function onClick(e: MouseEvent): void {
   if (handleCodeCopy(e)) return
+  // A box here is a picture of one. CSS keeps the pointer off it; this keeps
+  // the SPACE key off it too, since a focused checkbox fires a click either
+  // way — and this card is a look at a page, not a place that writes to it.
+  if ((e.target as HTMLElement).closest('.task-check')) {
+    e.preventDefault()
+    return
+  }
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   e.preventDefault()

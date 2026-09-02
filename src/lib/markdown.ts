@@ -265,8 +265,27 @@ export function renderMarkdown(
     breaks: false,
   })
 
+  /**
+   * Task list checkboxes, numbered in document order.
+   *
+   * The number is the whole of how a click finds its line: `lib/tasks` counts
+   * the source the same way, so the nth box on screen is the nth task line in
+   * the text.
+   *
+   * NOT `disabled`, which was the first attempt: a disabled input is not sent
+   * clicks at all, so nothing could ever tick one. Inertness is CSS instead —
+   * `pointer-events: none` unless the surface carries `md-interactive` to say
+   * it has wired the click up. A box that toggles its own appearance and
+   * writes nothing is worse than one that does not move.
+   */
+  let taskIndex = 0
+
   marked.use({
     renderer: {
+      checkbox(checked: boolean) {
+        const on = checked ? ' checked' : ''
+        return `<input type="checkbox" class="task-check" data-task="${taskIndex++}"${on}> `
+      },
       code(code: string, infostring: string | undefined) {
         const lang = infostring?.trim().split(/\s+/)[0]?.toLowerCase()
         return lang === QUERY_FENCE ? queryPlaceholder(code) : highlightCode(code, lang)

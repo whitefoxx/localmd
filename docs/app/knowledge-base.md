@@ -204,7 +204,15 @@ Some of what turns up while you are reading is not a note, it is a job. ⌘K,
 as `- [ ] …`. The panel stays open, so several go in one after another, and
 nothing you were reading is disturbed.
 
-`[]` on its own opens the list instead, to go through them.
+`[x]` files something already done, box ticked — a thing you did before there
+was time to write it down still belongs on the list, which is a record of what
+happened as much as a queue of what has not. `[]` on its own opens the list
+instead, to go through them.
+
+**Tick a box by clicking it.** Anywhere a page is being read — the list itself,
+or a note that happens to carry a checklist — the boxes in the preview are
+live, and clicking one edits the line behind it. No switching to edit and
+hunting for the right one.
 
 That file is a task list in the ordinary markdown sense, which is the whole
 design: GitHub renders it, every editor's preview renders it, the assistant can

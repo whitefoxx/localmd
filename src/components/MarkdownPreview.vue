@@ -8,6 +8,7 @@ import { useCiteQuote } from '@/composables/useCiteQuote'
 import { renderMarkdown } from '@/lib/markdown'
 import { handleCodeCopy } from '@/lib/copyCode'
 import { splitFrontmatter } from '@/lib/wiki'
+import { toggleTask } from '@/lib/tasks'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
 import { useTtsHighlight } from '@/composables/useTtsHighlight'
@@ -90,6 +91,18 @@ useKbQuery(root, () => html.value)
 
 async function onClick(e: MouseEvent): Promise<void> {
   if (handleCodeCopy(e)) return
+  // Ticking a box off where you are reading it, rather than switching to edit
+  // and finding the line. It writes through the same buffer as the editor, so
+  // there is one text and one autosave — and `toggleTask` refuses an item the
+  // text no longer has, which is what a render clicked after the file changed
+  // underneath would otherwise tick by accident.
+  const box = (e.target as HTMLElement).closest<HTMLElement>('.task-check')
+  if (box) {
+    e.preventDefault()
+    const next = toggleTask(files.content, Number(box.dataset.task))
+    if (next !== null) files.onEdited(next)
+    return
+  }
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   // Citation tokens: [[N:blockid]] chips and [[pdfN:path]] source links.
@@ -171,7 +184,7 @@ watch(
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div
       ref="root"
-      class="md-preview max-w-3xl mx-auto px-8 py-6"
+      class="md-preview md-interactive max-w-3xl mx-auto px-8 py-6"
       v-html="html"
       @click="onClick"
       @mouseover="quoteOnHover"

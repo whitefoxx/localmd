@@ -270,3 +270,61 @@ test('a name nobody recognises opens as text, and only real bytes say binary', a
   await expect(page.locator('.cm-editor')).toHaveCount(0)
   await expect(page.getByText('Binary file — no preview')).toBeVisible()
 })
+
+
+/**
+ * Ticking a task off where you are reading it.
+ *
+ * The rendered box and the source line agree by ordinal — the renderer numbers
+ * boxes in document order and `lib/tasks` numbers task lines the same way — so
+ * the thing this really tests is that the two counts skip the same things. A
+ * fenced sample is the case that breaks a naive count, and it is here.
+ */
+test('a task box in the preview ticks the line it stands for', async ({ page }) => {
+  const doc = [
+    '# Todos',
+    '',
+    '- [ ] buy oat milk',
+    '- [x] call the bank',
+    '',
+    '```markdown',
+    '- [ ] a sample, not a task',
+    '```',
+    '',
+    '- [ ] after the fence',
+    '',
+  ].join('\n')
+  await openWith(page, [['todos.md', doc]])
+  await openFromTree(page, 'todos.md')
+
+  const boxes = page.locator('.md-preview .task-check')
+  // Three, not four: the one inside the fence is a code sample.
+  await expect(boxes).toHaveCount(3)
+  expect(await boxes.evaluateAll((n) => n.map((b) => (b as HTMLInputElement).checked))).toEqual([
+    false,
+    true,
+    false,
+  ])
+
+  // Where the import actually landed — `setInputFiles` files go to the selected
+  // directory, which after Initialize is `wiki/`, not the root.
+  const read = (): Promise<string | null> =>
+    page.evaluate(async () => {
+      const { useFilesStore } = await import('/src/stores/files.ts')
+      const fs = await import('/src/lib/fs.ts')
+      return fs.tryReadFile(useFilesStore().currentPath!)
+    })
+
+  await boxes.nth(0).click()
+  await expect.poll(read).toContain('- [x] buy oat milk')
+
+  // The one after the fence: a count that included the sample would tick the
+  // sample instead, and leave this line alone.
+  await boxes.nth(2).click()
+  await expect.poll(read).toContain('- [x] after the fence')
+  expect(await read()).toContain('```markdown\n- [ ] a sample, not a task')
+
+  // And back off again.
+  await boxes.nth(1).click()
+  await expect.poll(read).toContain('- [ ] call the bank')
+})
