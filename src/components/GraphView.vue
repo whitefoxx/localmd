@@ -10,7 +10,7 @@ import {
   type Simulation,
 } from 'd3-force'
 import { select } from 'd3-selection'
-import { zoom, zoomIdentity } from 'd3-zoom'
+import { zoom, zoomIdentity, zoomTransform } from 'd3-zoom'
 import { drag } from 'd3-drag'
 import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
@@ -45,6 +45,9 @@ const files = useFilesStore()
 const ui = useUiStore()
 
 const host = ref<HTMLElement | null>(null)
+/** The card's frame. Measured, not assumed: its left edge is where the space
+ *  the graph still has to itself ends. */
+const cardFrame = ref<HTMLElement | null>(null)
 let sim: Simulation<GraphNode, GraphLink> | null = null
 /** Re-fit the current drawing to the container. Set by render(); calling it
  *  is much cheaper than rebuilding the graph, and it keeps every node where
@@ -52,6 +55,9 @@ let sim: Simulation<GraphNode, GraphLink> | null = null
 let refit: (() => void) | null = null
 /** Stops the previous render's watch on the legend filter. */
 let stopTypeWatch: (() => void) | null = null
+/** Bring a node into the part of the frame the card is not covering. Set by
+ *  render(), which owns the zoom behaviour it has to move. */
+let centerOn: ((id: string) => void) | null = null
 /** Push the selection state at the current drawing — dimming and ring. Set by
  *  render(), because everything it needs is built there and thrown away with
  *  it; the watch at the bottom of this file is the only caller. */
@@ -171,9 +177,13 @@ const canLocate = computed(
     !lit.value.has(previewId.value),
 )
 
-/** What the button does: exactly what clicking that node would have done. */
+/** What the button does: exactly what clicking that node would have done —
+ *  plus the part a click never needs, because a click happens where the
+ *  pointer already is and this does not. */
 function locate(): void {
-  if (previewId.value) pin(previewId.value)
+  if (!previewId.value) return
+  pin(previewId.value)
+  centerOn?.(previewId.value)
 }
 
 function clearSelection(): void {
@@ -329,12 +339,42 @@ function render(): void {
   const topLinks = litLinkLayer.node() as SVGGElement
   const topNodes = litNodeLayer.node() as SVGGElement
 
-  svg.call(
-    zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 4])
-      .on('zoom', (e) => g.attr('transform', e.transform)) as never,
-  )
+  // Kept, rather than called and forgotten: moving the view from code means
+  // handing the new transform back to the same behaviour, or the next drag
+  // would resume from where the user last left it and jump.
+  const zoomer = zoom<SVGSVGElement, unknown>()
+    .scaleExtent([0.2, 4])
+    .on('zoom', (e) => g.attr('transform', e.transform))
+  svg.call(zoomer as never)
   svg.call((sel) => sel.property('__zoom', zoomIdentity))
+
+  /**
+   * Put a node in the middle of the space the card leaves.
+   *
+   * Not the middle of the frame: the card is docked over the right of it, and
+   * centring a node you were just told to go and find UNDER the thing that
+   * told you would be the joke. The card is measured rather than assumed —
+   * it has a max-width, so on a narrow window it is not the width it declares.
+   *
+   * The scale is left alone. Zoom is the user's; this is being asked where to
+   * look, not how close.
+   */
+  centerOn = (id: string): void => {
+    const d = nodesById.value.get(id)
+    const svgEl = svg.node()
+    if (!d || !svgEl || d.x === undefined || d.y === undefined) return
+    const free = cardFrame.value
+      ? cardFrame.value.getBoundingClientRect().left - el.getBoundingClientRect().left
+      : el.clientWidth
+    const k = zoomTransform(svgEl).k
+    // A window too narrow to have a free half still has a left edge; putting
+    // the node against it beats leaving it wherever it happened to be.
+    const tx = Math.max(free / 2, 60)
+    zoomer.transform(
+      svg as never,
+      zoomIdentity.translate(tx - k * d.x, el.clientHeight / 2 - k * d.y).scale(k),
+    )
+  }
 
   const link = linkLayer.selectAll<SVGLineElement, GraphLink>('line').data(links).join('line')
 
@@ -697,6 +737,7 @@ onBeforeUnmount(() => {
   clearSelection()
   hoverId.value = null
   applyFocus = null
+  centerOn = null
   nodesById.value = new Map()
   lit.value = new Set()
   observer?.disconnect()
@@ -718,6 +759,7 @@ onBeforeUnmount(() => {
          still takes a click everywhere the card itself is not. -->
     <div
       v-if="preview"
+      ref="cardFrame"
       class="pointer-events-none absolute right-4 top-4 bottom-4 z-10 flex w-[360px] max-w-[calc(100%-2rem)] flex-col items-stretch"
     >
       <GraphPreviewCard

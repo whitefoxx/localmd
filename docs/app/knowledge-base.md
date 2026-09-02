@@ -106,8 +106,11 @@ nothing: looking around should not create files.
 
 Follow links far enough and the page in the card is one the graph is dimming —
 it is drawn, but at an opacity that reads as absent, so you cannot see where it
-sits. **Find it on the graph** appears then, and does exactly what clicking that
-node would have done: the graph re-aims around it.
+sits. **Find it on the graph** appears then. It does what clicking that node would
+have done — the graph re-aims around it — and brings it into the middle of the
+part of the window the card is not covering, so it is somewhere you can
+actually look at it. Your zoom is left alone: you asked where to look, not how
+close.
 
 **Tags**, in the bar along the top, adds a second kind of dot: one per tag,
 joined to every page carrying it. A tag has no file to show, so its card lists

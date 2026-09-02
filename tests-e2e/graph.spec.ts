@@ -199,6 +199,36 @@ test.describe('picking a node', () => {
     })
   }
 
+  /**
+   * Wait until the force layout has stopped moving things.
+   *
+   * Anything that measures a POSITION has to, and creating a file mid-test
+   * rebuilds the graph — so the assertion below would otherwise race a
+   * simulation still pulling the whole picture apart, and read a node on its
+   * way somewhere else.
+   */
+  async function settled(page: import('@playwright/test').Page): Promise<void> {
+    let last = ''
+    await expect
+      .poll(
+        async () => {
+          const now = await page.evaluate(() =>
+            [...document.querySelectorAll('svg > g > g > g')]
+              .map((e) => {
+                const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(e.getAttribute('transform') ?? '')
+                return m ? `${Math.round(+m[1])},${Math.round(+m[2])}` : '?'
+              })
+              .join('|'),
+          )
+          const same = now !== '' && now === last
+          last = now
+          return same
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true)
+  }
+
   /** Fire a real DOM event at one node — the simulation keeps moving, so
    *  clicking by coordinate would race the layout. */
   async function at(
@@ -446,6 +476,7 @@ test.describe('picking a node', () => {
     await expect(locate).toBeVisible()
 
     // Pressing it is exactly what clicking that node would have been.
+    await settled(page)
     await locate.click()
     expect(
       await page.evaluate(async () => {
@@ -457,6 +488,31 @@ test.describe('picking a node', () => {
     await expect(locate).toBeHidden()
     // A new subject, so the trail it took to get here is gone — same as a click.
     await expect(page.getByTitle('Back to the page you came from')).toBeHidden()
+
+    // And it was brought somewhere it can be read: vertically centred, and in
+    // the half of the frame the card is not covering. Polled, because the
+    // simulation may still be settling — but a pan that never happened leaves
+    // the node nowhere near, so this cannot pass by accident.
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const svg = document.querySelector('svg')!.getBoundingClientRect()
+          const card = document.querySelector('[data-preview]')!.getBoundingClientRect()
+          const el = [...document.querySelectorAll('svg > g > g > g')].find(
+            (e) => (e as unknown as { __data__: { id: string } }).__data__.id === 'wiki/cc.md',
+          )!
+          const dot = el.querySelector('circle')!.getBoundingClientRect()
+          const x = dot.left + dot.width / 2 - svg.left
+          const y = dot.top + dot.height / 2 - svg.top
+          const free = card.left - svg.left
+          return {
+            centredInFreeHalf: Math.abs(x - free / 2) < 40,
+            clearOfTheCard: x < free,
+            centredDown: Math.abs(y - svg.height / 2) < 40,
+          }
+        }),
+      )
+      .toEqual({ centredInFreeHalf: true, clearOfTheCard: true, centredDown: true })
   })
 
   test('the card is the way out: its button opens the file', async ({ page }) => {
