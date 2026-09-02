@@ -76,21 +76,16 @@ export function renderQueryBlock(
 
   const result = runQuery(pages, query)
   const columns = query.columns ?? DEFAULT_COLUMNS
-  const terms = result.unmatchedTerms.join(', ')
-  // An unmatched term cannot leave a row standing, so an empty result and an
-  // unknown term are one sentence, not two stacked ones that both open with
-  // "nothing". The warning below survives for the case the invariant does
-  // not cover — a filter that reports unknown vocabulary without excluding
-  // anything — rather than being unreachable by assumption.
+  // `unmatchedTerms` is only ever populated for an empty result — a filter
+  // nothing satisfies cannot leave a row standing — so the empty message
+  // absorbs the reason and there is no second place for it to appear.
   if (!result.rows.length) {
+    const terms = result.unmatchedTerms.join(', ')
     return note(
       'kb-query-empty',
-      result.unmatchedTerms.length ? t('query.emptyUnknown', { terms }) : t('query.empty'),
+      terms ? t('query.emptyUnknown', { terms }) : t('query.empty'),
     )
   }
-  const warning = result.unmatchedTerms.length
-    ? note('kb-query-warn', t('query.unknown', { terms }))
-    : ''
 
   const head = ['', ...columns].map((c) => `<th>${escapeHtml(c)}</th>`).join('')
   const body = result.rows
@@ -107,7 +102,6 @@ export function renderQueryBlock(
 
   return (
     `<table class="kb-query-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
-    `<p class="kb-query-count">${escapeHtml(count)}</p>` +
-    warning
+    `<p class="kb-query-count">${escapeHtml(count)}</p>`
   )
 }

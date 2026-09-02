@@ -5,10 +5,10 @@ export default {
     count: '{n} pages',
     countCapped: '{shown} of {total} pages',
     empty: 'Nothing matches this query.',
-    // Only ever shown together with an empty result: a term nothing in the KB
-    // satisfies cannot leave any row standing, so saying "nothing matches"
-    // first and naming the term second is the same sentence twice.
-    emptyUnknown: 'Nothing matches: this knowledge base has no {terms}.',
+    // Only ever shown with an empty result: a filter nothing satisfies cannot
+    // leave a row standing, so naming it and saying "nothing matches" would be
+    // the same sentence twice.
+    emptyUnknown: 'Nothing matches — nothing here satisfies {terms}.',
     badQuery: 'This query could not be read:',
     canWrite: 'What a query can ask for:',
     // One line per filter, shown for whichever row the palette is sitting on.
@@ -31,13 +31,12 @@ export default {
       limit: 'Show at most this many; the true total is still reported',
       columns: 'Extra fields to show for each result',
     },
-    unknown: 'Nothing in this knowledge base matches: {terms}',
   },
   zh: {
     count: '{n} 个页面',
     countCapped: '{total} 个页面中的 {shown} 个',
     empty: '没有页面匹配这个查询。',
-    emptyUnknown: '没有匹配：这个知识库里没有 {terms}。',
+    emptyUnknown: '没有匹配——这里没有任何东西满足 {terms}。',
     badQuery: '这个查询读不了：',
     canWrite: '一个查询可以问这些：',
     filter: {
@@ -57,6 +56,5 @@ export default {
       limit: '最多显示这么多；真实总数仍会报出',
       columns: '每条结果额外显示哪些字段',
     },
-    unknown: '这个知识库里没有：{terms}',
   },
 }

@@ -376,39 +376,62 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
     }
   })
 
-  return { rows, total: matched.length, unmatchedTerms: unmatched(pages, facts, q) }
+  return {
+    rows,
+    total: matched.length,
+    unmatchedTerms: matched.length ? [] : unmatched(pages, q),
+  }
 }
 
 /**
- * Terms no page in the KB could satisfy, checked against the whole corpus
- * rather than the filtered set — the question is "does this vocabulary
- * exist?", not "did this query return anything?".
+ * The filters that, on their own against the whole corpus, match nothing.
  *
- * Worth knowing before rendering one: every term checked here is also a hard
- * filter, so a term nothing satisfies cannot leave a row standing. A non-empty
- * result here therefore implies an empty `rows`, and a caller that prints
- * "nothing matches" and then names the term is printing one sentence twice.
- * The test named "an unknown term always means an empty result" holds this.
+ * One rule instead of the four special cases this started as. It began by
+ * asking "does this vocabulary exist?" — a tag, a type, a frontmatter field, a
+ * path — which left every other filter unexplained. `age:>3m` returning empty
+ * looked identical whether the knowledge base held nothing that old or the
+ * threshold was simply wrong, and the only way to tell was to run a second
+ * query. Asking each filter alone answers all of them the same way, time and
+ * link filters and free text included.
+ *
+ * It also turns an invariant that was true by argument into one true by
+ * construction: a filter matching nothing alone cannot leave a row standing in
+ * a conjunction that contains it. So this is only computed for an empty
+ * result — a non-empty one provably has nothing to report — which is what
+ * makes running each filter separately affordable.
  */
-function unmatched(
-  pages: readonly QueryPage[],
-  facts: Map<string, Facts>,
-  q: KbQuery,
-): string[] {
+function unmatched(pages: readonly QueryPage[], q: KbQuery): string[] {
   const out: string[] = []
-  const all = [...facts.values()]
-  const lower = (s: string): string => s.toLowerCase()
-  if (q.type !== undefined && !all.some((f) => lower(f.type() ?? '').includes(lower(q.type!))))
-    out.push(`type:${q.type}`)
-  for (const want of q.tags ?? []) {
-    if (!all.some((f) => f.tags().some((t) => lower(t).includes(lower(want)))))
-      out.push(`tag:${want}`)
+  const alone = (part: KbQuery, label: string): void => {
+    if (!filterPages(pages, part).matched.length) out.push(label)
   }
-  for (const test of q.fields ?? []) {
-    if (!all.some((f) => f.field(test.field) !== null)) out.push(`fm:${test.field}`)
+  if (q.type !== undefined) alone({ type: q.type }, `type:${q.type}`)
+  for (const tag of q.tags ?? []) alone({ tags: [tag] }, `tag:${tag}`)
+  for (const f of q.fields ?? []) {
+    alone({ fields: [f] }, `fm:${f.field}${f.op === 'exists' ? '' : `${f.op}${f.value ?? ''}`}`)
   }
-  if (q.path !== undefined && !pages.some((p) => lower(p.path).includes(lower(q.path!))))
-    out.push(`path:${q.path}`)
+  if (q.path !== undefined) alone({ path: q.path }, `path:${q.path}`)
+  if (q.role !== undefined) alone({ role: q.role }, `role:${q.role}`)
+  if (q.orphan !== undefined) alone({ orphan: q.orphan }, `orphan:${q.orphan}`)
+  if (q.broken !== undefined) alone({ broken: q.broken }, `broken:${q.broken}`)
+  if (q.linksTo !== undefined) alone({ linksTo: q.linksTo }, `links-to:${q.linksTo}`)
+  if (q.linkedBy !== undefined) alone({ linkedBy: q.linkedBy }, `linked-by:${q.linkedBy}`)
+  if (q.cites !== undefined) alone({ cites: q.cites }, `cites:${q.cites}`)
+  if (q.modifiedAfter !== undefined || q.modifiedBefore !== undefined) {
+    // Reported as the dates it resolved to rather than the words that produced
+    // them: `age:>3m` and `modified:<2026-06-04` are the same question, and the
+    // answer worth giving is which side of the knowledge base's own range the
+    // threshold fell on.
+    const { modifiedAfter: after, modifiedBefore: before } = q
+    const bound = [
+      after !== undefined ? `touched after ${isoDay(after)}` : '',
+      before !== undefined ? `touched before ${isoDay(before)}` : '',
+    ]
+      .filter(Boolean)
+      .join(' and ')
+    alone({ modifiedAfter: after, modifiedBefore: before }, bound)
+  }
+  if (q.text !== undefined) alone({ text: q.text }, `"${q.text}"`)
   return out
 }
 
@@ -671,8 +694,8 @@ export function formatQueryResult(r: QueryResult, columns: readonly string[] = [
   const terms = r.unmatchedTerms.join(', ')
   const head =
     r.total === 0
-      ? r.unmatchedTerms.length
-        ? `No pages match. This KB has no ${terms} — check the spelling.`
+      ? terms
+        ? `No pages match. Nothing here satisfies ${terms}.`
         : 'No pages match.'
       : r.rows.length < r.total
         ? `${r.rows.length} of ${r.total} matches:`
@@ -688,11 +711,5 @@ export function formatQueryResult(r: QueryResult, columns: readonly string[] = [
     return '  ' + bits.join('  ')
   })
   if (r.rows.length > MAX_LISTED) lines.push(`  … +${r.rows.length - MAX_LISTED} more`)
-  // Only when rows survived: an empty result already said it above, and
-  // saying it twice is the same sentence twice.
-  const warn =
-    r.total > 0 && r.unmatchedTerms.length
-      ? `\n\nNothing in this KB matches: ${terms} — check the spelling.`
-      : ''
-  return head + (lines.length ? '\n' + lines.join('\n') : '') + warn
+  return head + (lines.length ? '\n' + lines.join('\n') : '')
 }

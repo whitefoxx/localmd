@@ -63,14 +63,14 @@ describe('renderQueryBlock', () => {
     // term is *why* the result is empty. Saying "nothing matches" and then
     // naming the term is the same sentence twice.
     const unknown = render('tag:llmm')
-    expect(unknown).toContain('this knowledge base has no tag:llmm')
+    expect(unknown).toContain('nothing here satisfies tag:llmm')
     expect(unknown).not.toContain('Nothing matches this query')
 
-    // Real terms that simply do not co-occur say only that, with nothing to
-    // blame on a typo.
-    const real = render('type:paper orphan:false')
+    // Filters that each match something and simply do not co-occur say only
+    // that, with nothing to blame on a typo.
+    const real = render('path:scaling fm:rating=9')
     expect(real).toContain('Nothing matches this query')
-    expect(real).not.toContain('knowledge base has no')
+    expect(real).not.toContain('nothing here satisfies')
   })
 
   it('shows what it could not read instead of rendering an empty table', () => {

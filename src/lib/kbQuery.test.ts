@@ -227,14 +227,47 @@ describe('runQuery', () => {
     }
   })
 
-  it('names vocabulary the KB does not have, so a typo is not an empty table', () => {
+  it('names the filters nothing satisfies, so a typo is not an empty table', () => {
     const r = runQuery(PAGES, parseKbQuery('tag:llmm fm:nosuch type:nope path:none/', NOW).query)
     expect(r.rows).toEqual([])
-    expect(r.unmatchedTerms).toEqual(['type:nope', 'tag:llmm', 'fm:nosuch', 'path:none/'])
-    // A real term that simply returns nothing in combination is NOT flagged.
+    expect(r.unmatchedTerms).toEqual([
+      'type:nope',
+      'tag:llmm',
+      'fm:nosuch',
+      'path:none/',
+    ])
+    // Filters that each match something and simply do not co-occur are NOT
+    // flagged: the query is answerable, the answer is just empty.
     expect(
       runQuery(PAGES, parseKbQuery('tag:llm tag:people', NOW).query).unmatchedTerms,
     ).toEqual([])
+  })
+
+  it('explains a time threshold the knowledge base does not reach', () => {
+    // The gap this closes: `age:` used to be invisible here, so an empty
+    // result could not tell "nothing is that old" from "the threshold is
+    // wrong" — the only way to find out was to run a second query.
+    const tooOld = runQuery(PAGES, parseKbQuery('age:>10y', NOW).query)
+    expect(tooOld.rows).toEqual([])
+    expect(tooOld.unmatchedTerms).toEqual(['touched before 2016-09-03'])
+
+    const future = runQuery(PAGES, parseKbQuery('modified:>2030-01-01', NOW).query)
+    expect(future.unmatchedTerms).toEqual(['touched after 2030-01-01'])
+
+    // A range the KB does reach says nothing.
+    expect(runQuery(PAGES, parseKbQuery('age:<1y', NOW).query).unmatchedTerms).toEqual([])
+  })
+
+  it('explains the other filters too, not just the vocabulary ones', () => {
+    const q = (s: string): string[] =>
+      runQuery(PAGES, parseKbQuery(s, NOW).query).unmatchedTerms
+    expect(q('cites:nothing.pdf')).toEqual(['cites:nothing.pdf'])
+    expect(q('links-to:nowhere')).toEqual(['links-to:nowhere'])
+    expect(q('linked-by:nosuchpage')).toEqual(['linked-by:nosuchpage'])
+    expect(q('definitelynotinanybody')).toEqual(['"definitelynotinanybody"'])
+    // Satisfiable on their own, so there is nothing to explain.
+    expect(q('role:log')).toEqual([])
+    expect(q('broken:true')).toEqual([])
   })
 
   it('resolves role from the filename when no marker is declared', () => {
@@ -364,7 +397,7 @@ describe('formatQueryResult', () => {
 
     // One sentence, not "No pages match." followed by a line saying the same.
     const empty = formatQueryResult(runQuery(PAGES, parseKbQuery('tag:llmm', NOW).query))
-    expect(empty).toBe('No pages match. This KB has no tag:llmm — check the spelling.')
+    expect(empty).toBe('No pages match. Nothing here satisfies tag:llmm.')
 
     // A genuinely empty result, with every term real, says only that.
     const real = formatQueryResult(runQuery(PAGES, parseKbQuery('type:paper role:log', NOW).query))
