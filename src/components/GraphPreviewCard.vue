@@ -13,6 +13,7 @@ import { useFilesStore } from '@/stores/files'
 import { renderMarkdown } from '@/lib/markdown'
 import { handleCodeCopy } from '@/lib/copyCode'
 import { useKbImages } from '@/composables/useKbImages'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { fileStem } from '@/lib/wiki'
 import type { GraphPreview } from '@/lib/graphData'
 
@@ -148,15 +149,21 @@ function onClick(e: MouseEvent): void {
         </div>
       </div>
       <!-- A page can be written in. A tag has no file, and a PDF has no text
-           this could put a caret into — both are read here or nowhere. -->
+           this could put a caret into — both are read here or nowhere. The
+           glyphs and the words are the editor toolbar's, because it is the
+           same switch: a second vocabulary for one idea is a second thing to
+           learn. -->
       <button
         v-if="preview.kind === 'page'"
         class="shrink-0"
         :class="editing ? 'text-accent' : 'text-fg-3 hover:text-fg-0'"
-        :title="editing ? $t('graph.previewDone') : $t('graph.previewEdit')"
+        :title="editing ? $t('common.preview') : $t('common.edit')"
         @click="editing ? emit('done') : emit('edit', preview.path)"
       >
-        <span class="codicon codicon-sm" :class="editing ? 'codicon-preview' : 'codicon-edit'" />
+        <span
+          class="codicon codicon-sm"
+          :class="editing ? 'codicon-open-preview' : 'codicon-edit'"
+        />
       </button>
       <button
         class="shrink-0 text-fg-3 hover:text-fg-0"
@@ -177,15 +184,16 @@ function onClick(e: MouseEvent): void {
       </button>
     </div>
 
-    <!-- The same buffer the editor writes: typing here goes through the store's
-         own autosave, so nothing here has a second way to reach the disk. -->
-    <textarea
-      v-if="editing && preview.kind === 'page'"
-      class="mx-auto min-h-0 w-full max-w-3xl flex-1 resize-none bg-transparent px-3 py-2 font-mono text-[13px] leading-relaxed text-fg-1 outline-none"
-      spellcheck="false"
-      :value="files.content"
-      @input="files.onEdited(($event.target as HTMLTextAreaElement).value)"
-    />
+    <!-- The editor itself, not a lookalike. It takes no props: it binds to the
+         open file, which `edit` has just made this one — so highlighting, live
+         rendering, wikilink completion, image paste and the undo history are
+         the ones you already know, and there is no second editor to keep in
+         step with the real one. Two instances can be mounted at once (the main
+         pane is still there under the graph); each ignores a document change
+         that already matches its own, so they do not fight. -->
+    <div v-if="editing && preview.kind === 'page'" class="min-h-0 flex-1 overflow-hidden">
+      <MarkdownEditor />
+    </div>
     <!-- Filling the window is for reading a whole page, so the column stops
          where a line stops being readable and the headings go back to the
          reading view's scale — `md-compact` exists for a 360px card. -->

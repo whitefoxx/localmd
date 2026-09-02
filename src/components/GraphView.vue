@@ -868,13 +868,17 @@ onBeforeUnmount(() => {
           : 'right-4 top-4 bottom-4 w-[360px] max-w-[calc(100%-2rem)]'
       "
     >
+      <!-- Docked, the card is as tall as what it has to say — a short note gets
+           a short card. Writing is the exception: a textarea's own height is
+           two rows, so a card sized to its content collapsed to a slot nobody
+           could write in. Then it takes the whole column. -->
       <GraphPreviewCard
         :preview="preview"
         :can-go-back="trail.length > 0"
         :can-locate="canLocate"
         :editing="editing"
         :expanded="expanded"
-        :class="expanded ? 'min-h-0 flex-1' : 'max-h-full'"
+        :class="expanded || editing ? 'min-h-0 flex-1' : 'max-h-full'"
         @follow="follow"
         @back="back"
         @locate="locate"

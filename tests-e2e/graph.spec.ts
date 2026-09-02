@@ -539,12 +539,17 @@ test.describe('picking a node', () => {
   test('the card can be written in, through the editor’s own buffer', async ({ page }) => {
     const { hub, neighbor } = await pickable(page)
     await at(page, hub, 'click')
-    await page.getByTitle('Write in this file').click()
+    await page.locator('[data-preview]').getByTitle('Edit').click()
 
-    const box = page.locator('[data-preview] textarea')
+    // The real editor, not a textarea that looks like one.
+    const box = page.locator('[data-preview] .cm-editor')
     await expect(box).toBeVisible()
-    await box.click()
-    await page.keyboard.press('End')
+    // Docked, the card sizes to its content — and an editor's own height is
+    // its text, which collapsed the card to a slot nobody could write in.
+    const frame = (await page.locator('svg').boundingBox())!
+    expect((await box.boundingBox())!.height).toBeGreaterThan(frame.height * 0.6)
+    await page.locator('[data-preview] .cm-content').click()
+    await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.type('\n\nWritten from the graph.')
 
     // The pointer must not swap the subject out from under a caret.
@@ -572,7 +577,7 @@ test.describe('picking a node', () => {
     ).toBe(true)
 
     // Reading it again shows what was just written, not the index's snapshot.
-    await page.getByTitle('Stop writing').click()
+    await page.locator('[data-preview]').getByTitle('Preview').click()
     await expect(page.locator('[data-preview] .md-preview')).toContainText(
       'Written from the graph.',
     )
