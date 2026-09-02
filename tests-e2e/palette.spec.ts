@@ -1,9 +1,10 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * The palette (⌘K) and its six modes: fuzzy file search, `>` commands,
- * `@` chats, `?` filters, `:` to jot a line into today's capture page (or,
- * alone, to open it), and ⇧Enter to hand the query to the agent.
+ * The palette (⌘K) and its seven modes: fuzzy file search, `>` commands,
+ * `@` chats, `?` filters, `:` to jot a line into today's capture page and `[]`
+ * to add one to the todo list (either alone opens the file it writes to), and
+ * ⇧Enter to hand the query to the agent.
  */
 
 /** Today as the app files it — local calendar day, never UTC. */
@@ -29,7 +30,7 @@ async function openPalette(page: Page): Promise<void> {
 
 function palette(page: Page) {
   return page.getByPlaceholder(
-    /Search files and content|Run a command|Find a chat|Filter the knowledge base|Jot a line/,
+    /Search files and content|Run a command|Find a chat|Filter the knowledge base|Jot a line|Add something to the todo/,
   )
 }
 
@@ -329,4 +330,49 @@ test('without `?` a colon is just text, so a search stays a search', async ({ pa
   await palette(page).fill('type:concept')
   // The words, matched as words — the line that literally contains them.
   await expect(hits(page).filter({ hasText: 'wiki/notes.md' })).toBeVisible()
+})
+
+
+/**
+ * `[]` — the same capture bargain as `:`, aimed at one well-known file.
+ *
+ * The list is `todos.md` at the root and the lines are GFM task items, so
+ * nothing here needs this app to be read or ticked off.
+ */
+test('[] adds an item to the todo list and stays open for the next one', async ({ page }) => {
+  const read = (): Promise<string | null> =>
+    page.evaluate(async () => (await import('/src/lib/fs.ts')).tryReadFile('todos.md'))
+
+  await openPalette(page)
+  await palette(page).fill('[] buy oat milk')
+  await expect(results(page).filter({ hasText: 'buy oat milk' })).toBeVisible()
+  await palette(page).press('Enter')
+
+  await expect.poll(read).toContain('- [ ] buy oat milk')
+  // Still open, and reset to the prefix — several items go in one after another.
+  await expect(palette(page)).toBeVisible()
+  await expect(palette(page)).toHaveValue('[]')
+  await expect(page.getByText('todos.md', { exact: false }).first()).toBeVisible()
+
+  // `[ ]` is the same thought typed slightly differently.
+  await palette(page).fill('[ ] and a second one')
+  await palette(page).press('Enter')
+  await expect.poll(read).toBe('# Todos\n\n- [ ] buy oat milk\n- [ ] and a second one\n')
+})
+
+test('[] alone opens the todo list in edit mode, making it if there is none', async ({ page }) => {
+  await openPalette(page)
+  await palette(page).fill('[]')
+  await expect(results(page).filter({ hasText: 'todos.md' })).toBeVisible()
+  await palette(page).press('Enter')
+
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const { useFilesStore } = await import('/src/stores/files.ts')
+        const files = useFilesStore()
+        return { path: files.currentPath, mode: files.mode }
+      }),
+    )
+    .toEqual({ path: 'todos.md', mode: 'edit' })
 })

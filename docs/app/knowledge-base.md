@@ -197,6 +197,20 @@ The log below runs the other direction. Today's page is what *you* put in before
 it has a home; the log is what the assistant worked out about the pages you
 already have.
 
+## The todo list — what you have to do about it
+
+Some of what turns up while you are reading is not a note, it is a job. ⌘K,
+`[]`, the line, Enter — it lands in **`todos.md`** at the root of your folder,
+as `- [ ] …`. The panel stays open, so several go in one after another, and
+nothing you were reading is disturbed.
+
+`[]` on its own opens the list instead, to go through them.
+
+That file is a task list in the ordinary markdown sense, which is the whole
+design: GitHub renders it, every editor's preview renders it, the assistant can
+read and tick items in it, and none of that needs this app. It is one file at
+the root because a list you cannot find is a list you stop keeping.
+
 ## The log — what is not a page
 
 Some of what comes out of reading is not a page. Two notes end up disagreeing.

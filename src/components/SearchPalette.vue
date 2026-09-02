@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * The palette (⌘K / ⌘P). One input, six things behind it, chosen by a prefix:
+ * The palette (⌘K / ⌘P). One input, seven things behind it, chosen by a prefix:
  *
  *   (none)  files and content — filenames fuzzy-ranked, content substring
  *   >       commands (see composables/useCommands)
  *   @       agent conversations, by title
  *   ?       the filter grammar — tag:, type:, orphan:, … (lib/kbQuery)
  *   :       jot a line into today's capture page — or, alone, open it (lib/daily)
+ *   []      add an item to the todo list — or, alone, open it (lib/todo)
  *   ⇧Enter  hand whatever is typed to the agent
  *
  * `?` is a prefix because a filter is a different question from a search, and
@@ -50,6 +51,7 @@ import { openInEditor, revealEditor } from '@/lib/openInEditor'
 import { usesRawLayout } from '@/lib/capture'
 import { todayIso, resolveDailyPath } from '@/lib/daily'
 import { jotToday, openTodayPage } from '@/lib/jot'
+import { addTodo, openTodos, TODOS_PATH } from '@/lib/todo'
 import { baseName } from '@/lib/wiki'
 import { typeColor } from '@/lib/typeColor'
 import { t } from '@/i18n'
@@ -66,10 +68,22 @@ const query = ref('')
 const selected = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 
-type Mode = 'search' | 'command' | 'session' | 'filter' | 'jot'
+type Mode = 'search' | 'command' | 'session' | 'filter' | 'jot' | 'todo'
 
 interface Row {
-  kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask' | 'value' | 'filter' | 'jot' | 'jotOpen'
+  kind:
+    | 'file'
+    | 'hit'
+    | 'doc'
+    | 'command'
+    | 'session'
+    | 'ask'
+    | 'value'
+    | 'filter'
+    | 'jot'
+    | 'jotOpen'
+    | 'todo'
+    | 'todoOpen'
   /** Primary text; for files this is the path. */
   label: string
   /** Characters of `label` the query matched, for underlining. */
@@ -97,21 +111,31 @@ interface Row {
 // matching still runs through this panel's cached maps and fuzzy ranking,
 // because finding a file and answering a structural question are different
 // jobs.
-const mode = computed<Mode>(() =>
-  query.value.startsWith('?')
-    ? 'filter'
-    : query.value.startsWith('>')
-    ? 'command'
-    : query.value.startsWith('@')
-      ? 'session'
-      : query.value.startsWith(':')
-        ? 'jot'
-        : 'search',
-)
-/** The query with any mode prefix removed. */
-const term = computed(() =>
-  mode.value === 'search' ? query.value : query.value.slice(1).trimStart(),
-)
+/** What opens each mode. Held as patterns rather than as a chain of
+ *  `startsWith` so `term` can strip exactly what was matched — `[]` is two
+ *  characters where the rest are one, and `[ ]` is the same thought typed
+ *  slightly differently. */
+const MODE_PREFIX: Record<Mode, RegExp | null> = {
+  command: /^>/,
+  session: /^@/,
+  filter: /^\?/,
+  jot: /^:/,
+  todo: /^\[\s?\]/,
+  search: null,
+}
+
+const mode = computed<Mode>(() => {
+  for (const [m, re] of Object.entries(MODE_PREFIX)) {
+    if (re?.test(query.value)) return m as Mode
+  }
+  return 'search'
+})
+
+/** The query with its mode prefix removed. */
+const term = computed(() => {
+  const re = MODE_PREFIX[mode.value]
+  return re ? query.value.replace(re, '').trimStart() : query.value
+})
 
 /* Parse errors are deliberately silent HERE and nowhere else. A search box is
  * incremental: `age:<` is a half-typed filter on the way to `age:<30d`, not a
@@ -262,6 +286,15 @@ const jotRows = computed<Row[]>(() =>
     : [{ kind: 'jotOpen', label: jotTarget.value, icon: 'codicon-go-to-file', hint: '↵' }],
 )
 
+/** Mirrors the jot rows exactly: a line to add, or — with nothing typed — the
+ *  list itself. The two halves of a capture surface are always "put this
+ *  somewhere" and "go and look at what I put there". */
+const todoRows = computed<Row[]>(() =>
+  term.value.trim()
+    ? [{ kind: 'todo', label: term.value.trim(), icon: 'codicon-add', hint: '↵' }]
+    : [{ kind: 'todoOpen', label: TODOS_PATH, icon: 'codicon-go-to-file', hint: '↵' }],
+)
+
 const searchRows = computed<Row[]>(() => {
   // Only `?` mode carries filters; a plain search is words, so a file actually
   // called `type:foo` is findable by its name.
@@ -331,6 +364,7 @@ const rows = computed<Row[]>(() => {
   if (mode.value === 'command') return commandRows.value
   if (mode.value === 'session') return sessionRows.value
   if (mode.value === 'jot') return jotRows.value
+  if (mode.value === 'todo') return todoRows.value
   if (mode.value === 'filter') {
     // `?` and nothing else: what can be asked. Then, once a key is typed and
     // stopped at, what can go in it. The two halves of finding out, in order.
@@ -429,8 +463,10 @@ const placeholder = computed(() =>
     ? t('search.commandPlaceholder')
     : mode.value === 'session'
       ? t('search.sessionPlaceholder')
-      : mode.value === 'jot'
-        ? t('search.jotPlaceholder')
+      : mode.value === 'todo'
+        ? t('search.todoPlaceholder')
+        : mode.value === 'jot'
+          ? t('search.jotPlaceholder')
         : mode.value === 'filter'
           ? t('search.filterPlaceholder')
           : t('search.placeholder'),
@@ -500,6 +536,22 @@ async function openToday(): Promise<void> {
   await openTodayPage()
 }
 
+/** Add the typed line to the todo list and stay open for the next one — the
+ *  same bargain as a jot: capturing may not cost you the file you were in. */
+async function doTodo(): Promise<void> {
+  const path = await addTodo(term.value)
+  if (!path) return
+  query.value = '[]'
+  jotted.value = path
+  inputEl.value?.focus()
+}
+
+async function openTodoList(): Promise<void> {
+  ui.searchOpen = false
+  ui.graphOpen = false
+  await openTodos()
+}
+
 async function doJot(): Promise<void> {
   const path = await jotToday(term.value)
   if (!path) return
@@ -520,6 +572,14 @@ async function pick(row: Row | undefined): Promise<void> {
   }
   if (row.kind === 'jotOpen') {
     await openToday()
+    return
+  }
+  if (row.kind === 'todo') {
+    await doTodo()
+    return
+  }
+  if (row.kind === 'todoOpen') {
+    await openTodoList()
     return
   }
   if (row.kind === 'filter') {
@@ -655,6 +715,14 @@ function onKeydown(e: KeyboardEvent): void {
               <span class="shrink-0 text-fg-3">{{ $t('search.jotPrefix') }}</span>
               <span class="truncate text-fg-2">{{ row.label }}</span>
             </template>
+            <template v-else-if="row.kind === 'todo'">
+              <span class="shrink-0 text-fg-3">{{ $t('search.todoPrefix') }}</span>
+              <span class="truncate text-fg-0">{{ row.label }}</span>
+            </template>
+            <template v-else-if="row.kind === 'todoOpen'">
+              <span class="shrink-0 text-fg-3">{{ $t('search.todoOpen') }}</span>
+              <span class="truncate text-fg-0">{{ row.label }}</span>
+            </template>
             <template v-else-if="row.kind === 'jotOpen'">
               <span class="shrink-0 text-fg-3">{{ $t('search.jotOpen') }}</span>
               <span class="truncate text-fg-2">{{ row.label }}</span>
@@ -685,7 +753,10 @@ function onKeydown(e: KeyboardEvent): void {
           </button>
           <!-- Where the last jot went, while the input is empty again: a
                write with no receipt is one you go and check on. -->
-          <div v-if="mode === 'jot' && jotted && !term" class="px-4 py-3 text-sm text-fg-3">
+          <div
+            v-if="(mode === 'jot' || mode === 'todo') && jotted && !term"
+            class="px-4 py-3 text-sm text-fg-3"
+          >
             {{ $t('search.jotSaved', { path: jotted }) }}
           </div>
           <div v-else-if="query && !rows.length" class="px-4 py-3 text-sm text-fg-3">
@@ -695,12 +766,13 @@ function onKeydown(e: KeyboardEvent): void {
         <!-- A status bar, outside the scroller. It used to be the last item in
              the list, which was invisible until the list grew: with the filters
              above it, it scrolled off the bottom and read as clipped. -->
-        <div v-if="!query || query === '?'" class="shrink-0 border-t border-border">
+        <div v-if="!term.trim()" class="shrink-0 border-t border-border">
           <div class="px-4 py-2 text-xs text-fg-3 flex flex-wrap gap-x-4 gap-y-1">
             <span><span class="font-mono text-fg-2">&gt;</span> {{ $t('search.hintCommands') }}</span>
             <span><span class="font-mono text-fg-2">@</span> {{ $t('search.hintSessions') }}</span>
             <span><span class="font-mono text-fg-2">?</span> {{ $t('search.hintFilters') }}</span>
             <span><span class="font-mono text-fg-2">:</span> {{ $t('search.hintJot') }}</span>
+            <span><span class="font-mono text-fg-2">[]</span> {{ $t('search.hintTodo') }}</span>
             <span><span class="font-mono text-fg-2">⇧↵</span> {{ $t('search.hintAsk') }}</span>
           </div>
         </div>
