@@ -34,13 +34,18 @@ export function emptyTodos(): string {
  * Pure, so what the file ends up looking like is testable without a folder.
  * A line that already carries its own bullet or checkbox is left as the user
  * typed it — pasting `- [x] done` should not become `- [ ] - [x] done`.
+ *
+ * `done` writes the box already ticked. Something you did before you got round
+ * to writing it down is still worth on the list: the list is a record of what
+ * happened as much as a queue of what has not.
  */
-export function appendTodo(content: string, text: string): string {
+export function appendTodo(content: string, text: string, done = false): string {
+  const box = done ? '[x]' : '[ ]'
   const items = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
-    .map((l) => (/^([-*+]|\d+\.)\s/.test(l) ? l : `- [ ] ${l}`))
+    .map((l) => (/^([-*+]|\d+\.)\s/.test(l) ? l : `- ${box} ${l}`))
   if (!items.length) return content
   const head = content.trim() ? `${content.replace(/\s+$/, '')}\n` : emptyTodos()
   return `${head}${items.join('\n')}\n`
@@ -48,15 +53,15 @@ export function appendTodo(content: string, text: string): string {
 
 /** Add a line to the todo list. Returns where it went, or null when there was
  *  nothing to write. */
-export async function addTodo(text: string): Promise<string | null> {
+export async function addTodo(text: string, done = false): Promise<string | null> {
   if (!text.trim()) return null
   const files = useFilesStore()
   if (files.currentPath === TODOS_PATH && !files.unreadable) {
-    files.onEdited(appendTodo(files.content, text))
+    files.onEdited(appendTodo(files.content, text, done))
     await files.flush() // durable the moment it is made, not 800ms later
   } else {
     const existing = (await fs.tryReadFile(TODOS_PATH)) ?? ''
-    await fs.writeFile(TODOS_PATH, appendTodo(existing, text))
+    await fs.writeFile(TODOS_PATH, appendTodo(existing, text, done))
     await syncAfterFsChange()
   }
   return TODOS_PATH

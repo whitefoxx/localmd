@@ -7,7 +7,8 @@
  *   @       agent conversations, by title
  *   ?       the filter grammar — tag:, type:, orphan:, … (lib/kbQuery)
  *   :       jot a line into today's capture page — or, alone, open it (lib/daily)
- *   []      add an item to the todo list — or, alone, open it (lib/todo)
+ *   []      add an item to the todo list — `[x]` adds it already done, and
+ *           either alone opens the list (lib/todo)
  *   ⇧Enter  hand whatever is typed to the agent
  *
  * `?` is a prefix because a filter is a different question from a search, and
@@ -120,7 +121,7 @@ const MODE_PREFIX: Record<Mode, RegExp | null> = {
   session: /^@/,
   filter: /^\?/,
   jot: /^:/,
-  todo: /^\[\s?\]/,
+  todo: /^\[[ xX]?\]/,
   search: null,
 }
 
@@ -286,12 +287,24 @@ const jotRows = computed<Row[]>(() =>
     : [{ kind: 'jotOpen', label: jotTarget.value, icon: 'codicon-go-to-file', hint: '↵' }],
 )
 
+/** Whether the box was typed already ticked. Something done before there was
+ *  time to write it down still belongs on the list — it is a record of what
+ *  happened as much as a queue of what has not. */
+const todoDone = computed(() => /^\[[xX]\]/.test(query.value))
+
 /** Mirrors the jot rows exactly: a line to add, or — with nothing typed — the
  *  list itself. The two halves of a capture surface are always "put this
  *  somewhere" and "go and look at what I put there". */
 const todoRows = computed<Row[]>(() =>
   term.value.trim()
-    ? [{ kind: 'todo', label: term.value.trim(), icon: 'codicon-add', hint: '↵' }]
+    ? [
+        {
+          kind: 'todo',
+          label: term.value.trim(),
+          icon: todoDone.value ? 'codicon-check' : 'codicon-add',
+          hint: '↵',
+        },
+      ]
     : [{ kind: 'todoOpen', label: TODOS_PATH, icon: 'codicon-go-to-file', hint: '↵' }],
 )
 
@@ -539,9 +552,12 @@ async function openToday(): Promise<void> {
 /** Add the typed line to the todo list and stay open for the next one — the
  *  same bargain as a jot: capturing may not cost you the file you were in. */
 async function doTodo(): Promise<void> {
-  const path = await addTodo(term.value)
+  const done = todoDone.value
+  const path = await addTodo(term.value, done)
   if (!path) return
-  query.value = '[]'
+  // Back to the prefix that was used, so a run of ticked-off items does not
+  // silently start filing unfinished ones.
+  query.value = done ? '[x]' : '[]'
   jotted.value = path
   inputEl.value?.focus()
 }
@@ -716,7 +732,9 @@ function onKeydown(e: KeyboardEvent): void {
               <span class="truncate text-fg-2">{{ row.label }}</span>
             </template>
             <template v-else-if="row.kind === 'todo'">
-              <span class="shrink-0 text-fg-3">{{ $t('search.todoPrefix') }}</span>
+              <span class="shrink-0 text-fg-3">
+                {{ todoDone ? $t('search.todoDonePrefix') : $t('search.todoPrefix') }}
+              </span>
               <span class="truncate text-fg-0">{{ row.label }}</span>
             </template>
             <template v-else-if="row.kind === 'todoOpen'">

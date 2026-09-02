@@ -360,6 +360,20 @@ test('[] adds an item to the todo list and stays open for the next one', async (
   await expect.poll(read).toBe('# Todos\n\n- [ ] buy oat milk\n- [ ] and a second one\n')
 })
 
+test('[x] files something already done, box ticked', async ({ page }) => {
+  await openPalette(page)
+  await palette(page).fill('[x] shipped the thing')
+  await expect(results(page).filter({ hasText: 'shipped the thing' })).toBeVisible()
+  await palette(page).press('Enter')
+
+  await expect
+    .poll(() => page.evaluate(async () => (await import('/src/lib/fs.ts')).tryReadFile('todos.md')))
+    .toContain('- [x] shipped the thing')
+  // The prefix that was used comes back, so a run of them does not silently
+  // start filing unfinished ones.
+  await expect(palette(page)).toHaveValue('[x]')
+})
+
 test('[] alone opens the todo list in edit mode, making it if there is none', async ({ page }) => {
   await openPalette(page)
   await palette(page).fill('[]')

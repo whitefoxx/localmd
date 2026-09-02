@@ -6,7 +6,7 @@ export default {
     commandPlaceholder: 'Run a command…',
     sessionPlaceholder: 'Find a chat…',
     jotPlaceholder: 'Jot a line into today’s page…',
-    todoPlaceholder: 'Add something to the todo list…',
+    todoPlaceholder: 'Add something to the todo list…  ([x] for already done)',
     // Shown beside a filter whose values are neither the grammar's nor the
     // knowledge base's to list — a date, a number — where the shape of what
     // goes there is the most that can be offered.
@@ -23,6 +23,7 @@ export default {
     jotPrefix: 'Jot:',
     jotOpen: 'Open today’s page:',
     todoPrefix: 'Todo:',
+    todoDonePrefix: 'Done:',
     todoOpen: 'Open the todo list:',
     jotSaved: 'Saved to {path}',
     today: 'today',
@@ -35,7 +36,7 @@ export default {
     commandPlaceholder: '执行命令…',
     sessionPlaceholder: '查找对话…',
     jotPlaceholder: '随手记一行到今天的页面…',
-    todoPlaceholder: '往待办清单里加一条…',
+    todoPlaceholder: '往待办清单里加一条…（[x] 表示已经做完了）',
     filterShape: '例如',
     noResults: '没有结果',
     askAgent: '问助手：',
@@ -49,6 +50,7 @@ export default {
     jotPrefix: '记下：',
     jotOpen: '打开今天的页面：',
     todoPrefix: '待办：',
+    todoDonePrefix: '已完成：',
     todoOpen: '打开待办清单：',
     jotSaved: '已记到 {path}',
     today: '今天',

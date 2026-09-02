@@ -21,6 +21,10 @@ describe('appendTodo', () => {
     expect(appendTodo('# Todos\n', 'one\n\n  two  \n')).toBe('# Todos\n- [ ] one\n- [ ] two\n')
   })
 
+  it('can write the box already ticked', () => {
+    expect(appendTodo('# Todos\n', 'shipped it', true)).toBe('# Todos\n- [x] shipped it\n')
+  })
+
   it('writes nothing at all for nothing', () => {
     expect(appendTodo('# Todos\n- [ ] one\n', '   \n  ')).toBe('# Todos\n- [ ] one\n')
   })
