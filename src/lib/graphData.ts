@@ -9,6 +9,9 @@
  * decides how one behaves, so a page that happens to be named like a tag id
  * is still a page. The prefix only keeps the Maps apart.
  */
+import { fileKind, isTextName } from '@/lib/filetypes'
+import { extractTitle, fileStem, splitFrontmatter } from '@/lib/wiki'
+
 export const TAG_PREFIX = 'tag::'
 
 export interface GraphDatum {
@@ -91,4 +94,88 @@ export function graphDegrees(links: readonly GraphEdge[]): {
  *  the palette's grammar splits an unquoted filter at the first one. */
 export function tagQuery(tag: string): string {
   return `tag:${/\s/.test(tag) ? `"${tag}"` : tag}`
+}
+
+/** The nodes a selection lights up: itself, and everything it touches.
+ *
+ *  What is NOT in here is dimmed, and a dimmed node answers nothing — pointing
+ *  at one while a selection is held leaves the card showing what it showed.
+ *  Otherwise a sweep across a dense graph would flip the card through every
+ *  unrelated page between the pointer and where it was going. */
+export function litAround(
+  selected: string | null,
+  neighbors: ReadonlyMap<string, Set<string>>,
+): Set<string> {
+  if (selected === null) return new Set()
+  return new Set([selected, ...(neighbors.get(selected) ?? [])])
+}
+
+/** How much of a page the card shows. A preview answers "is this the note I
+ *  think it is", which the first screens settle; the whole file is one click
+ *  away, and rendering an arbitrarily long note on every hover is not. */
+export const PREVIEW_CHARS = 8000
+
+export type GraphPreview =
+  | { kind: 'page'; path: string; title: string; body: string; truncated: boolean }
+  | { kind: 'binary'; path: string; title: string; format: string }
+  | { kind: 'tag'; tag: string; pages: string[] }
+
+export interface PreviewSources {
+  /** A page's text as the index already holds it — no file read. Null when the
+   *  index has none, which is what a node whose file has just gone away looks
+   *  like; it renders as an empty preview rather than as an error. */
+  content: (path: string) => string | null
+  /** Every page carrying a tag. */
+  tagged: (tag: string) => string[]
+}
+
+/**
+ * What the card says about one node.
+ *
+ * Pure: the component resolves the node and hands over the text the index
+ * already has, so what the card shows can be tested without a browser — the
+ * same split as the rest of this file, where the view owns d3 and this owns
+ * what is in the picture.
+ */
+export function graphPreview(node: GraphDatum, src: PreviewSources): GraphPreview {
+  if (node.kind === 'tag') {
+    const tag = node.tag ?? ''
+    return { kind: 'tag', tag, pages: src.tagged(tag) }
+  }
+  const path = node.id
+  // Today every graph node is a markdown page, so this only ever takes the text
+  // branch. It asks the question anyway because the answer is a property of the
+  // path and nothing else — a card that renders whatever it is handed cannot
+  // start showing a PDF's bytes as mojibake if the graph ever draws one.
+  if (!isTextName(path)) {
+    return { kind: 'binary', path, title: fileStem(path), format: formatLabel(path) }
+  }
+  const content = src.content(path) ?? ''
+  const { body } = splitFrontmatter(content)
+  const text = body.trim()
+  const truncated = text.length > PREVIEW_CHARS
+  return {
+    kind: 'page',
+    path,
+    title: extractTitle(content) ?? fileStem(path),
+    // Cut at a line boundary: stopping mid-fence would render the rest of the
+    // preview as one unterminated code block.
+    body: truncated ? cutAtLine(text, PREVIEW_CHARS) : text,
+    truncated,
+  }
+}
+
+/** This file in one word: its extension, which is what people call it. Falls
+ *  back to the classification for a name that has no extension at all — and
+ *  upper-cased, so the sentence it lands in needs no article to agree with
+ *  (`a PDF` and `an EPUB` would). */
+function formatLabel(path: string): string {
+  const ext = /\.([A-Za-z0-9]+)$/.exec(path)?.[1]
+  return ext ? ext.toUpperCase() : fileKind(path)
+}
+
+function cutAtLine(text: string, at: number): string {
+  const head = text.slice(0, at)
+  const nl = head.lastIndexOf('\n')
+  return nl > at / 2 ? head.slice(0, nl) : head
 }
