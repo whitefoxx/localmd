@@ -16,7 +16,16 @@ import { useKbIndexStore } from '@/stores/kbIndex'
 import { useFilesStore } from '@/stores/files'
 import { useUiStore } from '@/stores/ui'
 import { fileStem } from '@/lib/wiki'
-import { buildGraphData, graphDegrees, tagQuery, type GraphDatum } from '@/lib/graphData'
+import {
+  buildGraphData,
+  graphDegrees,
+  graphPreview,
+  litAround,
+  tagQuery,
+  type GraphDatum,
+  type GraphPreview,
+} from '@/lib/graphData'
+import GraphPreviewCard from '@/components/GraphPreviewCard.vue'
 import { typeColor } from '@/lib/typeColor'
 import { openInEditor } from '@/lib/openInEditor'
 
@@ -43,6 +52,13 @@ let sim: Simulation<GraphNode, GraphLink> | null = null
 let refit: (() => void) | null = null
 /** Stops the previous render's watch on the legend filter. */
 let stopTypeWatch: (() => void) | null = null
+/** Push the selection state at the current drawing — dimming and ring. Set by
+ *  render(), because everything it needs is built there and thrown away with
+ *  it; the watch at the bottom of this file is the only caller. */
+let applyFocus: (() => void) | null = null
+/** Every node in the current drawing, by id. Outside render() so the card can
+ *  hand back a path — drilling into a tag's page list — and be understood. */
+let nodesById = new Map<string, GraphNode>()
 
 /**
  * Whether the layout is still being worked out.
@@ -62,15 +78,97 @@ const laying = ref(false)
 const HEAVY_NODES = 25
 
 /**
- * Whether tags are drawn as nodes of their own.
+ * Which node the graph is currently ABOUT, and which one the card is showing.
  *
- * Off by default: the link graph answers "what did I connect", and mixing in
- * a second kind of edge changes the shape of the answer — worth seeing when
- * you ask for it, wrong to impose on someone who opened the graph to look at
- * their links. A tag node is not a file; clicking one searches for it rather
- * than opening anything.
+ * Two ids rather than one, because they answer different questions.
+ * `ui.graphSelected` is what a click pinned: it decides the dimming, and it
+ * holds still while the pointer wanders, so the neighbourhood you are reading
+ * stays the one you asked for. `previewId` is what the card is about, and it
+ * follows the pointer across that neighbourhood — hovering a neighbour swaps
+ * the card without re-aiming the graph under it, and then STAYS there, because
+ * the card has to be reachable by a pointer that is no longer on the node.
+ * Both null is the resting state, where hover alone lights the graph up
+ * exactly as it always did.
+ *
+ * Refs and not closure state: render() throws its DOM away and rebuilds it
+ * whenever the graph changes, and a selection has to survive that.
  */
-const showTags = ref(false)
+const previewId = ref<string | null>(null)
+const hoverId = ref<string | null>(null)
+/** The node behind `previewId`. Held beside the id so the card renders from
+ *  the index alone — no file read, nothing to await, nothing to go stale. */
+const previewNode = ref<GraphDatum | null>(null)
+
+const preview = computed<GraphPreview | null>(() =>
+  previewNode.value
+    ? graphPreview(previewNode.value, {
+        content: (path) => index.pages.get(path)?.content ?? null,
+        tagged: (tag) => [...index.tags].filter(([, l]) => l.includes(tag)).map(([p]) => p).sort(),
+      })
+    : null,
+)
+
+/** Pages entered by following a link inside the card, oldest first. Only link
+ *  navigation is recorded: pointing at a node is a new subject rather than a
+ *  step in a trail, so it starts one over. */
+const trail = ref<string[]>([])
+
+/** Point the card at a node — or at nothing — as a fresh subject. */
+function show(id: string | null): void {
+  trail.value = []
+  goto(id)
+}
+
+function goto(id: string | null): void {
+  previewId.value = id
+  // A link can leave the graph: wikilinks resolve to any file, and the graph
+  // draws only markdown pages. The card describes the path either way — it is
+  // the `kind: 'binary'` branch that says a PDF has no text to show — and the
+  // solid mark simply has no node to sit on, which is the truth.
+  previewNode.value = id ? (nodesById.get(id) ?? { id, kind: 'page' }) : null
+}
+
+/** Follow a link out of the card. The graph stays where it is: you asked to
+ *  read something, not to move the picture, so only the card and the mark that
+ *  says what the card is showing travel. Back undoes exactly this. */
+function follow(path: string): void {
+  if (previewId.value) trail.value = [...trail.value, previewId.value]
+  goto(path)
+}
+
+function back(): void {
+  const prev = trail.value.at(-1)
+  if (prev === undefined) return
+  trail.value = trail.value.slice(0, -1)
+  goto(prev)
+}
+
+/** Pin a node: the graph lights up around it, and the card is about it. */
+function pin(id: string): void {
+  ui.graphSelected = id
+  show(id)
+}
+
+function clearSelection(): void {
+  ui.graphSelected = null
+  show(null)
+}
+
+/** Leave the graph for the file the card is showing. The graph is reachable
+ *  from inside the full-window agent panel, so the file has to be uncovered as
+ *  well as opened — see lib/openInEditor. */
+function openFromCard(path: string): void {
+  ui.graphOpen = false
+  void openInEditor(path)
+}
+
+/** A tag has no file to open, so its card offers the question it stands for
+ *  instead — the same search a tag node used to run on click. The answer
+ *  arrives ON TOP of the graph (the palette is z-50, this is z-40), so the
+ *  neighbourhood you were comparing against is still there behind it. */
+function searchTag(tag: string): void {
+  ui.searchFor(tagQuery(tag))
+}
 
 /**
  * What the chip says, or null for nothing to say.
@@ -154,7 +252,7 @@ function render(): void {
   const width = el.clientWidth
   const height = el.clientHeight
 
-  const built = buildGraphData(index.graph, index.types, index.tags, showTags.value)
+  const built = buildGraphData(index.graph, index.types, index.tags, ui.graphTags)
   const nodes: GraphNode[] = built.nodes
   const links: GraphLink[] = built.links.map((l) => ({ ...l }))
   const { degree, neighbors } = graphDegrees(built.links)
@@ -217,20 +315,16 @@ function render(): void {
     .selectAll<SVGGElement, GraphNode>('g')
     .data(nodes)
     .join('g')
+    .attr('class', 'graph-node')
     .attr('cursor', 'pointer')
-    .on('click', (_e, d) => {
-      // A tag is not a file: clicking it asks the question it stands for, and
-      // the answer arrives ON TOP of the graph (the palette is z-50, this is
-      // z-40) — you are looking at the neighbourhood, so leaving it to read
-      // the list would put the thing you were comparing against away.
-      if (d.kind === 'tag') {
-        ui.searchFor(tagQuery(d.tag ?? ''))
-        return
-      }
-      ui.graphOpen = false
-      // The graph is reachable from inside the full-window agent panel, so the
-      // file has to be uncovered as well as opened — see lib/openInEditor.
-      void openInEditor(d.id)
+    // A click pins the node rather than leaving for it. Opening the file was
+    // the old behaviour, and it threw away the picture that was clicked from:
+    // the neighbourhood is the reason the graph is open, so pointing at
+    // something in it now answers beside it. Leaving is the card's own button,
+    // which makes it a decision instead of a side effect of pointing.
+    .on('click', (e, d) => {
+      e.stopPropagation()
+      pin(d.id)
     })
 
   const nodeRadius = (d: GraphNode): number =>
@@ -289,11 +383,16 @@ function render(): void {
 
   // --- Focus: point at one node and the rest of the graph steps back ---------
   //
-  // The node the graph is currently about — hovered, or held by a drag. Null is
-  // the resting state, where everything is drawn at full strength; a dense graph
-  // is otherwise unreadable one node at a time.
+  // What the graph is lit around — the pinned selection if there is one, else
+  // whatever the pointer is over. Null is the resting state, where everything
+  // is drawn at full strength; a dense graph is otherwise unreadable one node
+  // at a time.
   let focus: string | null = null
   let dragging = false
+  /** Everything the selection lights up, kept in step by applyFocus below.
+   *  Held rather than recomputed per mouseenter: sweeping a pointer across a
+   *  hub would otherwise rebuild its whole neighbour set once per node. */
+  let lit = new Set<string>()
   /** What is currently lifted, and where to put it back: its layer and the
    *  sibling it sat in front of. Restored in reverse so a recorded sibling is
    *  always home before the element that names it — which keeps paint order
@@ -308,8 +407,10 @@ function render(): void {
   // id → its element, and id → the lines that touch it. Built once per render,
   // which is the only place they can go stale.
   const nodeEl = new Map<string, SVGGElement>()
+  nodesById = new Map<string, GraphNode>()
   node.each(function (d) {
     nodeEl.set(d.id, this)
+    nodesById.set(d.id, d)
   })
   const linkEls = new Map<string, SVGLineElement[]>()
   link.each(function (d) {
@@ -380,15 +481,80 @@ function render(): void {
     }
   }
 
+  // --- Two marks, because there are two answers on screen --------------------
+  //
+  // Solid, inner: the node the CARD is about. Dashed, outer: the node the
+  // graph is lit AROUND. They are usually the same node and then read as one
+  // double ring; they come apart the moment the pointer wanders onto a
+  // neighbour, which is exactly when "why is the card showing this, but the
+  // graph arranged around that" needs answering on the picture itself.
+  //
+  // One element each, moved between nodes, rather than a hidden pair on every
+  // node. Each lives INSIDE its node's own `<g>`, so it travels with the node —
+  // through every simulation tick, and through the re-parenting `raise()` does
+  // when the focus changes. First child, so the label still draws over it.
+  function mark(dashed: boolean): SVGCircleElement {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+    c.setAttribute('fill', 'none')
+    c.setAttribute('stroke', 'rgb(var(--c-accent))')
+    c.setAttribute('stroke-width', dashed ? '1.5' : '2')
+    if (dashed) c.setAttribute('stroke-dasharray', '2 3')
+    c.style.pointerEvents = 'none'
+    return c
+  }
+  const shownRing = mark(false)
+  const pinnedRing = mark(true)
+
+  function place(el: SVGCircleElement, id: string | null, pad: number): void {
+    const g = id ? nodeEl.get(id) : null
+    const d = id ? nodesById.get(id) : null
+    if (!g || !d) {
+      el.remove()
+      return
+    }
+    el.setAttribute('r', String(nodeRadius(d) + pad))
+    g.insertBefore(el, g.firstChild)
+  }
+
+  // The one place the state above becomes pixels. Everything else sets a ref.
+  applyFocus = (): void => {
+    lit = litAround(ui.graphSelected, neighbors)
+    setFocus(ui.graphSelected ?? hoverId.value)
+    place(pinnedRing, ui.graphSelected, 7)
+    place(shownRing, previewId.value, 4)
+  }
+
   node
-    .on('mouseenter', (_e, d) => setFocus(d.id))
+    .on('mouseenter', (_e, d) => {
+      hoverId.value = d.id
+      // While a node is pinned the pointer moves the CARD only, and only across
+      // what the pin lit up: a dimmed node is not part of the answer on screen,
+      // so pointing at one says nothing rather than swapping the card to a page
+      // the pointer was merely passing over.
+      if (ui.graphSelected && lit.has(d.id)) show(d.id)
+    })
     // A drag keeps its node: the pointer routinely outruns the node it is
     // pulling, and the graph re-lighting mid-drag is exactly the flicker this
     // is meant to remove. The pointer is still over it when the drag ends, so
     // the leave that clears the focus is the one after the user lets go.
+    // Only the dimming answers to the pointer leaving, and only when nothing is
+    // pinned. The card stays on whatever it was last asked about: reading it
+    // means moving the pointer off the node to reach it, and a card that
+    // emptied itself on the way over would be one you could never actually
+    // read. The dashed mark is what keeps that honest — it stays on the pinned
+    // node, so a card about a neighbour never looks like the graph moved.
     .on('mouseleave', () => {
-      if (!dragging) setFocus(null)
+      if (dragging) return
+      hoverId.value = null
     })
+
+  // Clicking the background puts the graph back as it was. d3's own drag and
+  // zoom suppress the click that ends a pan or a node drag, so this only ever
+  // hears a real click on empty space.
+  svg.on('click', (e: MouseEvent) => {
+    if ((e.target as Element | null)?.closest('.graph-node')) return
+    clearSelection()
+  })
 
   node.call(
     drag<SVGGElement, GraphNode>()
@@ -397,7 +563,7 @@ function render(): void {
         d.fx = d.x
         d.fy = d.y
         dragging = true
-        setFocus(d.id)
+        hoverId.value = d.id
       })
       .on('drag', (e, d) => {
         d.fx = e.x
@@ -408,7 +574,7 @@ function render(): void {
         d.fx = null
         d.fy = null
         dragging = false
-        setFocus(d.id)
+        hoverId.value = d.id
       }) as never,
   )
 
@@ -447,6 +613,21 @@ function render(): void {
       node.attr('transform', (d) => `translate(${d.x ?? 0},${d.y ?? 0})`)
     })
     .on('end', () => (laying.value = false))
+
+  // A rebuild throws every element away, so re-assert the selection over the
+  // new drawing — and drop what the new graph no longer has. A page deleted
+  // while the graph is open, or the tag nodes going away with the toggle, must
+  // not leave a card describing something that is not on screen. The pointer is
+  // not re-entered either, so a hover left over from the old drawing would dim
+  // the graph around a node nothing is pointing at.
+  hoverId.value = null
+  if (ui.graphSelected && !nodesById.has(ui.graphSelected)) clearSelection()
+  const keep =
+    previewId.value &&
+    nodesById.has(previewId.value) &&
+    (!ui.graphSelected || litAround(ui.graphSelected, neighbors).has(previewId.value))
+  show(keep ? previewId.value : ui.graphSelected)
+  applyFocus()
 }
 
 let observer: ResizeObserver | null = null
@@ -463,12 +644,33 @@ onMounted(() => {
   }
 })
 
-watch([() => index.graph, showTags], () => void renderMaybeSlow())
+watch([() => index.graph, () => ui.graphTags], () => void renderMaybeSlow())
+// Esc unpins from App.vue's layer chain, which knows the selection and not the
+// card; the card follows it down rather than being left describing nothing.
+// Declared first so that, within the same synchronous flush, the card is
+// already empty by the time the ring is asked where to go.
+watch(
+  () => ui.graphSelected,
+  (id) => {
+    if (id === null) show(null)
+  },
+  { flush: 'sync' },
+)
+// Dimming and ring, pushed at the drawing the moment the state changes.
+// Synchronously, because this is pointer work: hovering used to reach the DOM
+// in the same tick as the event, and a queued watcher would put a frame of lag
+// between the pointer and the graph lighting up under it.
+watch([() => ui.graphSelected, previewId, hoverId], () => applyFocus?.(), { flush: 'sync' })
 
 onBeforeUnmount(() => {
   stopTypeWatch?.()
   stopTypeWatch = null
   ui.graphType = null
+  ui.graphTags = false
+  clearSelection()
+  hoverId.value = null
+  applyFocus = null
+  nodesById = new Map()
   observer?.disconnect()
   observer = null
   refit = null
@@ -481,16 +683,27 @@ onBeforeUnmount(() => {
   <div class="relative h-full w-full">
     <div ref="host" class="h-full w-full" />
 
-    <!-- Top-left, out of forceCenter's way (see the busy chip below). -->
-    <button
-      class="btn absolute left-4 top-4 text-xs shadow-sm"
-      :class="{ '!text-added !border-added/50': showTags }"
-      :title="$t('graph.showTagsHint')"
-      @click="showTags = !showTags"
+    <!-- What the pinned node is. Docked rather than following the pointer: the
+         card changes as the pointer crosses the neighbourhood, and a panel that
+         jumped to each node in turn would be unreadable exactly while it is
+         being used. pointer-events-none on the frame, so the graph underneath
+         still takes a click everywhere the card itself is not. -->
+    <div
+      v-if="preview"
+      class="pointer-events-none absolute right-4 top-4 bottom-4 z-10 flex w-[360px] max-w-[calc(100%-2rem)] flex-col items-stretch"
     >
-      <span class="codicon codicon-sm codicon-tag" />
-      {{ $t('graph.showTags') }}
-    </button>
+      <GraphPreviewCard
+        :preview="preview"
+        :can-go-back="trail.length > 0"
+        class="max-h-full"
+        @follow="follow"
+        @back="back"
+        @open="openFromCard"
+        @search="searchTag"
+        @select="pin"
+        @close="clearSelection"
+      />
+    </div>
     <!-- Near the top of the graph area, not in its middle: forceCenter pulls
          every node into the centre, so that is the one place a line of text
          cannot be read. Same chip as the PDF reader's. -->

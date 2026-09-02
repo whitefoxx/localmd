@@ -158,6 +158,25 @@ export const useUiStore = defineStore('ui', () => {
    *  in the layout and the drawing is in GraphView. */
   const graphType = ref<string | null>(null)
 
+  /**
+   * Whether the graph draws each tag as a node of its own.
+   *
+   * Off by default: the link graph answers "what did I connect", and mixing in
+   * a second kind of edge changes the shape of the answer — worth seeing when
+   * you ask for it, wrong to impose on someone who opened the graph to look at
+   * their links. Lives here for the same reason `graphType` does: the toggle is
+   * in the layout's header bar and the drawing is in GraphView.
+   */
+  const graphTags = ref(false)
+
+  /**
+   * The graph node a click has pinned, or null when nothing is. The graph dims
+   * to that node's neighbourhood and a card describes it, so it is a layer of
+   * its own — which is why it lives here: Esc unwinds the layers in App.vue,
+   * and putting the card away has to come before closing the graph under it.
+   */
+  const graphSelected = ref<string | null>(null)
+
   /** A query handed to the search palette from elsewhere — the graph's tag
    *  nodes use it to turn "what else carries this tag" into a real search the
    *  user can edit. One-shot, like pendingPrompt: the palette consumes it on
@@ -260,6 +279,8 @@ export const useUiStore = defineStore('ui', () => {
     editorTabsVisible,
     pendingPrompt,
     graphType,
+    graphTags,
+    graphSelected,
     pendingSearch,
     searchFor,
     settingsSection,

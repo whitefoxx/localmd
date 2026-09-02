@@ -80,6 +80,35 @@ Pages can also carry a `type:` at the top (`concept`, `source`, `person`, …) i
 you find that useful. It is free-form; there is no fixed list. The same goes
 for `tags:`.
 
+## The graph
+
+The graph view draws every page as a dot and every link between them as a line.
+It is a picture of what you have connected — and the place an island is obvious.
+
+Click a dot and the graph dims to that page and the pages it touches, with a
+card beside it showing what the page says. Nothing is opened: the picture you
+clicked from is the reason you are there, so leaving it is a button on the card
+rather than something a click does to you. While a page is held, moving the
+pointer across its neighbours swaps the card between them without re-aiming the
+graph — and it stays on the last one, so you can move the pointer onto the card
+and read it. Two marks keep that legible: a dashed ring on the page the graph is
+arranged around, a solid one on the page the card is showing. A dimmed page is
+not part of the answer on screen, so pointing at one does nothing. Click empty
+space, or press Esc, to let go.
+
+A link inside the card is read inside the card: the page it names takes over,
+and **Back** returns you to the one you came from. The graph does not move while
+you do it — the dashed ring stays where you put it — so following a link three
+pages deep never costs you the neighbourhood you started in. A link to a PDF or
+a picture says what the file is rather than trying to show it, and the button
+underneath still opens it properly. A link to a page that does not exist does
+nothing: looking around should not create files.
+
+**Tags**, in the bar along the top, adds a second kind of dot: one per tag,
+joined to every page carrying it. A tag has no file to show, so its card lists
+what carries it — click one of those to look at it, or search the tag to see
+the whole answer.
+
 ## Finding things by tag
 
 Search (⌘K) takes filters as well as words — `type:concept`, `tag:llm`,

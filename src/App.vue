@@ -116,6 +116,8 @@ function closeTopLayer(): void {
   // list is hiding rows until it is cleared, and clearing it is what Esc means
   // to someone with the caret still in that box.
   else if (chat.historyQuery) chat.historyQuery = ''
+  // The graph's preview card, before the graph it is drawn over.
+  else if (ui.graphSelected) ui.graphSelected = null
   else if (ui.graphOpen) ui.graphOpen = false
   else if (ui.agentMaximized) ui.agentMaximized = false
   else if (ui.zen) ui.zen = false

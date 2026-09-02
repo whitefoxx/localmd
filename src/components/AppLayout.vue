@@ -777,6 +777,18 @@ function closeKb(): void {
             <span class="text-fg-3 whitespace-nowrap">{{ $t('layout.currentFile') }}</span>
           </span>
         </div>
+        <!-- Beside the legend rather than floating over the canvas: it is a
+             control on what the graph draws, which is what this bar is for,
+             and over the canvas it sat on top of whatever landed under it. -->
+        <button
+          class="btn shrink-0 text-xs"
+          :class="{ '!text-added !border-added/50': ui.graphTags }"
+          :title="$t('graph.showTagsHint')"
+          @click="ui.graphTags = !ui.graphTags"
+        >
+          <span class="codicon codicon-sm codicon-tag" />
+          {{ $t('graph.showTags') }}
+        </button>
         <button class="text-fg-3 hover:text-fg-0 shrink-0" :title="$t('layout.closeEsc')" @click="ui.graphOpen = false">
           <span class="codicon codicon-close" />
         </button>

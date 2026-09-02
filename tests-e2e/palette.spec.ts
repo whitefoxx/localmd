@@ -102,7 +102,7 @@ test('> runs a command, and shows the key binding for the ones that have it', as
   await row.click()
 
   // The command ran: the graph overlay is up.
-  await expect(page.getByText('Click a node to open its file')).toBeVisible()
+  await expect(page.getByText('Click a node to see what it is')).toBeVisible()
 
   // A command bound to a hotkey advertises it.
   await page.keyboard.press('Escape')
