@@ -104,6 +104,11 @@ a picture says what the file is rather than trying to show it, and the button
 underneath still opens it properly. A link to a page that does not exist does
 nothing: looking around should not create files.
 
+Follow links far enough and the page in the card is one the graph is dimming —
+it is drawn, but at an opacity that reads as absent, so you cannot see where it
+sits. **Find it on the graph** appears then, and does exactly what clicking that
+node would have done: the graph re-aims around it.
+
 **Tags**, in the bar along the top, adds a second kind of dot: one per tag,
 joined to every page carrying it. A tag has no file to show, so its card lists
 what carries it — click one of those to look at it, or search the tag to see

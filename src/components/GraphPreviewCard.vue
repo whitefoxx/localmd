@@ -16,12 +16,14 @@ import { useKbImages } from '@/composables/useKbImages'
 import { fileStem } from '@/lib/wiki'
 import type { GraphPreview } from '@/lib/graphData'
 
-const props = defineProps<{ preview: GraphPreview; canGoBack: boolean }>()
+const props = defineProps<{ preview: GraphPreview; canGoBack: boolean; canLocate: boolean }>()
 const emit = defineEmits<{
   /** Read a link's target here, without moving the graph. */
   (e: 'follow', path: string): void
   /** Undo the last follow. */
   (e: 'back'): void
+  /** Aim the graph at this page — what clicking its node would have done. */
+  (e: 'locate'): void
   /** Leave the graph and open this file in the editor. */
   (e: 'open', path: string): void
   /** Search the knowledge base for this tag. */
@@ -182,7 +184,18 @@ function onClick(e: MouseEvent): void {
       </template>
     </div>
 
-    <div class="shrink-0 border-t border-border px-3 py-2">
+    <div class="shrink-0 space-y-1.5 border-t border-border px-3 py-2">
+      <!-- Only while this page is somewhere you cannot see. A dimmed node and
+           its mark are drawn at an opacity that reads as absent, so "where is
+           this" is a real question here and nowhere else. -->
+      <button
+        v-if="canLocate"
+        class="btn w-full justify-center text-xs"
+        @click="emit('locate')"
+      >
+        <span class="codicon codicon-sm codicon-target" />
+        {{ $t('graph.previewLocate') }}
+      </button>
       <button
         v-if="preview.kind === 'tag'"
         class="btn w-full justify-center text-xs"

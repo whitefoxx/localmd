@@ -408,6 +408,57 @@ test.describe('picking a node', () => {
     await expect(page.getByTitle('Back to the page you came from')).toBeHidden()
   })
 
+  test('a page the graph is dimming offers to be found on it', async ({ page }) => {
+    // A → B → C, so that C is two hops from A and therefore dimmed while A is
+    // pinned. Following a link is the only way to land the card there.
+    await page.evaluate(async () => {
+      const { useFilesStore } = await import('/src/stores/files.ts')
+      const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+      const files = useFilesStore()
+      await files.createFile('wiki/aa.md', '# Aa\n\nOn to [[bb]].\n')
+      await files.createFile('wiki/bb.md', '# Bb\n\nOn to [[cc]].\n')
+      await files.createFile('wiki/cc.md', '# Cc\n\nThe end.\n')
+      await useKbIndexStore().refresh()
+    })
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('svg > g > g > g')].some(
+            (e) => (e as unknown as { __data__: { id: string } }).__data__.id === 'wiki/cc.md',
+          ),
+        ),
+      )
+      .toBe(true)
+
+    const locate = page.getByRole('button', { name: 'Find it on the graph' })
+    await at(page, 'wiki/aa.md', 'click')
+    // The pin itself is not lost, so there is nothing to find.
+    await expect(locate).toBeHidden()
+
+    // One hop: bb is lit, still visible, still nothing to find.
+    await page.locator('[data-preview] a.wikilink').first().click()
+    expect(await shown(page)).toBe('wiki/bb.md')
+    await expect(locate).toBeHidden()
+
+    // Two hops: cc is dimmed, and now the offer appears.
+    await page.locator('[data-preview] a.wikilink').first().click()
+    expect(await shown(page)).toBe('wiki/cc.md')
+    await expect(locate).toBeVisible()
+
+    // Pressing it is exactly what clicking that node would have been.
+    await locate.click()
+    expect(
+      await page.evaluate(async () => {
+        const { useUiStore } = await import('/src/stores/ui.ts')
+        return useUiStore().graphSelected
+      }),
+    ).toBe('wiki/cc.md')
+    expect(await shown(page)).toBe('wiki/cc.md')
+    await expect(locate).toBeHidden()
+    // A new subject, so the trail it took to get here is gone — same as a click.
+    await expect(page.getByTitle('Back to the page you came from')).toBeHidden()
+  })
+
   test('the card is the way out: its button opens the file', async ({ page }) => {
     const { hub } = await pickable(page)
     await at(page, hub, 'click')

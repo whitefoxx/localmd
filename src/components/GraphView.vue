@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, nextTick, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, nextTick, ref, shallowRef, watch } from 'vue'
 import {
   forceSimulation,
   forceLink,
@@ -57,8 +57,14 @@ let stopTypeWatch: (() => void) | null = null
  *  it; the watch at the bottom of this file is the only caller. */
 let applyFocus: (() => void) | null = null
 /** Every node in the current drawing, by id. Outside render() so the card can
- *  hand back a path — drilling into a tag's page list — and be understood. */
-let nodesById = new Map<string, GraphNode>()
+ *  hand back a path — drilling into a tag's page list — and be understood, and
+ *  reactive because the card also asks whether what it is showing is on the
+ *  graph at all. */
+const nodesById = shallowRef(new Map<string, GraphNode>())
+/** Everything the selection lights up. Written by applyFocus, read both by the
+ *  hover handler and by the card, which offers to go and find a node that is
+ *  NOT in here. */
+const lit = shallowRef(new Set<string>())
 
 /**
  * Whether the layout is still being worked out.
@@ -125,7 +131,7 @@ function goto(id: string | null): void {
   // draws only markdown pages. The card describes the path either way — it is
   // the `kind: 'binary'` branch that says a PDF has no text to show — and the
   // solid mark simply has no node to sit on, which is the truth.
-  previewNode.value = id ? (nodesById.get(id) ?? { id, kind: 'page' }) : null
+  previewNode.value = id ? (nodesById.value.get(id) ?? { id, kind: 'page' }) : null
 }
 
 /** Follow a link out of the card. The graph stays where it is: you asked to
@@ -147,6 +153,27 @@ function back(): void {
 function pin(id: string): void {
   ui.graphSelected = id
   show(id)
+}
+
+/**
+ * Whether the card is about a node the graph is currently dimming.
+ *
+ * Following a link is how you get there: the page it names need not be a
+ * neighbour of the pin, and a dimmed node — mark and all — is drawn at an
+ * opacity that makes it effectively invisible. So the card stops pretending
+ * you can see where it is, and offers to go there instead.
+ */
+const canLocate = computed(
+  () =>
+    !!previewId.value &&
+    !!ui.graphSelected &&
+    nodesById.value.has(previewId.value) &&
+    !lit.value.has(previewId.value),
+)
+
+/** What the button does: exactly what clicking that node would have done. */
+function locate(): void {
+  if (previewId.value) pin(previewId.value)
 }
 
 function clearSelection(): void {
@@ -389,10 +416,6 @@ function render(): void {
   // at a time.
   let focus: string | null = null
   let dragging = false
-  /** Everything the selection lights up, kept in step by applyFocus below.
-   *  Held rather than recomputed per mouseenter: sweeping a pointer across a
-   *  hub would otherwise rebuild its whole neighbour set once per node. */
-  let lit = new Set<string>()
   /** What is currently lifted, and where to put it back: its layer and the
    *  sibling it sat in front of. Restored in reverse so a recorded sibling is
    *  always home before the element that names it — which keeps paint order
@@ -407,11 +430,15 @@ function render(): void {
   // id → its element, and id → the lines that touch it. Built once per render,
   // which is the only place they can go stale.
   const nodeEl = new Map<string, SVGGElement>()
-  nodesById = new Map<string, GraphNode>()
+  // Filled first, published once: a shallowRef notifies on assignment, so
+  // handing out a map that is still being populated would let a reader cache
+  // an answer taken from an empty one.
+  const byId = new Map<string, GraphNode>()
   node.each(function (d) {
     nodeEl.set(d.id, this)
-    nodesById.set(d.id, d)
+    byId.set(d.id, d)
   })
+  nodesById.value = byId
   const linkEls = new Map<string, SVGLineElement[]>()
   link.each(function (d) {
     for (const end of [endId(d.source), endId(d.target)]) {
@@ -507,7 +534,7 @@ function render(): void {
 
   function place(el: SVGCircleElement, id: string | null, pad: number): void {
     const g = id ? nodeEl.get(id) : null
-    const d = id ? nodesById.get(id) : null
+    const d = id ? nodesById.value.get(id) : null
     if (!g || !d) {
       el.remove()
       return
@@ -518,7 +545,7 @@ function render(): void {
 
   // The one place the state above becomes pixels. Everything else sets a ref.
   applyFocus = (): void => {
-    lit = litAround(ui.graphSelected, neighbors)
+    lit.value = litAround(ui.graphSelected, neighbors)
     setFocus(ui.graphSelected ?? hoverId.value)
     place(pinnedRing, ui.graphSelected, 7)
     place(shownRing, previewId.value, 4)
@@ -531,7 +558,7 @@ function render(): void {
       // what the pin lit up: a dimmed node is not part of the answer on screen,
       // so pointing at one says nothing rather than swapping the card to a page
       // the pointer was merely passing over.
-      if (ui.graphSelected && lit.has(d.id)) show(d.id)
+      if (ui.graphSelected && lit.value.has(d.id)) show(d.id)
     })
     // A drag keeps its node: the pointer routinely outruns the node it is
     // pulling, and the graph re-lighting mid-drag is exactly the flicker this
@@ -621,10 +648,10 @@ function render(): void {
   // not re-entered either, so a hover left over from the old drawing would dim
   // the graph around a node nothing is pointing at.
   hoverId.value = null
-  if (ui.graphSelected && !nodesById.has(ui.graphSelected)) clearSelection()
+  if (ui.graphSelected && !nodesById.value.has(ui.graphSelected)) clearSelection()
   const keep =
     previewId.value &&
-    nodesById.has(previewId.value) &&
+    nodesById.value.has(previewId.value) &&
     (!ui.graphSelected || litAround(ui.graphSelected, neighbors).has(previewId.value))
   show(keep ? previewId.value : ui.graphSelected)
   applyFocus()
@@ -670,7 +697,8 @@ onBeforeUnmount(() => {
   clearSelection()
   hoverId.value = null
   applyFocus = null
-  nodesById = new Map()
+  nodesById.value = new Map()
+  lit.value = new Set()
   observer?.disconnect()
   observer = null
   refit = null
@@ -695,9 +723,11 @@ onBeforeUnmount(() => {
       <GraphPreviewCard
         :preview="preview"
         :can-go-back="trail.length > 0"
+        :can-locate="canLocate"
         class="max-h-full"
         @follow="follow"
         @back="back"
+        @locate="locate"
         @open="openFromCard"
         @search="searchTag"
         @select="pin"
