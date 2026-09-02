@@ -769,6 +769,31 @@
 .md-preview th {
   @apply bg-bg-2 font-semibold;
 }
+/* A `localmd-query` block once useKbQuery has answered it. The answer is a
+   view — rebuilt from the index on every render, never written back — so this
+   styles a result, not a stored list. Before hydration, and in every other
+   markdown renderer, the same node is the plain code block the user typed. */
+.md-preview .kb-query {
+  @apply my-3;
+}
+.md-preview .kb-query-table {
+  @apply my-0;
+}
+.md-preview .kb-query-count {
+  @apply mt-1 text-xs text-fg-3;
+}
+.md-preview .kb-query-note {
+  @apply my-1 text-sm text-fg-2;
+}
+.md-preview .kb-query-error {
+  @apply text-removed;
+}
+.md-preview .kb-query-errors {
+  @apply list-disc pl-6 my-1 text-sm text-fg-2 font-mono;
+}
+.md-preview .kb-query-warn {
+  @apply text-xs text-fg-3;
+}
 .md-preview hr {
   @apply my-4 border-border;
 }

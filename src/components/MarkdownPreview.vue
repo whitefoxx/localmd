@@ -12,6 +12,7 @@ import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
 import { previewScroll } from '@/lib/viewMemory'
 import { useTtsHighlight } from '@/composables/useTtsHighlight'
 import { useKbImages } from '@/composables/useKbImages'
+import { useKbQuery } from '@/composables/useKbQuery'
 import { t } from '@/i18n'
 
 const files = useFilesStore()
@@ -82,6 +83,10 @@ useKbImages(
   () => html.value,
   (href) => files.resolveMarkdownLink(files.currentPath ?? '', href),
 )
+
+// `localmd-query` blocks — same division of labour as the images above: the
+// renderer leaves the question, this answers it against the live index.
+useKbQuery(root, () => html.value)
 
 async function onClick(e: MouseEvent): Promise<void> {
   if (handleCodeCopy(e)) return

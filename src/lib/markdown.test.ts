@@ -103,6 +103,30 @@ describe('code highlighting', () => {
   })
 })
 
+describe('localmd-query blocks', () => {
+  it('leaves a placeholder carrying the query, not a highlighted block', () => {
+    const html = renderMarkdown('```localmd-query\ntype:paper age:>6m\n```', resolver)
+    expect(html).toContain('class="kb-query"')
+    expect(html).toContain('data-kb-query="type:paper age:&gt;6m"')
+    // The fallback IS the code block the user typed: wherever nothing
+    // hydrates it — the chat transcript, another markdown tool — the question
+    // still reads as the text it is.
+    expect(html).toContain('<pre><code class="hljs">type:paper age:&gt;6m</code></pre>')
+  })
+
+  it('does not touch an ordinary fence that merely mentions a query', () => {
+    const html = renderMarkdown('```\ntype:paper\n```', resolver)
+    expect(html).not.toContain('kb-query')
+    expect(html).toContain('code-block')
+  })
+
+  it('escapes the query text — a note is untrusted input', () => {
+    const html = renderMarkdown('```localmd-query\ntag:"><img src=x>\n```', resolver)
+    expect(html).not.toContain('<img src=x')
+    expect(html).toContain('&quot;&gt;&lt;img src=x&gt;')
+  })
+})
+
 describe('math (KaTeX)', () => {
   it('renders inline $…$', () => {
     const html = renderMarkdown('质能方程 $E = mc^2$ 很有名', resolver)

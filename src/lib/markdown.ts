@@ -84,6 +84,28 @@ function highlightCode(code: string, infostring?: string): string {
   return wrapCodeBlock(`<pre><code class="hljs">${escapeHtml(code)}</code></pre>`)
 }
 
+/** The fence language that turns a code block into a live query. */
+export const QUERY_FENCE = 'localmd-query'
+
+/**
+ * A query block renders in two halves: this placeholder carries the query
+ * text, and `useKbQuery` fills in the answer once it can reach the index.
+ *
+ * The split is not incidental. `renderMarkdown` is synchronous and knows
+ * nothing about stores, which is what lets the chat transcript and the
+ * editor's live preview render markdown with no knowledge base behind them; a
+ * renderer that needed one would stop working in exactly those places.
+ *
+ * So the fallback — what you see wherever nothing hydrates it — is the query
+ * as the plain code block the user typed. That is also what every other
+ * markdown tool shows when it opens the file, which is the honest answer: the
+ * question is the text, and the table is only ever a view of it.
+ */
+function queryPlaceholder(query: string): string {
+  const text = escapeHtml(query.replace(/\n+$/, ''))
+  return `<div class="kb-query" data-kb-query="${text}"><pre><code class="hljs">${text}</code></pre></div>`
+}
+
 export interface WikilinkResolver {
   /** Returns the KB-relative path for a wikilink target, or null if missing. */
   resolve(target: string): string | null
@@ -246,7 +268,8 @@ export function renderMarkdown(
   marked.use({
     renderer: {
       code(code: string, infostring: string | undefined) {
-        return highlightCode(code, infostring?.trim().split(/\s+/)[0]?.toLowerCase())
+        const lang = infostring?.trim().split(/\s+/)[0]?.toLowerCase()
+        return lang === QUERY_FENCE ? queryPlaceholder(code) : highlightCode(code, lang)
       },
       codespan(text: string) {
         const path = opts.resolvePath?.(unescapeHtml(text).trim())

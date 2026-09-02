@@ -85,6 +85,35 @@ Maths written between dollar signs renders where it sits: `$E = mc^2$` inline,
 or a `$$` block on its own lines for something bigger. Prices are safe — `$5`
 and `$10` in a sentence stay a price.
 
+## A question that answers itself
+
+A code block marked `localmd-query` is not code. It is a question, and it is
+answered against your folder every time you look at the note.
+
+```localmd-query
+type:paper tag:llm age:>6m sort:-modified
+```
+
+That one asks for papers tagged llm that nothing has touched in six months,
+newest first. What you see is a table of the pages that match; click one to
+open it.
+
+The filters are the ones the search box takes, and more of them: `type:` and
+`tag:`, `path:wiki/` for a folder, `fm:status=draft` for any other field you
+keep at the top of a page, `age:<30d` or `modified:<2026-01-01` for time,
+`orphan:true` for pages nothing links to, `broken:true` for pages with a dead
+link, and `sort:`, `limit:` and `columns:` to shape the answer. Anything that
+is not a filter searches the words. If you would rather describe what you want
+than write it, ask the assistant — it uses the same filters.
+
+**Only the question is saved.** Your file holds those few words and nothing
+else; the table is built fresh each time and never written back into the note.
+That is deliberate. A list pasted into a page is correct the day you paste it
+and wrong the first time you rename something, and nobody ever notices. A
+question stays true. Open the same note in any other markdown app and you will
+find the question sitting there as an ordinary code block — which is all it
+ever was.
+
 ## Related
 
 Where notes live: `knowledge-base`. Asking the assistant to write for you:

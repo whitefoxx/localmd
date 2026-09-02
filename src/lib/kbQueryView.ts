@@ -1,0 +1,104 @@
+/**
+ * A `localmd-query` block rendered to HTML.
+ *
+ * Pure over a snapshot, like the engine it calls and for the same reason as
+ * `marks.ts`: vitest runs in the node environment, and a renderer that only
+ * existed inside a Vue composable could only ever be checked by looking at it.
+ * The composable that uses this is DOM plumbing and nothing else.
+ *
+ * What comes out is a VIEW. It is rebuilt from the index on every render and
+ * never written back — the note on disk keeps the question, never the answer.
+ * That is the whole reason the block is worth having over a pasted list: a
+ * materialized list is a record, and a record nobody maintains starts to lie
+ * the day someone renames a file.
+ *
+ * Page links are emitted as ordinary wikilink anchors so the preview's
+ * existing click handler opens them. A second click path would be a second
+ * thing to keep in step with what opening a page means.
+ */
+import { parseKbQuery, runQuery, type QueryPage, type QueryRow } from '@/lib/kbQuery'
+import { escapeHtml } from '@/lib/wiki'
+import { t } from '@/i18n'
+
+/** Shown when the query names no columns of its own. */
+const DEFAULT_COLUMNS = ['type', 'modified']
+
+function isoDay(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10)
+}
+
+/** A cell the query asked for, or one of the built-ins it did not have to. */
+function cellText(row: QueryRow, name: string): string {
+  if (name in row.cells) return row.cells[name]
+  switch (name) {
+    case 'path':
+      return row.path
+    case 'title':
+      return row.title
+    case 'type':
+      return row.type ?? ''
+    case 'tags':
+      return row.tags.join(', ')
+    case 'modified':
+      return row.mtime === undefined ? '' : isoDay(row.mtime)
+    case 'inbound':
+      return String(row.inbound)
+    default:
+      return ''
+  }
+}
+
+function note(cls: string, text: string): string {
+  return `<p class="kb-query-note ${cls}">${escapeHtml(text)}</p>`
+}
+
+export function renderQueryBlock(
+  pages: readonly QueryPage[],
+  queryText: string,
+  now: number,
+): string {
+  const { query, errors } = parseKbQuery(queryText, now)
+  if (errors.length) {
+    return (
+      note('kb-query-error', t('query.badQuery')) +
+      `<ul class="kb-query-errors">${errors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+    )
+  }
+
+  const result = runQuery(pages, query)
+  const columns = query.columns ?? DEFAULT_COLUMNS
+  const terms = result.unmatchedTerms.join(', ')
+  // An unmatched term cannot leave a row standing, so an empty result and an
+  // unknown term are one sentence, not two stacked ones that both open with
+  // "nothing". The warning below survives for the case the invariant does
+  // not cover — a filter that reports unknown vocabulary without excluding
+  // anything — rather than being unreachable by assumption.
+  if (!result.rows.length) {
+    return note(
+      'kb-query-empty',
+      result.unmatchedTerms.length ? t('query.emptyUnknown', { terms }) : t('query.empty'),
+    )
+  }
+  const warning = result.unmatchedTerms.length
+    ? note('kb-query-warn', t('query.unknown', { terms }))
+    : ''
+
+  const head = ['', ...columns].map((c) => `<th>${escapeHtml(c)}</th>`).join('')
+  const body = result.rows
+    .map((row) => {
+      const link = `<a class="wikilink" data-target="${escapeHtml(row.path)}" data-resolved="1">${escapeHtml(row.title)}</a>`
+      const cells = columns.map((c) => `<td>${escapeHtml(cellText(row, c))}</td>`).join('')
+      return `<tr><td>${link}</td>${cells}</tr>`
+    })
+    .join('')
+  const count =
+    result.rows.length < result.total
+      ? t('query.countCapped', { shown: result.rows.length, total: result.total })
+      : t('query.count', { n: result.total })
+
+  return (
+    `<table class="kb-query-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>` +
+    `<p class="kb-query-count">${escapeHtml(count)}</p>` +
+    warning
+  )
+}
