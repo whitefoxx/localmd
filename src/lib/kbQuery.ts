@@ -327,9 +327,17 @@ export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
   return { rows, total: matched.length, unmatchedTerms: unmatched(pages, facts, q) }
 }
 
-/** Terms no page in the KB could satisfy, checked against the whole corpus
- *  rather than the filtered set — the question is "does this vocabulary
- *  exist?", not "did this query return anything?". */
+/**
+ * Terms no page in the KB could satisfy, checked against the whole corpus
+ * rather than the filtered set — the question is "does this vocabulary
+ * exist?", not "did this query return anything?".
+ *
+ * Worth knowing before rendering one: every term checked here is also a hard
+ * filter, so a term nothing satisfies cannot leave a row standing. A non-empty
+ * result here therefore implies an empty `rows`, and a caller that prints
+ * "nothing matches" and then names the term is printing one sentence twice.
+ * The test named "an unknown term always means an empty result" holds this.
+ */
 function unmatched(
   pages: readonly QueryPage[],
   facts: Map<string, Facts>,
@@ -498,9 +506,12 @@ const MAX_LISTED = 50
 
 /** Compact text for the agent, in the shape `formatLintReport` established. */
 export function formatQueryResult(r: QueryResult, columns: readonly string[] = []): string {
+  const terms = r.unmatchedTerms.join(', ')
   const head =
     r.total === 0
-      ? 'No pages match.'
+      ? r.unmatchedTerms.length
+        ? `No pages match. This KB has no ${terms} — check the spelling.`
+        : 'No pages match.'
       : r.rows.length < r.total
         ? `${r.rows.length} of ${r.total} matches:`
         : `${r.total} match${r.total === 1 ? '' : 'es'}:`
@@ -515,8 +526,11 @@ export function formatQueryResult(r: QueryResult, columns: readonly string[] = [
     return '  ' + bits.join('  ')
   })
   if (r.rows.length > MAX_LISTED) lines.push(`  … +${r.rows.length - MAX_LISTED} more`)
-  const warn = r.unmatchedTerms.length
-    ? `\n\nNothing in this KB matches: ${r.unmatchedTerms.join(', ')} — check the spelling.`
-    : ''
+  // Only when rows survived: an empty result already said it above, and
+  // saying it twice is the same sentence twice.
+  const warn =
+    r.total > 0 && r.unmatchedTerms.length
+      ? `\n\nNothing in this KB matches: ${terms} — check the spelling.`
+      : ''
   return head + (lines.length ? '\n' + lines.join('\n') : '') + warn
 }

@@ -202,6 +202,22 @@ describe('runQuery', () => {
     expect(r.rows[0].cells).toEqual({ rating: '9', status: 'draft', title: 'Attention' })
   })
 
+  it('an unknown term always means an empty result', () => {
+    // Every term `unmatched` checks is also a hard filter, so nothing it flags
+    // can leave a row standing. Renderers rely on this to say it once.
+    for (const q of [
+      'tag:llmm',
+      'type:nope',
+      'fm:nosuch',
+      'path:none/',
+      'type:paper tag:llmm',
+      'fm:rating>=1 fm:nosuch',
+    ]) {
+      const r = runQuery(PAGES, parseKbQuery(q, NOW).query)
+      if (r.unmatchedTerms.length) expect(r.rows, q).toEqual([])
+    }
+  })
+
   it('names vocabulary the KB does not have, so a typo is not an empty table', () => {
     const r = runQuery(PAGES, parseKbQuery('tag:llmm fm:nosuch type:nope path:none/', NOW).query)
     expect(r.rows).toEqual([])
@@ -239,9 +255,13 @@ describe('formatQueryResult', () => {
     expect(formatQueryResult(r)).toContain('1 of 2 matches')
     expect(formatQueryResult(r)).toContain('wiki/attention.md')
 
-    const empty = runQuery(PAGES, parseKbQuery('tag:llmm', NOW).query)
-    expect(formatQueryResult(empty)).toContain('No pages match.')
-    expect(formatQueryResult(empty)).toContain('tag:llmm')
+    // One sentence, not "No pages match." followed by a line saying the same.
+    const empty = formatQueryResult(runQuery(PAGES, parseKbQuery('tag:llmm', NOW).query))
+    expect(empty).toBe('No pages match. This KB has no tag:llmm — check the spelling.')
+
+    // A genuinely empty result, with every term real, says only that.
+    const real = formatQueryResult(runQuery(PAGES, parseKbQuery('type:paper role:log', NOW).query))
+    expect(real).toBe('No pages match.')
   })
 
   it('shows requested non-built-in columns', () => {
