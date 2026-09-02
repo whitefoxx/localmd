@@ -251,6 +251,27 @@ test.describe('picking a node', () => {
   const shown = (page: import('@playwright/test').Page): Promise<string | null> =>
     page.evaluate(() => document.querySelector('[data-preview]')?.getAttribute('data-preview') ?? null)
 
+  test('the dot is the node — its name is not part of it', async ({ page }) => {
+    // A label runs to the right as far as the name is long, and the focused
+    // one grows. While it answered to the pointer, the area that counted as a
+    // node changed depending on what the pointer had already done.
+    const overLabel = await page.evaluate(() => {
+      for (const g of document.querySelectorAll('svg > g > g > g')) {
+        const label = g.querySelector('text')
+        if (!label) continue
+        const r = label.getBoundingClientRect()
+        if (r.width < 12) continue
+        const hit = document.elementFromPoint(r.left + r.width - 3, r.top + r.height / 2)
+        if (hit === label) return 'the label itself'
+        if (hit?.tagName === 'text') return 'some other label'
+        return hit?.tagName ?? 'nothing'
+      }
+      return 'no label found'
+    })
+    expect(overLabel).not.toBe('the label itself')
+    expect(overLabel).not.toBe('some other label')
+  })
+
   test('a click pins the node and describes it, instead of leaving for it', async ({ page }) => {
     const { hub } = await pickable(page)
     await at(page, hub, 'click')

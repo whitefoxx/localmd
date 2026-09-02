@@ -441,8 +441,15 @@ function render(): void {
     .attr('stroke', 'rgb(var(--c-added))')
     .attr('stroke-width', 1.5)
 
+  // The dot is the node; the label is only its name. A label runs to the right
+  // as far as the name is long, and while it counted as part of the node you
+  // could be pointing at open canvas — or at a neighbour's dot — and still be
+  // hovering something else entirely. Worse, the focused label grows, so the
+  // area that answered to the pointer changed depending on what the pointer
+  // had already done.
   node
     .append('text')
+    .attr('pointer-events', 'none')
     .text((d) => (d.kind === 'tag' ? `#${d.tag}` : fileStem(d.id)))
     .attr('font-size', 10)
     .attr('dx', (d) => nodeRadius(d) + 5)
