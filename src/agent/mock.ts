@@ -11,6 +11,7 @@
  *   write <path> <content>   run the real write_file tool, then confirm
  *   delete <path>            run the real delete_path tool (recursive)
  *   index <path>             run the real index_document tool
+ *   health                   run the real kb_health tool and reply with it
  *   plan                     exercise update_plan (3 steps, all done)
  *   anything else            stream a fixed reply
  *
@@ -115,6 +116,11 @@ export async function runMockTurn(opts: MockTurnOptions): Promise<ModelMessage[]
     const target = script.slice('delete '.length).trim()
     const result = await runTool('delete_path', { path: target, recursive: true }, opts)
     reply = `Done: ${result}`
+    await streamText(reply, opts.onEvent)
+  } else if (script === 'health') {
+    // The report itself is the reply, so a browser test can read what the
+    // agent was handed rather than trusting that the tool returned something.
+    reply = await runTool('kb_health', {}, opts)
     await streamText(reply, opts.onEvent)
   } else if (script.startsWith('index ')) {
     const target = script.slice('index '.length).trim()
