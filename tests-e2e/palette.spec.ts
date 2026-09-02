@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * The palette (⌘K) and its five modes: fuzzy file search, `>` commands,
- * `@` chats, `:` to jot a line into today's capture page (or, alone, to open
- * it), and ⇧Enter to hand the query to the agent.
+ * The palette (⌘K) and its six modes: fuzzy file search, `>` commands,
+ * `@` chats, `?` filters, `:` to jot a line into today's capture page (or,
+ * alone, to open it), and ⇧Enter to hand the query to the agent.
  */
 
 /** Today as the app files it — local calendar day, never UTC. */
@@ -28,7 +28,9 @@ async function openPalette(page: Page): Promise<void> {
 }
 
 function palette(page: Page) {
-  return page.getByPlaceholder(/Search files and content|Run a command|Find a chat|Jot a line/)
+  return page.getByPlaceholder(
+    /Search files and content|Run a command|Find a chat|Filter the knowledge base|Jot a line/,
+  )
 }
 
 /** Result rows, scoped to the panel — the same names live in the file tree. */
@@ -255,4 +257,76 @@ test('Enter while an IME is composing does not jot the half-written line', async
   // And a real Enter still jots, so the guard denies the IME's key only.
   await page.keyboard.press('Enter')
   await expect(page.locator('[data-palette]')).toContainText(`Saved to raw/daily/${today()}.md`)
+})
+
+
+/**
+ * What ⌘K opens on, and where the filter grammar went.
+ *
+ * The empty palette used to list the filters, which was only ever better than
+ * the blank it replaced. Behind `?` they keep a front door of their own, and
+ * the empty palette can answer what people actually open it for.
+ */
+test('the empty palette lists what is already open, current file first', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { useFilesStore } = await import('/src/stores/files.ts')
+    const files = useFilesStore()
+    await files.createFile('wiki/alpha.md', '# Alpha\n')
+    await files.createFile('wiki/beta.md', '# Beta\n')
+    await files.openFile('wiki/alpha.md')
+    await files.openFile('wiki/beta.md')
+  })
+  await openPalette(page)
+  const rows = await results(page).allTextContents()
+  expect(rows[0]).toContain('wiki/beta.md') // the file on screen
+  expect(rows.join('|')).toContain('wiki/alpha.md')
+  // Files that are not open are not offered — this is the open set, not a list
+  // of everything.
+  expect(rows.join('|')).not.toContain('AGENTS.md')
+})
+
+test('with nothing open the palette says nothing, rather than inventing a list', async ({
+  page,
+}) => {
+  await page.evaluate(async () => {
+    const { useFilesStore } = await import('/src/stores/files.ts')
+    await useFilesStore().closeAllTabs()
+  })
+  await openPalette(page)
+  await expect(results(page)).toHaveCount(0)
+  // The prefixes are still named, which is the one thing an empty panel owes.
+  await expect(page.locator('[data-palette]')).toContainText('filters')
+})
+
+test('`?` opens the filter grammar, and answers what can go in a key', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { useFilesStore } = await import('/src/stores/files.ts')
+    const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+    await useFilesStore().createFile('wiki/typed.md', '---\ntype: concept\n---\n\n# Typed\n')
+    await useKbIndexStore().refresh()
+  })
+  await openPalette(page)
+  await palette(page).fill('?')
+  await expect(results(page).filter({ hasText: 'tag:' })).toBeVisible()
+  await expect(results(page).filter({ hasText: 'orphan:' })).toBeVisible()
+
+  // A key with nothing after it lists the knowledge base's own vocabulary.
+  await palette(page).fill('?type:')
+  await expect(results(page).filter({ hasText: 'concept' })).toBeVisible()
+
+  await palette(page).fill('?type:concept')
+  await expect(results(page).filter({ hasText: 'wiki/typed.md' })).toBeVisible()
+})
+
+test('without `?` a colon is just text, so a search stays a search', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { useFilesStore } = await import('/src/stores/files.ts')
+    const { useKbIndexStore } = await import('/src/stores/kbIndex.ts')
+    await useFilesStore().createFile('wiki/notes.md', '# Notes\n\nA line saying type:concept.\n')
+    await useKbIndexStore().refresh()
+  })
+  await openPalette(page)
+  await palette(page).fill('type:concept')
+  // The words, matched as words — the line that literally contains them.
+  await expect(hits(page).filter({ hasText: 'wiki/notes.md' })).toBeVisible()
 })

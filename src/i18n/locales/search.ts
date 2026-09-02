@@ -1,7 +1,8 @@
 /** The palette (⌘K): search, commands, chats. Namespace: `search`. */
 export default {
   en: {
-    placeholder: 'Search files and content…  (> commands, @ chats, type:foo)',
+    placeholder: 'Search files and content…  (> commands, @ chats, ? filters)',
+    filterPlaceholder: 'Filter the knowledge base…  (tag:, type:, orphan:, …)',
     commandPlaceholder: 'Run a command…',
     sessionPlaceholder: 'Find a chat…',
     jotPlaceholder: 'Jot a line into today’s page…',
@@ -14,7 +15,9 @@ export default {
     hintCommands: 'commands',
     hintSessions: 'chats',
     hintAsk: 'ask the agent',
+    hintFilters: 'filters',
     hintJot: 'daily',
+    hintOpenNow: 'open',
     jotPrefix: 'Jot:',
     jotOpen: 'Open today’s page:',
     jotSaved: 'Saved to {path}',
@@ -23,7 +26,8 @@ export default {
     daysAgo: '{n}d ago',
   },
   zh: {
-    placeholder: '搜索文件与内容…  （> 命令，@ 对话，type:foo 按类型）',
+    placeholder: '搜索文件与内容…  （> 命令，@ 对话，? 过滤）',
+    filterPlaceholder: '按条件过滤知识库…  （tag:、type:、orphan: ……）',
     commandPlaceholder: '执行命令…',
     sessionPlaceholder: '查找对话…',
     jotPlaceholder: '随手记一行到今天的页面…',
@@ -33,7 +37,9 @@ export default {
     hintCommands: '命令',
     hintSessions: '对话',
     hintAsk: '问助手',
+    hintFilters: '过滤',
     hintJot: '每日',
+    hintOpenNow: '当前',
     jotPrefix: '记下：',
     jotOpen: '打开今天的页面：',
     jotSaved: '已记到 {path}',

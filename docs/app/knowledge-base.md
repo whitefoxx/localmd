@@ -134,16 +134,24 @@ the whole answer.
 
 ## Finding things by tag
 
-Search (⌘K) takes filters as well as words — `type:concept`, `tag:llm`,
-`path:wiki/`, `fm:status=draft` for any other field at the top of a page,
-`age:>6m`, `orphan:true` — and they combine, match part of a word, and ignore
-case. Repeat one and both must hold. Type `tag:` and stop and it lists every
-tag in the knowledge base with how many files carry it — pick one rather than
-remembering it.
+Search (⌘K) opens on the files you already have open, the way an editor does.
+Type to search them all; type **`?`** to ask a different kind of question.
+
+Behind `?` are the filters — `?type:concept`, `?tag:llm`, `?path:wiki/`,
+`?fm:status=draft` for any other field at the top of a page, `?age:>6m`,
+`?orphan:true`. They combine, match part of a word, and ignore case; repeat one
+and both must hold. `?` on its own lists every filter there is, and a key with
+nothing after it lists what can go in it — `?tag:` names every tag in the
+knowledge base with how many files carry it, so you pick one rather than
+remember it.
+
+The prefix earns its keystroke: without it a colon is just a colon, so
+searching for the words `type:concept` finds the page that says them.
 
 These are the same filters a `localmd-query` block takes (see `writing-notes`)
-and the same ones the assistant uses, so a way of narrowing that you work out
-in one place works in the others. A filter that will not parse is quietly
+and the same ones the assistant uses — only ⌘K asks for the `?` first, because
+it is also a search box. A way of narrowing that you work out in one place
+works in the others. A filter that will not parse is quietly
 ignored here rather than complained about: half-typed is the normal state of a
 search box.
 

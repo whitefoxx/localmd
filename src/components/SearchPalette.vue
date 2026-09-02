@@ -1,12 +1,21 @@
 <script setup lang="ts">
 /**
- * The palette (⌘K / ⌘P). One input, five things behind it, chosen by a prefix:
+ * The palette (⌘K / ⌘P). One input, six things behind it, chosen by a prefix:
  *
  *   (none)  files and content — filenames fuzzy-ranked, content substring
  *   >       commands (see composables/useCommands)
  *   @       agent conversations, by title
+ *   ?       the filter grammar — tag:, type:, orphan:, … (lib/kbQuery)
  *   :       jot a line into today's capture page — or, alone, open it (lib/daily)
  *   ⇧Enter  hand whatever is typed to the agent
+ *
+ * `?` is a prefix because a filter is a different question from a search, and
+ * a palette that guesses which one you meant gets it wrong on the word that
+ * happens to contain a colon. It also gives the empty palette back: with the
+ * filters behind a key, opening ⌘K can answer the question people actually
+ * open it with — which of my files is already open — the way every editor
+ * does. Nothing is shown when nothing is open, because there is nothing to
+ * say and an empty list says it better than an invented one.
  *
  * `:` earns a prefix where the others earn one: it is a *write*, and the
  * palette is the only surface reachable without leaving what you were doing —
@@ -57,7 +66,7 @@ const query = ref('')
 const selected = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 
-type Mode = 'search' | 'command' | 'session' | 'jot'
+type Mode = 'search' | 'command' | 'session' | 'filter' | 'jot'
 
 interface Row {
   kind: 'file' | 'hit' | 'doc' | 'command' | 'session' | 'ask' | 'value' | 'filter' | 'jot' | 'jotOpen'
@@ -82,16 +91,16 @@ interface Row {
   filterKey?: string
 }
 
-// Filters plus free text. The grammar is `lib/kbQuery` — the same one a
-// `localmd-query` block and the agent's query_kb speak, so something learned
-// in one place works in the others. Only the GRAMMAR is shared: matching
-// still runs through this panel's cached maps and fuzzy ranking, because
-// finding a file and answering a structural question are different jobs.
-
-// A leading `:` is unambiguous: the `type:` / `tag:` filters are word-bounded,
-// so a colon never opens a search query.
+// Filters plus free text, in `?` mode only. The grammar is `lib/kbQuery` — the
+// same one a `localmd-query` block and the agent's query_kb speak, so something
+// learned in one place works in the others. Only the GRAMMAR is shared:
+// matching still runs through this panel's cached maps and fuzzy ranking,
+// because finding a file and answering a structural question are different
+// jobs.
 const mode = computed<Mode>(() =>
-  query.value.startsWith('>')
+  query.value.startsWith('?')
+    ? 'filter'
+    : query.value.startsWith('>')
     ? 'command'
     : query.value.startsWith('@')
       ? 'session'
@@ -111,6 +120,34 @@ const term = computed(() =>
  * not applied — and the two places where a query is KEPT rather than typed
  * (the note block, the agent tool) both report the errors in full. */
 const parsed = computed(() => parseKbQuery(term.value, Date.now()).query)
+
+/**
+ * What ⌘K shows before a key is pressed: the files you already have open.
+ *
+ * It used to be the filter list, which was there because the alternative had
+ * been a blank panel — the one surface everyone opens every time and nobody
+ * ever learnt anything from. Behind `?` the filters keep their own front door
+ * and this can answer the question people actually open ⌘K with, the way every
+ * editor does. Current file first: it is the one "go back to what I was doing"
+ * lands on, and the palette opens on the first row.
+ *
+ * Nothing open, nothing shown. An empty folder has no answer here and a list
+ * invented to fill the space would be worse than the space.
+ */
+const tabRows = computed<Row[]>(() => {
+  const open = files.openTabs
+  const first = files.currentPath && open.includes(files.currentPath) ? [files.currentPath] : []
+  return [...first, ...open.filter((p) => p !== files.currentPath)].map(
+    (path): Row => ({
+      kind: 'file',
+      label: path,
+      path,
+      icon: 'codicon-markdown',
+      type: index.types.get(path) ?? null,
+      hint: path === files.currentPath ? t('search.hintOpenNow') : undefined,
+    }),
+  )
+})
 
 function bindingHint(cmd: Command): string | undefined {
   if (!cmd.hotkey) return undefined
@@ -226,7 +263,9 @@ const jotRows = computed<Row[]>(() =>
 )
 
 const searchRows = computed<Row[]>(() => {
-  const q = parsed.value
+  // Only `?` mode carries filters; a plain search is words, so a file actually
+  // called `type:foo` is findable by its name.
+  const q = mode.value === 'filter' ? parsed.value : { text: term.value }
   const text = q.text ?? ''
   // The engine answers the filters; the free text stays with this panel's own
   // search, which ranks fuzzily and reaches inside document indexes. Handing
@@ -292,10 +331,15 @@ const rows = computed<Row[]>(() => {
   if (mode.value === 'command') return commandRows.value
   if (mode.value === 'session') return sessionRows.value
   if (mode.value === 'jot') return jotRows.value
-  if (bareFilterKey(term.value)) return valueRows.value
-  // Nothing typed yet: the filters, rather than the blank the palette used to
-  // answer an empty query with.
-  if (!term.value.trim()) return filterRows.value
+  if (mode.value === 'filter') {
+    // `?` and nothing else: what can be asked. Then, once a key is typed and
+    // stopped at, what can go in it. The two halves of finding out, in order.
+    if (bareFilterKey(term.value)) return valueRows.value
+    if (!term.value.trim()) return filterRows.value
+    return searchRows.value
+  }
+  // Nothing typed: whatever is already open. Nothing open: nothing.
+  if (!term.value.trim()) return tabRows.value
   const found = searchRows.value
   // The offer to ask instead of search — only with something to ask about,
   // and FIRST. Search results are unbounded: put the offer after them and it
@@ -303,11 +347,8 @@ const rows = computed<Row[]>(() => {
   // finding it has already stopped looking. Being first must NOT make it the
   // default action, though — see `defaultRow`, which keeps Enter meaning "open
   // the top hit".
-  if (!parsed.value.text) return found
-  return [
-    { kind: 'ask', label: parsed.value.text ?? '', icon: 'codicon-sparkle', hint: '⇧↵' },
-    ...found,
-  ]
+  if (!term.value.trim()) return found
+  return [{ kind: 'ask', label: term.value.trim(), icon: 'codicon-sparkle', hint: '⇧↵' }, ...found]
 })
 
 /**
@@ -390,7 +431,9 @@ const placeholder = computed(() =>
       ? t('search.sessionPlaceholder')
       : mode.value === 'jot'
         ? t('search.jotPlaceholder')
-        : t('search.placeholder'),
+        : mode.value === 'filter'
+          ? t('search.filterPlaceholder')
+          : t('search.placeholder'),
 )
 
 /** Split text into matched / unmatched runs so the matched characters can be
@@ -481,7 +524,7 @@ async function pick(row: Row | undefined): Promise<void> {
   }
   if (row.kind === 'filter') {
     // Insert the key and stop: the value list answers what can follow it.
-    query.value = `${query.value.trimEnd()}${query.value.trim() ? ' ' : ''}${row.filterKey}:`
+    query.value = `${query.value.trimEnd()}${term.value.trim() ? ' ' : ''}${row.filterKey}:`
     inputEl.value?.focus()
     return
   }
@@ -652,10 +695,11 @@ function onKeydown(e: KeyboardEvent): void {
         <!-- A status bar, outside the scroller. It used to be the last item in
              the list, which was invisible until the list grew: with the filters
              above it, it scrolled off the bottom and read as clipped. -->
-        <div v-if="!query" class="shrink-0 border-t border-border">
+        <div v-if="!query || query === '?'" class="shrink-0 border-t border-border">
           <div class="px-4 py-2 text-xs text-fg-3 flex flex-wrap gap-x-4 gap-y-1">
             <span><span class="font-mono text-fg-2">&gt;</span> {{ $t('search.hintCommands') }}</span>
             <span><span class="font-mono text-fg-2">@</span> {{ $t('search.hintSessions') }}</span>
+            <span><span class="font-mono text-fg-2">?</span> {{ $t('search.hintFilters') }}</span>
             <span><span class="font-mono text-fg-2">:</span> {{ $t('search.hintJot') }}</span>
             <span><span class="font-mono text-fg-2">⇧↵</span> {{ $t('search.hintAsk') }}</span>
           </div>
