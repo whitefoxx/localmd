@@ -605,8 +605,11 @@ test.describe('picking a node', () => {
       await useFilesStore().createFile('wiki/needle.md', '# Needle\n\nIn a haystack.\n')
       await useKbIndexStore().refresh()
     })
+    // Shut, it is one icon; the field is what a click on it gets you.
     const box = page.getByPlaceholder('Find a page…')
-    await box.click()
+    await expect(box).toBeHidden()
+    await page.getByTitle('Find a page…').click()
+    await expect(box).toBeFocused()
     await box.fill('needle')
     // The dropdown row, named by both halves it shows — the tree and the tab
     // bar also hold a "needle" button, since creating the file opened it.
@@ -641,13 +644,16 @@ test.describe('picking a node', () => {
       )
       .toBe(true)
 
-    await box.click()
+    await page.getByTitle('Find a page…').click()
     await box.fill('zzzznothing')
     await expect(page.getByText('No page here goes by that name.')).toBeVisible()
 
-    // Esc gives up the half-typed search first — the graph is a layer below it.
+    // Esc unwinds in order: the text, then the box, then the graph under both.
     await page.keyboard.press('Escape')
     await expect(page.getByText('No page here goes by that name.')).toBeHidden()
+    await expect(box).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(box).toBeHidden()
     await expect(page.getByText('Click a node to see what it is')).toBeVisible()
   })
 

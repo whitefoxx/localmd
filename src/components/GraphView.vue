@@ -832,6 +832,7 @@ onBeforeUnmount(() => {
   ui.graphType = null
   ui.graphTags = false
   ui.graphQuery = ''
+  ui.graphSearchOpen = false
   editing.value = false
   expanded.value = false
   clearSelection()

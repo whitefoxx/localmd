@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useKbStore } from '@/stores/kb'
 import { useFilesStore } from '@/stores/files'
 import { useThemeStore } from '@/stores/theme'
@@ -387,6 +387,20 @@ function closeKb(): void {
  * by what it is called and by where it lives.
  */
 const graphHit = ref(0)
+const graphSearchBox = ref<HTMLInputElement | null>(null)
+
+async function openGraphSearch(): Promise<void> {
+  ui.graphSearchOpen = true
+  await nextTick()
+  graphSearchBox.value?.focus()
+}
+
+/** Give the field up when it is empty and unfocused — a box with nothing in it
+ *  is the icon it came from. A query still in it stays, so clicking back onto
+ *  the graph to look at a hit does not throw the search away. */
+function blurGraphSearch(): void {
+  if (!ui.graphQuery.trim()) ui.graphSearchOpen = false
+}
 const graphHits = computed<string[]>(() =>
   ui.graphQuery.trim()
     ? fuzzyRank(ui.graphQuery, [...kbIndex.graph.nodes], (p) => `${fileStem(p)} ${p}`)
@@ -401,6 +415,7 @@ function goToGraphHit(i = graphHit.value): void {
   if (!id) return
   ui.graphGoTo = id
   ui.graphQuery = ''
+  ui.graphSearchOpen = false
 }
 </script>
 
@@ -812,16 +827,27 @@ function goToGraphHit(i = graphHit.value): void {
              a box floating over the canvas sits on top of whatever lands under
              it, and this one has a list that drops down as well. -->
         <div class="relative shrink-0">
+          <button
+            v-if="!ui.graphSearchOpen"
+            class="text-fg-3 hover:text-fg-0"
+            :title="$t('graph.searchPlaceholder')"
+            @click="openGraphSearch"
+          >
+            <span class="codicon codicon-search" />
+          </button>
           <input
+            v-else
+            ref="graphSearchBox"
             v-model="ui.graphQuery"
             class="w-40 rounded border border-border bg-bg-0 px-2 py-1 text-xs text-fg-0 outline-none placeholder:text-fg-3 focus:border-accent"
             :placeholder="$t('graph.searchPlaceholder')"
+            @blur="blurGraphSearch"
             @keydown.down.prevent="graphHit = Math.min(graphHit + 1, graphHits.length - 1)"
             @keydown.up.prevent="graphHit = Math.max(graphHit - 1, 0)"
             @keydown.enter.prevent="goToGraphHit()"
           />
           <ul
-            v-if="ui.graphQuery.trim() && graphHits.length"
+            v-if="ui.graphSearchOpen && ui.graphQuery.trim() && graphHits.length"
             class="absolute right-0 top-full z-50 mt-1 max-h-72 w-64 overflow-y-auto rounded-md border border-border bg-bg-1 py-1 shadow-lg"
           >
             <li v-for="(hit, i) in graphHits" :key="hit">
@@ -836,7 +862,7 @@ function goToGraphHit(i = graphHit.value): void {
             </li>
           </ul>
           <p
-            v-else-if="ui.graphQuery.trim()"
+            v-else-if="ui.graphSearchOpen && ui.graphQuery.trim()"
             class="absolute right-0 top-full z-50 mt-1 w-64 rounded-md border border-border bg-bg-1 px-2 py-2 text-xs text-fg-3 shadow-lg"
           >
             {{ $t('graph.searchNone') }}

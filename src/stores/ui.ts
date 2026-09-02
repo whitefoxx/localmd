@@ -182,6 +182,11 @@ export const useUiStore = defineStore('ui', () => {
    *  clearing it is what Esc means to someone with the caret still in it. */
   const graphQuery = ref('')
 
+  /** Whether that box is showing at all — shut, it is one icon. Here for the
+   *  same reason the query is: Esc gives up the text first and the box second,
+   *  and App.vue is where that order lives. */
+  const graphSearchOpen = ref(false)
+
   /** A node the graph has been asked to go to — pinned and brought into view,
    *  exactly as if it had been clicked and then found. One-shot, like
    *  `pendingSearch`: GraphView consumes it and clears it. Lives here because
@@ -293,6 +298,7 @@ export const useUiStore = defineStore('ui', () => {
     graphTags,
     graphSelected,
     graphQuery,
+    graphSearchOpen,
     graphGoTo,
     pendingSearch,
     searchFor,

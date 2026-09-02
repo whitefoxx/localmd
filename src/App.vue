@@ -119,6 +119,7 @@ function closeTopLayer(): void {
   // Inside the graph, innermost first: a half-typed search, then the preview
   // card, then the graph they are both drawn over.
   else if (ui.graphQuery) ui.graphQuery = ''
+  else if (ui.graphSearchOpen) ui.graphSearchOpen = false
   else if (ui.graphSelected) ui.graphSelected = null
   else if (ui.graphOpen) ui.graphOpen = false
   else if (ui.agentMaximized) ui.agentMaximized = false
