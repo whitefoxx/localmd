@@ -234,6 +234,15 @@ const SETTLED_ALPHA = 0.2
 const DIM_NODES = 0.12
 const DIM_LINKS = 0.07
 
+/** What a node not of the chosen type is drawn in. Opaque, and a colour rather
+ *  than a transparency, because the focus above already spends opacity and two
+ *  opacities MULTIPLY: with both on, a stepped-back link sat at 0.07 × 0.07,
+ *  which is not stepped back, it is gone. At that depth the compositor also
+ *  rounds a pixel in or out between frames, which is what made a filtered graph
+ *  shimmer while nothing at all was happening. Different channels compose; the
+ *  same channel twice does not. */
+const MUTED = 'rgb(var(--c-bg-3))'
+
 /** How big a node is drawn: the more it is linked, the bigger. Square-rooted
  *  so a hub stands out without swallowing the page — area, not radius, tracks
  *  the degree — and capped so one runaway index page stays a circle. */
@@ -402,21 +411,26 @@ function render(): void {
   // Pages are circles; tags are diamonds. Shape rather than colour alone, so
   // the two kinds stay apart for anyone who cannot rely on hue — and because
   // colour here already means the page's `type:`.
+  /** A page's own colour: the file you are in, else its `type:`, else nothing
+   *  in particular. Named because the legend puts it back after taking it. */
+  const pageFill = (d: GraphNode): string =>
+    d.id === files.currentPath
+      ? 'rgb(var(--c-accent))'
+      : d.type
+        ? typeColor(d.type)
+        : 'rgb(var(--c-fg-3))'
+
   node
     .filter((d) => d.kind === 'page')
     .append('circle')
+    .attr('class', 'node-dot')
     .attr('r', nodeRadius)
-    .attr('fill', (d) =>
-      d.id === files.currentPath
-        ? 'rgb(var(--c-accent))'
-        : d.type
-          ? typeColor(d.type)
-          : 'rgb(var(--c-fg-3))',
-    )
+    .attr('fill', pageFill)
 
   node
     .filter((d) => d.kind === 'tag')
     .append('rect')
+    .attr('class', 'node-dot')
     .attr('width', (d) => nodeRadius(d) * 1.6)
     .attr('height', (d) => nodeRadius(d) * 1.6)
     .attr('x', (d) => -nodeRadius(d) * 0.8)
@@ -435,19 +449,6 @@ function render(): void {
     .attr('dy', 3)
     .attr('fill', (d) => (d.kind === 'tag' ? 'rgb(var(--c-added))' : 'rgb(var(--c-fg-2))'))
 
-  // The legend's type filter: the chosen type keeps its weight, the rest
-  // steps back. Applied per element rather than by dimming a layer, because
-  // this selection is not the hover's — it persists, and the hover has to
-  // keep working on top of it.
-  function applyTypeFilter(): void {
-    const want = ui.graphType
-    node.style('opacity', (d) => (!want || d.type === want ? null : String(DIM_NODES)))
-    link.style('opacity', () => (want ? String(DIM_LINKS) : null))
-  }
-  applyTypeFilter()
-  stopTypeWatch?.()
-  stopTypeWatch = watch(() => ui.graphType, applyTypeFilter)
-
   // --- Focus: point at one node and the rest of the graph steps back ---------
   //
   // What the graph is lit around — the pinned selection if there is one, else
@@ -464,6 +465,46 @@ function render(): void {
   let lifted: [Element, SVGGElement, ChildNode | null][] = []
   /** The label currently drawn large, so it can be put back. */
   let enlarged: SVGTextElement | null = null
+
+  /**
+   * The legend's type filter, spent on COLOUR rather than on opacity: the
+   * chosen type keeps its own colour and its name, everything else drains to
+   * the neutral and goes anonymous. Links are left alone entirely — a link has
+   * no type, and dimming the whole mesh because you picked one was what left a
+   * filtered graph with no structure visible at all.
+   *
+   * The focus is exempt. What you are pointing at and what it touches are the
+   * answer to the question the pointer is asking, and a filtered-out neighbour
+   * is still a neighbour.
+   */
+  function isMuted(d: GraphNode): boolean {
+    if (!ui.graphType || d.type === ui.graphType) return false
+    return !(focus !== null && (d.id === focus || neighbors.get(focus)?.has(d.id)))
+  }
+
+  /** Redraw every node the way the legend and the focus currently want it.
+   *  A whole-graph pass, but it WRITES only where the answer changed — so a
+   *  hover with no filter on costs a read per node and nothing else, and one
+   *  with a filter costs writes on the handful the focus just exempted. */
+  function redress(): void {
+    node.each(function (d) {
+      const muted = isMuted(d)
+      const dot = this.querySelector('.node-dot')
+      if (dot) {
+        const key = d.kind === 'tag' ? 'stroke' : 'fill'
+        const want = muted ? MUTED : d.kind === 'tag' ? 'rgb(var(--c-added))' : pageFill(d)
+        if (dot.getAttribute(key) !== want) dot.setAttribute(key, want)
+      }
+      const label = this.querySelector('text')
+      if (label) {
+        const want = muted ? 'none' : ''
+        if (label.style.display !== want) label.style.display = want
+      }
+    })
+  }
+  redress()
+  stopTypeWatch?.()
+  stopTypeWatch = watch(() => ui.graphType, redress)
 
   const endId = (e: string | GraphNode): string => (typeof e === 'string' ? e : e.id)
 
@@ -501,24 +542,23 @@ function render(): void {
       enlarged.removeAttribute('font-weight')
       enlarged = null
     }
-    // Re-assert the legend's filter over everything, then let the raise below
-    // exempt what this hover is about.
-    applyTypeFilter()
     if (id === null) {
       baseLinks.style.opacity = ''
       baseNodes.style.opacity = ''
-      return
+    } else {
+      baseLinks.style.opacity = String(DIM_LINKS)
+      baseNodes.style.opacity = String(DIM_NODES)
     }
-    baseLinks.style.opacity = String(DIM_LINKS)
-    baseNodes.style.opacity = String(DIM_NODES)
-    // Hover outranks the legend. What you are pointing at and what it is
-    // connected to are the answer to the question the pointer is asking, and
-    // a filtered-out neighbour is still a neighbour: raising it into the
-    // undimmed layer only helps if its own filter opacity comes off too.
+    // Nothing inside a layer carries an opacity of its own any more, so a
+    // raise is only ever a re-parent: the layer it lands in decides how it is
+    // painted, and the legend decides its colour (redress, below).
     const raise = (el: Element, home: SVGGElement, to: SVGGElement): void => {
       lifted.push([el, home, el.nextSibling])
       to.appendChild(el)
-      ;(el as SVGElement).style.opacity = ''
+    }
+    if (id === null) {
+      redress()
+      return
     }
     // Only the focused node's OWN lines: one between two lit neighbours is not
     // part of what you are pointing at. Lines first, and in their own layer
@@ -546,6 +586,8 @@ function render(): void {
         label.setAttribute('font-weight', '600')
       }
     }
+    // Last, because it asks what the focus set is.
+    redress()
   }
 
   // --- Two marks, because there are two answers on screen --------------------
