@@ -140,7 +140,16 @@ Type to search them all; type **`?`** to ask a different kind of question.
 Behind `?` are the filters — `?type:concept`, `?tag:llm`, `?path:wiki/`,
 `?fm:status=draft` for any other field at the top of a page, `?age:>6m`,
 `?orphan:true`. They combine, match part of a word, and ignore case; repeat one
-and both must hold. `?` on its own lists every filter there is, and a key with
+and both must hold.
+
+A few of them ask what the app noticed rather than what you wrote:
+`?stale:true` for pages written before a document they cite was last changed,
+`?undistilled:true` for a day's jottings nothing has been written out of yet,
+`?thin:true` for pages that never got past a stub, `?weakly-linked:true` for
+ones only an index points at. These are the same checks the health button runs.
+The difference is where the answer meets you: a panel is something you open
+after you have already decided to tidy up, and a filter is something you can
+ask in the middle of looking for something else. `?` on its own lists every filter there is, and a key with
 nothing after it lists what can go in it — `?tag:` names every tag in the
 knowledge base with how many files carry it, so you pick one rather than
 remember it.

@@ -16,7 +16,14 @@
  * existing click handler opens them. A second click path would be a second
  * thing to keep in step with what opening a page means.
  */
-import { parseKbQuery, runQuery, FILTER_HELP, type QueryPage, type QueryRow } from '@/lib/kbQuery'
+import {
+  parseKbQuery,
+  runQuery,
+  FILTER_HELP,
+  type HealthSets,
+  type QueryPage,
+  type QueryRow,
+} from '@/lib/kbQuery'
 import { escapeHtml } from '@/lib/wiki'
 import { t } from '@/i18n'
 
@@ -56,6 +63,10 @@ export function renderQueryBlock(
   pages: readonly QueryPage[],
   queryText: string,
   now: number,
+  /** Read only if the question asks a health flag — the same lazy hand-off the
+   *  palette makes, so a note full of ordinary queries never triggers a lint
+   *  pass on every render. */
+  health?: () => HealthSets,
 ): string {
   const { query, errors } = parseKbQuery(queryText, now)
   if (errors.length) {
@@ -74,7 +85,7 @@ export function renderQueryBlock(
     )
   }
 
-  const result = runQuery(pages, query)
+  const result = runQuery(pages, query, health)
   const columns = query.columns ?? DEFAULT_COLUMNS
   // `unmatchedTerms` is only ever populated for an empty result — a filter
   // nothing satisfies cannot leave a row standing — so the empty message

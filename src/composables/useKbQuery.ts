@@ -20,7 +20,12 @@ export function useKbQuery(root: Ref<HTMLElement | null>, deps: () => unknown): 
     for (const node of el.querySelectorAll<HTMLElement>('div.kb-query[data-kb-query]')) {
       // The question survives in the dataset, so re-answering never has to
       // read back the table it wrote last time.
-      node.innerHTML = renderQueryBlock(kb.queryPages, node.dataset.kbQuery ?? '', Date.now())
+      node.innerHTML = renderQueryBlock(
+        kb.queryPages,
+        node.dataset.kbQuery ?? '',
+        Date.now(),
+        () => kb.healthFlags,
+      )
     }
   }
 

@@ -319,7 +319,9 @@ const searchRows = computed<Row[]>(() => {
   // (sort/limit/columns) is dropped too: the palette has its own order and its
   // own cap, and a `limit:` meant for a note must not silently truncate it.
   const filters = { ...q, text: undefined, sort: undefined, limit: undefined, columns: undefined }
-  const pages = hasFilters(q) ? matchingPaths(index.queryPages, filters) : null
+  const pages = hasFilters(q)
+    ? matchingPaths(index.queryPages, filters, () => index.healthFlags)
+    : null
   // A document is not a page but it does have tags — the ones the pages citing
   // it declared — so `tag:llm` finds the paper as well as the notes on it, as
   // it always has. `sourceMatches` decides which questions it can be asked.

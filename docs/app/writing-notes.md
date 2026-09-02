@@ -102,7 +102,9 @@ The filters are the ones the search box takes — the same grammar in both place
 `tag:`, `path:wiki/` for a folder, `fm:status=draft` for any other field you
 keep at the top of a page, `age:<30d` or `modified:<2026-01-01` for time,
 `orphan:true` for pages nothing links to, `broken:true` for pages with a dead
-link, and `sort:`, `limit:` and `columns:` to shape the answer. Anything that
+link, `stale:true` for pages a document they cite has moved on from,
+`undistilled:true` for jottings never written up, and `sort:`, `limit:` and
+`columns:` to shape the answer. Anything that
 is not a filter searches the words. If you would rather describe what you want
 than write it, ask the assistant — it uses the same filters.
 

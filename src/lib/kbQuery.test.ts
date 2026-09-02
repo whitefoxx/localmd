@@ -6,9 +6,12 @@ import {
   hasFilters,
   sourceMatches,
   bareFilterKey,
+  healthSets,
   FILTER_HELP,
+  type HealthSets,
   type QueryPage,
 } from './kbQuery'
+import { computeLint, type LintPage } from './lint'
 
 const NOW = Date.parse('2026-09-01T00:00:00Z')
 const DAY = 86_400_000
@@ -407,5 +410,105 @@ describe('formatQueryResult', () => {
   it('shows requested non-built-in columns', () => {
     const q = parseKbQuery('type:paper columns:rating', NOW).query
     expect(formatQueryResult(runQuery(PAGES, q), q.columns)).toContain('rating=9')
+  })
+})
+
+// ── health flags ───────────────────────────────────────────────────
+
+/** The one thing that can silently break: `healthSets` reads a field name off
+ *  a `LintReport`, and nothing else in the file would notice if one moved. So
+ *  this fixture goes through the real checks rather than hand-building sets. */
+const lintPage = (content: string, outgoing: string[] = []): LintPage => ({
+  content,
+  outgoing,
+  broken: [],
+})
+const LINT_FM = '---\ntitle: x\n---\n'
+const LINT_KB = new Map<string, LintPage>([
+  ['wiki/index.md', lintPage(LINT_FM + 'body', ['wiki/thick.md'])],
+  // Three content pages point at thick, so it is the one page here that none
+  // of the reachability checks have anything to say about.
+  ['wiki/thick.md', lintPage(LINT_FM + 'x\n'.repeat(20))],
+  ['wiki/stub.md', lintPage(LINT_FM + 'two lines\nonly', ['wiki/thick.md'])],
+  ['wiki/bare.md', lintPage('no frontmatter at all\n'.repeat(20), ['wiki/thick.md'])],
+  ['wiki/template.md', lintPage(LINT_FM + 'see [[wiki/...]]\n'.repeat(20), ['wiki/thick.md'])],
+])
+
+describe('healthSets', () => {
+  const sets = healthSets(computeLint(LINT_KB))
+
+  it('reads each finding off the field the report actually carries', () => {
+    // A renamed LintReport field would empty one of these silently.
+    expect([...sets.thin]).toContain('wiki/stub.md')
+    expect([...sets['no-frontmatter']]).toContain('wiki/bare.md')
+    expect([...sets.placeholder]).toContain('wiki/template.md')
+    // bare links out and nothing links in: findable only if you knew it was
+    // there. thick is pointed at by three content pages and is neither.
+    expect([...sets['weakly-linked']]).toContain('wiki/bare.md')
+    expect([...sets.unreachable]).toContain('wiki/stub.md')
+    expect(sets['weakly-linked'].has('wiki/thick.md')).toBe(false)
+    expect(sets.unreachable.has('wiki/thick.md')).toBe(false)
+  })
+
+  it('answers every flag the grammar advertises, and no others', () => {
+    const advertised = FILTER_HELP.map((f) => f.key).filter((k) => k in sets)
+    expect(advertised.sort()).toEqual(Object.keys(sets).sort())
+  })
+
+  it('is reachable through the parser under its own name', () => {
+    // A flag in the sets that the parser drops on the floor would filter
+    // nothing while looking like it filtered.
+    for (const key of Object.keys(sets)) {
+      const { query, errors } = parseKbQuery(`${key}:true`, NOW)
+      expect(errors, key).toEqual([])
+      expect(query.flags?.[key as keyof typeof query.flags], key).toBe(true)
+    }
+  })
+})
+
+describe('filtering by a health flag', () => {
+  const sets = {
+    thin: new Set(['wiki/alice.md']),
+    stale: new Set(['wiki/attention.md', 'wiki/alice.md']),
+    unreachable: new Set<string>(),
+    'weakly-linked': new Set<string>(),
+    undistilled: new Set<string>(),
+    placeholder: new Set<string>(),
+    'no-frontmatter': new Set(['raw/notes.md']),
+  } as HealthSets
+  const found = (text: string): string[] =>
+    runQuery(PAGES, parseKbQuery(text, NOW).query, () => sets).rows.map((r) => r.path)
+
+  it('keeps what the check found', () => {
+    expect(found('stale:true')).toEqual(['wiki/attention.md', 'wiki/alice.md'])
+    expect(found('no-frontmatter:true')).toEqual(['raw/notes.md'])
+  })
+
+  it('reads false as the complement, not as off', () => {
+    expect(found('thin:false')).not.toContain('wiki/alice.md')
+    expect(found('thin:false')).toContain('wiki/scaling.md')
+  })
+
+  it('ANDs with the flags and with everything else', () => {
+    expect(found('stale:true thin:true')).toEqual(['wiki/alice.md'])
+    expect(found('stale:true type:paper')).toEqual(['wiki/attention.md'])
+  })
+
+  it('matches nothing when there is no report to answer from', () => {
+    // Not everything: a question nobody can answer is not a satisfied one, and
+    // silently returning the whole KB would read as "all of these are stale".
+    expect(runQuery(PAGES, parseKbQuery('stale:true', NOW).query).rows).toEqual([])
+  })
+
+  it('rejects a value that is not true or false', () => {
+    expect(parseKbQuery('stale:maybe', NOW).errors).toEqual([
+      'stale: expects true or false, got "maybe"',
+    ])
+  })
+
+  it('counts as narrowing, and is not a question a document can answer', () => {
+    // A PDF has inherited tags and a path; it has no body of ours to be thin.
+    expect(hasFilters(parseKbQuery('thin:true', NOW).query)).toBe(true)
+    expect(sourceMatches(parseKbQuery('thin:true', NOW).query, 'raw/x.pdf', ['llm'])).toBe(false)
   })
 })

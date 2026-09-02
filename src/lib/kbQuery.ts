@@ -28,7 +28,7 @@
  * `now` is a parameter, never `Date.now()`: `age:<30d` has to be assertable.
  */
 import { splitFrontmatter, extractTitle, extractType, extractRole, extractTags, extractField } from '@/lib/wiki'
-import { isEntryPage, isLogPage } from '@/lib/lint'
+import { isEntryPage, isLogPage, type LintReport } from '@/lib/lint'
 
 /** A page as the engine sees it. Type, role, tags and title are derived from
  *  `content` rather than passed in — one input that cannot disagree with
@@ -76,6 +76,10 @@ export interface KbQuery {
   /** Tri-state: undefined means the query does not care. */
   orphan?: boolean
   broken?: boolean
+  /** What the health checks said about the page, tri-state per flag. One map
+   *  rather than seven fields: they are one idea, and `FILTER_KEYS` then has
+   *  one entry to keep in step instead of seven. */
+  flags?: Readonly<Partial<Record<HealthFlag, boolean>>>
   /** Substring of the body (frontmatter stripped). */
   text?: string
   modifiedAfter?: number
@@ -105,6 +109,47 @@ export interface QueryResult {
    *  constraint), but without it a typo and a genuinely empty result are the
    *  same empty table, and only one of them is telling the truth. */
   unmatchedTerms: string[]
+}
+
+// ── health flags ───────────────────────────────────────────────────
+
+/**
+ * A `computeLint` finding a query can ask about.
+ *
+ * Not new checks: every one of these was already computed on every scan, and
+ * the only ways to reach one were the health panel's five cards and the
+ * agent's `kb_health`. A finding you cannot ask for is one you meet only after
+ * you already went looking — which is the moment you least need telling.
+ *
+ * `orphan:` and `broken:` are deliberately NOT here. They predate the report
+ * and answer from the page in hand (`inbound`, `page.broken`), so they cost
+ * nothing and work with no report at all; folding them in would make two cheap
+ * filters wait on a whole-KB sweep.
+ */
+export type HealthFlag =
+  | 'thin'
+  | 'stale'
+  | 'unreachable'
+  | 'weakly-linked'
+  | 'undistilled'
+  | 'placeholder'
+  | 'no-frontmatter'
+
+/** Membership per flag — all a query ever asks of a report. */
+export type HealthSets = Readonly<Record<HealthFlag, ReadonlySet<string>>>
+
+/** The report, narrowed to what the filters ask. The caller passes the one it
+ *  already has (kbIndex caches a scan's); this never runs the checks itself. */
+export function healthSets(r: LintReport): HealthSets {
+  return {
+    thin: new Set(r.thin.map((t) => t.path)),
+    stale: new Set(r.stalePages.map((s) => s.path)),
+    unreachable: new Set(r.unreachable),
+    'weakly-linked': new Set(r.weaklyLinked),
+    undistilled: new Set(r.undistilledCaptures),
+    placeholder: new Set(r.placeholders),
+    'no-frontmatter': new Set(r.noFrontmatter),
+  }
 }
 
 // ── derived facts ───────────────────────────────────────────────────────────
@@ -285,9 +330,17 @@ function sortKeyOf(key: SortKey, page: QueryPage, f: Facts): { v: number | strin
 function filterPages(
   pages: readonly QueryPage[],
   q: KbQuery,
+  health?: () => HealthSets,
 ): { matched: QueryPage[]; facts: Map<string, Facts> } {
   const facts = factsFor(pages)
   const lower = (s: string): string => s.toLowerCase()
+
+  // Read only when a flag was actually asked for, and once. The lint pass is a
+  // whole-KB sweep and the palette runs this on every keystroke — the same
+  // reason `Facts` above is lazy. Nothing supplied means nothing to answer
+  // from, and a flag filter then matches nothing rather than everything: an
+  // unanswerable question is not a satisfied one.
+  const sets = q.flags && health ? health() : null
 
   // `linked-by:X` reads the graph backwards: collect what the pages matching X
   // point at, then keep the pages in that set.
@@ -320,6 +373,12 @@ function filterPages(
       return false
     if (q.orphan !== undefined && f.inbound() === 0 !== q.orphan) return false
     if (q.broken !== undefined && page.broken.length > 0 !== q.broken) return false
+    if (q.flags) {
+      if (!sets) return false
+      for (const [flag, want] of Object.entries(q.flags)) {
+        if (sets[flag as HealthFlag].has(page.path) !== want) return false
+      }
+    }
     if (q.text !== undefined && !lower(f.body()).includes(lower(q.text))) return false
     if (q.modifiedAfter !== undefined && !(page.mtime !== undefined && page.mtime >= q.modifiedAfter))
       return false
@@ -338,12 +397,20 @@ function filterPages(
  * re-renders the result its own way, so building a row per match — which
  * derives a title per match — is work thrown away on every keystroke.
  */
-export function matchingPaths(pages: readonly QueryPage[], q: KbQuery): Set<string> {
-  return new Set(filterPages(pages, q).matched.map((p) => p.path))
+export function matchingPaths(
+  pages: readonly QueryPage[],
+  q: KbQuery,
+  health?: () => HealthSets,
+): Set<string> {
+  return new Set(filterPages(pages, q, health).matched.map((p) => p.path))
 }
 
-export function runQuery(pages: readonly QueryPage[], q: KbQuery): QueryResult {
-  const { matched, facts } = filterPages(pages, q)
+export function runQuery(
+  pages: readonly QueryPage[],
+  q: KbQuery,
+  health?: () => HealthSets,
+): QueryResult {
+  const { matched, facts } = filterPages(pages, q, health)
   const ordered = [...matched]
   if (q.sort) {
     const { key, order } = q.sort
@@ -469,6 +536,13 @@ export const FILTER_HELP: readonly FilterHelp[] = [
   { key: 'role', example: 'index', values: ['index', 'log'] },
   { key: 'orphan', example: 'true', values: ['true', 'false'] },
   { key: 'broken', example: 'true', values: ['true', 'false'] },
+  { key: 'stale', example: 'true', values: ['true', 'false'] },
+  { key: 'undistilled', example: 'true', values: ['true', 'false'] },
+  { key: 'thin', example: 'true', values: ['true', 'false'] },
+  { key: 'weakly-linked', example: 'true', values: ['true', 'false'] },
+  { key: 'unreachable', example: 'true', values: ['true', 'false'] },
+  { key: 'placeholder', example: 'true', values: ['true', 'false'] },
+  { key: 'no-frontmatter', example: 'true', values: ['true', 'false'] },
   { key: 'age', example: '>6m' },
   { key: 'modified', example: '<2026-01-01' },
   { key: 'links-to', example: 'index' },
@@ -503,6 +577,7 @@ export function parseKbQuery(text: string, now: number): { query: KbQuery; error
   const errors: string[] = []
   const tags: string[] = []
   const fields: FieldTest[] = []
+  const flags: Partial<Record<HealthFlag, boolean>> = {}
   const free: string[] = []
 
   const after = (ms: number): void => {
@@ -539,6 +614,17 @@ export function parseKbQuery(text: string, now: number): { query: KbQuery; error
           if (key === 'orphan') query.orphan = on
           else query.broken = on
         } else errors.push(`${key}: expects true or false, got "${value}"`)
+        break
+      }
+      case 'thin':
+      case 'stale':
+      case 'unreachable':
+      case 'weakly-linked':
+      case 'undistilled':
+      case 'placeholder':
+      case 'no-frontmatter': {
+        if (value === 'true' || value === 'false') flags[key] = value === 'true'
+        else errors.push(`${key}: expects true or false, got "${value}"`)
         break
       }
       case 'age': {
@@ -607,6 +693,7 @@ export function parseKbQuery(text: string, now: number): { query: KbQuery; error
 
   if (tags.length) query.tags = tags
   if (fields.length) query.fields = fields
+  if (Object.keys(flags).length) query.flags = flags
   const textTerm = free.join(' ').trim()
   if (textTerm) query.text = textTerm
   return { query, errors }
@@ -623,7 +710,7 @@ export function parseKbQuery(text: string, now: number): { query: KbQuery; error
  */
 const FILTER_KEYS = [
   'path', 'type', 'tags', 'role', 'fields', 'linksTo', 'linkedBy', 'cites',
-  'orphan', 'broken', 'modifiedAfter', 'modifiedBefore',
+  'orphan', 'broken', 'flags', 'modifiedAfter', 'modifiedBefore',
 ] as const
 
 /** The filter keys this query actually uses. */

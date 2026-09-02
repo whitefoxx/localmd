@@ -23,7 +23,7 @@ import { coalesce } from '@/lib/async'
 import { useFilesStore } from '@/stores/files'
 import { useSettingsStore } from '@/stores/settings'
 import { isIgnored } from '@/lib/scanScope'
-import type { QueryPage } from '@/lib/kbQuery'
+import { healthSets, type HealthSets, type QueryPage } from '@/lib/kbQuery'
 import { frontmatterKeys } from '@/lib/wiki'
 import { isDailyPath } from '@/lib/daily'
 
@@ -335,6 +335,18 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     )
   }
 
+  /**
+   * The health findings the `?` filters answer from, narrowed to membership.
+   *
+   * A computed, so a whole-KB lint pass happens when the page graph changes
+   * and not on a keystroke — and being lazy, never at all in a session where
+   * nobody asks a flag. `healthIgnore` is deliberately NOT applied: that list
+   * says what the panel may nag about, and a filter is not a nag. Someone who
+   * types `stale:true` asked, and hiding the answer they asked for would be
+   * the app deciding it knows better.
+   */
+  const healthFlags = computed<HealthSets>(() => healthSets(lintReport()))
+
   /** KB path → OKF `type`, for pages that declare one. Feeds the file-tree
    *  chips, graph node coloring, and the search palette's `type:` filter. */
   const types = computed(() => {
@@ -634,5 +646,5 @@ export const useKbIndexStore = defineStore('kbIndex', () => {
     sourceMtimes.value = new Map()
   }
 
-  return { pages, queryPages, filterValues, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
+  return { pages, queryPages, filterValues, healthFlags, indexes, staleIndexes, undeclaredCitations, refreshing, refresh, backlinks, lintReport, types, tags, sourceTags, allTags, tagsFor, related, declaredSources, hasSourceNote, sourcesWithoutNote, graph, health, search, findBlockSources, blockText, reset }
 })

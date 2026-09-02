@@ -655,6 +655,13 @@ const QUERY_SYNTAX = `Filters, space-separated (quote values containing spaces):
   cites:X.pdf          declares X as a source
   orphan:true|false    nothing links to it
   broken:true|false    has a link that resolves to no file
+  stale:true|false     written before a source it cites was last changed
+  undistilled:true     a day's jottings nothing has been written out of yet
+  thin:true            barely any content
+  weakly-linked:true   only an index or log links to it
+  unreachable:true     not reachable by following links from the index
+  placeholder:true     still carries a template's [[wiki/...]] link
+  no-frontmatter:true  has no frontmatter block
   age:<30d  age:>6m    touched within / untouched for (d w m y)
   modified:<2026-01-01 before that date (use > for after)
   sort:-modified       path title modified inbound, or any frontmatter field
@@ -677,7 +684,7 @@ const queryKb = defineTool({
     if (errors.length) return `Could not read the query:\n  ${errors.join('\n  ')}\n\n${QUERY_SYNTAX}`
     const kb = useKbIndexStore()
     await kb.refresh()
-    return formatQueryResult(runQuery(kb.queryPages, parsed), parsed.columns)
+    return formatQueryResult(runQuery(kb.queryPages, parsed, () => kb.healthFlags), parsed.columns)
   },
 })
 
