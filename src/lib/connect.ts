@@ -184,6 +184,19 @@ interface Names {
 }
 
 /**
+ * Plumbing, ours or the user's: `.localmd/` indexes, `.agents/` skills,
+ * `.obsidian/`. The same exclusion `isSourceCandidate` makes in lint.ts, for
+ * the same reason — and here it is not merely noise. A skill file is
+ * instructions to an agent, so a wikilink proposed into one is a proposal to
+ * edit the thing giving the orders. Running this against a scaffolded KB is
+ * what surfaced it: every suggestion in the first real report came out of
+ * `.agents/skills/*\/SKILL.md`.
+ */
+function isPlumbing(path: string): boolean {
+  return path.split('/').some((seg) => seg.startsWith('.'))
+}
+
+/**
  * Name → the one page it belongs to.
  *
  * A name two pages answer to is dropped, not resolved. It names neither: a
@@ -198,7 +211,7 @@ interface Names {
 function nameIndex(pages: ReadonlyMap<string, LintPage>): Names {
   const owner = new Map<string, string | null>()
   for (const [path, page] of pages) {
-    if (isEntryPage(path) || isDailyPath(path)) continue
+    if (isEntryPage(path) || isDailyPath(path) || isPlumbing(path)) continue
     for (const raw of [extractTitle(page.content), fileStem(path)]) {
       if (raw === null || !longEnough(raw)) continue
       const key = nameKey(raw)
@@ -344,7 +357,7 @@ export function suggestLinks(pages: ReadonlyMap<string, LintPage>): LinkSuggesti
 
   const found: LinkSuggestion[] = []
   for (const [from, page] of pages) {
-    if (isDailyPath(from)) continue
+    if (isDailyPath(from) || isPlumbing(from)) continue
     const masked = maskable(page.content)
     const linked = new Set(page.outgoing)
     const seen = new Set<string>()

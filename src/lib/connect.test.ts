@@ -161,6 +161,19 @@ describe('suggestLinks', () => {
     expect(found).toEqual([])
   })
 
+  it('stays out of the dot-directories entirely', () => {
+    // A skill file is instructions to an agent: a wikilink proposed into one
+    // is a proposal to edit the thing giving the orders.
+    const found = suggestLinks(
+      kb({
+        'wiki/attention.md': target('Attention'),
+        '.agents/skills/ingest/SKILL.md': page('# Ingest\n\nwrite up the attention notes\n'),
+        '.localmd/notes.md': page('# Cache\n\nabout attention\n'),
+      }),
+    )
+    expect(found).toEqual([])
+  })
+
   it('matches a CJK name without word boundaries to hold it', () => {
     const found = suggestLinks(
       kb({
