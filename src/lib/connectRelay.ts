@@ -229,6 +229,8 @@ interface RelayFrame {
   dir?: unknown
   ext?: unknown
   ready?: unknown
+  /** The relay's port to the extension went away — see McpRelayClient.onLost. */
+  closed?: unknown
   msg?: unknown
 }
 
@@ -249,9 +251,21 @@ export class McpRelayClient implements McpClientLike {
    *  write tool is involved. */
   private ext: string | null = null
   private listener: ((e: MessageEvent) => void) | null = null
-  /** Never called: there is no lifecycle event to observe. A relay that stopped
-   *  answering surfaces as a timeout on the next call, which the store already
-   *  turns into a red row. */
+  /**
+   * The relay telling us its port to the extension is gone.
+   *
+   * This used to say there was no lifecycle event to observe, and that a dead
+   * relay would surface as a timeout on the next call. Both were true and the
+   * conclusion was wrong: Chrome recycles an idle MV3 service worker after a
+   * few minutes and takes the port with it, so between calls the row is green
+   * and the connection is not — and anything the extension tries to PUSH (the
+   * capture inbox's poke) reaches nobody at all. Waiting for the next call to
+   * find out is exactly the wrong direction when the point of the connection
+   * is that the other side can start the conversation.
+   *
+   * The event exists; it just lives in the content script, which now forwards
+   * it as `{ closed: true }`.
+   */
   onLost?: (reason: string) => void
 
   /** Server→client notifications, which this transport is the only one to
@@ -296,9 +310,24 @@ export class McpRelayClient implements McpClientLike {
   private onFrame(win: Window, e: MessageEvent): void {
     if (e.source !== win) return // only this page's own frames
     const d = e.data as RelayFrame | null
-    if (!d || d.webcli !== 'mcp' || d.dir !== 'to-page' || !d.msg) return
+    if (!d || d.webcli !== 'mcp' || d.dir !== 'to-page') return
     // A second install (store + dev) answering something we didn't send it.
     if (this.ext && typeof d.ext === 'string' && d.ext !== this.ext) return
+    // The extension's side of the port went away (service worker recycled, or
+    // the extension reloaded). Nothing in flight can arrive now, and nothing
+    // will be pushed to us until we reconnect. Checked BEFORE the `msg` guard
+    // below: this frame carries no JSON-RPC payload, and requiring one is how
+    // the first version of this silently ignored it.
+    if (d.closed === true) {
+      const err = new Error(`${this.target.name} disconnected`)
+      for (const p of this.pending.values()) p.reject(err)
+      this.pending.clear()
+      this.onLost?.(
+        `${this.target.name} disconnected — its service worker was recycled or the extension reloaded. It reconnects by itself when you come back to this tab.`,
+      )
+      return
+    }
+    if (!d.msg) return
     const m = d.msg as {
       id?: unknown
       result?: unknown

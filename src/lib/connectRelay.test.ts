@@ -100,6 +100,9 @@ function fakeRelay(
       else dataset[key] = id
     },
     listenerCount: () => listeners.size,
+    /** The extension's service worker being recycled under the page: the relay
+     *  content script forwards its port's onDisconnect. */
+    drop: () => dispatch({ webcli: 'mcp', dir: 'to-page', ext, closed: true }),
   }
 }
 
@@ -361,5 +364,38 @@ describe('extensionWire', () => {
     await expect(wire({ url: 'https://e/mcp', method: 'POST', headers: {} })).rejects.toThrow(
       /signal timed out/,
     )
+  })
+})
+
+describe('the relay port going away', () => {
+  it('tells the store, so a green row does not outlive its connection', async () => {
+    const relay = fakeRelay()
+    const client = new McpRelayClient()
+    await client.connect()
+    const lost: string[] = []
+    client.onLost = (r) => lost.push(r)
+    relay.drop()
+    expect(lost).toHaveLength(1)
+    // The message has to be actionable: the row shows it verbatim.
+    expect(lost[0]).toMatch(/disconnected/)
+    expect(lost[0]).toMatch(/reconnects by itself/)
+  })
+
+  it('fails the calls that were in flight instead of leaving them to time out', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    // A call nothing will ever answer, then the port dies under it.
+    const pending = client.callTool('generic__fetch_url', {}).catch((e: Error) => e.message)
+    relay.drop()
+    await expect(pending).resolves.toMatch(/disconnected/)
+  })
+
+  it('reconnects on the next use — the marker is still there, only the port went', async () => {
+    const relay = fakeRelay()
+    const client = new McpRelayClient()
+    await client.connect()
+    relay.drop()
+    const tools = await client.connect()
+    expect(tools).toHaveLength(1)
   })
 })
