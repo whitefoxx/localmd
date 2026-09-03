@@ -66,6 +66,18 @@ intentional Chinese in the tree: the `zh` values in i18n catalogs
   them. A finding worth *keeping* does have a durable home: a dated `log.md`
   entry, a note like any other. A view costs nothing to abandon; a note
   survives being hand-edited; a record does neither.
+
+  There is a third home, for the one thing the other two cannot serve: state
+  only this app can read. "What changed since you last looked" needs a mark
+  saying when that was, and no view can derive it. That mark goes in the
+  browser — a `localmd:`-prefixed `localStorage` key or IndexedDB, under the
+  storage contracts below — never in the folder, and it must be built to be
+  lost. Losing it costs one prompt nobody sees; the same fact written into
+  someone's folder is a record they did not ask for, cannot read and will not
+  maintain, and a record left to a human starts to lie. The test is not "is it
+  small". It is: **if this disappears, does anything the user owns become
+  wrong?** If it does, it does not belong in the browser either — it belongs in
+  a note.
 - **Minimal and manual over clever and automatic.** Prefer a manual action + a
   native dialog over background automation; prefer deterministic tools
   (kb_health) over LLM passes; confirm before token-heavy operations. Ship the
