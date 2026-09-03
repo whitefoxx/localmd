@@ -235,6 +235,15 @@ pipeline (`docs/token-optimization.md` has the full log):
   someone happened to look, with typecheck and vitest green over them the whole
   time — what they asserted was browser behaviour, and only the browser knew.
   `git push --no-verify` skips it when you genuinely mean to.
+- **Measure a text heuristic on real text.** Anything that reads the user's own
+  prose and decides something about it — a matcher, a scorer, a threshold — is
+  only as good as the corpus it met. A fixture contains what its author thought
+  of, so it confirms the rules you already wrote and is silent about the ones
+  you never considered. `lib/connect` shipped with eighteen green tests and was
+  unusable on the first real corpus it saw: 35 suggestions over this repo's own
+  `docs/`, almost all of them a file name that is also an ordinary word. Point
+  it at `docs/`, at a real KB, at anything nobody wrote for it, and read the
+  output before believing the suite.
 - **Verify browser-facing work in a real browser.** typecheck and vitest cannot
   see the three things this app actually lives on: CORS, the Chrome-extension
   transports, and the File System Access API. Drive the running dev server by
