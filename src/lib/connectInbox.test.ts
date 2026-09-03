@@ -120,6 +120,17 @@ describe('drainInbox', () => {
     expect(openInEditor).toHaveBeenCalledWith('raw/articles/a.md')
     expect(s.calls.map((c) => c.tool)).toEqual([LIST_INBOX_TOOL, ACK_INBOX_TOOL])
     expect(JSON.parse(String(s.calls[1].args.ids))).toEqual(['ib_1'])
+    // The ack names the file, so the browser can say "this page is in your KB".
+    expect(JSON.parse(String(s.calls[1].args.written))).toEqual([
+      { id: 'ib_1', path: 'raw/articles/a.md' },
+    ])
+  })
+
+  it('an ack for asks alone carries no `written`', async () => {
+    useKbStore().name = 'kb'
+    const s = server([ask])
+    await drainInbox(s.deps)
+    expect('written' in s.calls[1].args).toBe(false)
   })
 
   it('opens nothing when a batch wrote several — that would be a fight over the editor', async () => {

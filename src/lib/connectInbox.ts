@@ -130,6 +130,9 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
     const composer = useComposerStore()
     const done: string[] = []
     const written: string[] = []
+    /** Which item became which file — handed back in the ack so the browser
+     *  learns the page is now in the knowledge base. */
+    const wrote: Array<{ id: string; path: string }> = []
     const asked: InboxItem[] = []
     let asks = 0
     let left = 0
@@ -145,7 +148,9 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
             done.push(item.id)
             continue
           }
-          written.push(await writeClip(clip))
+          const path = await writeClip(clip)
+          written.push(path)
+          wrote.push({ id: item.id, path })
           done.push(item.id)
         } else if (item.kind === 'ask') {
           if (typeof item.tabId === 'number') {
@@ -190,7 +195,10 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
 
     if (done.length) {
       for (const id of done) attempts.delete(id)
-      await deps.call(ACK_INBOX_TOOL, { ids: JSON.stringify(done) })
+      await deps.call(ACK_INBOX_TOOL, {
+        ids: JSON.stringify(done),
+        ...(wrote.length ? { written: JSON.stringify(wrote) } : {}),
+      })
     }
     // An ask becomes a DRAFT in the chat box, not just an attached tab.
     //
