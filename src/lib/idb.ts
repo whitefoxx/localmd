@@ -31,6 +31,9 @@ export interface StoredSession {
   favorite?: boolean
   /** Snapshot of the agent's update_plan checklist (see stores/chat). */
   plan?: unknown[]
+  /** A generated title has landed (see stores/chat) — absent on sessions
+   *  stored before the flag existed, which read as "not yet titled". */
+  titled?: boolean
 }
 
 function openDb(): Promise<IDBDatabase> {

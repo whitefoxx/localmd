@@ -246,6 +246,11 @@ interface ChatSession {
    *  stores/plan, which closeTab clears — this rides the session record so
    *  reopening restores the card instead of losing what was already done. */
   plan?: PlanItem[]
+  /** A generated title has landed, so stop asking for one. Distinct from
+   *  "the first turn is over": that turn can end with no text to title from,
+   *  and the title call itself can fail — both want another go. Absent on
+   *  sessions stored before this flag, which are past the window anyway. */
+  titled?: boolean
 }
 
 /** An open chat tab: a session plus its runtime flags. Multiple tabs run
@@ -290,6 +295,13 @@ export interface AgentSessionRecord {
 /** Text files this small are inlined into the message when @-mentioned;
  *  larger ones the agent reads via tools. */
 const INLINE_MENTION_CHARS = 16_000
+
+/** How far into a session a generated title is still worth asking for, counted
+ *  in nodes on the active branch (≈ four exchanges). The first turn is the
+ *  usual one, but it can produce nothing to title from — so the attempt is
+ *  allowed to repeat, and this is what stops a profile that never answers from
+ *  paying for a call every turn forever. */
+const TITLE_WINDOW = 8
 
 let nextId = 1
 
@@ -1022,7 +1034,12 @@ export const useChatStore = defineStore('chat', () => {
     if (session.editingFrom != null) {
       const edited = session.uiMessages.find((m) => m.id === session.editingFrom)
       session.editingFrom = undefined
-      if (edited) branchTo(session, edited.parentId ?? null)
+      if (edited) {
+        branchTo(session, edited.parentId ?? null)
+        // Re-asking the OPENING question starts a different conversation — let
+        // it be retitled, exactly as the first exchange was.
+        if (edited.parentId == null) session.titled = false
+      }
     }
 
     // Switching the primary profile mid-conversation would replay an
@@ -1346,16 +1363,21 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /** After the FIRST exchange, replace the sliced-text title with a short
+  /** Early in a session, replace the sliced-text title with a short
    *  model-generated one (fire-and-forget; failures keep the fallback). */
   async function autoTitle(
     session: OpenSession,
     userText: string,
     assistant: UiMessage,
   ): Promise<void> {
-    // Only the first turn — counted along the branch being read, so re-asking
-    // the opening question can still retitle the session.
-    if (branchPath(session.uiMessages, session.leafId).length > 2) return
+    // The condition is "no title has landed yet", not "this was the first
+    // turn". A turn can end with no text to title from (tool-only, or an
+    // error), a steer opens a second bubble below the interjection so the
+    // opening exchange is four nodes deep, and the title call can simply fail
+    // — a first-turn-only guard left every one of those named after the user's
+    // first message for the life of the session. Retry inside a window instead.
+    if (session.titled) return
+    if (branchPath(session.uiMessages, session.leafId).length > TITLE_WINDOW) return
     const settings = useSettingsStore()
     if (!settings.primary) return
     const reply = assistant.parts
@@ -1366,6 +1388,7 @@ export const useChatStore = defineStore('chat', () => {
     const title = await generateTitle(settings.primary, userText, reply)
     if (title) {
       session.title = title
+      session.titled = true
       void persist(session)
     }
   }
