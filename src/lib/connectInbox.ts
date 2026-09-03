@@ -24,6 +24,7 @@ import { useUiStore } from '@/stores/ui'
 import { openInEditor } from '@/lib/openInEditor'
 import { parseClip, writeClip, dataUrlToBlob } from '@/lib/clip'
 import { importFile, ensureFilename } from '@/lib/capture'
+import { jotToday } from '@/lib/jot'
 
 export const LIST_INBOX_TOOL = 'generic__list_inbox'
 export const ACK_INBOX_TOOL = 'generic__ack_inbox'
@@ -40,7 +41,7 @@ const BATCH = 10
  *  malformed capture cannot make every future drain fail at the same place. */
 const MAX_ATTEMPTS = 3
 
-export type InboxKind = 'clip' | 'ask' | 'highlight' | 'screenshot'
+export type InboxKind = 'clip' | 'ask' | 'highlight' | 'screenshot' | 'jot' | 'tabs'
 
 export interface InboxItem {
   id: string
@@ -186,6 +187,21 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
           asked.push(item)
           asks++
           done.push(item.id)
+        } else if (item.kind === 'jot' || item.kind === 'tabs') {
+          // Both land on today's capture page, through the same append the
+          // palette's `:` mode uses — no note shape of their own. A jot is one
+          // line; a saved session is one line per tab.
+          const text = jotTextFor(item)
+          if (!text) {
+            done.push(item.id)
+            continue
+          }
+          const path = await jotToday(text)
+          if (path) {
+            written.push(path)
+            wrote.push({ id: item.id, path })
+          }
+          done.push(item.id)
         } else if (item.kind === 'screenshot') {
           const shot = parseScreenshot(item.payload)
           if (!shot) {
@@ -241,6 +257,19 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
   } finally {
     running.delete(deps.serverId)
   }
+}
+
+/** The line(s) a jot or a saved tab session adds to today's page. Pure. */
+export function jotTextFor(item: InboxItem): string {
+  const p = (item.payload ?? {}) as { text?: unknown; tabs?: unknown }
+  if (item.kind === 'jot') return typeof p.text === 'string' ? p.text.trim() : ''
+  if (item.kind === 'tabs' && Array.isArray(p.tabs)) {
+    const rows = (p.tabs as Array<{ title?: unknown; url?: unknown }>)
+      .filter((t) => typeof t?.url === 'string' && t.url)
+      .map((t) => `[${String(t.title || t.url).replace(/[\[\]]/g, ' ').trim()}](${t.url})`)
+    return rows.length ? `Open tabs:\n${rows.join('\n')}` : ''
+  }
+  return ''
 }
 
 /** A clip that is a PDF file rather than a page. Pure. */

@@ -31,12 +31,15 @@ vi.mock('@/lib/clip', async (orig) => ({
 }))
 
 const openInEditor = vi.fn(async (_path: string) => {})
+const jotToday = vi.fn(async (_text: string) => 'daily/2026-09-03.md')
+vi.mock('@/lib/jot', () => ({ jotToday: (t: string) => jotToday(t) }))
 vi.mock('@/lib/openInEditor', () => ({ openInEditor: (p: string) => openInEditor(p) }))
 
 import {
   parseInbox,
   drainInbox,
   askDraft,
+  jotTextFor,
   __resetInboxAttempts,
   LIST_INBOX_TOOL,
   ACK_INBOX_TOOL,
@@ -231,6 +234,34 @@ describe('drainInbox', () => {
     expect(file.type).toBe('application/pdf')
     expect(file.name).toBe('Attention Is All You Need.pdf')
     expect(out.written).toEqual([`raw/images/${file.name}`]) // the mock's path; the real intake routes .pdf to raw/papers/
+    expect(out.acked).toBe(1)
+  })
+
+  it('appends a jot to today\'s page and reports the page as written', async () => {
+    useKbStore().name = 'kb'
+    jotToday.mockClear()
+    const out = await drainInbox(
+      server([{ ...clip, id: 'ib_j', kind: 'jot', payload: { text: '[T](https://ex.test/a) — “q”' } }]).deps,
+    )
+    expect(jotToday).toHaveBeenCalledWith('[T](https://ex.test/a) — “q”')
+    expect(out.written).toEqual(['daily/2026-09-03.md'])
+    expect(out.acked).toBe(1)
+  })
+
+  it('turns a saved tab session into one line per tab', () => {
+    const text = jotTextFor({
+      ...clip,
+      kind: 'tabs',
+      payload: { tabs: [{ title: 'A [x]', url: 'https://a.test/' }, { url: 'https://b.test/' }, { title: 'no url' }] },
+    } as never)
+    expect(text).toBe('Open tabs:\n[A  x](https://a.test/)\n[https://b.test/](https://b.test/)')
+  })
+
+  it('acks an empty jot rather than writing an empty line', async () => {
+    useKbStore().name = 'kb'
+    jotToday.mockClear()
+    const out = await drainInbox(server([{ ...clip, kind: 'jot', payload: { text: '  ' } }]).deps)
+    expect(jotToday).not.toHaveBeenCalled()
     expect(out.acked).toBe(1)
   })
 

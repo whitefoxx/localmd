@@ -133,6 +133,13 @@ the page when you come back to it, and when you clip that page they come along �
 the note lands with an annotations file beside it, the same kind a PDF or an
 EPUB gets, so the assistant sees what you marked and why.
 
+Two smaller gestures go to today's daily page instead of becoming a note of
+their own: **Jot this page** adds one line — the page as a link, plus anything
+you had selected — and **Save open tabs** (in the extension's popup) adds every
+tab in the window as a list, so a reading session is kept before you close it.
+The daily page is the folder's scratch intake; filing by date is what makes a
+passing thought reach the folder at all.
+
 Clipping keeps you where you are. **Ask localmd about this page** (Alt+Shift+L)
 does the opposite: it brings this app to the front with the page attached, so
 you can start asking about what you were just reading. That one hands over the
