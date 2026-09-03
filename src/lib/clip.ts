@@ -24,6 +24,7 @@
  */
 import * as fs from '@/lib/fs'
 import { landingPathFor, resolveUniquePath, usesRawLayout } from '@/lib/capture'
+import { colorHexFor, saveWebSidecar, type WebAnnotation } from '@/lib/annotations'
 
 export interface ClipImage {
   src: string
@@ -39,6 +40,17 @@ export interface ClipSelection {
   exact: string
   prefix: string
   suffix: string
+}
+
+/** A highlight the user had made on the page before clipping it, as the
+ *  extension reports it (colour by NAME; the sidecar stores hex). */
+export interface ClipHighlight {
+  id: string
+  text: string
+  color?: string
+  note?: string
+  date: string
+  anchor: ClipSelection
 }
 
 export interface ClipPayload {
@@ -57,6 +69,9 @@ export interface ClipPayload {
   truncated?: boolean
   images?: ClipImage[]
   selection?: ClipSelection
+  /** Browser highlights on the page, arriving WITH the clip so the note and
+   *  its annotations are never apart. */
+  highlights?: ClipHighlight[]
   clipped_at?: string
 }
 
@@ -217,6 +232,39 @@ export function dataUrlToBlob(dataUrl: string): Blob | null {
   }
 }
 
+function isClipHighlight(v: unknown): v is ClipHighlight {
+  const h = v as ClipHighlight | null
+  return (
+    !!h &&
+    typeof h === 'object' &&
+    typeof h.text === 'string' &&
+    !!h.anchor &&
+    typeof h.anchor.exact === 'string'
+  )
+}
+
+/**
+ * The sidecar entries for a clip's highlights. Pure. The extension names its
+ * colours; sidecars store hex — the same five on both sides, so the archived
+ * highlight looks like the one on the page.
+ */
+export function webAnnotationsFor(payload: ClipPayload): WebAnnotation[] {
+  const url = payload.canonical || payload.url
+  return (payload.highlights ?? []).map((h) => ({
+    anchor: {
+      exact: h.anchor.exact,
+      prefix: h.anchor.prefix ?? '',
+      suffix: h.anchor.suffix ?? '',
+    },
+    url,
+    color: colorHexFor(h.color),
+    text: h.text,
+    createdAt: h.date,
+    ...(h.note ? { note: h.note } : {}),
+    ...(h.id ? { id: h.id } : {}),
+  }))
+}
+
 /** Shape-check a clip that arrived as JSON from a tool result. Anything that is
  *  not recognisably a clip is rejected rather than half-written. */
 export function parseClip(value: unknown): ClipPayload | null {
@@ -242,6 +290,9 @@ export function parseClip(value: unknown): ClipPayload | null {
     markdown: o.markdown,
     truncated: o.truncated === true,
     images: Array.isArray(o.images) ? (o.images as ClipImage[]) : [],
+    highlights: Array.isArray(o.highlights)
+      ? (o.highlights as unknown[]).filter(isClipHighlight)
+      : [],
     ...(sel && typeof sel.exact === 'string'
       ? {
           selection: {
@@ -292,5 +343,10 @@ export async function writeClip(payload: ClipPayload): Promise<string> {
     }
   }
   await fs.writeFile(notePath, renderClipNote(payload, byUrl))
+  // The highlights go beside the note in the sidecar format the annotations
+  // viewer and the agent digest already read — written AFTER the note, so a
+  // sidecar never exists without the file it annotates.
+  const annotations = webAnnotationsFor(payload)
+  if (annotations.length) await saveWebSidecar(notePath, annotations)
   return notePath
 }

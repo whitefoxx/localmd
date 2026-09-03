@@ -8,6 +8,7 @@ import {
   parseClip,
   markdownRefs,
   dataUrlToBlob,
+  webAnnotationsFor,
   type ClipPayload,
 } from '@/lib/clip'
 
@@ -181,5 +182,56 @@ describe('dataUrlToBlob', () => {
     expect(blob.size).toBe(3)
     expect(dataUrlToBlob('https://x.test/a.png')).toBeNull()
     expect(dataUrlToBlob('data:image/png;base64,!!!')).toBeNull()
+  })
+})
+
+describe('webAnnotationsFor', () => {
+  const withHighlights: ClipPayload = {
+    ...base,
+    highlights: [
+      {
+        id: 'hl_1',
+        text: 'a marked line',
+        color: 'green',
+        note: 'keep',
+        date: '2026-09-03T09:00:00.000Z',
+        anchor: { exact: 'a marked line', prefix: 'p', suffix: 's' },
+      },
+      {
+        id: 'hl_2',
+        text: 'another',
+        date: '2026-09-03T09:01:00.000Z',
+        anchor: { exact: 'another', prefix: '', suffix: '' },
+      },
+    ],
+  }
+
+  it('turns the clip\'s highlights into sidecar entries against the canonical url', () => {
+    const out = webAnnotationsFor(withHighlights)
+    expect(out).toHaveLength(2)
+    expect(out[0]).toEqual({
+      anchor: { exact: 'a marked line', prefix: 'p', suffix: 's' },
+      url: 'https://ex.test/a',
+      color: '#7ED67E',
+      text: 'a marked line',
+      createdAt: '2026-09-03T09:00:00.000Z',
+      note: 'keep',
+      id: 'hl_1',
+    })
+    // No note, no colour → no note key, palette default.
+    expect('note' in out[1]).toBe(false)
+    expect(out[1].color).toBe('#FFD633')
+  })
+
+  it('is empty for a clip with no highlights', () => {
+    expect(webAnnotationsFor(base)).toEqual([])
+  })
+
+  it('parseClip keeps well-formed highlights and drops the rest', () => {
+    const clip = parseClip({
+      ...base,
+      highlights: [withHighlights.highlights![0], { text: 'no anchor' }, 'junk'],
+    })!
+    expect(clip.highlights).toHaveLength(1)
   })
 })

@@ -127,6 +127,12 @@ special kind of file — it is markdown you can edit, move and cite like any
 other, and the assistant can distil it into a page in `wiki/` the way it would
 with a PDF.
 
+Select text on any page and a small bar appears: five colours to highlight it
+in, a note to write on it, and the same Clip and Ask buttons. Highlights stay on
+the page when you come back to it, and when you clip that page they come along —
+the note lands with an annotations file beside it, the same kind a PDF or an
+EPUB gets, so the assistant sees what you marked and why.
+
 Clipping keeps you where you are. **Ask localmd about this page** (Alt+Shift+L)
 does the opposite: it brings this app to the front with the page attached, so
 you can start asking about what you were just reading. That one hands over the
