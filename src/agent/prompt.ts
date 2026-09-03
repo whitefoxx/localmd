@@ -177,7 +177,7 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   if (hasExtension) {
     prompt += `
 
-Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
+Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. A tool that returns an image (screenshot) has it saved into .tmp/ and tells you the path — call view_image on it to actually see it; never describe a screenshot you did not look at. These are deferred — enable_tools first (batch all the names you'll need in one call).`
   }
 
   // localmd Connect adds adapters + site scripts on top of the generic tools.

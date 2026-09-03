@@ -7,6 +7,7 @@ import {
   parseExternalToolName,
   parseSseResponse,
   flattenToolResult,
+  resolveToolResult,
   normalizeMcpServerList,
   mergeMcpConfigs,
   isDeferredTool,
@@ -198,6 +199,48 @@ describe('McpHttpClient over an injected wire', () => {
     const client = new McpHttpClient({ id: 'x', name: 'x', url: 'https://e/mcp', token: 'tok' }, wire)
     await client.connect()
     expect(sent[0].headers.Authorization).toBe('Bearer tok')
+  })
+})
+
+describe('resolveToolResult (images a tool returned)', () => {
+  it('with an images array, flatten holds the bytes back behind a numbered placeholder', () => {
+    const images: { mimeType: string; data: string }[] = []
+    const out = flattenToolResult(
+      { content: [{ type: 'image', mimeType: 'image/png', data: 'QUJD' }, { type: 'text', text: 'after' }] },
+      images,
+    )
+    expect(out).toBe('[image #1]\nafter')
+    expect(images).toEqual([{ mimeType: 'image/png', data: 'QUJD' }])
+  })
+
+  it('writes each image through the sink and names the path', async () => {
+    const seen: string[] = []
+    const out = await resolveToolResult(
+      { content: [{ type: 'image', mimeType: 'image/png', data: 'QUJD' }] },
+      async (img) => {
+        seen.push(img.mimeType)
+        return '.tmp/tool-image.png'
+      },
+    )
+    expect(seen).toEqual(['image/png'])
+    expect(out).toContain('saved to .tmp/tool-image.png')
+    expect(out).toContain('view_image')
+  })
+
+  it('says so when the sink cannot take the image', async () => {
+    const out = await resolveToolResult(
+      { content: [{ type: 'image', mimeType: 'image/png', data: 'QUJD' }] },
+      async () => null,
+    )
+    expect(out).toContain('could not be saved')
+    expect(out).not.toContain('view_image')
+  })
+
+  it('without a sink is plain flattening — the old behaviour, unchanged', async () => {
+    const out = await resolveToolResult({
+      content: [{ type: 'image', mimeType: 'image/png', data: 'QUJD' }],
+    })
+    expect(out).toBe('[image image/png]')
   })
 })
 

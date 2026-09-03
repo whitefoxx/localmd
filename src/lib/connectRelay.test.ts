@@ -399,3 +399,19 @@ describe('the relay port going away', () => {
     expect(tools).toHaveLength(1)
   })
 })
+
+describe('images over the relay', () => {
+  it('go through the client\'s sink, so the model gets a path it can look at', async () => {
+    fakeRelay({
+      answer: (method) =>
+        method === 'tools/call'
+          ? { content: [{ type: 'image', mimeType: 'image/webp', data: 'QUJD' }] }
+          : {},
+    })
+    const client = new McpRelayClient()
+    await client.connect()
+    client.imageSink = async (img) => `.tmp/${img.mimeType.split('/')[1]}.bin`
+    const out = await client.callTool('generic__screenshot', {})
+    expect(out).toContain('saved to .tmp/webp.bin')
+  })
+})

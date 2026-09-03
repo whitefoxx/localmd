@@ -46,10 +46,11 @@
  * missed.
  */
 import {
-  flattenToolResult,
+  resolveToolResult,
   type McpClientLike,
   type McpToolDef,
   type McpWire,
+  type ImageSink,
 } from '@/lib/mcp'
 
 /** One extension speaking the relay protocol: which DOM marker announces it,
@@ -432,6 +433,8 @@ export class McpRelayClient implements McpClientLike {
       CALL_TIMEOUT_MS,
       signal,
     )) as { content?: Array<Record<string, unknown>>; isError?: boolean }
-    return flattenToolResult(result ?? {})
+    return resolveToolResult(result ?? {}, this.imageSink)
   }
+
+  imageSink?: ImageSink
 }

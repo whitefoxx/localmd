@@ -50,6 +50,7 @@ import {
   extensionWire,
 } from '@/lib/connectRelay'
 import { INBOX_NOTIFICATION, drainInbox } from '@/lib/connectInbox'
+import { importTempFile } from '@/lib/capture'
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
@@ -551,6 +552,18 @@ export const useMcpStore = defineStore('mcp', () => {
     // until someone happens to run a tool.
     client.onLost = (reason) => {
       if (clients.get(config.id) === client) patch(config.id, { status: 'error', error: reason })
+    }
+    // A tool's image lands in `.tmp/` like a pasted screenshot does, and the
+    // model gets the path to view_image. Only with a folder open — the sink
+    // says so by returning null, and the result then says the image could not
+    // be shown rather than pretending it was.
+    client.imageSink = async (img) => {
+      if (!useKbStore().name) return null
+      const bin = atob(img.data)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const ext = img.mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
+      return importTempFile(new File([bytes], `tool-image.${ext}`, { type: img.mimeType }))
     }
     clients.set(config.id, client)
     patch(config.id, { status: 'connecting', error: undefined })
