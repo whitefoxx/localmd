@@ -6,6 +6,7 @@ import {
   rewriteImages,
   renderClipNote,
   parseClip,
+  markdownRefs,
   dataUrlToBlob,
   type ClipPayload,
 } from '@/lib/clip'
@@ -136,6 +137,15 @@ describe('renderClipNote', () => {
 
   it('names the host when the page declares no site', () => {
     expect(renderClipNote({ ...base, site: undefined })).toContain('[ex.test](https://ex.test/a)')
+  })
+})
+
+describe('markdownRefs', () => {
+  it('collects the image targets the content actually shows', () => {
+    expect([...markdownRefs('![a](x.png) text ![b](y.png "t") [not an image](z.png)')]).toEqual([
+      'x.png',
+      'y.png',
+    ])
   })
 })
 

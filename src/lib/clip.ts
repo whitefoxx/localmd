@@ -179,6 +179,13 @@ export function renderClipNote(
   return parts.join('\n\n') + '\n'
 }
 
+/** Image targets the Markdown actually references. */
+export function markdownRefs(markdown: string): Set<string> {
+  const out = new Set<string>()
+  for (const m of markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) out.add(m[1])
+  return out
+}
+
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '')
@@ -266,6 +273,12 @@ export async function writeClip(payload: ClipPayload): Promise<string> {
   let n = 0
   for (const img of payload.images ?? []) {
     if (!img.dataUrl) continue
+    // Only pictures the note will actually show. The clipper also hands over
+    // the page's social-card image (og:image), which usually appears nowhere in
+    // the content — saving it would leave a file in the folder that nothing
+    // points at, and an orphan is exactly what a knowledge base must not
+    // accumulate.
+    if (!markdownRefs(payload.markdown ?? '').has(img.src)) continue
     const blob = dataUrlToBlob(img.dataUrl)
     if (!blob) continue
     n++
