@@ -254,6 +254,13 @@ export class McpRelayClient implements McpClientLike {
    *  turns into a red row. */
   onLost?: (reason: string) => void
 
+  /** Server→client notifications, which this transport is the only one to
+   *  receive: the extension pokes us when the user captures something in their
+   *  browser (`notifications/localmd/inbox`, see lib/connectInbox). They carry
+   *  no id and must never be answered. Set by the store; without it a
+   *  notification is dropped, which is what every earlier build did. */
+  onNotification?: (method: string, params: unknown) => void
+
   /** The only config is WHICH extension — its marker supplies the target
    *  install, so there is still no URL, id or token for a user to get wrong. */
   constructor(private target: RelayExtension = LOCALMD_CONNECT_EXTENSION) {}
@@ -292,8 +299,24 @@ export class McpRelayClient implements McpClientLike {
     if (!d || d.webcli !== 'mcp' || d.dir !== 'to-page' || !d.msg) return
     // A second install (store + dev) answering something we didn't send it.
     if (this.ext && typeof d.ext === 'string' && d.ext !== this.ext) return
-    const m = d.msg as { id?: unknown; result?: unknown; error?: RpcError; method?: unknown }
-    if (typeof m.method === 'string' && m.method.startsWith('notifications/')) return
+    const m = d.msg as {
+      id?: unknown
+      result?: unknown
+      error?: RpcError
+      method?: unknown
+      params?: unknown
+    }
+    if (typeof m.method === 'string' && m.method.startsWith('notifications/')) {
+      // A notification never carries an id, so it can never be a reply we are
+      // waiting on — hand it over and stop. A handler that throws must not take
+      // the message listener down with it.
+      try {
+        this.onNotification?.(m.method, m.params)
+      } catch {
+        /* a bad handler is not this transport's problem */
+      }
+      return
+    }
     if (typeof m.id !== 'number') return
     const p = this.pending.get(m.id)
     if (!p) return

@@ -78,7 +78,10 @@ export function numberedVariant(desired: string, n: number): string {
   return `${desired}-${n}`
 }
 
-async function resolveUniquePath(desired: string): Promise<string> {
+/** First free name at `desired`, trying `-2`, `-3`, … Exported because every
+ *  intake path needs it (drops, pastes, web clips) and two of them getting
+ *  collision handling subtly different is how a file silently overwrites another. */
+export async function resolveUniquePath(desired: string): Promise<string> {
   for (let n = 1; n < 1000; n++) {
     const candidate = numberedVariant(desired, n)
     if (!(await fs.exists(candidate))) return candidate

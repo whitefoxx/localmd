@@ -49,6 +49,7 @@ import {
   relayExtensionId,
   extensionWire,
 } from '@/lib/connectRelay'
+import { INBOX_NOTIFICATION, drainInbox } from '@/lib/connectInbox'
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
@@ -103,6 +104,15 @@ function missingSecretMessage(ids: readonly string[]): string {
 }
 
 /**
+ * The store's own `callTool`, reachable from `clientFor` — which runs while the
+ * store body is still being built. A notification cannot arrive before a
+ * connection exists, so by the time this is read it is set.
+ */
+const callToolRef: {
+  value: ((serverId: string, tool: string, args: Record<string, unknown>) => Promise<string>) | null
+} = { value: null }
+
+/**
  * Which client a row gets. Three cases, and only the first is about the url:
  *   - the relay sentinel — the row IS localmd Connect, over its postMessage
  *     relay
@@ -111,7 +121,22 @@ function missingSecretMessage(ids: readonly string[]): string {
  *   - otherwise — a normal endpoint, reached by the browser directly
  */
 function clientFor(config: McpServerConfig, extension: McpWire | null): McpClientLike {
-  if (isLocalmdConnectRelayUrl(config.url)) return new McpRelayClient()
+  if (isLocalmdConnectRelayUrl(config.url)) {
+    const client = new McpRelayClient()
+    // The extension is the only tool source that talks to us unprompted: it
+    // pokes when the user has captured something in their browser. Bound here
+    // because this is where the row's id is known, and the drain calls back
+    // over that same row (lib/connectInbox).
+    client.onNotification = (method) => {
+      if (method !== INBOX_NOTIFICATION) return
+      const call = callToolRef.value
+      if (!call) return
+      void drainInbox({ serverId: config.id, call: (t, a) => call(config.id, t, a) }).catch(() => {
+        /* a failed drain leaves the items queued for the next poke */
+      })
+    }
+    return client
+  }
   if (config.transport !== 'extension') return new McpHttpClient(config)
   if (!extension) throw new Error(EXTENSION_TRANSPORT_MISSING)
   return new McpHttpClient(config, extension)
@@ -670,6 +695,10 @@ export const useMcpStore = defineStore('mcp', () => {
       return client.callTool(tool, args, signal)
     }
   }
+
+  // Published for clientFor's notification handler, which is built before this
+  // function exists but can only ever run after a connection does.
+  callToolRef.value = (serverId, tool, args) => callTool(serverId, tool, args)
 
   // Reconnect when the global config or the opened KB changes.
   const settings = useSettingsStore()

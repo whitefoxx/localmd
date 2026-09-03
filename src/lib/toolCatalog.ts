@@ -39,6 +39,9 @@ export const EXTENSION_FETCH_TOOL = 'generic__fetch_url'
 export const CONNECT_ACTIVE_TOOLS: ReadonlySet<string> = new Set([
   'generic__find_adapters',
   'generic__run_adapter',
+  // Saving a page is this app's whole point, so the clipper is not something
+  // the model should have to discover and activate first.
+  'generic__clip_page',
   EXTENSION_FETCH_TOOL,
 ])
 

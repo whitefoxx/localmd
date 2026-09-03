@@ -111,6 +111,32 @@ Once it is connected, **@** in the chat box also lists the pages you have open,
 so you can hand the assistant a tab (or several) to work with — see
 `working-with-the-agent`.
 
+## Saving a page you are reading
+
+The extension also works the other way round. When you are on a page worth
+keeping, right-click it and choose **Clip page to localmd** — or press
+Alt+Shift+S, or use the buttons in the extension's popup. Selecting some text
+first clips only that passage.
+
+You do not have to have this app open. The clip waits in the extension until
+the app next runs, and the number on the extension's icon is how many are
+waiting. When it arrives it becomes an ordinary note in your folder, next to
+everything else that comes in from outside: what the page said, its address,
+its author and date, and its pictures saved beside it. Nothing about it is a
+special kind of file — it is markdown you can edit, move and cite like any
+other, and the assistant can distil it into a page in `wiki/` the way it would
+with a PDF.
+
+Clipping keeps you where you are. **Ask localmd about this page** (Alt+Shift+L)
+does the opposite: it brings this app to the front with the page attached, so
+you can start asking about what you were just reading. That one hands over the
+address, not a copy, so the assistant reads the page as you have it — signed
+in, and with whatever you had filtered or searched still on screen.
+
+A clip lands in your folder without asking, because you already asked by
+clipping it. Nothing else about your browser is read: the extension only ever
+looks at a page you point it at.
+
 ## Adding a server yourself
 
 Settings → Tools → **Add an MCP server** takes an address, an optional name, and
