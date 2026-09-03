@@ -219,6 +219,32 @@ describe('suggestLinks', () => {
     expect(found[0].excerpt.endsWith('…')).toBe(true)
   })
 
+  it('does not let a file name that is an ordinary word carry a page', () => {
+    // The failure that made this unusable on a real corpus: `keys.md` is
+    // titled "API keys and privacy", and every sentence in the manual that
+    // says "keys" was being offered as a link to it.
+    const found = suggestLinks(
+      kb({
+        'wiki/keys.md': target('API keys and privacy'),
+        'wiki/notes.md': page('# Notes\n\nthe keys are stored in the browser\n'),
+      }),
+    )
+    expect(found).toEqual([])
+  })
+
+  it('loses nothing when the title and the file name are the same words', () => {
+    // Which is the ordinary case, and why dropping the stem costs so little:
+    // `nameKey` folds separators, so both spellings are one key.
+    const found = suggestLinks(
+      kb({
+        'wiki/kv-cache.md': target('KV cache'),
+        'wiki/a.md': page('# A\n\nthe kv cache grows\n'),
+        'wiki/b.md': page('# B\n\nthe kv-cache grows\n'),
+      }),
+    )
+    expect(found.map((s) => s.from)).toEqual(['wiki/a.md', 'wiki/b.md'])
+  })
+
   it('finds a page by its file stem when it has no title', () => {
     const found = suggestLinks(
       kb({

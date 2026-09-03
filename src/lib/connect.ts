@@ -199,6 +199,34 @@ function isPlumbing(path: string): boolean {
 /**
  * Name → the one page it belongs to.
  *
+ * **A page is named by its title. Its file name is a fallback, not a second
+ * name.**
+ *
+ * This registered both at first, and the fixtures it was written against had
+ * nothing to say about that, because a fixture only contains what its author
+ * thought to put in it. The first real corpus did: run over this repo's own
+ * `docs/`, 21 pages, it produced 35 suggestions and almost every one was a
+ * file name that is also an ordinary English word — `documents`, `keys`,
+ * `tools`, `models`, `skills`. Every sentence in a manual that says "keys" was
+ * being offered as a link to `keys.md`.
+ *
+ * Taking the title alone left 4, and all 4 turned out to be an artifact of the
+ * probe rather than of this: they sat in "Related" lines that already carry
+ * the link, which the probe had not supplied as `outgoing`. Supplied, the real
+ * answer on that corpus is zero — a well-linked set of pages has nothing to
+ * suggest — and removing one page's links brings back its one genuine unlinked
+ * mention and nothing else.
+ *
+ * Two rules that scored worse on the same corpus, for the record: dropping
+ * only single-word stems left 14 (it kept ten mentions of "knowledge base"),
+ * and dropping names that appear in over a fifth of the pages left 13 (it kept
+ * `documents`, `models` and `skills` — the wrong end of the list).
+ *
+ * Almost nothing is lost, because `nameKey` folds separators: `kv-cache.md`
+ * titled "KV cache" produces ONE key either way. The stem is ignored only when
+ * it says something DIFFERENT from the title — and when those differ, the
+ * title is what a person calls the page and the file name is a convention.
+ *
  * A name two pages answer to is dropped, not resolved. It names neither: a
  * link would have to guess, and a suggestion that guesses is worse than no
  * suggestion — it is the first thing a reviewer catches, and after catching it
@@ -212,8 +240,11 @@ function nameIndex(pages: ReadonlyMap<string, LintPage>): Names {
   const owner = new Map<string, string | null>()
   for (const [path, page] of pages) {
     if (isEntryPage(path) || isDailyPath(path) || isPlumbing(path)) continue
-    for (const raw of [extractTitle(page.content), fileStem(path)]) {
-      if (raw === null || !longEnough(raw)) continue
+    // A page's name is its title; the file name only stands in when there is
+    // no title. Registering both is what made this unusable on a real corpus —
+    // see the note above `nameIndex`.
+    for (const raw of [extractTitle(page.content) ?? fileStem(path)]) {
+      if (!longEnough(raw)) continue
       const key = nameKey(raw)
       if (!key) continue
       if (owner.has(key) && owner.get(key) !== path) owner.set(key, null)
