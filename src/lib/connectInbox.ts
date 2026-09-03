@@ -141,7 +141,29 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
       const tries = (attempts.get(item.id) ?? 0) + 1
       attempts.set(item.id, tries)
       try {
-        if (item.kind === 'clip') {
+        if (item.kind === 'clip' && isPdfClip(item.payload)) {
+          // A PDF the user had open: the file itself, filed the way a dropped
+          // paper is (raw/papers/ in a raw-layout folder). localmd indexes it
+          // from there; nothing here tries to read it.
+          const pdf = item.payload
+          const stem = (pdf.title || 'document')
+            .replace(/\.pdf$/i, '')
+            .replace(/[\\/:*?"<>|]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80)
+          const blob = dataUrlToBlob(`data:application/pdf;base64,${pdf.data}`)
+          if (!blob) {
+            done.push(item.id) // undecodable bytes are permanent
+            continue
+          }
+          const path = await importFile(
+            new File([blob], `${stem || 'document'}.pdf`, { type: 'application/pdf' }),
+          )
+          written.push(path)
+          wrote.push({ id: item.id, path })
+          done.push(item.id)
+        } else if (item.kind === 'clip') {
           const clip = parseClip(item.payload)
           // Unparseable is permanent — retrying it forever helps nobody.
           if (!clip) {
@@ -219,6 +241,14 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
   } finally {
     running.delete(deps.serverId)
   }
+}
+
+/** A clip that is a PDF file rather than a page. Pure. */
+export function isPdfClip(
+  value: unknown,
+): value is { kind: 'pdf'; title: string; url: string; data: string; size: number } {
+  const v = value as { kind?: unknown; data?: unknown } | null
+  return !!v && typeof v === 'object' && v.kind === 'pdf' && typeof v.data === 'string' && !!v.data
 }
 
 /** A region screenshot's bytes, or null when the payload is not one. Pure. */

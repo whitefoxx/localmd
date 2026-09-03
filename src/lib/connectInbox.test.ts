@@ -209,6 +209,31 @@ describe('drainInbox', () => {
     expect(out.acked).toBe(1)
   })
 
+  it('files a PDF clip as the document it is, named after its title', async () => {
+    useKbStore().name = 'kb'
+    importFile.mockClear()
+    const pdf = {
+      ...clip,
+      id: 'ib_p',
+      payload: {
+        kind: 'pdf',
+        url: 'https://arxiv.org/pdf/2401.00001',
+        title: 'Attention Is All You Need.pdf',
+        mime: 'application/pdf',
+        size: 4,
+        data: 'JVBERi0=', // "%PDF-"
+        clipped_at: '2026-09-03T00:00:00.000Z',
+      },
+    }
+    const out = await drainInbox(server([pdf]).deps)
+    expect(importFile).toHaveBeenCalledTimes(1)
+    const file = importFile.mock.calls[0][0]
+    expect(file.type).toBe('application/pdf')
+    expect(file.name).toBe('Attention Is All You Need.pdf')
+    expect(out.written).toEqual([`raw/images/${file.name}`]) // the mock's path; the real intake routes .pdf to raw/papers/
+    expect(out.acked).toBe(1)
+  })
+
   it('acks a screenshot whose payload is not an image, rather than retrying it', async () => {
     useKbStore().name = 'kb'
     importFile.mockClear()
