@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
+// The ui store reads a persisted panel width at construction, and this suite
+// runs in node. Nothing here is about layout; a bare stub keeps the store
+// constructible without pulling in a DOM.
+vi.stubGlobal('localStorage', {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+})
+
 vi.mock('@/lib/idb', () => ({
   listSessions: async () => [],
   saveSession: async () => {},
@@ -22,12 +31,14 @@ vi.mock('@/lib/openInEditor', () => ({ openInEditor: (p: string) => openInEditor
 import {
   parseInbox,
   drainInbox,
+  askDraft,
   __resetInboxAttempts,
   LIST_INBOX_TOOL,
   ACK_INBOX_TOOL,
 } from '@/lib/connectInbox'
 import { useKbStore } from '@/stores/kb'
 import { useComposerStore } from '@/stores/composer'
+import { useUiStore } from '@/stores/ui'
 
 const clip = {
   id: 'ib_1',
@@ -113,16 +124,46 @@ describe('drainInbox', () => {
     expect(openInEditor).not.toHaveBeenCalled()
   })
 
-  it('hands an ask to the composer as an attached tab plus the quoted passage', async () => {
+  it('hands an ask to the composer as a DRAFT, and attaches the tab too', async () => {
     useKbStore().name = 'kb'
     const out = await drainInbox(server([ask]).deps)
     const composer = useComposerStore()
     expect(composer.tabs).toEqual([
       { serverId: 'connect', tabId: 7, title: 'B', url: 'https://ex.test/b' },
     ])
-    expect(composer.refs.map((r) => r.text)).toEqual(['a passage'])
-    expect(composer.refs[0].pinned).toBe(true)
+    // The draft is what the user actually sees. A tab chip alone delivered
+    // nothing visible: chips are staged per session, so one lands in whichever
+    // chat happened to be open when the drain ran — and someone arriving from
+    // the browser usually starts a new one.
+    const draft = useUiStore().pendingPrompt
+    expect(draft).toContain('https://ex.test/b')
+    expect(draft).toContain('> a passage')
     expect(out.asks).toBe(1)
+  })
+
+  it('leaves the question to the user rather than writing one for them', () => {
+    const draft = askDraft([ask as never])
+    expect(draft).toMatch(/^About this page: B — https:\/\/ex\.test\/b/)
+    expect(draft).not.toMatch(/\?/)
+    expect(draft.endsWith('\n\n')).toBe(true)
+  })
+
+  it('quotes a multi-line passage as a whole block', () => {
+    const draft = askDraft([{ ...ask, payload: { selection: 'line one\nline two' } } as never])
+    expect(draft).toContain('> line one\n> line two')
+  })
+
+  it('carries a page with no selection and no title', () => {
+    const draft = askDraft([{ ...ask, title: '', payload: {} } as never])
+    expect(draft).toBe('About this page: https://ex.test/b\n\n')
+  })
+
+  it('combines a batch instead of overwriting one draft with the next', async () => {
+    useKbStore().name = 'kb'
+    await drainInbox(server([ask, { ...ask, id: 'ib_2b', url: 'https://ex.test/c' }]).deps)
+    const draft = useUiStore().pendingPrompt
+    expect(draft).toContain('https://ex.test/b')
+    expect(draft).toContain('https://ex.test/c')
   })
 
   it('acks an unparseable clip instead of retrying it forever', async () => {

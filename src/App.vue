@@ -30,6 +30,18 @@ useThemeStore() // instantiate so the html[data-theme] effect runs
 // previous document).
 watch(() => files.currentPath, () => tts.stop())
 
+/**
+ * Coming back to this tab — which is not the same event as the window gaining
+ * focus, and this handler was wired only to the latter. Switching to this tab
+ * inside a window that already had focus fires nothing at all, so none of it
+ * ran: the folder was not re-read, failing tool rows were not re-probed, and
+ * captures made in the browser sat unclaimed.
+ *
+ * It showed up as "pressing Ask localmd brings me here with nothing, but
+ * clicking the extension's icon fixes it" — opening the popup takes focus off
+ * the page and closing it hands focus back, which is a real window focus event
+ * where switching tabs never was.
+ */
 function onFocus(): void {
   void files.refreshOnFocus()
   // Coming back to the tab is when the concurrent-folder bar gets read, so it
@@ -42,7 +54,21 @@ function onFocus(): void {
   // A tool server that was down, or an extension that was mid-reload, often
   // came back while the user was away. Only failing rows are re-probed — and
   // only with a KB open, so the landing screen still connects to nothing.
-  if (kb.isOpen) void useMcpStore().retryFailed()
+  if (kb.isOpen) {
+    const mcp = useMcpStore()
+    void mcp.retryFailed()
+    // Anything captured in the browser while we were away. The extension pokes
+    // us when it can, but that needs a live port and Chrome takes those away
+    // with its service worker — so coming back here is the reliable trigger,
+    // and it is also the moment someone arrives having pressed "Ask localmd".
+    void mcp.drainConnectInboxes()
+  }
+}
+
+/** Tab activation. Everything onFocus does is a cheap, idempotent catch-up, so
+ *  running it on both events costs nothing and misses neither. */
+function onVisible(): void {
+  if (document.visibilityState === 'visible') onFocus()
 }
 
 /** What each command does. Key bindings live in the registry (@/lib/hotkeys);
@@ -164,6 +190,7 @@ async function boot(): Promise<void> {
 onMounted(() => {
   void boot()
   window.addEventListener('focus', onFocus)
+  document.addEventListener('visibilitychange', onVisible)
   // Capture phase: claim hotkeys before the PDF viewer / browser default can.
   window.addEventListener('keydown', onKeydown, true)
   window.addEventListener('contextmenu', onContextMenu)
@@ -172,6 +199,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('focus', onFocus)
+  document.removeEventListener('visibilitychange', onVisible)
   window.removeEventListener('keydown', onKeydown, true)
   window.removeEventListener('contextmenu', onContextMenu)
   window.removeEventListener('beforeunload', onBeforeUnload)

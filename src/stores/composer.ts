@@ -71,20 +71,6 @@ export const useComposerStore = defineStore('composer', () => {
     }
   }
 
-  /**
-   * Stage a passage that did NOT come from a live selection in this app — the
-   * text a user highlighted in their browser before pressing "Ask localmd"
-   * (lib/connectInbox). It goes in pinned, because there is no selection behind
-   * it to keep it alive: an unpinned chip is a mirror of something on screen,
-   * and this one has nothing to mirror.
-   */
-  function stageQuote(text: string, from?: QuoteOrigin): void {
-    const t = text.trim()
-    if (!t) return
-    if (refs.value.some((r) => r.text === t)) return
-    refs.value.push({ id: crypto.randomUUID(), text: t, pinned: true, from })
-  }
-
   /** Remove just the transient chip (leaving pinned ones). */
   function dropLive(): void {
     if (!liveId) return
@@ -200,7 +186,6 @@ export const useComposerStore = defineStore('composer', () => {
   return {
     refs,
     syncLive,
-    stageQuote,
     clearTransient,
     togglePin,
     remove,

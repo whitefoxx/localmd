@@ -700,6 +700,36 @@ export const useMcpStore = defineStore('mcp', () => {
   // function exists but can only ever run after a connection does.
   callToolRef.value = (serverId, tool, args) => callTool(serverId, tool, args)
 
+  /**
+   * Pull whatever the user captured in their browser, without waiting to be
+   * told about it.
+   *
+   * The extension pokes when something arrives, and that poke needs a live
+   * port — which Chrome takes away whenever it recycles the extension's service
+   * worker. So the push half is a fast path, not a delivery guarantee, and the
+   * PULL half had no trigger of its own: captures sat in the queue until
+   * something else happened to reconnect.
+   *
+   * Asking is cheap and self-healing: the relay redials its port on the way
+   * OUT, so a call revives a connection a notification could never have
+   * reached. Called on every return to this tab, which is exactly the moment
+   * someone arrives from their browser having pressed "Ask localmd".
+   */
+  async function drainConnectInboxes(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status === 'error') continue // retryFailed is already on it
+      try {
+        await drainInbox({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        // A drain that cannot reach the extension leaves the queue alone; the
+        // next return to the tab tries again.
+      }
+    }
+  }
+
   // Reconnect when the global config or the opened KB changes.
   const settings = useSettingsStore()
   const kb = useKbStore()
@@ -755,6 +785,7 @@ export const useMcpStore = defineStore('mcp', () => {
     refresh,
     reconnect,
     retryFailed,
+    drainConnectInboxes,
     signIn,
     signOut,
     isSignedIn,

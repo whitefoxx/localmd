@@ -20,6 +20,7 @@
  */
 import { useKbStore } from '@/stores/kb'
 import { useComposerStore } from '@/stores/composer'
+import { useUiStore } from '@/stores/ui'
 import { openInEditor } from '@/lib/openInEditor'
 import { parseClip, writeClip } from '@/lib/clip'
 
@@ -128,6 +129,7 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
     const composer = useComposerStore()
     const done: string[] = []
     const written: string[] = []
+    const asked: InboxItem[] = []
     let asks = 0
     let left = 0
 
@@ -153,8 +155,7 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
               url: item.url,
             })
           }
-          const selection = (item.payload as { selection?: unknown } | null)?.selection
-          if (typeof selection === 'string') composer.stageQuote(selection)
+          asked.push(item)
           asks++
           done.push(item.id)
         } else {
@@ -173,6 +174,18 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
       for (const id of done) attempts.delete(id)
       await deps.call(ACK_INBOX_TOOL, { ids: JSON.stringify(done) })
     }
+    // An ask becomes a DRAFT in the chat box, not just an attached tab.
+    //
+    // Attaching the tab alone was the first design and it delivered nothing the
+    // user could see: tabs are staged per SESSION, so a chip lands in whichever
+    // chat happened to be open when the drain ran and is invisible in the next
+    // one — and someone arriving from the browser usually starts a new chat. A
+    // draft is session-independent, visible and editable, which is also the
+    // house pattern (a document's "Write a note" drafts a request rather than
+    // sending one). The tab is still attached when there is one: reading the
+    // live page beats reading its address.
+    if (asked.length) useUiStore().pendingPrompt = askDraft(asked)
+
     // The receipt: one clip opens where it landed. Several would be a fight
     // over the editor, so a batch says nothing and leaves them in the tree.
     if (written.length === 1) await openInEditor(written[0])
@@ -180,6 +193,30 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
   } finally {
     running.delete(deps.serverId)
   }
+}
+
+/**
+ * The draft an "Ask localmd" lands in the chat box. Names the page and quotes
+ * the passage, then stops: the QUESTION is the user's to type, and a guess is
+ * something they have to delete first.
+ */
+export function askDraft(items: InboxItem[]): string {
+  const parts = items.map((item) => {
+    const title = item.title && item.title !== item.url ? item.title : ''
+    const head = title ? `${title} — ${item.url}` : item.url
+    const selection = (item.payload as { selection?: unknown } | null)?.selection
+    const quote =
+      typeof selection === 'string' && selection.trim()
+        ? '\n\n' +
+          selection
+            .trim()
+            .split(/\r?\n/)
+            .map((l) => `> ${l}`)
+            .join('\n')
+        : ''
+    return `About this page: ${head}${quote}`
+  })
+  return parts.join('\n\n') + '\n\n'
 }
 
 /** Test seam: forget the retry counters. */
