@@ -20,6 +20,11 @@ vi.mock('@/lib/idb', () => ({
 }))
 
 const writeClip = vi.fn(async () => 'raw/articles/a.md')
+const importFile = vi.fn(async (f: File) => `raw/images/${f.name}`)
+vi.mock('@/lib/capture', async (orig) => ({
+  ...(await orig<typeof import('@/lib/capture')>()),
+  importFile: (f: File) => importFile(f),
+}))
 vi.mock('@/lib/clip', async (orig) => ({
   ...(await orig<typeof import('@/lib/clip')>()),
   writeClip: (...a: unknown[]) => writeClip(...(a as [])),
@@ -171,6 +176,33 @@ describe('drainInbox', () => {
     const s = server([{ ...clip, payload: { nonsense: true } }])
     const out = await drainInbox(s.deps)
     expect(writeClip).not.toHaveBeenCalled()
+    expect(out.acked).toBe(1)
+  })
+
+  it('writes a region screenshot like a pasted picture, named after its page', async () => {
+    useKbStore().name = 'kb'
+    importFile.mockClear()
+    const shot = {
+      ...clip,
+      id: 'ib_s',
+      kind: 'screenshot',
+      title: 'Some: page / title',
+      payload: { dataUrl: 'data:image/png;base64,QUJD', width: 2, height: 1, format: 'png' },
+    }
+    const out = await drainInbox(server([shot]).deps)
+    expect(importFile).toHaveBeenCalledTimes(1)
+    const file = importFile.mock.calls[0][0]
+    expect(file.type).toBe('image/png')
+    expect(file.name).toMatch(/^Some page title\.png$/)
+    expect(out.written).toEqual([`raw/images/${file.name}`])
+    expect(out.acked).toBe(1)
+  })
+
+  it('acks a screenshot whose payload is not an image, rather than retrying it', async () => {
+    useKbStore().name = 'kb'
+    importFile.mockClear()
+    const out = await drainInbox(server([{ ...clip, kind: 'screenshot', payload: { nope: 1 } }]).deps)
+    expect(importFile).not.toHaveBeenCalled()
     expect(out.acked).toBe(1)
   })
 

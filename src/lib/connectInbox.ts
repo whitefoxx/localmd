@@ -22,7 +22,8 @@ import { useKbStore } from '@/stores/kb'
 import { useComposerStore } from '@/stores/composer'
 import { useUiStore } from '@/stores/ui'
 import { openInEditor } from '@/lib/openInEditor'
-import { parseClip, writeClip } from '@/lib/clip'
+import { parseClip, writeClip, dataUrlToBlob } from '@/lib/clip'
+import { importFile, ensureFilename } from '@/lib/capture'
 
 export const LIST_INBOX_TOOL = 'generic__list_inbox'
 export const ACK_INBOX_TOOL = 'generic__ack_inbox'
@@ -158,8 +159,25 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
           asked.push(item)
           asks++
           done.push(item.id)
+        } else if (item.kind === 'screenshot') {
+          const shot = parseScreenshot(item.payload)
+          if (!shot) {
+            done.push(item.id)
+            continue
+          }
+          // The same landing as a dropped or pasted picture: raw/images/ in a
+          // raw-layout folder, inbox/ elsewhere. Named after the page it came
+          // from, so a folder of them still means something.
+          const stem = (item.title || 'screenshot')
+            .replace(/[\\/:*?"<>|]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 60)
+          const name = ensureFilename(`${stem || 'screenshot'}.png`, 'image/png', Date.now())
+          written.push(await importFile(new File([shot], name, { type: 'image/png' })))
+          done.push(item.id)
         } else {
-          // A kind this build does not handle yet (highlight, screenshot). Leave
+          // A kind this build does not handle yet (highlight). Leave
           // it: a newer app version will know what to do with it, and acking
           // would throw away something the user captured.
           left++
@@ -193,6 +211,14 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
   } finally {
     running.delete(deps.serverId)
   }
+}
+
+/** A region screenshot's bytes, or null when the payload is not one. Pure. */
+export function parseScreenshot(value: unknown): Blob | null {
+  if (!value || typeof value !== 'object') return null
+  const dataUrl = (value as { dataUrl?: unknown }).dataUrl
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null
+  return dataUrlToBlob(dataUrl)
 }
 
 /**
