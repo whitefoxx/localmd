@@ -23,7 +23,7 @@ import { useComposerStore } from '@/stores/composer'
 import { useUiStore } from '@/stores/ui'
 import { openInEditor } from '@/lib/openInEditor'
 import { parseClip, writeClip, dataUrlToBlob } from '@/lib/clip'
-import { importFile, ensureFilename } from '@/lib/capture'
+import { importFile, ensureFilename, extForMime } from '@/lib/capture'
 import { syncAfterFsChange } from '@/lib/fileOps'
 
 export const LIST_INBOX_TOOL = 'generic__list_inbox'
@@ -52,6 +52,12 @@ export interface InboxItem {
   /** The browser tab it was captured from, when that tab is still open. */
   tabId?: number
   payload: unknown
+  /** The extension could not deliver this item even on its own — it is
+   *  larger than one relay frame — and sent its metadata without the payload.
+   *  Nothing can be written from it; acking it is what lets the queue move. */
+  oversized?: true
+  /** Its size, when `oversized`. */
+  bytes?: number
 }
 
 function row(value: unknown): InboxItem | null {
@@ -66,28 +72,52 @@ function row(value: unknown): InboxItem | null {
     title: typeof o.title === 'string' ? o.title : '',
     ...(typeof o.tabId === 'number' ? { tabId: o.tabId } : {}),
     payload: o.payload,
+    ...(o.oversized === true ? { oversized: true as const } : {}),
+    ...(typeof o.bytes === 'number' ? { bytes: o.bytes } : {}),
   }
 }
 
 /**
- * Items out of a `list_inbox` result, whatever JSON shape it chose. Anything
- * that is not JSON — an error line, prose from a transport that failed — yields
- * nothing, which the caller treats as "an empty inbox" rather than guessing.
+ * Items out of a `list_inbox` result, whatever JSON shape it chose.
+ *
+ * Text that is not JSON is an ERROR, not an empty inbox. It used to yield
+ * nothing, "rather than guessing" — and the guess that replaced it was worse:
+ * the extension truncates a reply that exceeds its frame ceiling, the tail of a
+ * JSON document went missing, this returned [], and the drain concluded there
+ * was nothing to do while eight captures sat in the queue. Throwing leaves them
+ * queued too, but as a failure someone can see, not a success that did nothing.
  */
 export function parseInbox(out: string): InboxItem[] {
+  return parseInboxReply(out).items
+}
+
+export interface InboxReply {
+  items: InboxItem[]
+  /** How many items the extension holds in total — the reply is one batch of
+   *  them, bounded by bytes, so this is what says whether to ask again. */
+  pending: number
+}
+
+export function parseInboxReply(out: string): InboxReply {
   let parsed: unknown
   try {
     parsed = JSON.parse(out)
   } catch {
-    return []
+    throw new Error(
+      `list_inbox returned something that is not JSON (${out.length} chars): ${out.slice(0, 80)}…`,
+    )
   }
   const list = Array.isArray(parsed)
     ? parsed
     : parsed && typeof parsed === 'object'
       ? ((parsed as { items?: unknown }).items ?? [])
       : []
-  if (!Array.isArray(list)) return []
-  return list.map(row).filter((r): r is InboxItem => r !== null)
+  const items = Array.isArray(list) ? list.map(row).filter((r): r is InboxItem => r !== null) : []
+  const declared =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as { pending?: unknown }).pending
+      : undefined
+  return { items, pending: typeof declared === 'number' ? declared : items.length }
 }
 
 export interface DrainDeps {
@@ -118,16 +148,113 @@ const attempts = new Map<string, number>()
  *  is still writing, and two drains would fight over the same ids. */
 const running = new Set<string>()
 
+/** Servers poked while their drain was running. The poke itself is dropped by
+ *  the guard above; this is what makes the drain look once more before it
+ *  ends, so a capture made mid-drain is not left waiting for the next one. */
+const poked = new Set<string>()
+
+/** Rounds one drain may run. The extension hands over one frame's worth per
+ *  call and eight captures took four; a bound, not a target. */
+const MAX_ROUNDS = 25
+
+/**
+ * The lock two TABS of this app contend for. Both are connected to the same
+ * extension, both are poked, and without this both would list the same items,
+ * write each of them twice into the same folder and ack them twice. Web Locks
+ * are per origin, which is exactly the scope of "the same app". Where the API
+ * is missing (tests, an old runtime) the drain simply runs.
+ */
+async function withInboxLock<T>(serverId: string, skipped: T, fn: () => Promise<T>): Promise<T> {
+  const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks
+  if (!locks) return fn()
+  return (await locks.request(
+    `localmd-connect-inbox:${serverId}`,
+    { ifAvailable: true },
+    async (lock) => (lock ? fn() : skipped),
+  )) as T
+}
+
+/**
+ * Pull everything the browser has queued, in as many rounds as it takes.
+ *
+ * One round is one `list_inbox` — a batch the extension bounds by BYTES — and
+ * it used to be the whole drain. Eight captures arrived in four batches, and
+ * only the first was pulled by the poke that announced them; the rest waited
+ * for a coincidence (another capture, a tab switch). Now a round that made
+ * progress while the extension still reports items pending is followed by
+ * another, and a poke that arrived mid-drain earns one more look at the end.
+ */
 export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
   const empty: DrainResult = { written: [], asks: 0, acked: 0, left: 0 }
-  if (running.has(deps.serverId)) return empty
+  if (running.has(deps.serverId)) {
+    poked.add(deps.serverId)
+    return empty
+  }
   // No folder open: a clip has nowhere to go, and acking it would lose it.
   if (!useKbStore().name) return empty
-  running.add(deps.serverId)
-  try {
-    const items = parseInbox(await deps.call(LIST_INBOX_TOOL, { limit: BATCH }))
-    if (!items.length) return empty
+  return withInboxLock(deps.serverId, empty, async () => {
+    running.add(deps.serverId)
+    const total: DrainResult = { written: [], asks: 0, acked: 0, left: 0 }
+    const asked: InboxItem[] = []
+    try {
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        poked.delete(deps.serverId)
+        const r = await drainBatch(deps)
+        total.written.push(...r.written)
+        total.asks += r.asks
+        total.acked += r.acked
+        total.left = r.left
+        asked.push(...r.asked)
+        const more = r.acked > 0 && r.remaining > 0
+        if (!more && !poked.has(deps.serverId)) break
+      }
+    } finally {
+      running.delete(deps.serverId)
+      poked.delete(deps.serverId)
+    }
 
+    // The receipts, once per drain rather than once per round.
+    //
+    // The tree does not watch the disk, so a file written behind its back is
+    // invisible until something re-reads it — which is why a capture only
+    // showed up after a manual reload.
+    if (total.written.length) await syncAfterFsChange()
+
+    // An ask becomes a DRAFT in the chat box, not just an attached tab.
+    //
+    // Attaching the tab alone was the first design and it delivered nothing the
+    // user could see: tabs are staged per SESSION, so a chip lands in whichever
+    // chat happened to be open when the drain ran and is invisible in the next
+    // one — and someone arriving from the browser usually starts a new chat. A
+    // draft is session-independent, visible and editable, which is also the
+    // house pattern (a document's "Write a note" drafts a request rather than
+    // sending one). The tab is still attached when there is one: reading the
+    // live page beats reading its address. One draft for the whole drain: a
+    // second round must not overwrite what the first one asked.
+    if (asked.length) useUiStore().pendingPrompt = askDraft(asked)
+
+    // One clip opens where it landed. Several would be a fight over the
+    // editor, so a batch says nothing and leaves them in the tree.
+    if (total.written.length === 1) await openInEditor(total.written[0])
+    return total
+  })
+}
+
+interface BatchResult extends DrainResult {
+  /** The asks of this round, for the one draft written at the end. */
+  asked: InboxItem[]
+  /** Items the extension still holds after this round's acks. */
+  remaining: number
+}
+
+/** One `list_inbox`, its writes, and one `ack_inbox`. */
+async function drainBatch(deps: DrainDeps): Promise<BatchResult> {
+  const none: BatchResult = { written: [], asks: 0, acked: 0, left: 0, asked: [], remaining: 0 }
+  const reply = parseInboxReply(await deps.call(LIST_INBOX_TOOL, { limit: BATCH }))
+  const items = reply.items
+  if (!items.length) return none
+
+  {
     const composer = useComposerStore()
     const done: string[] = []
     const written: string[] = []
@@ -142,6 +269,17 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
       const tries = (attempts.get(item.id) ?? 0) + 1
       attempts.set(item.id, tries)
       try {
+        if (item.oversized) {
+          // Bigger than a relay frame: the extension sent the metadata only,
+          // and no retry will bring the payload. Give it up so what is queued
+          // behind it can arrive — and say so, since something the user
+          // captured is being dropped.
+          console.warn(
+            `[connect] a ${item.kind} capture of ${item.url} (${Math.round((item.bytes ?? 0) / 1_048_576)}MB) is too large to transfer and was dropped`,
+          )
+          done.push(item.id)
+          continue
+        }
         if (item.kind === 'clip' && isPdfClip(item.payload)) {
           // A PDF the user had open: the file itself, filed the way a dropped
           // paper is (raw/papers/ in a raw-layout folder). localmd indexes it
@@ -168,6 +306,7 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
           const clip = parseClip(item.payload)
           // Unparseable is permanent — retrying it forever helps nobody.
           if (!clip) {
+            console.warn(`[connect] a clip of ${item.url} was not a clip and was dropped`)
             done.push(item.id)
             continue
           }
@@ -190,6 +329,9 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
         } else if (item.kind === 'screenshot') {
           const shot = parseScreenshot(item.payload)
           if (!shot) {
+            // Permanent: no retry will make these bytes an image. Said out
+            // loud, because a capture is being dropped.
+            console.warn(`[connect] a screenshot of ${item.url} could not be decoded and was dropped`)
             done.push(item.id)
             continue
           }
@@ -201,8 +343,15 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
             .replace(/\s+/g, ' ')
             .trim()
             .slice(0, 60)
-          const name = ensureFilename(`${stem || 'screenshot'}.png`, 'image/png', Date.now())
-          written.push(await importFile(new File([shot], name, { type: 'image/png' })))
+          // The codec is the extension's choice (a whole page arrives as
+          // WebP, a region as PNG); the file is named for what it is.
+          const mime = shot.type || 'image/png'
+          const name = ensureFilename(
+            `${stem || 'screenshot'}.${extForMime(mime)}`,
+            mime,
+            Date.now(),
+          )
+          written.push(await importFile(new File([shot], name, { type: mime })))
           done.push(item.id)
         } else {
           // A kind this build does not handle yet (highlight). Leave
@@ -223,29 +372,14 @@ export async function drainInbox(deps: DrainDeps): Promise<DrainResult> {
         ...(wrote.length ? { written: JSON.stringify(wrote) } : {}),
       })
     }
-    // The tree does not watch the disk, so a file written behind its back is
-    // invisible until something re-reads it — which is why a capture only
-    // showed up after a manual reload.
-    if (written.length) await syncAfterFsChange()
-
-    // An ask becomes a DRAFT in the chat box, not just an attached tab.
-    //
-    // Attaching the tab alone was the first design and it delivered nothing the
-    // user could see: tabs are staged per SESSION, so a chip lands in whichever
-    // chat happened to be open when the drain ran and is invisible in the next
-    // one — and someone arriving from the browser usually starts a new chat. A
-    // draft is session-independent, visible and editable, which is also the
-    // house pattern (a document's "Write a note" drafts a request rather than
-    // sending one). The tab is still attached when there is one: reading the
-    // live page beats reading its address.
-    if (asked.length) useUiStore().pendingPrompt = askDraft(asked)
-
-    // The receipt: one clip opens where it landed. Several would be a fight
-    // over the editor, so a batch says nothing and leaves them in the tree.
-    if (written.length === 1) await openInEditor(written[0])
-    return { written, asks, acked: done.length, left }
-  } finally {
-    running.delete(deps.serverId)
+    return {
+      written,
+      asks,
+      acked: done.length,
+      left,
+      asked,
+      remaining: Math.max(0, reply.pending - done.length),
+    }
   }
 }
 

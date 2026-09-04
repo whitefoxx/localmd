@@ -151,9 +151,10 @@ export function clipFrontmatter(payload: ClipPayload, now = new Date()): string 
   return lines.join('\n')
 }
 
-/** Rewrite the Markdown's image targets to the files written beside the note.
- *  An image that could not be fetched keeps its remote URL rather than becoming
- *  a broken local link. */
+/** Rewrite the Markdown's image targets to the files that were written for
+ *  them (already relative to the note and encoded — see markdownTarget). An
+ *  image that could not be fetched keeps its remote URL rather than becoming a
+ *  broken local link. */
 export function rewriteImages(markdown: string, byUrl: Map<string, string>): string {
   if (!byUrl.size) return markdown
   return markdown.replace(/(!\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g, (all, open, src, close) => {
@@ -306,9 +307,41 @@ export function parseClip(value: unknown): ClipPayload | null {
   }
 }
 
+/** The path of `to`, written from inside `fromDir` (both KB-relative; `fromDir`
+ *  ends with `/` or is empty for the root). Pure. */
+export function relativePath(fromDir: string, to: string): string {
+  const from = fromDir.split('/').filter(Boolean)
+  const target = to.split('/').filter(Boolean)
+  let i = 0
+  while (i < from.length && i < target.length && from[i] === target[i]) i++
+  return [...from.slice(i).map(() => '..'), ...target.slice(i)].join('/')
+}
+
+/**
+ * A KB path as a Markdown link destination.
+ *
+ * A bare destination may not contain spaces or unbalanced parentheses — a
+ * title like "(99+ 封私信) 首页 - 知乎" made `![](…)` that CommonMark reads as
+ * plain text, and a note whose twenty pictures all rendered as their own
+ * source was the result. Only the characters that break the syntax are
+ * encoded (plus `%`, so the encoding round-trips); everything else, CJK
+ * included, stays readable in the raw file. The app's link resolver decodes
+ * with decodeURIComponent, as browsers do.
+ */
+export function markdownTarget(path: string): string {
+  return path.replace(/[ ()%]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
 /**
  * Write a clip into the KB: its images first (so the note never links a file
  * that is not there yet), then the note. Returns the note's path.
+ *
+ * The pictures go where pictures go in THIS folder — `raw/images/` in a
+ * raw-layout KB, the inbox beside the note otherwise — not beside the note
+ * regardless. A homepage clip brought twenty avatars and icons into
+ * `raw/articles/`, and a folder of notes with twenty image files interleaved
+ * read as a mess of duplicates. They are still named after the note, so a
+ * folder of images still says what each one belongs to.
  *
  * An image that fails to write is skipped and its Markdown keeps the remote
  * URL — a clip is worth having with one picture missing, and the alternative
@@ -316,7 +349,8 @@ export function parseClip(value: unknown): ClipPayload | null {
  */
 export async function writeClip(payload: ClipPayload): Promise<string> {
   const stem = clipSlug(payload)
-  const notePath = await resolveUniquePath(landingPathFor(`${stem}.md`, await usesRawLayout()))
+  const rawLayout = await usesRawLayout()
+  const notePath = await resolveUniquePath(landingPathFor(`${stem}.md`, rawLayout))
   const dir = notePath.slice(0, notePath.lastIndexOf('/') + 1)
   const noteStem = notePath.slice(dir.length, notePath.length - 3)
 
@@ -334,10 +368,10 @@ export async function writeClip(payload: ClipPayload): Promise<string> {
     if (!blob) continue
     n++
     const ext = EXT_BY_MIME[img.mime ?? blob.type] ?? 'png'
-    const name = `${noteStem}-${n}.${ext}`
     try {
-      await fs.writeFile(`${dir}${name}`, blob)
-      byUrl.set(img.src, name)
+      const target = await resolveUniquePath(landingPathFor(`${noteStem}-${n}.${ext}`, rawLayout))
+      await fs.writeFile(target, blob)
+      byUrl.set(img.src, markdownTarget(relativePath(dir, target)))
     } catch {
       /* keep the remote URL in the Markdown */
     }

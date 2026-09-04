@@ -50,6 +50,8 @@ import {
   extensionWire,
 } from '@/lib/connectRelay'
 import { INBOX_NOTIFICATION, drainInbox } from '@/lib/connectInbox'
+import { reconcileSavedPages } from '@/lib/connectSaved'
+import { OPEN_KB_NOTIFICATION, openKbByName, syncKbFolders } from '@/lib/connectKb'
 import { importTempFile } from '@/lib/capture'
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
@@ -128,7 +130,15 @@ function clientFor(config: McpServerConfig, extension: McpWire | null): McpClien
     // pokes when the user has captured something in their browser. Bound here
     // because this is where the row's id is known, and the drain calls back
     // over that same row (lib/connectInbox).
-    client.onNotification = (method) => {
+    client.onNotification = (method, params) => {
+      if (method === OPEN_KB_NOTIFICATION) {
+        // The user picked another knowledge base in the extension's popup. Only
+        // this side can open one, and the popup has already brought them here —
+        // where a lapsed permission prompt can be answered.
+        const name = (params as { name?: unknown } | undefined)?.name
+        if (typeof name === 'string') void openKbByName(name)
+        return
+      }
       if (method !== INBOX_NOTIFICATION) return
       const call = callToolRef.value
       if (!call) return
@@ -570,6 +580,20 @@ export const useMcpStore = defineStore('mcp', () => {
     try {
       const tools = await client.connect()
       patch(config.id, { status: 'ok', error: undefined, tools })
+      // A fresh connection is the moment to find out what changed in the folder
+      // while nothing was connected to hear about it — and to say which folder
+      // this is, so the popup can name it.
+      if (isLocalmdConnectRelayUrl(config.url)) {
+        const deps = {
+          serverId: config.id,
+          call: (tool: string, args: Record<string, unknown>) =>
+            callTool(config.id, tool, args),
+        }
+        void reconcileSavedPages(deps).catch(() => {
+          /* an older extension has no such tool; nothing to correct */
+        })
+        void syncKbFolders(deps).catch(() => undefined)
+      }
     } catch (err) {
       patch(config.id, { status: 'error', error: (err as Error).message, tools: [] })
     }
@@ -659,6 +683,35 @@ export const useMcpStore = defineStore('mcp', () => {
     )
   }
 
+  /**
+   * Tell every connected extension which knowledge base is open.
+   *
+   * Watched rather than called from the places that open a folder: opening,
+   * closing, restoring on load and forgetting a recent are four call sites and
+   * the popup only cares about the RESULT of any of them.
+   */
+  async function syncConnectKb(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status !== 'ok') continue
+      try {
+        await syncKbFolders({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        /* an older extension has no such tool */
+      }
+    }
+  }
+
+  watch(
+    () => {
+      const kbStore = useKbStore()
+      return [kbStore.name, kbStore.recents.map((r) => r.name).join('\u0000')].join('\u0001')
+    },
+    () => void syncConnectKb(),
+  )
+
   /** Re-probe only the rows that are currently failing. Cheap enough to run
    *  whenever the user comes back to the tab: a server that came up while they
    *  were away, or an extension that finished reloading, heals by itself. */
@@ -743,6 +796,30 @@ export const useMcpStore = defineStore('mcp', () => {
     }
   }
 
+  /**
+   * Check what the browser believes the folder holds against what it holds.
+   *
+   * The extension's badge and popup read an index it can only learn from us and
+   * can never see go stale — a deleted note left a green "Saved" tick behind
+   * (lib/connectSaved). Run on connect, when a file is deleted or renamed, and
+   * on every return to this tab, which is also when a note may have been
+   * removed from a terminal while the app was in the background.
+   */
+  async function reconcileConnectSavedPages(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status === 'error') continue
+      try {
+        await reconcileSavedPages({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        // Unreachable extension, or a tool an older build does not have: the
+        // index simply stays as it was.
+      }
+    }
+  }
+
   // Reconnect when the global config or the opened KB changes.
   const settings = useSettingsStore()
   const kb = useKbStore()
@@ -799,6 +876,8 @@ export const useMcpStore = defineStore('mcp', () => {
     reconnect,
     retryFailed,
     drainConnectInboxes,
+    reconcileConnectSavedPages,
+    syncConnectKb,
     signIn,
     signOut,
     isSignedIn,

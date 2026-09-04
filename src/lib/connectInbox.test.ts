@@ -37,6 +37,7 @@ vi.mock('@/lib/openInEditor', () => ({ openInEditor: (p: string) => openInEditor
 
 import {
   parseInbox,
+  parseInboxReply,
   drainInbox,
   askDraft,
   __resetInboxAttempts,
@@ -81,12 +82,67 @@ function server(items: unknown[]) {
   }
 }
 
+/** A fake Connect server whose queue is handed out in BATCHES — what the real
+ *  one does when the items are big — and shrinks as items are acked. */
+function pagedServer(batches: unknown[][]) {
+  const calls: Array<{ tool: string; args: Record<string, unknown> }> = []
+  let queue = batches.map((b) => [...b])
+  return {
+    calls,
+    deps: {
+      serverId: 'connect',
+      call: async (tool: string, args: Record<string, unknown>) => {
+        calls.push({ tool, args })
+        if (tool === LIST_INBOX_TOOL) {
+          const pending = queue.reduce((n, b) => n + b.length, 0)
+          return JSON.stringify({ pending, items: queue[0] ?? [] })
+        }
+        if (tool === ACK_INBOX_TOOL) {
+          const ids = new Set(JSON.parse(String(args.ids)) as string[])
+          queue = queue
+            .map((b) => b.filter((i) => !ids.has((i as { id: string }).id)))
+            .filter((b) => b.length)
+          return JSON.stringify({ removed: ids.size, remaining: queue.length })
+        }
+        return '{}'
+      },
+    },
+  }
+}
+
+describe('parseInboxReply', () => {
+  it('carries the pending count, and falls back to the batch size without one', () => {
+    expect(parseInboxReply(JSON.stringify({ pending: 8, items: [clip] })).pending).toBe(8)
+    expect(parseInboxReply(JSON.stringify([clip])).pending).toBe(1)
+  })
+})
+
 describe('parseInbox', () => {
-  it('reads the documented shape, a bare array, and rejects the rest', () => {
+  it('reads the documented shape, a bare array, and rejects rows that are not items', () => {
     expect(parseInbox(JSON.stringify({ items: [clip] }))).toHaveLength(1)
     expect(parseInbox(JSON.stringify([clip]))).toHaveLength(1)
-    expect(parseInbox('not json')).toEqual([])
     expect(parseInbox(JSON.stringify({ items: [{ nope: 1 }] }))).toEqual([])
+  })
+
+  it('treats a reply that is not JSON as a FAILURE, never as an empty inbox', () => {
+    // What the extension sends when a reply exceeds its frame ceiling: the
+    // document cut short with a note appended. Reading that as [] is how eight
+    // captures once sat in the queue behind a green row.
+    const truncated =
+      JSON.stringify({ pending: 3, items: [clip] }).slice(0, 40) +
+      '……[result too long, truncated to the 16MB message limit]'
+    expect(() => parseInbox(truncated)).toThrow(/not JSON/)
+    expect(() => parseInbox('not json')).toThrow(/not JSON/)
+  })
+
+  it('carries the oversized flag and size through', () => {
+    const [o] = parseInbox(
+      JSON.stringify({ items: [{ ...clip, payload: undefined, oversized: true, bytes: 17_000_000 }] }),
+    )
+    expect(o.oversized).toBe(true)
+    expect(o.bytes).toBe(17_000_000)
+    const [c] = parseInbox(JSON.stringify({ items: [clip] }))
+    expect('oversized' in c).toBe(false)
   })
 
   it('keeps a tabId only when the item has one', () => {
@@ -248,6 +304,115 @@ describe('drainInbox', () => {
     expect(file.name).toBe('Attention Is All You Need.pdf')
     expect(out.written).toEqual([`raw/images/${file.name}`]) // the mock's path; the real intake routes .pdf to raw/papers/
     expect(out.acked).toBe(1)
+  })
+
+  it('names a whole-page screenshot for the codec it arrived in', async () => {
+    useKbStore().name = 'kb'
+    importFile.mockClear()
+    const shot = {
+      ...clip,
+      id: 'ib_w',
+      kind: 'screenshot',
+      title: 'Long page',
+      payload: { dataUrl: 'data:image/webp;base64,QUJD', width: 2, height: 1, format: 'webp' },
+    }
+    await drainInbox(server([shot]).deps)
+    const file = importFile.mock.calls[0][0]
+    expect(file.type).toBe('image/webp')
+    expect(file.name).toBe('Long page.webp')
+  })
+
+  it('gives up on an item the extension could not deliver, so the queue moves', async () => {
+    useKbStore().name = 'kb'
+    importFile.mockClear()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const huge = {
+      id: 'ib_huge',
+      kind: 'screenshot',
+      createdAt: 1,
+      url: 'https://ex.test/long',
+      title: 'Long',
+      oversized: true,
+      bytes: 17_000_000,
+    }
+    const s = server([huge, ask])
+    const out = await drainInbox(s.deps)
+    expect(importFile).not.toHaveBeenCalled()
+    // Acked together with the ask behind it — nothing written, nothing retried.
+    const ack = s.calls.find((c) => c.tool === ACK_INBOX_TOOL)
+    expect(JSON.parse(String(ack?.args.ids))).toEqual(['ib_huge', 'ib_2'])
+    expect(out.acked).toBe(2)
+    expect(out.written).toEqual([])
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/too large to transfer/))
+    warn.mockRestore()
+  })
+
+  it('keeps pulling until the extension reports nothing pending', async () => {
+    // Three batches — the shape of a queue of big screenshots. One poke used to
+    // pull exactly one of them; the other two waited for a coincidence.
+    useKbStore().name = 'kb'
+    const s = pagedServer([[clip], [{ ...clip, id: 'ib_1b' }], [ask]])
+    const out = await drainInbox(s.deps)
+    expect(s.calls.filter((c) => c.tool === LIST_INBOX_TOOL)).toHaveLength(3)
+    expect(out.acked).toBe(3)
+    expect(out.written).toHaveLength(2)
+    expect(out.asks).toBe(1)
+  })
+
+  it('writes ONE draft for the asks of the whole drain, not one per round', async () => {
+    useKbStore().name = 'kb'
+    const s = pagedServer([[ask], [{ ...ask, id: 'ib_2c', url: 'https://ex.test/c' }]])
+    await drainInbox(s.deps)
+    const draft = useUiStore().pendingPrompt
+    expect(draft).toContain('https://ex.test/b')
+    expect(draft).toContain('https://ex.test/c')
+  })
+
+  it('opens nothing when the rounds together wrote several', async () => {
+    useKbStore().name = 'kb'
+    openInEditor.mockClear()
+    await drainInbox(pagedServer([[clip], [{ ...clip, id: 'ib_1b' }]]).deps)
+    expect(openInEditor).not.toHaveBeenCalled()
+  })
+
+  it('stops when a round makes no progress, even with items still pending', async () => {
+    // An unhandled kind is left for a later version; listing it again in a
+    // loop would spin until MAX_ROUNDS. No progress → stop.
+    useKbStore().name = 'kb'
+    const s = pagedServer([[{ ...clip, id: 'ib_h', kind: 'highlight' }]])
+    const out = await drainInbox(s.deps)
+    expect(s.calls.filter((c) => c.tool === LIST_INBOX_TOOL)).toHaveLength(1)
+    expect(out.left).toBe(1)
+  })
+
+  it('looks once more when a poke arrived while it was running', async () => {
+    useKbStore().name = 'kb'
+    // The server's queue is empty at first; a capture arrives mid-drain.
+    let calls = 0
+    const late = { ...clip, id: 'ib_late' }
+    let queue: unknown[] = [clip]
+    const deps = {
+      serverId: 'connect',
+      call: async (tool: string, args: Record<string, unknown>) => {
+        if (tool === LIST_INBOX_TOOL) {
+          calls++
+          if (calls === 1) {
+            // Simulate the poke: a second drainInbox call while this one runs.
+            queue = [...queue, late]
+            void drainInbox(deps) // returns empty at once — the guard — but marks the poke
+          }
+          return JSON.stringify({ pending: queue.length, items: queue.slice(0, 1) })
+        }
+        if (tool === ACK_INBOX_TOOL) {
+          const ids = new Set(JSON.parse(String(args.ids)) as string[])
+          queue = queue.filter((i) => !ids.has((i as { id: string }).id))
+        }
+        return '{}'
+      },
+    }
+    const out = await drainInbox(deps)
+    expect(out.acked).toBe(2)
+    expect(queue).toEqual([])
   })
 
   it('acks a screenshot whose payload is not an image, rather than retrying it', async () => {

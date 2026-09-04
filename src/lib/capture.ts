@@ -60,6 +60,11 @@ const MIME_EXT: Record<string, string> = {
   'image/svg+xml': 'svg',
 }
 
+/** File extension for an image MIME type; 'dat' for one we do not know. */
+export function extForMime(mime: string): string {
+  return MIME_EXT[mime] ?? 'dat'
+}
+
 /** Ensure a usable, unique-ish filename for a clipboard blob that may arrive
  *  name-less — browsers name every pasted screenshot "image.png". */
 export function ensureFilename(name: string, mime: string, stamp: number): string {

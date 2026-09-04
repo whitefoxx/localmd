@@ -62,6 +62,9 @@ function onFocus(): void {
     // with its service worker — so coming back here is the reliable trigger,
     // and it is also the moment someone arrives having pressed "Ask localmd".
     void mcp.drainConnectInboxes()
+    // And the reverse direction: a note deleted from a terminal while the app
+    // was in the background leaves the browser claiming that page is saved.
+    void mcp.reconcileConnectSavedPages()
   }
 }
 
