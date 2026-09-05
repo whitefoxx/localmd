@@ -408,19 +408,33 @@ export function askDraft(items: InboxItem[]): string {
   const parts = items.map((item) => {
     const title = item.title && item.title !== item.url ? item.title : ''
     const head = title ? `${title} — ${item.url}` : item.url
-    const selection = (item.payload as { selection?: unknown } | null)?.selection
-    const quote =
-      typeof selection === 'string' && selection.trim()
-        ? '\n\n' +
-          selection
-            .trim()
-            .split(/\r?\n/)
-            .map((l) => `> ${l}`)
-            .join('\n')
-        : ''
-    return `About this page: ${head}${quote}`
+    const p = (item.payload ?? {}) as { selection?: unknown; prompt?: unknown; answer?: unknown }
+    const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+    const selection = text(p.selection)
+    const quote = selection
+      ? '\n\n' +
+        selection
+          .split(/\r?\n/)
+          .map((l) => `> ${l}`)
+          .join('\n')
+      : ''
+    // The extension's in-page prompts answer where the reader is; "Continue in
+    // localmd" is the door out of that popover, and it carries what has already
+    // been said so the conversation starts where they are rather than making
+    // them re-explain what they just read. Absent on a plain "ask", and on
+    // anything sent by an extension older than this field.
+    const answer = text(p.answer)
+    const ran = text(p.prompt)
+    const already = answer
+      ? `\n\n${ran ? `**${ran}** already answered:` : 'Already answered:'}\n\n${answer}`
+      : ''
+    return `About this page: ${head}${quote}${already}`
   })
-  return parts.join('\n\n') + '\n\n'
+  // A rule between what the browser brought and where the person types. The
+  // draft can be several lines of quoted passage and an answer, and without a
+  // divider the composer opens with the cursor somewhere in the middle of a
+  // wall of text that is not theirs.
+  return parts.join('\n\n') + '\n\n---\n\n'
 }
 
 /** Test seam: forget the retry counters. */

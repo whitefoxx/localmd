@@ -233,7 +233,9 @@ describe('drainInbox', () => {
     const draft = askDraft([ask as never])
     expect(draft).toMatch(/^About this page: B — https:\/\/ex\.test\/b/)
     expect(draft).not.toMatch(/\?/)
-    expect(draft.endsWith('\n\n')).toBe(true)
+    // …and ends with a rule, so the cursor lands below what the browser
+    // brought rather than somewhere inside it.
+    expect(draft.endsWith('\n\n---\n\n')).toBe(true)
   })
 
   it('quotes a multi-line passage as a whole block', () => {
@@ -243,7 +245,7 @@ describe('drainInbox', () => {
 
   it('carries a page with no selection and no title', () => {
     const draft = askDraft([{ ...ask, title: '', payload: {} } as never])
-    expect(draft).toBe('About this page: https://ex.test/b\n\n')
+    expect(draft).toBe('About this page: https://ex.test/b\n\n---\n\n')
   })
 
   it('combines a batch instead of overwriting one draft with the next', async () => {
@@ -441,5 +443,35 @@ describe('drainInbox', () => {
     }
     const out = await drainInbox(server([clip]).deps)
     expect(out.acked).toBe(1)
+  })
+})
+
+describe('askDraft with an answer already in hand', () => {
+  const item = (payload: unknown) =>
+    ({
+      id: 'i1',
+      kind: 'ask' as const,
+      createdAt: 0,
+      url: 'https://a.test/p',
+      title: 'A page',
+      payload,
+    })
+
+  it('carries the passage, the prompt that was run and what it said', () => {
+    const draft = askDraft([
+      item({ selection: 'the passage', prompt: 'Explain', answer: 'because of X' }),
+    ])
+    expect(draft).toContain('About this page: A page — https://a.test/p')
+    expect(draft).toContain('> the passage')
+    expect(draft).toContain('**Explain** already answered:')
+    expect(draft).toContain('because of X')
+  })
+
+  it('is unchanged for a plain ask, and for an extension too old to send one', () => {
+    const plain = askDraft([item({ selection: 'the passage' })])
+    expect(plain).not.toContain('already answered')
+    expect(plain).toContain('> the passage')
+    // An answer with no prompt name still reads.
+    expect(askDraft([item({ answer: 'just this' })])).toContain('Already answered:')
   })
 })
