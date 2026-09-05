@@ -7,6 +7,7 @@ import {
   LOCALMD_CONNECT_RELAY_URL,
   LOCALMD_CONNECT_EXTENSION,
   extensionWire,
+  isRelayReadyFrame,
 } from '@/lib/connectRelay'
 import { McpHttpClient } from '@/lib/mcp'
 
@@ -100,6 +101,14 @@ function fakeRelay(
       else dataset[key] = id
     },
     listenerCount: () => listeners.size,
+    /** The extension speaking first — a notification, or (with an id) a request
+     *  it expects this side to answer. */
+    push: (msg: unknown) => dispatch({ webcli: 'mcp', dir: 'to-page', ext, msg }),
+    /** Frames this side sent that are replies rather than calls. */
+    replies: () =>
+      sent
+        .map((f) => f.msg as unknown as { id?: unknown; result?: unknown; error?: unknown })
+        .filter((m) => m && ('result' in m || 'error' in m)),
     /** The extension's service worker being recycled under the page: the relay
      *  content script forwards its port's onDisconnect. */
     drop: () => dispatch({ webcli: 'mcp', dir: 'to-page', ext, closed: true }),
@@ -413,5 +422,130 @@ describe('images over the relay', () => {
     client.imageSink = async (img) => `.tmp/${img.mimeType.split('/')[1]}.bin`
     const out = await client.callTool('generic__screenshot', {})
     expect(out).toContain('saved to .tmp/webp.bin')
+  })
+})
+
+/**
+ * The extension asking US — the direction of MCP this integration never used
+ * until localmd Connect's in-page quick actions needed it. The extension holds
+ * no API key and runs no model; Translate/Explain on a web page are answered
+ * by whichever model is configured here (lib/connectSampling).
+ */
+describe('server→client requests', () => {
+  const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0))
+
+  it('answers with what the handler returned, addressed to the same install', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    client.onRequest = async (method, params) => ({ echo: method, got: params })
+    // attach() is what starts listening; nothing has called it yet.
+    void client.callTool('generic__fetch_url', {}).catch(() => {})
+    relay.push({ jsonrpc: '2.0', id: 7, method: 'sampling/createMessage', params: { a: 1 } })
+    await settle()
+    expect(relay.replies()).toEqual([
+      { jsonrpc: '2.0', id: 7, result: { echo: 'sampling/createMessage', got: { a: 1 } } },
+    ])
+    expect(relay.targets()).toEqual([EXT])
+    relay.drop()
+  })
+
+  it('refuses a method it has no handler for instead of leaving the caller waiting', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    void client.callTool('generic__fetch_url', {}).catch(() => {})
+    relay.push({ jsonrpc: '2.0', id: 8, method: 'roots/list' })
+    await settle()
+    const [reply] = relay.replies() as Array<{ error?: { code: number; message: string } }>
+    expect(reply.error?.code).toBe(-32601)
+    expect(reply.error?.message).toContain('roots/list')
+    relay.drop()
+  })
+
+  it('turns a failing handler into an error reply, not an unhandled rejection', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    client.onRequest = async () => {
+      throw new Error('No model is configured in localmd')
+    }
+    void client.callTool('generic__fetch_url', {}).catch(() => {})
+    relay.push({ jsonrpc: '2.0', id: 9, method: 'sampling/createMessage' })
+    await settle()
+    const [reply] = relay.replies() as Array<{ error?: { code: number; message: string } }>
+    expect(reply.error).toEqual({ code: -32603, message: 'No model is configured in localmd' })
+    relay.drop()
+  })
+
+  /**
+   * The one that matters. Both directions number their requests from 1, so an
+   * INCOMING request whose id happens to match a call we are waiting on used to
+   * be looked up in our pending map — resolving somebody's tool call with
+   * somebody else's question. Reading the method first makes that unreachable.
+   */
+  it('does not settle a call of ours that happens to share the id', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    client.onRequest = async () => ({ content: { type: 'text', text: 'the answer' } })
+    let settled: 'no' | 'resolved' | 'rejected' = 'no'
+    const call = client.callTool('generic__fetch_url', {}).then(
+      () => (settled = 'resolved'),
+      () => (settled = 'rejected'),
+    )
+    // Our call went out as id 1; the extension's own first request is id 1 too.
+    expect(relay.sent[0].msg?.id).toBe(1)
+    relay.push({ jsonrpc: '2.0', id: 1, method: 'sampling/createMessage' })
+    await settle()
+    expect(settled).toBe('no')
+    expect(relay.replies()).toEqual([
+      { jsonrpc: '2.0', id: 1, result: { content: { type: 'text', text: 'the answer' } } },
+    ])
+    relay.drop()
+    await call
+    expect(settled).toBe('rejected') // by the disconnect, not by the question
+  })
+
+  it('still treats a notification as a notification — no id, no reply', async () => {
+    const relay = fakeRelay({ silent: true })
+    const client = new McpRelayClient()
+    const seen: string[] = []
+    client.onNotification = (m) => seen.push(m)
+    client.onRequest = async () => ({ never: true })
+    void client.callTool('generic__fetch_url', {}).catch(() => {})
+    relay.push({ jsonrpc: '2.0', method: 'notifications/localmd/inbox', params: { count: 2 } })
+    await settle()
+    expect(seen).toEqual(['notifications/localmd/inbox'])
+    expect(relay.replies()).toEqual([])
+    relay.drop()
+  })
+
+  it('tells the extension it can be asked, in the handshake', async () => {
+    const relay = fakeRelay()
+    await new McpRelayClient().connect()
+    const init = relay.sent.find((f) => f.msg?.method === 'initialize')!
+    expect((init.msg!.params as { capabilities: unknown }).capabilities).toEqual({ sampling: {} })
+  })
+})
+
+/**
+ * The frame that says a dead connection can be rebuilt. An extension reload
+ * takes the port with it and the relay is re-injected into open tabs — this is
+ * how the page hears about it without anyone clicking the tab (stores/mcp's
+ * heal; the extension nudges with the same frame when it needs an answer).
+ */
+describe('isRelayReadyFrame', () => {
+  it('accepts the relay saying it is attached', () => {
+    expect(isRelayReadyFrame({ webcli: 'mcp', dir: 'to-page', ext: EXT, ready: true })).toBe(true)
+  })
+
+  it('is not fooled by the other frames on the same wire', () => {
+    // A reply, a notification, our own outgoing frame, the drop notice, junk.
+    expect(isRelayReadyFrame({ webcli: 'mcp', dir: 'to-page', msg: { id: 1, result: {} } })).toBe(
+      false,
+    )
+    expect(isRelayReadyFrame({ webcli: 'mcp', dir: 'to-ext', ready: true })).toBe(false)
+    expect(isRelayReadyFrame({ webcli: 'mcp', dir: 'to-page', closed: true })).toBe(false)
+    expect(isRelayReadyFrame({ webcli: 'other', dir: 'to-page', ready: true })).toBe(false)
+    expect(isRelayReadyFrame({ webcli: 'mcp', dir: 'to-page', ready: 'yes' })).toBe(false)
+    expect(isRelayReadyFrame(null)).toBe(false)
+    expect(isRelayReadyFrame('ready')).toBe(false)
   })
 })

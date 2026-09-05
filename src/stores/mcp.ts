@@ -48,10 +48,12 @@ import {
   isLocalmdConnectRelayUrl,
   relayExtensionId,
   extensionWire,
+  isRelayReadyFrame,
 } from '@/lib/connectRelay'
 import { INBOX_NOTIFICATION, drainInbox } from '@/lib/connectInbox'
 import { reconcileSavedPages } from '@/lib/connectSaved'
 import { OPEN_KB_NOTIFICATION, openKbByName, syncKbFolders } from '@/lib/connectKb'
+import { SAMPLING_METHOD, handleSampling } from '@/lib/connectSampling'
 import { importTempFile } from '@/lib/capture'
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
@@ -145,6 +147,13 @@ function clientFor(config: McpServerConfig, extension: McpWire | null): McpClien
       void drainInbox({ serverId: config.id, call: (t, a) => call(config.id, t, a) }).catch(() => {
         /* a failed drain leaves the items queued for the next poke */
       })
+    }
+    // The extension asking US, which only this transport can do. It holds no
+    // API key and runs no model: its in-page quick actions are answered here,
+    // on the profile the user configured (lib/connectSampling).
+    client.onRequest = async (method, params) => {
+      if (method !== SAMPLING_METHOD) throw new Error(`${method} is not supported`)
+      return handleSampling(() => useSettingsStore().primary, params)
     }
     return client
   }
@@ -665,10 +674,46 @@ export const useMcpStore = defineStore('mcp', () => {
     if (next) for (const s of connectRows.value) void reconnect(s.config.id)
   }
 
+  /**
+   * The extension announcing that its relay is attached — the frame its content
+   * script posts on every attach, including the re-injection the service worker
+   * performs into already-open tabs after an extension reload or update.
+   *
+   * Why this is needed on top of `recheckRelay`: a reload takes the port with
+   * it, `onLost` puts the row in error, and the TRANSPORT then heals itself —
+   * measured, the relay answers a ping again within a moment. Nothing on this
+   * side noticed, because a client is what starts an MCP conversation and the
+   * only thing that re-probed a failed row was `retryFailed()` on focus. A
+   * localmd in a BACKGROUND tab therefore stayed dead until somebody clicked
+   * it, and the extension id has not changed, so `recheckRelay` returns early.
+   *
+   * That was not a cosmetic wait. The extension's in-page quick actions ask
+   * THIS side to answer them, and after every reload they failed with "localmd
+   * opened but did not connect in time" against a tab that was open, healthy
+   * and one click away from working.
+   *
+   * Only `error` rows are healed: `connecting` is somebody else's handshake in
+   * flight, and re-entering it would build a second client for the same row.
+   */
+  let healing = false
+  function onRelayReady(e: MessageEvent): void {
+    if (e.source !== window || !isRelayReadyFrame(e.data)) return
+    recheckRelay() // a different build may have taken the marker over
+    if (healing) return
+    const dead = connectRows.value.filter((s) => s.status === 'error')
+    if (!dead.length) return
+    healing = true
+    void Promise.all(dead.map((s) => reconnect(s.config.id))).finally(() => {
+      healing = false
+    })
+  }
+
   if (typeof window !== 'undefined') {
     // Coming back to the tab is the moment setup is most likely to have finished.
     window.addEventListener('focus', recheckRelay)
     document.addEventListener('visibilitychange', recheckRelay)
+    // …and this is the moment it finished without anyone coming back.
+    window.addEventListener('message', onRelayReady)
     let timer: ReturnType<typeof setInterval> | null = null
     watch(
       () => connectRows.value.length > 0 && !connectReady.value,
