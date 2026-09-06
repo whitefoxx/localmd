@@ -49,7 +49,6 @@ import { CATALOG, catalogEntryById } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
 import {
   confirmConnectCall,
-  noteConnectResult,
   parseWriteBlockedControl,
   confirmWriteResult,
 } from '@/agent/connectGuard'
@@ -1808,7 +1807,6 @@ function toExternalSpec(
             serverId: t.serverId,
             tool: t.def.name,
             args,
-            callTool: (tool, a) => mcp.callTool(t.serverId, tool, a, signal),
           })
           if (declined) return declined
         }
@@ -1837,13 +1835,10 @@ function toExternalSpec(
             out = await mcp.callTool(t.serverId, t.def.name, { ...args, allow_write: true }, signal)
           }
         }
-        // find_adapters results feed the (legacy) run_adapter gate's access
-        // cache — fed the UNclipped result, so a row past the budget still
-        // counts. A call that left a browser tab behind is recorded for the
-        // turn's end reap (agent/connectJanitor.ts): the extension hands us the
-        // tab and considers its job done, so closing it is this side's contract.
+        // A call that left a browser tab behind is recorded for the turn's end
+        // reap (agent/connectJanitor.ts): the extension hands us the tab and
+        // considers its job done, so closing it is this side's contract.
         if (isConnectServer(mcp, t.serverId)) {
-          noteConnectResult(t.serverId, t.def.name, out)
           noteOpenedTab(sessionId, t.serverId, out)
         }
         // A tool that actually ran earns a recall slot, so the next session in

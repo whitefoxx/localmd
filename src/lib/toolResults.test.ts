@@ -17,7 +17,7 @@ import {
 } from './toolResults'
 
 const SESSION = '19c1225e-0586-45cb-bf79-77f84645873f'
-const TOOL = 'mcp__localmd-connect__generic__run_adapter'
+const TOOL = 'mcp__localmd-connect__generic__eval_js'
 
 beforeEach(() => {
   fs.writeFile.mockReset().mockResolvedValue(undefined)
@@ -30,7 +30,7 @@ describe('toolResultPath', () => {
     const path = toolResultPath(SESSION, TOOL, 'body')
     expect(path.startsWith(`${TOOL_RESULTS_DIR}/`)).toBe(true)
     expect(path).toContain(SESSION)
-    expect(path).toContain('run-adapter')
+    expect(path).toContain('eval-js')
     expect(path.endsWith('.txt')).toBe(true)
   })
 
