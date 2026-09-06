@@ -30,15 +30,15 @@ export const EXTENSION_FETCH_TOOL = 'generic__fetch_url'
 
 /**
  * localmd Connect tools that stay ACTIVE (never deferred) even though its
- * tool count trips the defer threshold: the workhorse trio. `find_adapters` +
- * `run_adapter` are the whole marketplace flow — the catalog of ~300 site
- * adapters never changes the tool list precisely because loading and running
- * are one call — and `fetch_url` is the generic HTTP transport everything else
- * leans on. Everything beyond the trio activates via enable_tools as usual.
+ * tool count trips the defer threshold: the workhorse set. `eval_js` is the
+ * execution primitive the `reach-a-site` skill leans on — the same-origin
+ * request or DOM read that replaces the retired marketplace flow — and
+ * `fetch_url` is the generic HTTP transport everything else leans on. Both are
+ * reached on almost every browser turn, so neither should cost an enable_tools
+ * round-trip first. Everything beyond this set activates via enable_tools as usual.
  */
 export const CONNECT_ACTIVE_TOOLS: ReadonlySet<string> = new Set([
-  'generic__find_adapters',
-  'generic__run_adapter',
+  'generic__eval_js',
   // Saving a page is this app's whole point, so the clipper is not something
   // the model should have to discover and activate first.
   'generic__clip_page',

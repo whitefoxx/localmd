@@ -212,8 +212,8 @@ export const useMcpStore = defineStore('mcp', () => {
     return servers.value.find((s) => s.config.id === serverId)?.config.url ?? ''
   }
 
-  /** localmd Connect's workhorse trio (find_adapters / run_adapter / fetch_url)
-   *  is pinned active — never deferred, whatever the server's tool count. Keyed
+  /** localmd Connect's workhorse set (eval_js / clip_page / fetch_url) is
+   *  pinned active — never deferred, whatever the server's tool count. Keyed
    *  on the server's url, not the tool name alone: another server exposing the
    *  same tool names stays under the ordinary defer policy. */
   function pinnedActive(t: ExternalTool): boolean {

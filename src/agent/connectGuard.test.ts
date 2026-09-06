@@ -1,8 +1,10 @@
 /**
- * The confirm contract for localmd Connect's write surface: a write-access
- * adapter and a code-injecting site script must not reach the extension
- * without the user's approval recorded — and an adapter whose access cannot
- * be determined is treated as write (fail closed).
+ * The confirm contract for localmd Connect's write surface: a write-flagged
+ * eval_js snippet, a write-access run_adapter (legacy, until the tool retires),
+ * and a code-injecting site script must not reach the extension without the
+ * user's approval recorded. A read (an eval_js with no allow_write, a read
+ * adapter, or any read-side tool) passes untouched. An adapter whose access
+ * cannot be determined is treated as write (fail closed).
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
@@ -13,6 +15,8 @@ import {
   noteConnectResult,
   confirmConnectCall,
   clearAdapterAccessCache,
+  parseWriteBlockedControl,
+  confirmClickResult,
   type ConnectCallContext,
 } from './connectGuard'
 
@@ -40,7 +44,7 @@ function ctx(over: Partial<ConnectCallContext> = {}): ConnectCallContext {
   return {
     sessionId: 's1',
     serverId: 'srv',
-    tool: 'generic__run_adapter',
+    tool: 'generic__eval_js',
     args: {},
     callTool: async () => {
       throw new Error('unexpected lookup')
@@ -63,18 +67,17 @@ describe('parseAdapterRows', () => {
   })
 
   it('finds rows nested under any key', () => {
-    const out = JSON.stringify({ query: 'x', adapters: JSON.parse(ROWS) })
-    expect(parseAdapterRows(out)).toHaveLength(2)
+    expect(parseAdapterRows(JSON.stringify({ adapters: [{ site: 'x', name: 'y', access: 'read' }] }))).toEqual([
+      { site: 'x', name: 'y', access: 'read' },
+    ])
   })
 
   it('yields nothing for prose or an error line', () => {
-    expect(parseAdapterRows('Error: no adapters matched')).toEqual([])
-    expect(parseAdapterRows('')).toEqual([])
+    expect(parseAdapterRows('no adapters found')).toEqual([])
   })
 
   it('drops rows whose access is not read/write', () => {
-    const out = JSON.stringify([{ site: 'a', name: 'b', access: 'admin' }])
-    expect(parseAdapterRows(out)).toEqual([])
+    expect(parseAdapterRows(JSON.stringify([{ site: 'x', name: 'y', access: 'admin' }]))).toEqual([])
   })
 })
 
@@ -102,11 +105,84 @@ describe('siteScriptGate', () => {
   })
 })
 
-describe('confirmConnectCall — run_adapter', () => {
+describe('confirmConnectCall — eval_js write', () => {
+  it('lets a read eval_js (no allow_write) through without a card', async () => {
+    const result = await confirmConnectCall(ctx({ args: { code: 'return document.title' } }))
+    expect(result).toBeNull()
+    expect(useSetupStore().pending).toHaveLength(0)
+  })
+
+  it('confirms a write-flagged eval_js, and proceeds on approval', async () => {
+    const run = confirmConnectCall(
+      ctx({ args: { code: "fetch('/api/post', {method:'POST'})", allow_write: true } }),
+    )
+    await onCard('confirmed')
+    expect(await run).toBeNull()
+  })
+
+  it('shows the exact code on the write card', async () => {
+    const run = confirmConnectCall(ctx({ args: { code: 'doThePost()', allow_write: true } }))
+    const setup = useSetupStore()
+    for (let i = 0; i < 100 && !setup.pendingFor('s1'); i++) {
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    const card = setup.pendingFor('s1')
+    expect(card?.kind).toBe('confirm')
+    expect(card?.detail).toContain('doThePost()')
+    setup.settle(card!.id, 'confirmed')
+    expect(await run).toBeNull()
+  })
+
+  it('reports a decline instead of running, without an Error prefix', async () => {
+    const run = confirmConnectCall(ctx({ args: { code: 'doThePost()', allow_write: true } }))
+    await onCard('skipped')
+    const out = await run
+    expect(out).toMatch(/declined/)
+    expect(out).toMatch(/Do not retry/)
+    expect(out?.startsWith('Error')).toBe(false)
+  })
+})
+
+describe('parseWriteBlockedControl', () => {
+  it('reads the control label off a write_blocked click result', () => {
+    expect(parseWriteBlockedControl(JSON.stringify({ write_blocked: true, control: 'Post' }))).toBe('Post')
+  })
+
+  it('returns null for an ordinary click result or non-JSON', () => {
+    expect(parseWriteBlockedControl(JSON.stringify({ found: true, tag: 'button' }))).toBeNull()
+    expect(parseWriteBlockedControl('clicked')).toBeNull()
+  })
+
+  it('falls back to a generic label when the control text is missing', () => {
+    expect(parseWriteBlockedControl(JSON.stringify({ write_blocked: true }))).toBe('the control')
+  })
+})
+
+describe('confirmClickResult — seam-driven card with the extension label', () => {
+  it('shows the resolved label (not the opaque ref) and proceeds on approval', async () => {
+    const run = confirmClickResult('s1', 'Post')
+    const setup = useSetupStore()
+    for (let i = 0; i < 100 && !setup.pendingFor('s1'); i++) {
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    const card = setup.pendingFor('s1')
+    expect(card?.detail).toContain('Post')
+    setup.settle(card!.id, 'confirmed')
+    expect(await run).toBeNull()
+  })
+
+  it('reports a decline instead of clicking', async () => {
+    const run = confirmClickResult('s1', 'Delete')
+    await onCard('skipped')
+    expect(await run).toMatch(/declined/)
+  })
+})
+
+describe('confirmConnectCall — run_adapter (legacy)', () => {
   it('lets a known read adapter through without a card', async () => {
     noteConnectResult('srv', 'generic__find_adapters', ROWS)
     const result = await confirmConnectCall(
-      ctx({ args: { site: 'hackernews', name: 'top' } }),
+      ctx({ tool: 'generic__run_adapter', args: { site: 'hackernews', name: 'top' } }),
     )
     expect(result).toBeNull()
     expect(useSetupStore().pending).toHaveLength(0)
@@ -114,14 +190,16 @@ describe('confirmConnectCall — run_adapter', () => {
 
   it('confirms a known write adapter, and proceeds on approval', async () => {
     noteConnectResult('srv', 'generic__find_adapters', ROWS)
-    const run = confirmConnectCall(ctx({ args: { site: 'twitter', name: 'post', args: { text: 'hi' } } }))
+    const run = confirmConnectCall(
+      ctx({ tool: 'generic__run_adapter', args: { site: 'twitter', name: 'post', args: { text: 'hi' } } }),
+    )
     await onCard('confirmed')
     expect(await run).toBeNull()
   })
 
   it('reports a decline instead of running, without an Error prefix', async () => {
     noteConnectResult('srv', 'generic__find_adapters', ROWS)
-    const run = confirmConnectCall(ctx({ args: { site: 'twitter', name: 'post' } }))
+    const run = confirmConnectCall(ctx({ tool: 'generic__run_adapter', args: { site: 'twitter', name: 'post' } }))
     await onCard('skipped')
     const out = await run
     expect(out).toMatch(/declined/)
@@ -133,6 +211,7 @@ describe('confirmConnectCall — run_adapter', () => {
     const queries: unknown[] = []
     const result = await confirmConnectCall(
       ctx({
+        tool: 'generic__run_adapter',
         args: { site: 'hackernews', name: 'top' },
         callTool: async (tool, args) => {
           queries.push([tool, args])
@@ -147,6 +226,7 @@ describe('confirmConnectCall — run_adapter', () => {
   it('fails closed: unknown access confirms as a write', async () => {
     const run = confirmConnectCall(
       ctx({
+        tool: 'generic__run_adapter',
         args: { site: 'mystery', name: 'run' },
         callTool: async () => 'no such site',
       }),
@@ -159,6 +239,7 @@ describe('confirmConnectCall — run_adapter', () => {
     noteConnectResult('other-server', 'generic__find_adapters', ROWS)
     const run = confirmConnectCall(
       ctx({
+        tool: 'generic__run_adapter',
         args: { site: 'hackernews', name: 'top' },
         callTool: async () => 'not json',
       }),
@@ -214,6 +295,9 @@ describe('confirmConnectCall — create_site_script', () => {
       'generic__preview_site_script',
       'generic__find_in_dom',
       'generic__fetch_url',
+      // click is gated result-side by the seam, not here — confirmConnectCall
+      // lets it (and even a click carrying allow_write) straight through.
+      'generic__click',
     ]) {
       expect(await confirmConnectCall(ctx({ tool }))).toBeNull()
     }

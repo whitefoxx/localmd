@@ -3,12 +3,26 @@
  *
  * The extension does not gate writes: it trusts this app's UI, per "the agent
  * proposes; the user disposes". That makes this gate the front line — before a
- * call reaches the extension, two shapes of call must have the user's explicit
- * approval recorded:
+ * call reaches the extension, three shapes of call must have the user's explicit
+ * approval:
  *
- *   1. `run_adapter` on an adapter whose marketplace row says `access: write`
- *      (posting, messaging, deleting on a real site);
- *   2. `create_site_script` carrying `css` and/or `js` — persistent code
+ *   1. `eval_js` carrying `allow_write: true` — a snippet the agent flagged as
+ *      writing on a real site. The extension's own guard refuses such a write
+ *      without the flag; this gate turns the flag into an explicit confirmation,
+ *      showing the exact code.
+ *
+ *   A `click` on a write control (a Post/Send/Submit/Delete button) is gated too,
+ *   but result-side rather than here: the dispatch seam strips allow_write on the
+ *   first click so the extension's guard always evaluates, then confirms with the
+ *   control label the extension resolved (see `parseWriteBlockedControl` /
+ *   `confirmClickResult`). That keeps the label meaningful and stops the agent
+ *   self-approving a write click.
+ *   2. `run_adapter` on an adapter whose marketplace row says `access: write` —
+ *      the LEGACY marketplace path, kept gated only while the extension still
+ *      exposes `run_adapter` (its retirement is web-agent P5-B). The prompt no
+ *      longer steers the agent here, but the tool stays reachable via the
+ *      deferred catalog, so the gate must stay until the tool itself is gone.
+ *   3. `create_site_script` carrying `css` and/or `js` — persistent code
  *      injected into the user's pages on every visit. Hide-only rules
  *      (`hide_selectors`) are persistent too, so they confirm as well, just
  *      with lighter copy and no code block.
@@ -25,6 +39,7 @@
 import { useSetupStore } from '@/stores/setup'
 import { t } from '@/i18n'
 
+const EVAL_JS = 'generic__eval_js'
 const FIND_ADAPTERS = 'generic__find_adapters'
 const RUN_ADAPTER = 'generic__run_adapter'
 const CREATE_SITE_SCRIPT = 'generic__create_site_script'
@@ -150,13 +165,14 @@ export interface ConnectCallContext {
 }
 
 /**
- * The gate itself. Returns null when the call may proceed (read tools, read
- * adapters, or the user confirmed) and the model-facing refusal when the user
- * declined. A decline is a choice, not a failure, so it does not read as an
- * Error — but it does forbid a retry.
+ * The gate itself. Returns null when the call may proceed (read tools, a read
+ * eval_js, a read adapter, or the user confirmed) and the model-facing refusal
+ * when the user declined. A decline is a choice, not a failure, so it does not
+ * read as an Error — but it does forbid a retry.
  */
 export async function confirmConnectCall(ctx: ConnectCallContext): Promise<string | null> {
   if (ctx.tool === CREATE_SITE_SCRIPT) return confirmSiteScript(ctx)
+  if (ctx.tool === EVAL_JS) return confirmEvalWrite(ctx)
   if (ctx.tool === RUN_ADAPTER) return confirmRunAdapter(ctx)
   return null
 }
@@ -174,6 +190,63 @@ async function confirmSiteScript(ctx: ConnectCallContext): Promise<string | null
   })
   if (outcome === 'confirmed') return null
   return 'The user declined to install this site script. Do not retry it — say what stays undone, and ask what they would prefer.'
+}
+
+/**
+ * A read eval_js (no `allow_write`) passes untouched — the perception half of
+ * reaching a site must stay friction-free. A snippet flagged `allow_write:true`
+ * is a real write on the user's logged-in session: show the exact code and make
+ * the user approve it before it runs.
+ */
+async function confirmEvalWrite(ctx: ConnectCallContext): Promise<string | null> {
+  if (ctx.args.allow_write !== true) return null
+  const code = typeof ctx.args.code === 'string' ? ctx.args.code : String(ctx.args.code ?? '')
+  const outcome = await useSetupStore().ask({
+    id: crypto.randomUUID(),
+    sessionId: ctx.sessionId,
+    kind: 'confirm',
+    label: t('chat.connectEvalWrite'),
+    help: t('chat.connectEvalWriteHelp'),
+    detail: code,
+  })
+  if (outcome === 'confirmed') return null
+  return 'The user declined to run this write. Do not retry it — continue with read-only work, or ask what they would prefer.'
+}
+
+/**
+ * A `click` the extension refused as a write control comes back `write_blocked`
+ * with the control's human label (which only the in-page pass could read).
+ * Returns that label, or null when the result is an ordinary click. The seam
+ * uses it to confirm with a MEANINGFUL card, then re-runs the click with
+ * allow_write — the opaque locator the agent passed (a ref like "rd") never
+ * reaches the user.
+ */
+export function parseWriteBlockedControl(out: string): string | null {
+  try {
+    const o = JSON.parse(out)
+    if (o && typeof o === 'object' && (o as Record<string, unknown>).write_blocked === true) {
+      const control = (o as Record<string, unknown>).control
+      return typeof control === 'string' && control.trim() ? control.trim() : 'the control'
+    }
+  } catch {
+    /* not JSON — an ordinary string result */
+  }
+  return null
+}
+
+/** Confirm a write click the extension flagged, showing the label IT resolved.
+ *  null = proceed (re-run with allow_write); a message = the user declined. */
+export async function confirmClickResult(sessionId: string, control: string): Promise<string | null> {
+  const outcome = await useSetupStore().ask({
+    id: crypto.randomUUID(),
+    sessionId,
+    kind: 'confirm',
+    label: t('chat.connectClickWrite'),
+    help: t('chat.connectClickWriteHelp'),
+    detail: `click: ${control}`,
+  })
+  if (outcome === 'confirmed') return null
+  return 'The user declined this click. Do not retry it — continue with read-only work, or ask what they would prefer.'
 }
 
 async function confirmRunAdapter(ctx: ConnectCallContext): Promise<string | null> {

@@ -86,6 +86,12 @@ export default {
     setupWorking: 'Working…',
     setupSkip: 'Skip',
     // connectGuard — localmd Connect's write surface confirming before it runs
+    connectEvalWrite: 'Run this write on the real site',
+    connectEvalWriteHelp:
+      'This snippet writes on the site as you — it can post, message or change things. It runs once in your logged-in session, only if you confirm. The exact code:',
+    connectClickWrite: 'Click this write control on the real site',
+    connectClickWriteHelp:
+      'This clicks a Post/Send/Submit/Delete-type control on the site as you — it can publish, send or change things, and cannot be undone. It happens once, only if you confirm.',
     connectRunAdapter: 'Run “{site}/{name}” on the real site',
     connectRunAdapterHelp:
       'This marketplace adapter has write access — it can post, message or change things on the site, as you. It runs once, only if you confirm.',
@@ -217,6 +223,12 @@ export default {
     setupWorking: '处理中…',
     setupSkip: '跳过',
     // connectGuard —— localmd Connect 的写操作在执行前先确认
+    connectEvalWrite: '在真实网站上执行这次写操作',
+    connectEvalWriteHelp:
+      '这段代码会以你的身份在该网站写入 —— 它能发帖、发消息或改动内容。只有你确认后才会在你的登录会话里运行，且只运行这一次。代码原文如下：',
+    connectClickWrite: '在真实网站上点击这个写操作控件',
+    connectClickWriteHelp:
+      '这会以你的身份点击该网站上一个「发布/发送/提交/删除」类控件 —— 它能发布、发送或改动内容，且不可撤销。只有你确认后才会执行，且只执行这一次。',
     connectRunAdapter: '在真实网站上运行「{site}/{name}」',
     connectRunAdapterHelp:
       '这个市场适配器有写权限 —— 它能以你的身份在该网站发帖、发消息或改动内容。只有你确认后才会运行，且只运行这一次。',

@@ -47,7 +47,12 @@ import { WRITABLE, WRITABLE_BY_KEY, describeWritable } from '@/lib/appSettings'
 import { getLocale } from '@/i18n'
 import { CATALOG, catalogEntryById } from '@/lib/toolCatalog'
 import { isLocalmdConnectRelayUrl } from '@/lib/connectRelay'
-import { confirmConnectCall, noteConnectResult } from '@/agent/connectGuard'
+import {
+  confirmConnectCall,
+  noteConnectResult,
+  parseWriteBlockedControl,
+  confirmClickResult,
+} from '@/agent/connectGuard'
 import { noteOpenedTab } from '@/agent/connectJanitor'
 import { formatLintReport } from '@/lib/lint'
 import { parseKbQuery, runQuery, formatQueryResult } from '@/lib/kbQuery'
@@ -1802,12 +1807,34 @@ function toExternalSpec(
           })
           if (declined) return declined
         }
-        const out = await mcp.callTool(t.serverId, t.def.name, args, signal)
-        // find_adapters results feed the write-adapter gate's access cache —
-        // fed the UNclipped result, so a row past the budget still counts.
-        // A call that left a browser tab behind is recorded for the turn's end
-        // reap (agent/connectJanitor.ts): the extension hands us the tab and
-        // considers its job done, so closing it is this side's contract.
+        // A click on a connect server: DROP any agent-supplied allow_write on
+        // the first call, forcing the extension's write-guard to evaluate. A
+        // write control then comes back write_blocked with the control's human
+        // label — the extension is the only layer that can name the element, so
+        // the card shows "Post", never the opaque ref the agent passed. On
+        // approval we re-run with allow_write (a direct callTool, so it does not
+        // re-enter this gate). Stripping allow_write first is what makes the
+        // confirmation unskippable: the agent cannot self-approve a write click.
+        const isConnectClick = isConnectServer(mcp, t.serverId) && t.def.name === 'generic__click'
+        let out = await mcp.callTool(
+          t.serverId,
+          t.def.name,
+          isConnectClick ? { ...args, allow_write: false } : args,
+          signal,
+        )
+        if (isConnectClick) {
+          const control = parseWriteBlockedControl(out)
+          if (control) {
+            const declined = await confirmClickResult(sessionId, control)
+            if (declined) return declined
+            out = await mcp.callTool(t.serverId, t.def.name, { ...args, allow_write: true }, signal)
+          }
+        }
+        // find_adapters results feed the (legacy) run_adapter gate's access
+        // cache — fed the UNclipped result, so a row past the budget still
+        // counts. A call that left a browser tab behind is recorded for the
+        // turn's end reap (agent/connectJanitor.ts): the extension hands us the
+        // tab and considers its job done, so closing it is this side's contract.
         if (isConnectServer(mcp, t.serverId)) {
           noteConnectResult(t.serverId, t.def.name, out)
           noteOpenedTab(sessionId, t.serverId, out)
