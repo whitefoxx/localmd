@@ -11,12 +11,13 @@
  *      without the flag; this gate turns the flag into an explicit confirmation,
  *      showing the exact code.
  *
- *   A `click` on a write control (a Post/Send/Submit/Delete button) is gated too,
- *   but result-side rather than here: the dispatch seam strips allow_write on the
- *   first click so the extension's guard always evaluates, then confirms with the
- *   control label the extension resolved (see `parseWriteBlockedControl` /
- *   `confirmClickResult`). That keeps the label meaningful and stops the agent
- *   self-approving a write click.
+ *   A write done through an INTERACTION whose intent only the extension can see —
+ *   a `click` on a write control (a Post/Send/Submit/Delete button), a `press_key`
+ *   Cmd/Ctrl+Enter (the post/send shortcut) — is gated too, but result-side
+ *   rather than here: the dispatch seam strips allow_write on the first call so
+ *   the extension's guard always evaluates, then confirms with the label the
+ *   extension resolved (see `parseWriteBlockedControl` / `confirmWriteResult`).
+ *   That keeps the label meaningful and stops the agent self-approving a write.
  *   2. `run_adapter` on an adapter whose marketplace row says `access: write` —
  *      the LEGACY marketplace path, kept gated only while the extension still
  *      exposes `run_adapter` (its retirement is web-agent P5-B). The prompt no
@@ -214,12 +215,12 @@ async function confirmEvalWrite(ctx: ConnectCallContext): Promise<string | null>
 }
 
 /**
- * A `click` the extension refused as a write control comes back `write_blocked`
- * with the control's human label (which only the in-page pass could read).
- * Returns that label, or null when the result is an ordinary click. The seam
- * uses it to confirm with a MEANINGFUL card, then re-runs the click with
- * allow_write — the opaque locator the agent passed (a ref like "rd") never
- * reaches the user.
+ * A write-guarded interaction (a `click` on a write control, a `press_key`
+ * Cmd/Ctrl+Enter) the extension refused comes back `write_blocked` with a human
+ * label only the extension could name. Returns that label, or null for an
+ * ordinary result. The seam uses it to confirm with a MEANINGFUL card, then
+ * re-runs with allow_write — the opaque locator the agent passed never reaches
+ * the user.
  */
 export function parseWriteBlockedControl(out: string): string | null {
   try {
@@ -234,19 +235,20 @@ export function parseWriteBlockedControl(out: string): string | null {
   return null
 }
 
-/** Confirm a write click the extension flagged, showing the label IT resolved.
- *  null = proceed (re-run with allow_write); a message = the user declined. */
-export async function confirmClickResult(sessionId: string, control: string): Promise<string | null> {
+/** Confirm a write the extension flagged, showing the label IT resolved (the
+ *  "Post" control, "Cmd+Enter (submit)"). null = proceed (re-run with
+ *  allow_write); a message = the user declined. */
+export async function confirmWriteResult(sessionId: string, control: string): Promise<string | null> {
   const outcome = await useSetupStore().ask({
     id: crypto.randomUUID(),
     sessionId,
     kind: 'confirm',
-    label: t('chat.connectClickWrite'),
-    help: t('chat.connectClickWriteHelp'),
-    detail: `click: ${control}`,
+    label: t('chat.connectWriteAction'),
+    help: t('chat.connectWriteActionHelp'),
+    detail: control,
   })
   if (outcome === 'confirmed') return null
-  return 'The user declined this click. Do not retry it — continue with read-only work, or ask what they would prefer.'
+  return 'The user declined this action. Do not retry it — continue with read-only work, or ask what they would prefer.'
 }
 
 async function confirmRunAdapter(ctx: ConnectCallContext): Promise<string | null> {

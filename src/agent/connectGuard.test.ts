@@ -16,7 +16,7 @@ import {
   confirmConnectCall,
   clearAdapterAccessCache,
   parseWriteBlockedControl,
-  confirmClickResult,
+  confirmWriteResult,
   type ConnectCallContext,
 } from './connectGuard'
 
@@ -158,9 +158,9 @@ describe('parseWriteBlockedControl', () => {
   })
 })
 
-describe('confirmClickResult — seam-driven card with the extension label', () => {
-  it('shows the resolved label (not the opaque ref) and proceeds on approval', async () => {
-    const run = confirmClickResult('s1', 'Post')
+describe('confirmWriteResult — seam-driven card with the extension label', () => {
+  it('shows the resolved control label (not the opaque ref) and proceeds on approval', async () => {
+    const run = confirmWriteResult('s1', 'Post')
     const setup = useSetupStore()
     for (let i = 0; i < 100 && !setup.pendingFor('s1'); i++) {
       await new Promise((r) => setTimeout(r, 0))
@@ -171,8 +171,20 @@ describe('confirmClickResult — seam-driven card with the extension label', () 
     expect(await run).toBeNull()
   })
 
-  it('reports a decline instead of clicking', async () => {
-    const run = confirmClickResult('s1', 'Delete')
+  it('shows a press_key submit combo the same way', async () => {
+    const run = confirmWriteResult('s1', 'Meta+Enter (submit)')
+    const setup = useSetupStore()
+    for (let i = 0; i < 100 && !setup.pendingFor('s1'); i++) {
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    const card = setup.pendingFor('s1')
+    expect(card?.detail).toContain('Meta+Enter')
+    setup.settle(card!.id, 'confirmed')
+    expect(await run).toBeNull()
+  })
+
+  it('reports a decline instead of acting', async () => {
+    const run = confirmWriteResult('s1', 'Delete')
     await onCard('skipped')
     expect(await run).toMatch(/declined/)
   })

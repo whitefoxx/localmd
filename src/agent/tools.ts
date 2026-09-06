@@ -51,8 +51,13 @@ import {
   confirmConnectCall,
   noteConnectResult,
   parseWriteBlockedControl,
-  confirmClickResult,
+  confirmWriteResult,
 } from '@/agent/connectGuard'
+
+/** Connect tools whose write intent is only visible in the extension (the
+ *  resolved element / the key combo), so the seam drives their confirmation from
+ *  the write_blocked result rather than the opaque args. */
+const CONNECT_WRITE_TOOLS = new Set(['generic__click', 'generic__press_key'])
 import { noteOpenedTab } from '@/agent/connectJanitor'
 import { formatLintReport } from '@/lib/lint'
 import { parseKbQuery, runQuery, formatQueryResult } from '@/lib/kbQuery'
@@ -1807,25 +1812,27 @@ function toExternalSpec(
           })
           if (declined) return declined
         }
-        // A click on a connect server: DROP any agent-supplied allow_write on
-        // the first call, forcing the extension's write-guard to evaluate. A
-        // write control then comes back write_blocked with the control's human
-        // label — the extension is the only layer that can name the element, so
-        // the card shows "Post", never the opaque ref the agent passed. On
-        // approval we re-run with allow_write (a direct callTool, so it does not
-        // re-enter this gate). Stripping allow_write first is what makes the
-        // confirmation unskippable: the agent cannot self-approve a write click.
-        const isConnectClick = isConnectServer(mcp, t.serverId) && t.def.name === 'generic__click'
+        // A write-guardable interaction (click / press_key) on a connect server:
+        // DROP any agent-supplied allow_write on the first call, forcing the
+        // extension's write-guard to evaluate. A write then comes back
+        // write_blocked with a human label — the extension is the only layer that
+        // can name what it is (the "Post" control, "Cmd+Enter (submit)") — so the
+        // card shows that, never the opaque ref the agent passed. On approval we
+        // re-run with allow_write (a direct callTool, so it does not re-enter this
+        // gate). Stripping allow_write first is what makes the confirmation
+        // unskippable: the agent cannot self-approve a write.
+        const isConnectWrite =
+          isConnectServer(mcp, t.serverId) && CONNECT_WRITE_TOOLS.has(t.def.name)
         let out = await mcp.callTool(
           t.serverId,
           t.def.name,
-          isConnectClick ? { ...args, allow_write: false } : args,
+          isConnectWrite ? { ...args, allow_write: false } : args,
           signal,
         )
-        if (isConnectClick) {
+        if (isConnectWrite) {
           const control = parseWriteBlockedControl(out)
           if (control) {
-            const declined = await confirmClickResult(sessionId, control)
+            const declined = await confirmWriteResult(sessionId, control)
             if (declined) return declined
             out = await mcp.callTool(t.serverId, t.def.name, { ...args, allow_write: true }, signal)
           }
