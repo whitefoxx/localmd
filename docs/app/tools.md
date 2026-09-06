@@ -38,6 +38,13 @@ instead of hand-driving the page — and **site scripts**, persistent rules that
 fix a page on every visit: hide the ads, restyle a section, run a snippet.
 Worth setting up first.
 
+Both of those extras are **experimental**. The adapters in particular are a
+catalogue we maintain by hand, which is the opposite of how this app treats
+tools everywhere else — built for you by the assistant, kept as files you own.
+They are being replaced by exactly that: the assistant working out a site once
+and saving it as a skill in your folder. Until then they may change shape or
+disappear, and nothing you rely on is stored by them.
+
 There is no long list of recommendations. Keeping one would mean deciding on
 your behalf which services are worth having, and re-checking those decisions
 forever — services change their terms, their limits and their addresses. What
