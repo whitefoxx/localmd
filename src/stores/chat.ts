@@ -56,7 +56,7 @@ import * as fs from '@/lib/fs'
 import * as idb from '@/lib/idb'
 import type { AgentEvent } from '@/agent/types'
 import type { HunkLine } from '@/lib/diff'
-import type { SelectionRef } from '@/stores/composer'
+import { useComposerStore, type SelectionRef } from '@/stores/composer'
 import { describeTabs, type TabRef } from '@/lib/connectTabs'
 import type { ModelMessage } from 'ai'
 
@@ -526,6 +526,10 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function newSession(): void {
+    // The tabs the user staged for their next message follow them into the new
+    // conversation instead of vanishing (the composer keys staged tabs by
+    // session, and this switches the active session — carryTabs moves them).
+    const from = activeId.value
     // Reuse an existing empty draft tab rather than piling up blank tabs.
     const empty = tabs.value.find((t) => !t.uiMessages.length && !t.running)
     if (empty) activeId.value = empty.id
@@ -534,6 +538,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!addTab(s)) return
       activeId.value = s.id
     }
+    useComposerStore().carryTabs(from, activeId.value)
     historyOpen.value = false
     // plan/mcp state is keyed per session — a fresh session starts empty.
   }

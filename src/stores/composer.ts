@@ -158,6 +158,23 @@ export const useComposerStore = defineStore('composer', () => {
     if (tabs.value.length) setTabs([])
   }
 
+  /** New conversation: carry the browser tabs the user staged for their next
+   *  message into the fresh session, so "New conversation" doesn't drop them.
+   *  The currentSessionId watcher below only rescues the null→first-session
+   *  case; starting a new conversation from an EXISTING one is `from !== null`,
+   *  which it deliberately skips — so this is called explicitly from
+   *  chat.newSession(). No-op if the target already carries its own staged tabs. */
+  function carryTabs(fromId: string | null, toId: string | null): void {
+    if (fromId === null || fromId === toId) return
+    const staged = tabsBySession.value.get(fromId)
+    if (!staged?.length) return
+    if (tabsBySession.value.get(toId)?.length) return
+    const map = new Map(tabsBySession.value)
+    map.delete(fromId)
+    map.set(toId, staged)
+    tabsBySession.value = map
+  }
+
   // Staged context belongs to the KB it was selected in — drop it on KB switch.
   const kb = useKbStore()
   watch(() => kb.name, () => {
@@ -194,5 +211,6 @@ export const useComposerStore = defineStore('composer', () => {
     attachTab,
     detachTab,
     clearTabs,
+    carryTabs,
   }
 })
