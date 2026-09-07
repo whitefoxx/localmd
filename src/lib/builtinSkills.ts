@@ -270,12 +270,28 @@ cross-origin calls, open a tab on the site and make the request from inside it
 with \`eval_js\`: read the cookie, set the headers, \`XMLHttpRequest\` (sync is
 fine), then REDUCE the payload to rows in the page — never return the raw 150 KB.
 
+Don't know the endpoint, or which headers it wants? Let the page make the call
+once and watch it with \`capture_network\` — that captured request IS your URL
+template and header list — then REPLAY it with \`eval_js\`. Three traps that cost
+whole sessions: an entry's \`body\` is a raw STRING (\`JSON.parse\` it yourself);
+**never reload a tab while a capture is attached** — it can leave an SPA blank,
+losing the very load you meant to observe (arm the capture on a fresh tab BEFORE
+navigating, or re-trigger by in-app navigation); and once you HAVE the template,
+stop the capture and work from replay. Re-arming a capture over and over is a
+loop, not progress — if you already captured the payload, the answer is in your
+hand, so reduce it rather than going back for another.
+
 **3. Drive the rendered DOM (\`eval_js\` + recon).** When there is no reachable API
 (the data is server-rendered, or gated like YouTube captions), open the app in
 an ACTIVE tab (lazy apps do not render in the background), let it settle, and
 read the DOM. Find selectors with \`get_a11y_tree\` / \`find_structured_data\` /
-\`find_in_dom\` rather than guessing. Long lists virtualize — scroll the container
-to force earlier items in before reading.
+\`find_in_dom\` rather than guessing. Long lists VIRTUALIZE, and the trap is the
+opposite of what it looks like: what you scroll PAST is UNMOUNTED, so scrolling to
+the bottom and then reading gives you the tail and silently drops everything
+above it. Harvest as you go — small scroll steps, read after each, accumulate into
+a map keyed by a STABLE id (the item's permalink or data id) so re-renders dedup
+instead of duplicating. You are done when the count stops growing, not when you
+reach the bottom.
 
 Always: return the ROWS you need (id, text, author, url), not the whole payload;
 \`max_chars\` truncates the rest. Read markdown, not plain text, when links matter.
@@ -291,9 +307,14 @@ naive route actively fails:
   wall and captions are service-worker-fetched, so \`fetch_url\` and network
   capture do not see them. Drive the UI instead: open the watch page active,
   click "Show transcript", read the transcript panel's rows.
-- **X / Twitter** — no open API, but the web GraphQL answers from an x.com tab
-  with the user's \`ct0\` cookie plus the public web bearer; reduce the payload to
-  rows in the page.
+- **X / Twitter** — no open API, and the conversation view virtualizes, so DOM
+  scraping fights you on two fronts at once. Let the page issue its own
+  conversation GraphQL call, capture that ONE request for its URL template and
+  headers, then replay it same-origin from an x.com tab (the \`ct0\` cookie is the
+  CSRF header) and follow the cursor for the rest. Decide what belongs to a
+  thread from the RESPONSE's own fields — the display type marking an author's
+  self-thread, and the conversation id — never from rendered order, and never
+  from a number the author typed into the text.
 
 That is the extent of the site-specific knowledge shipped here. For anything
 else, WORK IT OUT LIVE with the ladder + recon. This project maintains the base
