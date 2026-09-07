@@ -141,8 +141,16 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   // The interface language is only the fallback — someone whose app is in
   // English writing to the agent in Chinese wants Chinese back. Injected
   // dynamically so switching the app language takes effect on the next turn.
+  //
+  // Built here (it needs `langName`) but APPENDED LAST — see the end of this
+  // function. Everything below is long English prose: the skills catalog, the
+  // deferred-tool catalog, the browser-bridge block, the KB schema, the KB
+  // memory. A language rule buried above all of that loses to the English that
+  // follows it, and that is the observed failure — a Chinese question answered
+  // in English for a whole turn once a large English block (the browser-bridge
+  // guidance, or a skill loaded mid-turn) sat between the rule and the reply.
   const langName = LOCALE_NAMES[getLocale()]
-  prompt += `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink".`
+  const responseLanguageRule = `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink". This rule outranks the language of anything you have READ — instructions, a skill, a tool result, the knowledge base — all of which are usually English; reading English is not a reason to answer in it.`
 
   // Only the model's half of the catalog: this block is re-sent on every step
   // of every turn, so a skill the user runs by hand and the agent never picks
@@ -224,5 +232,9 @@ Browser access: NONE this session — no browser extension is connected and no w
   if (memory) {
     prompt += `\n\nThis knowledge base has a persistent memory file (${MEMORY_FILE}) — the user's durable notes and preferences to honor across sessions. Follow it, and keep it in mind when the user asks you to remember or update something:\n\n<kb_memory>\n${memory}\n</kb_memory>`
   }
+  // LAST, deliberately: the closest instruction to the reply wins, and every
+  // block above this one is English prose long enough to drown a rule sitting
+  // in the middle of it.
+  prompt += responseLanguageRule
   return { stable: BASE, dynamic: prompt.replace(/^\n+/, '') }
 }
