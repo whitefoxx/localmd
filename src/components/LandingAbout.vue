@@ -2,18 +2,14 @@
 import { computed } from 'vue'
 import { t } from '@/i18n'
 import { SELECTABLE_PROVIDERS } from '@/lib/providers'
-import { CONNECT_STORE_URL, FEEDBACK_URL, SOURCE_URL } from '@/lib/links'
+import { CONNECT_SOURCE_URL, CONNECT_STORE_URL, FEEDBACK_URL, LLM_WIKI_URL, SOURCE_URL } from '@/lib/links'
+import CitationDemo from '@/components/CitationDemo.vue'
 import ConnectFlow from '@/components/ConnectFlow.vue'
+import HealthReport from '@/components/HealthReport.vue'
+import LocalFirst from '@/components/LocalFirst.vue'
 import { vReveal } from '@/composables/useReveal'
-import citeNoteDark from '@/assets/landing-cite-note-dark.jpg'
-import citePdfShot from '@/assets/landing-cite-pdf.jpg'
 
 defineEmits<{ open: [] }>()
-
-/** The landing is committed dark, so the note shot is always the dark crop —
- *  see `scripts/shoot-landing.mjs` for the coordinates. The PDF one has no
- *  dark twin because a page is white paper in either theme. */
-const citeNoteShot = citeNoteDark
 
 /**
  * The approval story, three lines. Each one names a mechanism that exists —
@@ -77,145 +73,98 @@ const pillars = computed(() => [
   },
 ])
 
-/** The key number is an id, not a position — this array is the running order.
- *  Only what the first screen has NOT already said survives here; a stance
- *  repeated is a stance diluted. */
-const believes = computed(() => [
-  { title: t('about.believe1Title'), body: t('about.believe1Body') },
-  { title: t('about.believe2Title'), body: t('about.believe2Body') },
-  { title: t('about.believe3Title'), body: t('about.believe3Body') },
-  { title: t('about.believe4Title'), body: t('about.believe4Body') },
-])
-
 /** The capability nouns, split for rendering as checked chips. */
 const caps = computed(() => t('about.caps').split('\u00b7').map((c) => c.trim()))
 
-const donts = computed(() => [
-  t('about.dont2'),
-  t('about.dont3'),
-  t('about.dont6'),
-  t('about.dont4'),
-])
+/**
+ * The account of where this came from. The one place on the page that says
+ * "I" — see the note on `whyLabel` in the catalog for why it is one place and
+ * not the page's voice. Two paragraphs carry a link and are assembled in the
+ * template from their split parts, so they are not in this list.
+ */
+const whyPlain = computed(() => ({ one: t('about.why1'), three: t('about.why3') }))
 </script>
 
 <template>
   <div class="border-t border-border">
-    <!-- ── 1 · The citation round trip, shown rather than described ──────
-         Show first, explain never: the one claim on this page a picture can
-         settle opens it. The chip in your own Markdown, and the paragraph it
-         opens in the source. -->
-    <section class="landing-wrap py-24">
-      <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
-        [[ {{ $t('about.showLabel') }} ]]
-      </div>
-      <h2
-        v-reveal="1"
-        class="font-display mb-5 max-w-[26ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
-      >
-        {{ $t('about.diff3Title') }}
-      </h2>
-      <p v-reveal="2" class="mb-12 max-w-[44rem] leading-relaxed text-fg-2">
-        {{ $t('about.diff3Body') }}
-      </p>
-
-      <!-- The round trip, performed: a cursor clicks the citation chip in
-           the note, and the source pane lights up at the paragraph. Only the
-           cursor and the reveal move; the screenshots are real. -->
-      <div class="grid items-center gap-6 lg:grid-cols-[1fr_auto_1fr]" aria-hidden="true">
-        <figure v-reveal="3" class="relative">
-          <div class="app-frame shot-fade-r">
-            <!-- object-left so the sliver this loses to its column comes off
-                 the right, which is the edge that fades. -->
-            <img :src="citeNoteShot" alt="" class="block h-[260px] w-full object-cover object-left" />
-          </div>
-          <span class="cit-click" style="--i: 0" />
-          <span class="cit-click" style="--i: 1" />
-          <span class="cit-click" style="--i: 2" />
-          <svg class="cit-cursor" viewBox="0 0 20 20">
-            <path
-              d="M3 1l13 8.5-5.6 1 3.2 6-2.6 1.2-3.1-6L3 15z"
-              fill="rgb(var(--c-accent))"
-              stroke="rgb(var(--c-bg-0))"
-              stroke-width="1"
-            />
-          </svg>
-          <figcaption class="mt-3 font-mono text-xs leading-relaxed text-fg-3">
-            {{ $t('about.showCapNote') }}
-          </figcaption>
-        </figure>
-
-        <div class="cit-arrow flex justify-center text-fg-3">
-          <span class="codicon codicon-arrow-right rotate-90 text-2xl lg:rotate-0" />
-        </div>
-
-        <figure class="cit-pdf">
-          <div class="app-frame shot-paper">
-            <img :src="citePdfShot" alt="" class="block h-[260px] w-full object-cover" />
-          </div>
-          <figcaption class="mt-3 font-mono text-xs leading-relaxed text-fg-3">
-            {{ $t('about.showCapPdf') }}
-          </figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <!-- ── 2 · Who decides ──────────────────────────────────────────────
-         The fear-killer, shown as the thing itself: a diff card, additions
-         green, originals untouched, the decision buttons waiting. Decorative
-         (icons only, no strings to translate) — the lines on the left say it
-         in words. -->
-    <section class="landing-grain relative border-y border-border bg-bg-1">
+    <!-- ── 1 · Local-first ─────────────────────────────────────────────
+         Where your things are and where they go, said once and first: it is
+         the promise every other section leans on. The drawing beside it is
+         the folder as a terminal would list it, and the database there is
+         not. The data-flow list follows the prose as the checkable version
+         of it. The root div already draws the top rule, so this section does
+         not. -->
+    <section>
       <div class="landing-wrap grid items-center gap-x-16 gap-y-12 py-24 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
-            [[ {{ $t('about.reviewLabel') }} ]]
+            [[ {{ $t('about.localLabel') }} ]]
           </div>
           <h2
             v-reveal="1"
-            class="font-display mb-10 text-[1.9rem] leading-[1.15] text-fg-0 sm:text-[2.4rem]"
+            class="font-display mb-6 max-w-[24ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
           >
-            {{ $t('about.reviewTitle') }}
+            {{ $t('about.localTitle') }}
           </h2>
-          <ul v-reveal="2" class="max-w-[36rem] space-y-5">
-            <li v-for="(r, i) in reviews" :key="i" class="flex gap-3.5 text-fg-1">
-              <span :class="['codicon', r.icon, 'mt-1 shrink-0 text-accent']" />
-              <span class="leading-relaxed">{{ r.text }}</span>
-            </li>
-          </ul>
+          <p v-reveal="2" class="max-w-[38rem] leading-relaxed text-fg-2">
+            {{ $t('about.localBody') }}
+          </p>
+          <div v-reveal="3" class="mt-8 max-w-[38rem] border-t border-border pt-4">
+            <div class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+              [[ {{ $t('about.flowLabel') }} ]]
+            </div>
+            <ul class="space-y-2 text-[0.95rem] leading-relaxed text-fg-2">
+              <li>{{ $t('about.flow1') }}</li>
+              <li>{{ $t('about.flow2') }}</li>
+              <li>{{ $t('about.flow3') }}</li>
+            </ul>
+          </div>
         </div>
 
-        <!-- A typographic frame — top rule, filename, bottom rule — not a
-             drawn window: the reader's own screen already supplies chrome. -->
-        <div v-reveal="2" class="w-[24rem] max-w-full justify-self-center font-mono text-[12.5px] leading-[1.9]" aria-hidden="true">
-          <div class="flex items-baseline justify-between border-t border-border pt-2.5 text-fg-3">
-            <span>wiki/attention.md</span>
-            <span><span class="text-added">+3</span> −0</span>
-          </div>
-          <div class="py-3">
-            <div class="text-fg-3">@@ new page @@</div>
-            <div class="bg-added/10 px-1.5 text-added">+ ## Chain-of-thought, in short</div>
-            <div class="bg-added/10 px-1.5 text-added">+ Emergent past ~10B params [[1:b14-3]]</div>
-            <div class="bg-added/10 px-1.5 text-added">+ Sources: [[pdf1:raw/papers/attention.pdf]]</div>
-            <div class="mt-2 text-fg-3">raw/papers/attention.pdf · untouched</div>
-          </div>
-          <div class="flex items-center gap-2.5 border-b border-border pb-3">
-            <span class="inline-flex items-center rounded border border-added/50 bg-added/15 px-2.5 py-1 text-added">
-              <span class="codicon codicon-sm codicon-check" />
-            </span>
-            <span class="inline-flex items-center rounded border border-border px-2.5 py-1 text-fg-3">
-              <span class="codicon codicon-sm codicon-close" />
-            </span>
-            <span class="ml-auto h-4 w-1.5 animate-pulse bg-accent/70" />
-          </div>
+        <div v-reveal="2" class="w-[460px] max-w-full justify-self-center" aria-hidden="true">
+          <LocalFirst />
         </div>
+      </div>
+    </section>
+
+    <!-- ── 2 · The citation round trip, shown rather than described ──────
+         Show first, explain never: the one claim on this page a picture can
+         settle opens it. The chip in your own Markdown, and the paragraph it
+         opens in the source. -->
+    <section class="landing-grain relative border-t border-border bg-bg-1">
+      <div class="landing-wrap py-24">
+        <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+          [[ {{ $t('about.showLabel') }} ]]
+        </div>
+        <h2
+          v-reveal="1"
+          class="font-display mb-5 max-w-[26ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+        >
+          {{ $t('about.diff3Title') }}
+        </h2>
+        <p v-reveal="2" class="mb-12 max-w-[44rem] leading-relaxed text-fg-2">
+          {{ $t('about.diff3Body') }}
+        </p>
+
+        <!-- The round trip, drawn: click a chip in the note and the block it
+             points to lights up in the source. Drawn rather than screenshotted
+             so it follows the theme; interactive rather than animated so
+             nothing appears or disappears. The reader does the clicking. -->
+        <CitationDemo />
       </div>
     </section>
 
     <!-- ── 3 · The three cards ──────────────────────────────────────────── -->
     <section class="landing-wrap py-24">
-      <div v-reveal class="mb-12 font-mono text-xs uppercase tracking-wider text-fg-3">
+      <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
         [[ {{ $t('about.diffLabel') }} ]]
       </div>
+      <h2
+        v-reveal="1"
+        class="font-display mb-12 max-w-[24ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+      >
+        {{ $t('about.basicsTitle') }}
+      </h2>
       <div class="grid gap-x-10 gap-y-10 md:grid-cols-12">
         <div
           v-for="(c, i) in pillars"
@@ -292,7 +241,92 @@ const donts = computed(() => [
       </details>
     </section>
 
-    <!-- ── Act two: sources beyond the disk ───────────────────────────── -->
+    <!-- ── 4 · Who decides ──────────────────────────────────────────────
+         The fear-killer, shown as the thing itself: a diff card, additions
+         green, originals untouched, the decision buttons waiting. Decorative
+         (icons only, no strings to translate) — the lines on the left say it
+         in words. -->
+    <section class="landing-grain relative border-y border-border bg-bg-1">
+      <div class="landing-wrap grid items-center gap-x-16 gap-y-12 py-24 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <div>
+          <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+            [[ {{ $t('about.reviewLabel') }} ]]
+          </div>
+          <h2
+            v-reveal="1"
+            class="font-display mb-10 text-[1.9rem] leading-[1.15] text-fg-0 sm:text-[2.4rem]"
+          >
+            {{ $t('about.reviewTitle') }}
+          </h2>
+          <ul v-reveal="2" class="max-w-[36rem] space-y-5">
+            <li v-for="(r, i) in reviews" :key="i" class="flex gap-3.5 text-fg-1">
+              <span :class="['codicon', r.icon, 'mt-1 shrink-0 text-accent']" />
+              <span class="leading-relaxed">{{ r.text }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- A typographic frame — top rule, filename, bottom rule — not a
+             drawn window: the reader's own screen already supplies chrome. -->
+        <div v-reveal="2" class="w-[24rem] max-w-full justify-self-center font-mono text-[12.5px] leading-[1.9]" aria-hidden="true">
+          <div class="flex items-baseline justify-between border-t border-border pt-2.5 text-fg-3">
+            <span>wiki/attention.md</span>
+            <span><span class="text-added">+3</span> −0</span>
+          </div>
+          <div class="py-3">
+            <div class="text-fg-3">@@ new page @@</div>
+            <div class="bg-added/10 px-1.5 text-added">+ ## Chain-of-thought, in short</div>
+            <div class="bg-added/10 px-1.5 text-added">+ Emergent past ~10B params [[1:b14-3]]</div>
+            <div class="bg-added/10 px-1.5 text-added">+ Sources: [[pdf1:raw/papers/attention.pdf]]</div>
+            <div class="mt-2 text-fg-3">raw/papers/attention.pdf · untouched</div>
+          </div>
+          <div class="flex items-center gap-2.5 border-b border-border pb-3">
+            <span class="inline-flex items-center rounded border border-added/50 bg-added/15 px-2.5 py-1 text-added">
+              <span class="codicon codicon-sm codicon-check" />
+            </span>
+            <span class="inline-flex items-center rounded border border-border px-2.5 py-1 text-fg-3">
+              <span class="codicon codicon-sm codicon-close" />
+            </span>
+            <span class="ml-auto h-4 w-1.5 animate-pulse bg-accent/70" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 5 · KB health ────────────────────────────────────────────────
+         The pair to the section above: that one is every change, one at a
+         time; this one is the whole folder at once. The drawing beside it is
+         the report, built from the panel's own headings rather than retyped,
+         so it says what the panel says. -->
+    <section class="border-t border-border">
+      <div
+        class="landing-wrap grid items-center gap-x-16 gap-y-12 py-24 lg:grid-cols-[minmax(0,1fr)_auto]"
+      >
+        <div>
+          <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+            [[ {{ $t('about.healthLabel') }} ]]
+          </div>
+          <h2
+            v-reveal="1"
+            class="font-display mb-6 max-w-[24ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+          >
+            {{ $t('about.healthTitle') }}
+          </h2>
+          <div class="max-w-[38rem] space-y-5 leading-relaxed text-fg-2">
+            <p v-reveal="2">{{ $t('about.healthBody') }}</p>
+            <p v-reveal="2">{{ $t('about.healthNote') }}</p>
+          </div>
+        </div>
+
+        <div v-reveal="2" class="w-[400px] max-w-full justify-self-center" aria-hidden="true">
+          <HealthReport />
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 6 · The browser ─────────────────────────────────────────────
+         The second source, and the one that is not on disk. Write actions
+         ask first, and the copy keeps saying so. -->
     <section class="landing-grain relative border-t border-border bg-bg-1">
       <div class="landing-wrap grid items-center gap-x-16 gap-y-12 py-24 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div>
@@ -307,6 +341,9 @@ const donts = computed(() => [
           </h2>
           <p v-reveal="2" class="max-w-[38rem] leading-relaxed text-fg-2">
             {{ $t('about.connectBody') }}
+          </p>
+          <p v-reveal="2" class="mt-4 max-w-[38rem] leading-relaxed text-fg-2">
+            {{ $t('about.connectApps') }}
           </p>
           <a
             v-reveal="3"
@@ -325,67 +362,98 @@ const donts = computed(() => [
       </div>
     </section>
 
-    <!-- ── What we believe ──────────────────────────────────────────────── -->
+    <!-- ── 7 · Why I built this ────────────────────────────────────────
+         Set narrow and plain on purpose: this section earns its place by
+         being someone's account, and any styling that makes it look
+         art-directed makes it look written by a committee instead. The
+         kicker is pulled out because it is the load-bearing sentence. Two
+         paragraphs carry a link and are written on one line each so the
+         template's whitespace handling cannot eat the space around it. -->
     <section class="border-t border-border">
       <div class="landing-wrap py-24">
-        <div v-reveal class="mb-10 font-mono text-xs uppercase tracking-wider text-fg-3">
-          [[ {{ $t('about.believeLabel') }} ]]
+        <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+          [[ {{ $t('about.whyLabel') }} ]]
         </div>
-        <div class="grid gap-x-12 gap-y-9 md:grid-cols-2">
-          <div v-for="(b, i) in believes" :key="b.title" v-reveal="i % 2">
-            <div class="font-display mb-1.5 text-lg text-fg-0">{{ b.title }}</div>
-            <p class="text-[0.95rem] leading-relaxed text-fg-2">{{ b.body }}</p>
-          </div>
+        <h2
+          v-reveal="1"
+          class="font-display mb-8 max-w-[26ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+        >
+          {{ $t('about.whyTitle') }}
+        </h2>
+        <div class="max-w-[42rem] space-y-5 leading-relaxed text-fg-2">
+          <p v-reveal="2">{{ whyPlain.one }}</p>
+          <p v-reveal="2">{{ $t('about.why2a') }}<a :href="LLM_WIKI_URL" target="_blank" rel="noopener" class="text-accent hover:underline">{{ $t('about.why2Link') }}</a>{{ $t('about.why2b') }}</p>
+          <p v-reveal="2">{{ whyPlain.three }}</p>
+          <p v-reveal="2">{{ $t('about.why4a') }}<a :href="CONNECT_STORE_URL" target="_blank" rel="noopener" class="text-accent hover:underline">{{ $t('about.why4Link') }}</a>{{ $t('about.why4b') }}</p>
         </div>
+        <p
+          v-reveal="3"
+          class="mt-9 max-w-[42rem] border-l-2 border-accent/60 pl-5 leading-relaxed text-fg-1"
+        >
+          {{ $t('about.whyKicker') }}
+        </p>
       </div>
     </section>
 
-    <!-- ── 5 · What we don't do — and how to check ─────────────────────── -->
-    <section class="border-t border-border">
-      <div class="landing-wrap grid gap-x-16 gap-y-14 py-24 lg:grid-cols-2">
-        <div>
-          <div v-reveal class="mb-6 font-mono text-xs uppercase tracking-wider text-fg-3">
-            [[ {{ $t('about.dontLabel') }} ]]
-          </div>
-          <ul v-reveal="1" class="space-y-4">
-            <li v-for="(f, i) in donts" :key="i" class="flex gap-3 text-[0.95rem] text-fg-2">
-              <span class="codicon codicon-close mt-0.5 shrink-0 text-fg-3" />
-              <span class="leading-relaxed">{{ f }}</span>
-            </li>
-          </ul>
+    <!-- ── 8 · Free and open ───────────────────────────────────────────
+         Both repositories are linked here and nowhere else on the page: the
+         extension is the half that can drive a signed-in browser, so it is
+         the half most worth being able to read, and a page that vouched for
+         only the app would be vouching for the wrong one. -->
+    <section class="landing-grain relative border-t border-border bg-bg-1">
+      <div class="landing-wrap py-24">
+        <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+          [[ {{ $t('about.freeLabel') }} ]]
         </div>
-
-        <!-- A privacy claim is worth what the reader's willingness to believe
-             it is worth. The source is the only thing that turns it into
-             something they can check, so it sits beside the list it vouches
-             for. -->
-        <div v-reveal="2">
-          <p class="text-[0.95rem] leading-relaxed text-fg-2">
-            <span class="text-fg-0">{{ $t('about.sourceLead') }}</span>
-            {{ $t('about.sourceBody') }}
-          </p>
+        <h2
+          v-reveal="1"
+          class="font-display mb-6 max-w-[24ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+        >
+          {{ $t('about.freeTitle') }}
+        </h2>
+        <div class="max-w-[42rem] space-y-5 leading-relaxed text-fg-2">
+          <p v-reveal="2">{{ $t('about.free1') }}</p>
+          <p v-reveal="2">{{ $t('about.free2') }}</p>
+        </div>
+        <div v-reveal="3" class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
           <a
             :href="SOURCE_URL"
             target="_blank"
             rel="noopener"
-            class="mt-3 inline-flex items-center gap-1.5 text-[0.95rem] text-accent hover:underline"
+            class="inline-flex items-center gap-1.5 text-[0.95rem] text-accent hover:underline"
           >
             <span class="codicon codicon-sm codicon-github" />{{ $t('about.sourceLink') }}
           </a>
-
-          <!-- The claim, as the tool that would catch us breaking it.
-               Decorative; the hosts are the real ones a BYOK session talks to. -->
-          <div class="mt-8 border-t border-border pt-4">
-            <div class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
-              [[ {{ $t('about.flowLabel') }} ]]
-            </div>
-            <ul class="space-y-2 text-[0.95rem] leading-relaxed text-fg-2">
-              <li>{{ $t('about.flow1') }}</li>
-              <li>{{ $t('about.flow2') }}</li>
-              <li>{{ $t('about.flow3') }}</li>
-            </ul>
-          </div>
+          <a
+            :href="CONNECT_SOURCE_URL"
+            target="_blank"
+            rel="noopener"
+            class="inline-flex items-center gap-1.5 text-[0.95rem] text-accent hover:underline"
+          >
+            <span class="codicon codicon-sm codicon-github" />{{ $t('about.connectSource') }}
+          </a>
         </div>
+      </div>
+    </section>
+
+    <!-- ── 9 · Phones ──────────────────────────────────────────────────
+         The only forward-looking claim on the page, so it is given the
+         quietest treatment on the page: no illustration, no button, and
+         nothing to sign up for. -->
+    <section class="border-t border-border">
+      <div class="landing-wrap py-24">
+        <div v-reveal class="mb-3 font-mono text-xs uppercase tracking-wider text-fg-3">
+          [[ {{ $t('about.mobileLabel') }} ]]
+        </div>
+        <h2
+          v-reveal="1"
+          class="font-display mb-6 max-w-[24ch] text-[1.7rem] leading-[1.15] text-fg-0 sm:text-[2.1rem]"
+        >
+          {{ $t('about.mobileTitle') }}
+        </h2>
+        <p v-reveal="2" class="max-w-[42rem] leading-relaxed text-fg-2">
+          {{ $t('about.mobileBody') }}
+        </p>
       </div>
     </section>
 

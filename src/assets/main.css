@@ -186,9 +186,6 @@
     0 0 0 1px rgb(255 255 255 / 0.08),
     0 12px 32px -18px rgb(0 0 0 / 0.7);
 }
-.landing .shot-paper img {
-  filter: brightness(0.86) contrast(1.02);
-}
 
 /* Atmosphere: one green aurora behind the hero visual, and a faint grain over
    the whole surface so the flat ink reads as material rather than #000. Both
@@ -382,64 +379,79 @@
   95%, 100% { opacity: 0; transform: scale(0.4); }
 }
 
-/* The citation round trip's 8s loop: a cursor clicks the chip in the note,
-   the source pane lights up at the paragraph. Base state = both panes
-   visible, no cursor — what reduced motion shows. */
-.cit-cursor {
-  position: absolute;
-  right: 26%;
-  top: 18%;
-  width: 22px;
-  opacity: 0;
-  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.6));
+/* The citation round trip, drawn. Clicking a citation moves the highlight;
+   nothing appears or disappears, which is why the transition is on colour and
+   never on opacity. The cursor and its ripple are the demo performing itself,
+   and CitationDemo.vue stops them at the reader's first real click. */
+.cite-slot {
+  position: relative;
+  display: inline-block;
 }
-.cit-click {
+.cite-mark {
+  @apply inline-flex items-center align-super rounded px-1 text-[0.72em] font-medium leading-none;
+  @apply bg-accent/15 text-accent transition-colors;
+}
+.cite-mark:hover,
+.cite-mark.is-active {
+  @apply bg-accent/30;
+}
+.cite-mark.is-active {
+  box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.6);
+}
+.cite-block {
+  @apply -mx-2 rounded px-2 py-1 transition-colors duration-300;
+}
+.cite-block.is-active {
+  background-color: rgb(var(--c-accent) / 0.16);
+  box-shadow: inset 2px 0 0 rgb(var(--c-accent));
+}
+
+/* Base state for both is invisible, and each one exists only while its
+   animation owns it — an element that is mounted but unanimated must not be
+   left sitting on the page. */
+.cite-cursor {
   position: absolute;
-  right: calc(26% - 8px);
-  top: calc(18% - 8px);
-  width: 26px;
-  height: 26px;
-  border-radius: 9999px;
-  border: 2px solid rgb(var(--c-accent) / 0.7);
+  left: 58%;
+  top: 62%;
+  width: 17px;
   opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.5));
+}
+.cite-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 9999px;
+  border: 2px solid rgb(var(--c-accent) / 0.75);
+  opacity: 0;
+  pointer-events: none;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .cit-cursor { animation: cit-cursor 8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-  /* Three rings, staggered by --i, each spreading wide and slow. */
-  .cit-click {
-    animation: cit-click 8s ease-out infinite;
-    animation-delay: calc(var(--i, 0) * 0.35s);
+  .cite-cursor {
+    animation: cite-cursor 3.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .cit-pdf { animation: cit-pdf 8s infinite; }
-  .cit-arrow { animation: cit-arrow 8s infinite; }
+  .cite-ripple {
+    animation: cite-ripple 900ms ease-out;
+  }
 }
-/* The cursor enters near the chip and gets there quickly. It used to travel
-   220px over 2.2s, which spends a third of the loop on the least interesting
-   part: the payoff is the paragraph lighting up, not the approach. Clicking
-   sooner buys that payoff 60% of the cycle instead of 40%. */
-@keyframes cit-cursor {
-  0%, 3% { opacity: 0; transform: translate(-48px, 52px); }
-  7% { opacity: 1; }
-  11% { transform: none; }
-  15% { transform: scale(0.85); }
-  19% { transform: scale(1); }
-  58% { opacity: 1; }
-  66%, 100% { opacity: 0; transform: none; }
+/* The press lands at 26%, which is 884ms of the 3.4s step — the moment
+   CitationDemo.vue moves the highlight. */
+@keyframes cite-cursor {
+  0% { opacity: 0; transform: translate(-18px, 14px); }
+  12% { opacity: 1; }
+  22% { transform: none; }
+  26% { transform: scale(0.8); }
+  33% { transform: none; }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: none; }
 }
-@keyframes cit-click {
-  0%, 13% { opacity: 0; transform: scale(0.45); }
-  15% { opacity: 0.85; transform: scale(0.5); }
-  35%, 100% { opacity: 0; transform: scale(2.6); }
-}
-@keyframes cit-pdf {
-  0%, 17% { opacity: 0; transform: translateX(14px); }
-  25%, 90% { opacity: 1; transform: none; }
-  97%, 100% { opacity: 0; transform: translateX(14px); }
-}
-@keyframes cit-arrow {
-  0%, 17% { opacity: 0.35; }
-  23%, 90% { opacity: 1; }
-  96%, 100% { opacity: 0.35; }
+@keyframes cite-ripple {
+  0% { opacity: 0.9; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(2.4); }
 }
 
 /* The Connect diagram: the streams flow, everything else holds still.
@@ -564,24 +576,6 @@
   box-shadow:
     0 0 0 1px rgb(255 255 255 / 0.09),
     0 30px 90px -30px rgb(0 0 0 / 0.85);
-}
-
-/* A shot of a PDF page. The reader does not invert pages — a page is white
-   paper in the app whatever the theme — so this does not invert one either; a
-   landing that showed a dark PDF would be advertising a feature that is not
-   there. All it does is take the glare off, so on a dark page it reads as a lit
-   sheet rather than as a hole punched through the layout. */
-:root[data-theme='dark'] .shot-paper img {
-  filter: brightness(0.86) contrast(1.02);
-}
-
-/* A crop that stops mid-sentence reads as a broken render. Fading the cut edge
-   instead reads as a window onto something larger, which is what it is. The
-   mask goes on the frame rather than the image so the border fades with it —
-   a crisp border around faded content would only move the problem. */
-.shot-fade-r {
-  -webkit-mask-image: linear-gradient(to right, #000 72%, transparent 98%);
-  mask-image: linear-gradient(to right, #000 72%, transparent 98%);
 }
 
 /* The hero's page-load entrance. Scoped to the no-preference query so that
