@@ -30,20 +30,27 @@ The Tools page is split by how far a row reaches:
 **localmd Connect** deserves a paragraph of its own: it is the companion
 extension made for this app, and the one install that makes most *other*
 things work. It lets the assistant use your own logged-in Chrome, so it
-reaches pages that need a login and services that refuse web pages outright —
-and on top of those browser tools it adds two things: a marketplace of a few
-hundred **site adapters** — ready-made extractors for popular sites (Twitter,
-Zhihu, Reddit, YouTube, …) that the assistant finds and runs in one step,
-instead of hand-driving the page — and **site scripts**, persistent rules that
-fix a page on every visit: hide the ads, restyle a section, run a snippet.
-Worth setting up first.
+reaches pages that need a login and services that refuse web pages outright.
+What it does there is deliberately plain: open a tab, read a page, click, type,
+fill a form, look at the structure underneath, and — when a page is stubborn —
+run a piece of JavaScript on it. On top of those it adds **site scripts**,
+persistent rules that fix a page on every visit: hide the ads, restyle a
+section, run a snippet. Worth setting up first.
 
-Both of those extras are **experimental**. The adapters in particular are a
-catalogue we maintain by hand, which is the opposite of how this app treats
-tools everywhere else — built for you by the assistant, kept as files you own.
-They are being replaced by exactly that: the assistant working out a site once
-and saving it as a skill in your folder. Until then they may change shape or
-disappear, and nothing you rely on is stored by them.
+What it deliberately does *not* have is a catalogue of supported sites. There
+was one — a few hundred ready-made extractors for popular sites — and it was
+dropped on purpose. A hand-maintained list is the opposite of how this app
+treats tools everywhere else, built for you by the assistant and kept as files
+you own; and a list like that is certain to rot, because every entry needs
+re-verifying forever and the day one goes stale it fails quietly. Reaching a
+site now works the way everything else here does: the assistant works the site
+out live, and can offer to save what it learned as a skill in your folder, so
+next time is one step instead of a fresh investigation.
+
+The honest cost is that driving a real site is less reliable than an extractor
+written for that site, because sites get redesigned. That is the trade. Site
+scripts remain **experimental** — they may change shape, and nothing you rely
+on is stored by them.
 
 There is no long list of recommendations. Keeping one would mean deciding on
 your behalf which services are worth having, and re-checking those decisions
@@ -81,31 +88,36 @@ and nothing to type. Check it on in Settings → Tools and the row turns green b
 itself. Two things are still worth knowing:
 
 - **The “Allow user scripts” toggle**, in the extension's popup. Site scripts
-  and the more capable (*func*) adapters need it; the simple (*pipeline*)
-  adapters work without. Until it is on, those tools report that they cannot
-  run — the assistant will tell you, and the fix is that one switch.
+  need it. Until it is on, those tools report that they cannot run — the
+  assistant will tell you, and the fix is that one switch.
 - **Development addresses** (a local `localhost:…` build of this app) are not
   pre-authorized. Click the extension's toolbar icon, open **Web app access**,
   add the address shown on the row's page — exactly as shown, port included —
   and reload this page (a page gets the extension as it loads, never
   afterwards).
 
-Two of its abilities can change things outside this app, so they always stop
+Some of its abilities can change things outside this app, so they always stop
 and ask first, in the chat:
 
-- **Running a write adapter** — one that posts, messages or deletes on a real
-  site, as you. The confirmation card names the site and the adapter and shows
-  the arguments; nothing runs until you confirm, and a decline is final for
-  that request.
+- **A click or a keypress that would submit something** — posting, sending or
+  deleting on a real site, as you. The extension looks at what is being
+  clicked and refuses to carry it out unless the request says it may write,
+  which is what puts the question in front of you. Nothing runs until you
+  confirm, and a decline is final for that request.
+- **Running JavaScript that is allowed to write.** Reading a page with a
+  snippet is ordinary; a snippet that may act on your behalf is not, and it
+  asks.
 - **Installing a site script that injects CSS or JavaScript.** The card shows
   the match patterns and the exact code. For hide-only rules the card is
   lighter — just the patterns and the selectors being hidden. The assistant can
   also preview the effect first (outlining what would be hidden, or a one-off
   dry run of the JavaScript) so you judge the real thing, not a description.
 
-Confirming is the front line, not the only line: every site script can be
-paused or deleted at any time from the extension's popup, whatever installed
-it.
+Confirming is the front line, not the only line. The refusal lives in the
+extension rather than in the assistant's instructions, so it is not something
+a page can talk its way past by getting the assistant to click the site's own
+buttons instead. And every site script can be paused or deleted at any time
+from the extension's popup, whatever installed it.
 
 When it browses, it works in a window of its own, its tabs collected under a
 “localmd Connect” group, so its pages never mix into the window you are working

@@ -155,7 +155,7 @@ export default {
       step1: 'Install it, then reload this page.',
       storeLink: 'Chrome Web Store →',
       stepScripts:
-        'Optional: turn on “Allow user scripts” in its popup — only marketplace func adapters and site scripts need it.',
+        'Optional: turn on “Allow user scripts” in its popup — only site scripts need it.',
       confirmNote:
         'Anything that could change a real site asks first, on a card in the chat. Site scripts can be paused or removed in the extension popup.',
     },
@@ -185,7 +185,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect browser extension',
-        desc: 'Your logged-in Chrome as agent tools: read pages, click and type, search, and open sites you are signed in to — including the many that a web page cannot reach on its own. Plus, experimental for now: ~300 ready-made site adapters (Twitter, Zhihu, Reddit, YouTube, …) and site scripts that fix a page on every visit. Anything that posts to a real site or injects code asks you first.',
+        desc: 'Your logged-in Chrome as agent tools: read pages, click and type, search, and open sites you are signed in to — including the many that a web page cannot reach on its own. Plus, experimental for now: site scripts that fix a page on every visit. Anything that posts to a real site or injects code asks you first.',
       },
       jina: {
         title: 'Jina web tools (web_search, web_fetch)',
@@ -418,7 +418,7 @@ export default {
       step1: '安装扩展，然后刷新本页。',
       storeLink: 'Chrome 应用商店 →',
       stepScripts:
-        '可选：在它的弹窗里打开「Allow user scripts」—— 只有市场里的 func 适配器和站点脚本需要它。',
+        '可选：在它的弹窗里打开「Allow user scripts」—— 只有站点脚本需要它。',
       confirmNote:
         '任何可能改动真实网站的操作，都会先在聊天里停在一张确认卡片上。站点脚本可以在扩展弹窗里暂停或删除。',
     },
@@ -446,7 +446,7 @@ export default {
     catalog: {
       'localmd-connect': {
         title: 'localmd Connect 浏览器扩展',
-        desc: '把你已登录的 Chrome 变成 agent 的工具：读网页、点击输入、搜索、打开你已登录的站点 —— 包括很多网页本身够不着的地方。另有两项目前仍是实验性的能力：约 300 个现成的站点适配器（Twitter、知乎、Reddit、YouTube……），以及每次打开页面自动生效的站点脚本。任何会向真实网站发内容或注入代码的操作都会先问你。',
+        desc: '把你已登录的 Chrome 变成 agent 的工具：读网页、点击输入、搜索、打开你已登录的站点 —— 包括很多网页本身够不着的地方。另有一项目前仍是实验性的能力：每次打开页面自动生效的站点脚本。任何会向真实网站发内容或注入代码的操作都会先问你。',
       },
       jina: {
         title: 'Jina 网页工具 (web_search、web_fetch)',

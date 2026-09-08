@@ -2,8 +2,8 @@
  * localmd Connect transport — JSON-RPC/MCP over `window.postMessage`.
  *
  * localmd Connect is this app's companion extension: the generic browser
- * bridge (open/read/click/fetch with the user's cookies) plus marketplace site
- * adapters and persistent site scripts. There is no `externally_connectable`
+ * bridge (open/read/click/fetch with the user's cookies) plus persistent site
+ * scripts. There is no `externally_connectable`
  * path (that field is read once at install time; nothing at runtime can widen
  * it, and it cannot express "let the user add a site"), so the extension
  * registers a tiny relay content script per authorized origin and we exchange
