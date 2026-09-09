@@ -12,6 +12,10 @@
  * tree, the document and the agent at once. So this says that, from the bottom
  * of the screen, and offers the address to carry to a machine that can. A bar
  * rather than a wall: the reason to move to a desktop is visible behind it.
+ *
+ * Which visitors see it at all is decided in `narrowNoticeOpen` (stores/ui), and
+ * narrowness alone is not enough: a desktop Chrome dragged narrow would be told
+ * to go and find a desktop Chrome.
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useUiStore } from '@/stores/ui'

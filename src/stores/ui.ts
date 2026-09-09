@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { isE2eMode } from '@/lib/e2e'
+import { isSupported as canOpenFolder } from '@/lib/fs'
 
 const AGENT_WIDTH_KEY = 'localmd:agentWidth'
 const DEFAULT_AGENT_WIDTH = 384 // matches the old w-96
@@ -95,9 +96,23 @@ export const useUiStore = defineStore('ui', () => {
    *  a drawer's own controls sit, so it stands down while one is out rather than
    *  covering the thing you just opened. It returns when the drawer does away. */
   const narrowNoticeDismissed = ref(false)
+  /**
+   * Narrow is not the condition — a browser that cannot open a folder is.
+   *
+   * What the bar says is "the workspace needs a desktop Chrome or Edge, here is
+   * the address to carry there". On a desktop Chrome narrowed to a small window
+   * every word of that is false: the visitor is already on the machine it names
+   * and has their own folder open behind it, and the address it offers to copy
+   * is the one they are reading it on. So the audience is the visitor who could
+   * not open a folder here however wide the window got — a phone, or a Firefox
+   * or Safari — which `isSupported` is exactly the test for. A desktop window
+   * dragged narrow gets the layout it already has and nothing else: the panels
+   * become drawers, which is an adaptation, not a limitation to announce.
+   */
   const narrowNoticeOpen = computed(
     () =>
       isNarrow.value &&
+      !canOpenFolder() &&
       !narrowNoticeDismissed.value &&
       !zen.value &&
       !sidebarOpen.value &&
