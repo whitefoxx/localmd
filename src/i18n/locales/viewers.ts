@@ -127,7 +127,9 @@ export default {
     },
 
     markdown: {
+      createPageTitle: 'Create this page?',
       createPagePrompt: 'This page does not exist. Create {target}?',
+      createPageButton: 'Create it',
     },
 
     docx: {
@@ -295,7 +297,9 @@ export default {
     },
 
     markdown: {
+      createPageTitle: '创建这个页面？',
       createPagePrompt: '页面不存在，是否创建 {target}？',
+      createPageButton: '创建',
     },
 
     docx: {

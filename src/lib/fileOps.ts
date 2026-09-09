@@ -11,7 +11,7 @@
  * second one ends up asking a different question.
  */
 import * as fs from '@/lib/fs'
-import { askDelete } from '@/lib/confirmDelete'
+import { askPick, askText, notify } from '@/lib/dialog'
 import { useFilesStore, type SelectedRow } from '@/stores/files'
 import { useGitStore } from '@/stores/git'
 import { t } from '@/i18n'
@@ -80,7 +80,12 @@ export async function syncAfterFsChange(): Promise<void> {
  *  folder / selected file's parent / KB root). Extensionless names get .md. */
 export async function newFileInteractive(): Promise<void> {
   const files = useFilesStore()
-  const name = prompt(t('files.newFilePrompt'))?.trim()
+  const name = await askText({
+    title: t('files.newFileTitle'),
+    label: t('files.newFilePrompt'),
+    placeholder: 'idea.md',
+    confirmLabel: t('files.create'),
+  })
   if (!name) return
   const rel = files.targetDir ? `${files.targetDir}/${name}` : name
   const path = /\.[^/]+$/.test(rel) ? rel : `${rel}.md`
@@ -107,18 +112,18 @@ export async function moveRows(rows: SelectedRow[], targetDir: string): Promise<
     (r) => r.isDir && (targetDir === r.path || targetDir.startsWith(`${r.path}/`)),
   )
   if (intoSelf) {
-    window.alert(t('files.moveIntoSelf', { name: nameOf(intoSelf.path) }))
+    await notify(t('files.moveTitle'), t('files.moveIntoSelf', { name: nameOf(intoSelf.path) }))
     return
   }
   if (targetDir && (await fs.statKind(targetDir)) !== 'dir') {
-    window.alert(t('files.moveNoTarget', { dir: targetDir }))
+    await notify(t('files.moveTitle'), t('files.moveNoTarget', { dir: targetDir }))
     return
   }
   const where = targetDir || t('files.kbRoot')
   for (const r of moving) {
     const name = nameOf(r.path)
     if (await fs.exists(targetDir ? `${targetDir}/${name}` : name)) {
-      window.alert(t('files.moveExists', { name, dir: where }))
+      await notify(t('files.moveTitle'), t('files.moveExists', { name, dir: where }))
       return
     }
   }
@@ -130,7 +135,7 @@ export async function moveRows(rows: SelectedRow[], targetDir: string): Promise<
       await files.renameEntry(r.path, dest, r.isDir)
     } catch (err) {
       console.error('move failed', r.path, err)
-      window.alert(t('files.moveFailed', { name: nameOf(r.path) }))
+      await notify(t('files.moveTitle'), t('files.moveFailed', { name: nameOf(r.path) }))
       break
     }
     landed.push({ path: dest, isDir: r.isDir })
@@ -147,9 +152,17 @@ export async function moveRows(rows: SelectedRow[], targetDir: string): Promise<
  *  prompt opens on the answer to "where am I" and is edited from there. */
 export async function moveInteractive(rows: SelectedRow[]): Promise<void> {
   if (!rows.length) return
-  const answer = prompt(t('files.moveToPrompt'), dirOf(rows[rows.length - 1]!.path))
-  if (answer === null) return // cancelled — distinct from "" (the KB root)
-  await moveRows(rows, answer.trim().replace(/^\/+|\/+$/g, ''))
+  const answer = await askText({
+    title: t('files.moveTitle'),
+    body: t('files.moveToPrompt'),
+    label: t('files.moveToLabel'),
+    value: dirOf(rows[rows.length - 1]!.path),
+    placeholder: t('files.kbRoot'),
+    confirmLabel: t('files.move'),
+  })
+  // null is cancelled; '' is a real answer — the top of the knowledge base.
+  if (answer === null) return
+  await moveRows(rows, answer.replace(/^\/+|\/+$/g, ''))
 }
 
 /**
@@ -179,20 +192,47 @@ export async function deleteRows(rows: SelectedRow[]): Promise<void> {
   const doomed = await stillThere(topLevelOnly(rows))
   if (!doomed.length) return
   const all = files.allFiles
-  const picked = await askDelete(
-    doomed.map((r) => ({
-      path: r.path,
-      isDir: r.isDir,
-      files: r.isDir ? fileCount(r.path, all) : 0,
-    })),
-  )
+  const byId = new Map(doomed.map((r) => [r.path, r]))
+  const picked = await askPick({
+    title: t('files.deleteTitle'),
+    body: t('files.deleteLead'),
+    danger: true,
+    rows: doomed.map((r) => {
+      const n = r.isDir ? fileCount(r.path, all) : 0
+      return {
+        id: r.path,
+        label: nameOf(r.path) + (r.isDir ? '/' : ''),
+        prefix: dirOf(r.path) ? `${dirOf(r.path)}/` : undefined,
+        icon: r.isDir ? 'folder' : 'file',
+        // A folder is the only row whose name understates it, so it carries
+        // the number itself — this is the fact whose absence let "delete these
+        // 4 items" mean an entire knowledge base.
+        badge: r.isDir ? (n ? t('files.nFiles', { n }) : t('files.emptyFolder')) : undefined,
+        loud: r.isDir,
+      }
+    }),
+    summary: (chosen) => {
+      const dirs = chosen.filter((c) => byId.get(c.id)?.isDir)
+      const inside = dirs.reduce((n, c) => n + fileCount(c.id, all), 0)
+      return dirs.length
+        ? t('files.deleteSummaryFolders', {
+            n: chosen.length,
+            dirs: dirs.length,
+            files: inside,
+          })
+        : t('files.deleteSummary', { n: chosen.length })
+    },
+    confirmLabel: (n) => t('files.deleteConfirmButton', { n }),
+  })
   if (!picked.length) return
-  for (const c of picked) {
+  for (const row of picked) {
+    const r = byId.get(row.id)
+    if (!r) continue
     try {
-      await files.deleteEntry(c.path, c.isDir)
+      await files.deleteEntry(r.path, r.isDir)
     } catch (err) {
-      console.error('delete failed', c.path, err)
-      window.alert(t('files.deleteFailed', { name: nameOf(c.path) }))
+      console.error('delete failed', r.path, err)
+      await notify(t('files.deleteTitle'), t('files.deleteFailed', { name: nameOf(r.path) }))
       break
     }
   }

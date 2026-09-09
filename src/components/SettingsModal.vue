@@ -38,6 +38,7 @@ import {
   type HotkeyId,
   type Binding,
 } from '@/lib/hotkeys'
+import { askConfirm } from '@/lib/dialog'
 import { t, useI18n, LOCALES, type Locale } from '@/i18n'
 
 const { locale, setLocale } = useI18n()
@@ -196,8 +197,8 @@ const sectionTitle = computed(() => {
   const n = NAV.find((n) => n.id === section.value)
   return n ? t(n.labelKey) : ''
 })
-function goSection(id: SectionId): void {
-  if (!leaveEditor()) return // leaving the models pane closes an in-progress edit
+async function goSection(id: SectionId): Promise<void> {
+  if (!(await leaveEditor())) return // leaving the models pane closes an in-progress edit
   section.value = id
   cancelRecording()
 }
@@ -219,13 +220,19 @@ function slotOptions(slot: Slot): { marked: LlmProfile[]; unmarked: LlmProfile[]
  *  again on every visit. A no puts the dropdown back where it was: the select
  *  has already moved by the time we are called, and leaving the store unchanged
  *  would not move it back on its own. */
-function onSlotChange(slot: Slot, e: Event): void {
+async function onSlotChange(slot: Slot, e: Event): Promise<void> {
   const el = e.target as HTMLSelectElement
   const id = el.value
   const p = store.state.profiles.find((x) => x.id === id)
   const cap = SLOT_CAPABILITY[slot]
   if (p && !profileCan(p, cap)) {
-    if (!confirm(t(`settings.markConfirm.${cap}`, { label: p.label }))) {
+    if (
+      !(await askConfirm({
+        title: t('settings.markTitle'),
+        body: t(`settings.markConfirm.${cap}`, { label: p.label }),
+        confirmLabel: t('settings.mark'),
+      }))
+    ) {
       el.value = store.state.slots[slot] ?? ''
       return
     }
@@ -323,20 +330,30 @@ function saveProfile(): void {
  *  edit away. A profile Save itself would refuse (no key, no model) can still
  *  only be discarded — but a half-filled one is minutes of pasting, so it asks
  *  before going, rather than vanishing without a word. */
-function leaveEditor(): boolean {
+async function leaveEditor(): Promise<boolean> {
   if (!editing.value) return true
   if (profileValid.value) {
     saveProfile()
     return true
   }
-  if (editingDirty.value && !confirm(t('settings.discardProfile'))) return false
+  if (
+    editingDirty.value &&
+    !(await askConfirm({
+      title: t('settings.discardProfileTitle'),
+      body: t('settings.discardProfile'),
+      confirmLabel: t('settings.discard'),
+      danger: true,
+    }))
+  ) {
+    return false
+  }
   editing.value = null
   return true
 }
 
 /** The modal's own exits take the editor with them, so they answer for it too. */
-function requestClose(): void {
-  if (leaveEditor()) emit('close')
+async function requestClose(): Promise<void> {
+  if (await leaveEditor()) emit('close')
 }
 
 function slotBadges(p: LlmProfile): string[] {

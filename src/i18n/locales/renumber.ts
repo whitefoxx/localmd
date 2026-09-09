@@ -3,8 +3,8 @@
  * to a different passage. Namespace: `renumber`.
  *
  * Written as sentences that compose (stake + reason + remedy), because the same
- * three facts are needed in three places — a notice in a viewer, a native
- * confirm on a button, and a decision card in the transcript — and three
+ * three facts are needed in three places — a notice in a viewer, a
+ * confirmation dialog on a button, and a decision card in the transcript — and three
  * separately-worded versions of one warning is three chances to disagree.
  */
 export default {
@@ -18,7 +18,9 @@ export default {
       'This format numbers passages from the document’s own structure and has no way to carry old ids over, and the algorithm has changed since this index was built. Some citations may land on a different paragraph.',
     remedy:
       'To keep them exact, copy .localmd/ from the machine that built the index before indexing here.',
+    title: 'Indexing could move your citations',
     proceed: 'Index it anyway?',
+    proceedButton: 'Index anyway',
     badge: 'Indexing paused',
     badgeHint: 'This document was not indexed, because doing so could re-point citations your notes already carry. Click to see what is at stake.',
   },
@@ -31,7 +33,9 @@ export default {
     noInheritance:
       '这种格式按文档自身的结构编号，没有沿用旧编号的机制，而算法在这个索引建成之后变过。有些引用可能落到别的段落。',
     remedy: '想让它们保持准确，先把建索引那台机器上的 `.localmd/` 拷过来，再在这里建索引。',
+    title: '建索引可能挪动你的引用',
     proceed: '仍然建立索引？',
+    proceedButton: '仍然建索引',
     badge: '索引已暂停',
     badgeHint: '这份文档没有建立索引，因为建索引可能让你笔记里已有的引用指向别处。点击查看具体情况。',
   },

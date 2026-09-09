@@ -1265,9 +1265,9 @@ const renumberWarning = ref<RenumberWarning | null>(null)
 
 /** The badge's click: the same question the manual path asks, and a yes runs
  *  the build that was held back. */
-function decideRenumber(): void {
+async function decideRenumber(): Promise<void> {
   const w = renumberWarning.value
-  if (!w || !confirmRenumber(w)) return
+  if (!w || !(await confirmRenumber(w))) return
   renumberWarning.value = null
   void runIndex(false, false, true)
 }
@@ -1364,7 +1364,7 @@ async function runIndex(auto = false, rebuild = false, confirmed = false): Promi
         renumberWarning.value = warning
         return
       }
-      if (!confirmRenumber(warning)) return
+      if (!(await confirmRenumber(warning))) return
     }
   }
   renumberWarning.value = null

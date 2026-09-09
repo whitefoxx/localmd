@@ -16,6 +16,7 @@ import { useFilesStore } from '@/stores/files'
 import { usePlanStore } from '@/stores/plan'
 import { useSkillsStore } from '@/stores/skillsStore'
 import { useComposerStore } from '@/stores/composer'
+import { askConfirm } from '@/lib/dialog'
 import { useFileSelectionCapture } from '@/lib/selectionContext'
 import { report } from '@/lib/analytics'
 import { parseCiteSources, type CiteSource } from '@/lib/citations'
@@ -401,11 +402,16 @@ const modelMenuOptions = computed<{ marked: LlmProfile[]; unmarked: LlmProfile[]
  *  once, and a yes writes the mark — so the answer is kept rather than asked
  *  again on every visit. A no changes nothing at all, which is the whole
  *  difference from a menu that just assigns whatever was clicked. */
-function pickModel(slot: Slot, id: string | null): void {
+async function pickModel(slot: Slot, id: string | null): Promise<void> {
   const profile = id ? settingsStore.state.profiles.find((x) => x.id === id) : null
   const cap = SLOT_CAPABILITY[slot]
   if (profile && !profileCan(profile, cap)) {
-    if (!confirm(t(`settings.markConfirm.${cap}`, { label: profile.label }))) return
+    const ok = await askConfirm({
+      title: t('settings.markTitle'),
+      body: t(`settings.markConfirm.${cap}`, { label: profile.label }),
+      confirmLabel: t('settings.mark'),
+    })
+    if (!ok) return
     settingsStore.upsertProfile({
       ...profile,
       capabilities: [...capabilitiesOf(profile), cap],

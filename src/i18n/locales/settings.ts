@@ -16,6 +16,8 @@ export default {
     editProfile: 'Edit model',
     discardProfile:
       'This model has not been saved — it still needs an API key and a model name. Discard what you entered?',
+    discardProfileTitle: 'Discard this model?',
+    discard: 'Discard',
 
     // General
     language: 'Language',
@@ -63,6 +65,8 @@ export default {
     slot: { primary: 'Primary', vision: 'Vision', image: 'Image generation' },
     notConfigured: 'Not set',
     notMarkedFor: 'Not marked for this',
+    markTitle: 'Use it for this role?',
+    mark: 'Use and mark it',
     markConfirm: {
       chat: '“{label}” is not marked as a chat model. Use it as the primary anyway, and mark it?',
       vision: '“{label}” is not marked as reading images. Use it for this role anyway, and mark it?',
@@ -287,6 +291,8 @@ export default {
     addProfile: '添加模型',
     editProfile: '编辑模型',
     discardProfile: '这个模型还没保存——它还缺 API key 和模型名。要丢弃已填的内容吗？',
+    discardProfileTitle: '丢弃这个模型？',
+    discard: '丢弃',
 
     // General
     language: '语言',
@@ -332,6 +338,8 @@ export default {
     slot: { primary: '主模型', vision: '视觉理解', image: '图像生成' },
     notConfigured: '未配置',
     notMarkedFor: '未标记为可做这件事',
+    markTitle: '用它来担这个角色？',
+    mark: '使用并标记',
     markConfirm: {
       chat: '「{label}」没有标记为对话模型。仍然把它设为主模型，并标记上吗？',
       vision: '「{label}」没有标记为能看图。仍然用它填这个角色，并标记上吗？',

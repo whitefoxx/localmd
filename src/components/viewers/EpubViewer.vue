@@ -930,9 +930,9 @@ async function maybeJump(): Promise<void> {
 }
 
 /** The badge's click: the same question, and a yes runs the held-back build. */
-function decideRenumber(): void {
+async function decideRenumber(): Promise<void> {
   const w = renumberWarning.value
-  if (!w || !confirmRenumber(w)) return
+  if (!w || !(await confirmRenumber(w))) return
   renumberWarning.value = null
   void runIndex(false, true)
 }
@@ -949,7 +949,7 @@ async function runIndex(rebuild = false, confirmed = false): Promise<void> {
         renumberWarning.value = warning
         return
       }
-      if (!confirmRenumber(warning)) return
+      if (!(await confirmRenumber(warning))) return
     }
   }
   renumberWarning.value = null

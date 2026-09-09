@@ -4,27 +4,30 @@ import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
 import { useFilesStore } from '@/stores/files'
 import { watch } from 'vue'
-import {
-  pendingDelete,
-  registerDeleteDialog,
-  settleDelete,
-  type DeleteCandidate,
-} from './confirmDelete'
+import { pendingDialog, registerDialogHost, settleDialog, type DialogRow } from './dialog'
 import { deleteRows, moveRows, readDragRows } from './fileOps'
 
 /**
- * Stand in for the dialog: register as a listener and answer the moment a
- * question opens. `pick` is what the user leaves ticked — the identity function
- * is "delete everything offered", `() => []` is cancel.
+ * Stand in for the dialog host: register, then answer the moment a question
+ * opens. `pick` is what the user leaves ticked — the identity function is
+ * "delete everything offered", `() => []` is cancel. Notices are read and
+ * dismissed, which is what makes them assertable as `alerts`.
  */
-function answerDelete(pick: (c: DeleteCandidate[]) => DeleteCandidate[]): () => void {
-  const unregister = registerDeleteDialog()
+function answerDialogs(pick: (rows: DialogRow[]) => DialogRow[]): () => void {
+  const unregister = registerDialogHost()
   const stop = watch(
-    pendingDelete,
+    pendingDialog,
     (req) => {
       if (!req) return
-      offered = req.candidates
-      settleDelete(pick(req.candidates))
+      if (req.kind === 'notice') {
+        alerts.push(req.body ?? req.title)
+        settleDialog(undefined)
+        return
+      }
+      if (req.kind !== 'pick') return settleDialog(null)
+      offered = req.rows
+      summary = req.summary(req.rows)
+      settleDialog(pick(req.rows))
     },
     { flush: 'sync' },
   )
@@ -34,7 +37,8 @@ function answerDelete(pick: (c: DeleteCandidate[]) => DeleteCandidate[]): () => 
   }
 }
 /** What the last question put in front of the user. */
-let offered: DeleteCandidate[] = []
+let offered: DialogRow[] = []
+let summary = ''
 let closeDialog: (() => void) | null = null
 
 /** What the batch helpers say when they refuse. */
@@ -45,12 +49,11 @@ beforeEach(async () => {
   fs.setRoot(createMemoryRoot())
   alerts = []
   offered = []
-  closeDialog = null
-  vi.stubGlobal('window', {
-    alert: (m: string) => alerts.push(m),
-    addEventListener: () => {},
-  })
+  summary = ''
   vi.stubGlobal('crypto', { randomUUID: () => `id-${Math.random()}` })
+  // Every test needs a host: without one the dialogs refuse by design, and a
+  // move that is silently refused looks exactly like a move that worked.
+  closeDialog = answerDialogs((rows) => rows)
   await fs.writeFile('wiki/a.md', 'A')
   await fs.writeFile('wiki/b.md', 'B')
   await fs.writeFile('notes/deep/c.md', 'C')
@@ -155,20 +158,20 @@ describe('moveRows', () => {
 
 describe('deleteRows', () => {
   it('offers the whole batch, and deletes what the user leaves ticked', async () => {
-    closeDialog = answerDelete((c) => c)
     await deleteRows([
       { path: 'wiki/a.md', isDir: false },
       { path: 'wiki/b.md', isDir: false },
     ])
 
-    expect(offered.map((c) => c.path)).toEqual(['wiki/a.md', 'wiki/b.md'])
+    expect(offered.map((r) => r.id)).toEqual(['wiki/a.md', 'wiki/b.md'])
     expect(await fs.exists('wiki/a.md')).toBe(false)
     expect(await fs.exists('wiki/b.md')).toBe(false)
   })
 
   it('deletes only the rows still ticked, leaving the ones taken back out', async () => {
     // The point of the dialog over a confirm: the batch is editable in it.
-    closeDialog = answerDelete((c) => c.filter((x) => x.path === 'wiki/a.md'))
+    closeDialog?.()
+    closeDialog = answerDialogs((rows) => rows.filter((r) => r.id === 'wiki/a.md'))
     await deleteRows([
       { path: 'wiki/a.md', isDir: false },
       { path: 'wiki/b.md', isDir: false },
@@ -179,48 +182,51 @@ describe('deleteRows', () => {
   })
 
   it('takes nothing when the dialog comes back empty', async () => {
-    closeDialog = answerDelete(() => [])
+    closeDialog?.()
+    closeDialog = answerDialogs(() => [])
     await deleteRows([{ path: 'wiki/a.md', isDir: false }])
 
     expect(await fs.exists('wiki/a.md')).toBe(true)
   })
 
-  it('takes nothing when there is no dialog to answer', async () => {
+  it('takes nothing when there is no host to answer', async () => {
     // A decision defaults to no: an unanswerable question must not fall
     // through to the delete, and must not hang the caller either.
+    closeDialog?.()
+    closeDialog = null
     await deleteRows([{ path: 'wiki/a.md', isDir: false }])
 
     expect(await fs.exists('wiki/a.md')).toBe(true)
   })
 
-  it('tells the dialog how many files a folder is carrying', async () => {
-    // The number the old one-line confirm had no room for, and whose absence
-    // let "delete these 3 items" mean an entire knowledge base.
-    closeDialog = answerDelete(() => [])
+  it('marks a folder out and says how many files it is carrying', async () => {
+    // The fact the old one-line confirm had no room for, and whose absence let
+    // "delete these 4 items" mean an entire knowledge base.
+    closeDialog?.()
+    closeDialog = answerDialogs(() => [])
     await deleteRows([
       { path: 'notes', isDir: true },
       { path: 'top.md', isDir: false },
     ])
 
     expect(offered).toEqual([
-      { path: 'notes', isDir: true, files: 2 },
-      { path: 'top.md', isDir: false, files: 0 },
+      { id: 'notes', label: 'notes/', prefix: undefined, icon: 'folder', badge: '2 files', loud: true },
+      { id: 'top.md', label: 'top.md', prefix: undefined, icon: 'file', badge: undefined, loud: false },
     ])
+    expect(summary).toBe('2 selected — 1 of them folders, holding 2 files. This cannot be undone.')
   })
 
   it('does not offer a row that is already gone, or trip over it', async () => {
-    closeDialog = answerDelete((c) => c)
     await deleteRows([
       { path: 'wiki/gone.md', isDir: false },
       { path: 'wiki/a.md', isDir: false },
     ])
 
-    expect(offered.map((c) => c.path)).toEqual(['wiki/a.md'])
+    expect(offered.map((r) => r.id)).toEqual(['wiki/a.md'])
     expect(await fs.exists('wiki/a.md')).toBe(false)
   })
 
   it('counts a folder and its contents once', async () => {
-    closeDialog = answerDelete((c) => c)
     await deleteRows([
       { path: 'notes/deep', isDir: true },
       { path: 'notes/deep/c.md', isDir: false },
@@ -228,7 +234,7 @@ describe('deleteRows', () => {
 
     // The child would already be gone with its parent; offering it separately
     // would ask about the same delete twice and then throw on a dead path.
-    expect(offered.map((c) => c.path)).toEqual(['notes/deep'])
+    expect(offered.map((r) => r.id)).toEqual(['notes/deep'])
     expect(await fs.exists('notes/deep/c.md')).toBe(false)
     expect(await fs.exists('notes/d.md')).toBe(true)
   })

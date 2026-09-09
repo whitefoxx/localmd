@@ -150,13 +150,15 @@ export const useUiStore = defineStore('ui', () => {
    *  backdrop — go through the modal directly and never come here.
    *
    *  A `let` rather than a ref on purpose: nothing renders from it. */
-  let settingsBeforeClose: (() => boolean) | null = null
+  let settingsBeforeClose: (() => boolean | Promise<boolean>) | null = null
   /** Installed by the Settings modal for as long as it is mounted. */
-  function setSettingsBeforeClose(fn: (() => boolean) | null): void {
+  function setSettingsBeforeClose(fn: (() => boolean | Promise<boolean>) | null): void {
     settingsBeforeClose = fn
   }
-  /** Whether the Settings layer may close now. Nothing installed = yes. */
-  function maySettingsClose(): boolean {
+  /** Whether the Settings layer may close now. Nothing installed = yes.
+   *  Async because the answer can be a question put to the user (a half-filled
+   *  profile asks before it is thrown away). */
+  async function maySettingsClose(): Promise<boolean> {
     return settingsBeforeClose ? settingsBeforeClose() : true
   }
   /** Show the editor tab bar. When hidden, files open via the Open Files list. */

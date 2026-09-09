@@ -17,6 +17,7 @@ import {
   readDragRows,
   refreshGitStatus,
 } from '@/lib/fileOps'
+import { askText } from '@/lib/dialog'
 import FileTreeNode from '@/components/FileTreeNode.vue'
 import type { TreeNode } from '@/lib/fs'
 import { t } from '@/i18n'
@@ -101,7 +102,11 @@ async function newFile(): Promise<void> {
 
 async function newFolder(): Promise<void> {
   closeMenu()
-  const name = prompt(t('files.newFolderPrompt'))?.trim()
+  const name = await askText({
+    title: t('files.newFolderTitle'),
+    label: t('files.newFolderPrompt'),
+    confirmLabel: t('files.create'),
+  })
   if (!name) return
   const path = inTarget(name)
   await fs.mkdir(path)
@@ -138,7 +143,7 @@ async function indexDocs(dir: string): Promise<void> {
       // set of citations at stake, and only the documents actually at risk
       // interrupt anything (lib/renumber).
       const warning = await checkRenumber(docs[i])
-      if (warning && !confirmRenumber(warning)) continue
+      if (warning && !(await confirmRenumber(warning))) continue
       await indexDocument(docs[i])
     } catch (err) {
       console.error('index failed', docs[i], err)
@@ -155,7 +160,7 @@ async function indexFile(path: string): Promise<void> {
   indexStatus.value = t('files.indexing')
   try {
     const warning = await checkRenumber(path)
-    if (warning && !confirmRenumber(warning)) {
+    if (warning && !(await confirmRenumber(warning))) {
       indexStatus.value = ''
       return
     }
@@ -181,7 +186,12 @@ function menuOpen(node: TreeNode): void {
 async function menuRename(row: SelectedRow): Promise<void> {
   closeMenu()
   const name = row.path.slice(row.path.lastIndexOf('/') + 1)
-  const next = prompt(t('files.renamePrompt'), name)?.trim()
+  const next = await askText({
+    title: t('files.renameTitle'),
+    label: t('files.renamePrompt'),
+    value: name,
+    confirmLabel: t('files.rename'),
+  })
   if (!next || next === name) return
   const i = row.path.lastIndexOf('/')
   const newPath = i < 0 ? next : `${row.path.slice(0, i)}/${next}`

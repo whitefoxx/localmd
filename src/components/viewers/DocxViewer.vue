@@ -220,10 +220,10 @@ function rebuildIndex(): void {
 
 /** The renumber badge's click: the same question the rebuild path asks, and a
  *  yes runs the build that was held back. */
-function decideRenumber(): void {
+async function decideRenumber(): Promise<void> {
   const w = renumberWarning.value
   const path = files.currentPath
-  if (!w || !path || !confirmRenumber(w)) return
+  if (!w || !path || !(await confirmRenumber(w))) return
   renumberWarning.value = null
   void runIndex(path, loadToken, false, true)
 }
@@ -246,7 +246,7 @@ async function runIndex(
         renumberWarning.value = warning
         return
       }
-      if (!confirmRenumber(warning)) return
+      if (!(await confirmRenumber(warning))) return
     }
   }
   renumberWarning.value = null

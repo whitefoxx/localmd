@@ -16,6 +16,7 @@
  * longer remember writing). What was wrong was doing it silently.
  */
 import { t } from '@/i18n'
+import { askConfirm } from '@/lib/dialog'
 import { publishedCitations } from '@/lib/citations'
 import { renumberRisk, type RenumberRisk } from '@/lib/docindex'
 import { useFilesStore } from '@/stores/files'
@@ -76,6 +77,11 @@ export function renumberMessage(w: RenumberWarning): string {
  * it stops, and the badge's click lands back here. One wording of the warning,
  * one place the decision is made.
  */
-export function confirmRenumber(w: RenumberWarning): boolean {
-  return confirm(`${renumberMessage(w)}\n\n${t('renumber.proceed')}`)
+export function confirmRenumber(w: RenumberWarning): Promise<boolean> {
+  return askConfirm({
+    title: t('renumber.title'),
+    body: `${renumberMessage(w)}\n\n${t('renumber.proceed')}`,
+    confirmLabel: t('renumber.proceedButton'),
+    danger: true,
+  })
 }

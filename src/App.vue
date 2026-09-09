@@ -13,7 +13,8 @@ import { useMcpStore } from '@/stores/mcp'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import NarrowScreenNotice from '@/components/NarrowScreenNotice.vue'
-import DeleteDialog from '@/components/DeleteDialog.vue'
+import AppDialog from '@/components/AppDialog.vue'
+import { pendingDialog } from '@/lib/dialog'
 import TtsBar from '@/components/TtsBar.vue'
 import UpdateBanner from '@/components/UpdateBanner.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
@@ -110,7 +111,7 @@ function onKeydown(e: KeyboardEvent): void {
     RUN[id]()
     return
   }
-  if (e.key === 'Escape') closeTopLayer()
+  if (e.key === 'Escape') void closeTopLayer()
 }
 
 /** Esc closes the top-most open layer, one per press: help → search → settings
@@ -126,9 +127,13 @@ function onKeydown(e: KeyboardEvent): void {
  *  exactly as it always did whenever Help is shut, which was every state it had
  *  until now: Help was the one modal Esc did not close, while its own close
  *  button advertised "Close (Esc)". */
-function closeTopLayer(): void {
+async function closeTopLayer(): Promise<void> {
   const review = useReviewStore()
   const chat = useChatStore()
+  // A dialog outranks every layer below, and answers Escape itself. This
+  // listener is in the capture phase, so without standing down it would reach
+  // the chain FIRST and start unwinding the layers the dialog is asking about.
+  if (pendingDialog.value) return
   if (ui.helpOpen) ui.helpOpen = false
   else if (ui.searchOpen) ui.searchOpen = false
   // Asks rather than tells: this layer can be holding unsaved input, and it is
@@ -136,7 +141,7 @@ function closeTopLayer(): void {
   // `settingsOpen` — folding the question into it would let a "no" fall through
   // to the next branch and close whatever is underneath instead.
   else if (ui.settingsOpen) {
-    if (ui.maySettingsClose()) ui.settingsOpen = false
+    if (await ui.maySettingsClose()) ui.settingsOpen = false
   }
   else if (git.panelOpen) git.panelOpen = false
   else if (review.panelOpen) review.panelOpen = false
@@ -223,11 +228,11 @@ onBeforeUnmount(() => {
          degrades correctly there on its own — it is the three-column workspace
          behind it that has no narrow form. -->
     <NarrowScreenNotice v-if="kb.isOpen" />
-    <!-- Root-level and unconditional while a folder is open: the question it
-         asks has to be answerable from wherever the delete was started, and a
-         dialog that is not mounted is a question that cannot be answered — which
-         `lib/confirmDelete` counts as no. -->
-    <DeleteDialog v-if="kb.isOpen" />
+    <!-- Root-level and always mounted: a question has to be answerable from
+         wherever it was asked, and a host that is not mounted is a question
+         that cannot be answered — which `lib/dialog` counts as a refusal.
+         Unconditional, because the start screen asks things too. -->
+    <AppDialog />
     <TtsBar />
     <!-- Also root-level: which screen is up decides whether a waiting build is
          offered or just applied (main.ts), not where the offer is drawn. -->

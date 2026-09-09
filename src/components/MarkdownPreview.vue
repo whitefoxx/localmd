@@ -7,6 +7,7 @@ import { inheritedCiteSources } from '@/lib/citations'
 import { useCiteQuote } from '@/composables/useCiteQuote'
 import { renderMarkdown } from '@/lib/markdown'
 import { handleCodeCopy } from '@/lib/copyCode'
+import { askConfirm } from '@/lib/dialog'
 import { splitFrontmatter } from '@/lib/wiki'
 import { toggleTask } from '@/lib/tasks'
 import { enumerateMarkdownBlocks } from '@/lib/docindex/md/parse'
@@ -131,9 +132,12 @@ async function onClick(e: MouseEvent): Promise<void> {
           : ''
       const dest = target.includes('/') || !dir ? `${target}.md` : `${dir}/${target}.md`
       const title = target.split('/').pop() ?? target
-      if (confirm(t('viewers.markdown.createPagePrompt', { target: dest }))) {
-        await files.createFile(dest, `# ${title}\n\n`)
-      }
+      const make = await askConfirm({
+        title: t('viewers.markdown.createPageTitle'),
+        body: t('viewers.markdown.createPagePrompt', { target: dest }),
+        confirmLabel: t('viewers.markdown.createPageButton'),
+      })
+      if (make) await files.createFile(dest, `# ${title}\n\n`)
     }
     return
   }
