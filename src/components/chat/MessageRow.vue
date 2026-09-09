@@ -374,7 +374,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
           </div>
         </div>
       </div>
-      <div v-if="userText(m)" class="whitespace-pre-wrap">{{ userText(m) }}</div>
+      <div v-if="userText(m)" class="whitespace-pre-wrap break-words">{{ userText(m) }}</div>
       <div v-if="m.attachments?.length" class="flex flex-wrap gap-1.5 mt-1.5">
         <button
           v-for="(a, i) in m.attachments"
@@ -487,7 +487,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
               class="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-right italic opacity-70 [mask-image:linear-gradient(to_right,transparent,#000_3rem)]"
             >{{ thinkTail(part.text) }}</span>
           </summary>
-          <div class="pl-4 pt-1 whitespace-pre-wrap selectable italic leading-relaxed">{{ part.text }}</div>
+          <div class="pl-4 pt-1 whitespace-pre-wrap break-words selectable italic leading-relaxed">{{ part.text }}</div>
         </details>
         <button
           v-else-if="part.type === 'artifact'"
@@ -563,7 +563,7 @@ async function copyMessage(e: MouseEvent): Promise<void> {
           </button>
         </div>
       </details>
-      <div v-if="m.error" class="text-xs text-removed">{{ m.error }}</div>
+      <div v-if="m.error" class="text-xs text-removed break-words">{{ m.error }}</div>
       <!-- Ran out of steps, not out of work. Say so and offer the obvious
            next move, rather than letting it read as a finished answer. -->
       <div

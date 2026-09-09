@@ -676,6 +676,14 @@
 .md-preview {
   @apply text-fg-1 leading-relaxed;
   user-select: text;
+  /* A URL, a hash, a token, a base64 blob: text with no break opportunity
+     anywhere in it. Left alone the line simply keeps going and draws straight
+     through whatever holds it — a chat bubble's border, the preview's column —
+     because wrapping at spaces is all the default does and there are none.
+     Inherited, so it reaches paragraphs, list items, links and inline code in
+     one rule; `pre` is untouched, since `white-space: pre` forbids wrapping
+     either way and a code block scrolls on purpose. */
+  overflow-wrap: break-word;
 }
 .md-preview h1 {
   @apply text-2xl font-bold text-fg-0 mt-4 mb-3 pb-2 border-b border-border;
@@ -759,6 +767,12 @@
 .md-preview th,
 .md-preview td {
   @apply px-3 py-1 border border-border;
+  /* `anywhere` rather than the `break-word` inherited above, and only here: the
+     two wrap identically once a width is settled, but only `anywhere` lets an
+     unbreakable word shrink the column's min-content width. In a table that is
+     the whole difference — auto layout sizes each column to its longest word,
+     so one URL in one cell pushes the whole table past the edge. */
+  overflow-wrap: anywhere;
 }
 .md-preview th {
   @apply bg-bg-2 font-semibold;
