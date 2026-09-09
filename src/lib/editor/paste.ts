@@ -15,15 +15,21 @@ import { EditorView } from '@codemirror/view'
 import type { Extension } from '@codemirror/state'
 import { importFileInto } from '@/lib/capture'
 import { dirName } from '@/lib/wiki'
+import { markdownTarget } from '@/lib/clip'
 
 /** Media we know how to embed. Anything else is left to the browser. */
 function isEmbeddable(file: File): boolean {
   return /^(image|video|audio)\//.test(file.type)
 }
 
-/** The markdown for an embedded file — only images get the `!`. */
+/** The markdown for an embedded file — only images get the `!`.
+ *
+ *  `markdownTarget` rather than `encodeURI`, which leaves parentheses alone: a
+ *  pasted `screenshot (1).png` produced `![](screenshot (1).png)`, which
+ *  CommonMark reads as plain text, not a link. Same escaping rule as a clip's
+ *  destinations, one description of it (lib/clip). */
 function embedFor(name: string, type: string): string {
-  const link = `[${type.startsWith('image/') ? '' : name}](${encodeURI(name)})`
+  const link = `[${type.startsWith('image/') ? '' : name}](${markdownTarget(name)})`
   return type.startsWith('image/') ? `!${link}` : link
 }
 
