@@ -234,6 +234,101 @@ few, report, and ask before spending the rest — twenty sources is a token-heav
 run the user should get to agree to first.
 `
 
+const REACH_A_SITE = `# Reaching a site
+
+The user wants something read off a mainstream site — an X thread, a Reddit
+discussion, a YouTube transcript, their own Gemini chats. Reaching a site is a
+capability you COMPOSE from the browser primitives, not a per-site tool you look
+up: there is no adapter catalog. You pick the cheapest route that works; for a
+couple of sites where the obvious route fails there is a hint below, and for
+everything else you work it out live.
+
+The signed-in state is the user's own — every route here rides their real
+session and cookies. The generic tools are for READING and navigating. A WRITE —
+post, send, follow, delete — always pauses on a confirmation card the user must
+approve; it happens ONLY after they approve. Two paths reach a write, both gated:
+PREFER calling the site's own action or API from an \`eval_js\` snippet with
+\`allow_write: true\` (steadier than fighting a live composer, e.g. X's CreateTweet
+over the same GraphQL the read recipe uses); or, when only the page's own control
+will do, just \`click\` that Post/Send/Submit button as usual — the extension
+recognises a write control and pauses it on the confirmation card for you (you do
+not pass a flag for a click). Never claim a write happened unless the call
+returned without a decline.
+
+## The ladder — try these in order, cheapest first
+
+**1. Hidden JSON / open API (no tab).** Most sites answer JSON somewhere. Try
+\`fetch_url {format:"json"}\` first — it carries the user's cookies, needs no tab,
+costs the least:
+- append \`.json\` to the URL (Reddit: any thread or listing, plus \`?raw_json=1\`);
+- a public data endpoint (\`/api/v4/…\`, oEmbed, a \`?format=json\`).
+If it comes back as the data you want, you are done — shape it into rows.
+
+**2. Same-origin request from a tab (\`eval_js\`).** When the endpoint needs a
+header the page holds (a CSRF cookie, a bearer the SPA carries) or refuses
+cross-origin calls, open a tab on the site and make the request from inside it
+with \`eval_js\`: read the cookie, set the headers, \`XMLHttpRequest\` (sync is
+fine), then REDUCE the payload to rows in the page — never return the raw 150 KB.
+
+Don't know the endpoint, or which headers it wants? Let the page make the call
+once and watch it with \`capture_network\` — that captured request IS your URL
+template and header list — then REPLAY it with \`eval_js\`. Three traps that cost
+whole sessions: an entry's \`body\` is a raw STRING (\`JSON.parse\` it yourself);
+**never reload a tab while a capture is attached** — it can leave an SPA blank,
+losing the very load you meant to observe (arm the capture on a fresh tab BEFORE
+navigating, or re-trigger by in-app navigation); and once you HAVE the template,
+stop the capture and work from replay. Re-arming a capture over and over is a
+loop, not progress — if you already captured the payload, the answer is in your
+hand, so reduce it rather than going back for another.
+
+**3. Drive the rendered DOM (\`eval_js\` + recon).** When there is no reachable API
+(the data is server-rendered, or gated like YouTube captions), open the app in
+an ACTIVE tab (lazy apps do not render in the background), let it settle, and
+read the DOM. Find selectors with \`get_a11y_tree\` / \`find_structured_data\` /
+\`find_in_dom\` rather than guessing. Long lists VIRTUALIZE, and the trap is the
+opposite of what it looks like: what you scroll PAST is UNMOUNTED, so scrolling to
+the bottom and then reading gives you the tail and silently drops everything
+above it. Harvest as you go — small scroll steps, read after each, accumulate into
+a map keyed by a STABLE id (the item's permalink or data id) so re-renders dedup
+instead of duplicating. You are done when the count stops growing, not when you
+reach the bottom.
+
+Always: return the ROWS you need (id, text, author, url), not the whole payload;
+\`max_chars\` truncates the rest. Read markdown, not plain text, when links matter.
+
+## A couple of hints where the obvious route fails
+
+Most sites fall straight out of the ladder — a hidden \`.json\`/API (Reddit's
+\`.json\`, Zhihu's \`api/v4\`, Bilibili's player API, the AI chats' own conversation
+APIs), or a DOM you read with \`eval_js\`. Two are worth a heads-up, because the
+naive route actively fails:
+
+- **YouTube transcript** — the caption API is behind a proof-of-origin (\`pot\`)
+  wall and captions are service-worker-fetched, so \`fetch_url\` and network
+  capture do not see them. Drive the UI instead: open the watch page active,
+  click "Show transcript", read the transcript panel's rows.
+- **X / Twitter** — no open API, and the conversation view virtualizes, so DOM
+  scraping fights you on two fronts at once. Let the page issue its own
+  conversation GraphQL call, capture that ONE request for its URL template and
+  headers, then replay it same-origin from an x.com tab (the \`ct0\` cookie is the
+  CSRF header) and follow the cursor for the rest. Decide what belongs to a
+  thread from the RESPONSE's own fields — the display type marking an author's
+  self-thread, and the conversation id — never from rendered order, and never
+  from a number the author typed into the text.
+
+That is the extent of the site-specific knowledge shipped here. For anything
+else, WORK IT OUT LIVE with the ladder + recon. This project maintains the base
+capabilities, not per-site extractors — so when you find a route that works, tell
+the user they can save it as a skill in their own skills directory to reuse, and
+have you re-derive it if the site later changes.
+
+## Finally
+
+Prove it: show the user a real row you pulled, and say which route worked. Save a
+page into the KB as a \`source\` note with the title, author, url and content —
+the same as any other clip.
+`
+
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   {
     name: 'ingest',
@@ -246,6 +341,12 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
     description:
       'Connect an external service (an API, a reading app, a note tool) by researching how it works and building real tools for it — use whenever the user asks to add, connect or integrate something, including "add the <name> skill".',
     body: CONNECT_A_SERVICE,
+  },
+  {
+    name: 'reach-a-site',
+    description:
+      'Reach a mainstream site — read an X thread, a Reddit discussion, a YouTube transcript, your own AI chats — by composing the browser primitives (fetch_url / eval_js / recon). Use before scraping or hand-driving a well-known site.',
+    body: REACH_A_SITE,
   },
 ]
 

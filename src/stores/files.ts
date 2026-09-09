@@ -463,6 +463,7 @@ export const useFilesStore = defineStore('files', () => {
     if (currentPath.value) currentPath.value = remap(currentPath.value)
     await refreshTree()
     select(newPath, isDir)
+    void afterPathsChanged()
   }
 
   /** Delete a file or directory; closes affected tabs and clears selection. */
@@ -493,6 +494,24 @@ export const useFilesStore = defineStore('files', () => {
     }
     if (affected(selectedPath.value)) clearSelection()
     await refreshTree()
+    void afterPathsChanged()
+  }
+
+  /**
+   * A note that moved or went away is news OUTSIDE this app: localmd Connect
+   * keeps its own map of "this web page is already in your knowledge base", it
+   * learned every entry from us, and it cannot see the folder — so a deleted
+   * note leaves its popup claiming the page is saved, at a path that is gone
+   * (findings F-61). Fire-and-forget, and imported lazily: this store sits
+   * underneath the one that owns the connection.
+   */
+  async function afterPathsChanged(): Promise<void> {
+    try {
+      const { reconcileSavedPagesEverywhere } = await import('@/lib/connectSaved')
+      await reconcileSavedPagesEverywhere()
+    } catch {
+      /* no extension connected, or nothing to correct */
+    }
   }
 
   /** Record what just landed. Appends, so two drops in a row read as one

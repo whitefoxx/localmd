@@ -24,3 +24,21 @@ export const SOURCE_URL = 'https://github.com/whitefoxx/localmd'
  *  you host yourself works with it once you add your own address to its list. */
 export const CONNECT_STORE_URL =
   'https://chromewebstore.google.com/detail/localmd-connect-browser-s/bgennbocoapjiiolmmlcbfingimhmchh'
+
+/**
+ * localmd Connect's source. Open, MIT, and linked from the landing page for a
+ * reason the app half cannot carry on its own: an extension that can drive a
+ * browser you are signed into is precisely the half a reader most needs to be
+ * able to read. An open app beside an unexaminable extension is half an
+ * argument.
+ *
+ * NOT `whitefoxx/web-agent`, which is a different extension — the standalone
+ * one, with an agent inside the browser, never released. It mounts this
+ * repository as a submodule, which is what makes the two easy to confuse.
+ */
+export const CONNECT_SOURCE_URL = 'https://github.com/whitefoxx/web-tools'
+
+/** Karpathy's note describing an LLM wiki — the idea this app started from,
+ *  linked from the landing page's account of where it came from. A gist, so
+ *  it may move; if it does, the link goes stale here and nowhere else. */
+export const LLM_WIKI_URL = 'https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f'

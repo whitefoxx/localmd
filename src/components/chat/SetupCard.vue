@@ -201,9 +201,14 @@ async function signIn(): Promise<void> {
         v-if="request.detail"
         class="rounded-lg bg-bg-2 px-2.5 py-2 text-xs font-mono text-fg-1 whitespace-pre-wrap break-words leading-relaxed max-h-48 overflow-auto"
       >{{ request.detail }}</p>
-      <button class="btn text-xs" :disabled="busy" @click="confirmAction">
-        {{ busy ? $t('chat.setupWorking') : $t('chat.setupConfirm') }}
-      </button>
+      <div class="flex items-center gap-3">
+        <button class="btn text-xs" :disabled="busy" @click="confirmAction">
+          {{ busy ? $t('chat.setupWorking') : $t('chat.setupConfirm') }}
+        </button>
+        <button class="text-xs text-fg-3 hover:text-fg-1" @click="setup.settle(request.id, 'skipped')">
+          {{ $t('chat.setupSkip') }}
+        </button>
+      </div>
     </div>
 
     <!-- An authorization only the user can grant, in the service's own window. -->
@@ -232,7 +237,9 @@ async function signIn(): Promise<void> {
     </p>
     <p v-if="failure" class="mt-1.5 text-xs text-removed leading-relaxed">{{ failure }}</p>
 
-    <div class="mt-2 flex items-center gap-3">
+    <!-- The confirm kind renders its own Confirm + Skip row above; every other
+         kind shares this bottom row (a "where" link plus Skip). -->
+    <div v-if="request.kind !== 'confirm'" class="mt-2 flex items-center gap-3">
       <a
         v-if="request.url && request.kind !== 'extension'"
         :href="request.url"

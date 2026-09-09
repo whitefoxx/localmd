@@ -60,6 +60,11 @@ const MIME_EXT: Record<string, string> = {
   'image/svg+xml': 'svg',
 }
 
+/** File extension for an image MIME type; 'dat' for one we do not know. */
+export function extForMime(mime: string): string {
+  return MIME_EXT[mime] ?? 'dat'
+}
+
 /** Ensure a usable, unique-ish filename for a clipboard blob that may arrive
  *  name-less — browsers name every pasted screenshot "image.png". */
 export function ensureFilename(name: string, mime: string, stamp: number): string {
@@ -78,7 +83,10 @@ export function numberedVariant(desired: string, n: number): string {
   return `${desired}-${n}`
 }
 
-async function resolveUniquePath(desired: string): Promise<string> {
+/** First free name at `desired`, trying `-2`, `-3`, … Exported because every
+ *  intake path needs it (drops, pastes, web clips) and two of them getting
+ *  collision handling subtly different is how a file silently overwrites another. */
+export async function resolveUniquePath(desired: string): Promise<string> {
   for (let n = 1; n < 1000; n++) {
     const candidate = numberedVariant(desired, n)
     if (!(await fs.exists(candidate))) return candidate

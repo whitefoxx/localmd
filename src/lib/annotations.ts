@@ -8,6 +8,9 @@
  * verbatim and only derive the fields we render, so fields we don't model
  * survive a round-trip. EPUB entries are simple {cfi, color, text, createdAt};
  * DOCX entries are the same with a block-offset `range` in place of the CFI.
+ * WEB entries — highlights the user made in their browser, arriving with a
+ * clipped page — carry a TextQuote `anchor` and the page `url` in place of a
+ * position, since the "document" they point into is a live page and not a file.
  */
 import { ref } from 'vue'
 import * as fs from '@/lib/fs'
@@ -244,6 +247,57 @@ export async function saveDocxSidecar(
   await fs.writeFile(sidecarPath(source), JSON.stringify({ version: 1, annotations }, null, 2))
 }
 
+/* ───────── WEB (a clipped page's browser highlights) ───────── */
+
+/**
+ * A highlight the user made in their browser, written beside the clipped note
+ * (localmd Connect hands them over with the clip — lib/clip.ts).
+ *
+ * The locator is a W3C TextQuote selector rather than a position, because the
+ * thing it points into is a LIVE page: the extension finds the passage again
+ * by its text and context, and so could anything else that reads this file.
+ * Recognised by the presence of `anchor`, not by the source's file kind —
+ * the shape says what it is.
+ */
+export interface WebAnnotation {
+  anchor: { exact: string; prefix: string; suffix: string }
+  url: string
+  color: string
+  text: string
+  createdAt: string
+  note?: string
+  /** The extension's own id for the highlight, kept so a later sync can tell
+   *  an entry it has seen from a new one. */
+  id?: string
+}
+
+export function isWebAnnotation(entry: unknown): entry is WebAnnotation {
+  const a = entry as WebAnnotation | null
+  return !!a && typeof a === 'object' && !!a.anchor && typeof a.anchor.exact === 'string'
+}
+
+/** The extension names its colours; sidecars store hex. Same five names on
+ *  both sides, on purpose, so a highlight looks the same here as on the page. */
+export function colorHexFor(name: string | undefined): string {
+  const hit = HIGHLIGHT_COLORS.find((c) => c.name === (name ?? '').toLowerCase())
+  return hit?.value ?? HIGHLIGHT_COLORS[0].value
+}
+
+export async function loadWebSidecar(source: string): Promise<WebAnnotation[]> {
+  const raw = await fs.tryReadFile(sidecarPath(source))
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw) as { annotations?: unknown[] }
+    return Array.isArray(parsed.annotations) ? parsed.annotations.filter(isWebAnnotation) : []
+  } catch {
+    return []
+  }
+}
+
+export async function saveWebSidecar(source: string, annotations: WebAnnotation[]): Promise<void> {
+  await fs.writeFile(sidecarPath(source), JSON.stringify({ version: 1, annotations }, null, 2))
+}
+
 /* ───────── categories (shared by the viewer + the agent digest) ───────── */
 
 /** PDF/EmbedPDF annotation subtype numbers → display names (from the engine's
@@ -288,6 +342,8 @@ export interface AnnotationItem {
   cfi?: string
   /** DOCX: block-offset locator (for the jump). */
   range?: string
+  /** WEB: the page the passage lives on (the jump opens it). */
+  url?: string
   origIndex: number
 }
 
@@ -318,6 +374,20 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
   const kind = fileKind(source)
   const items: AnnotationItem[] = []
   annotations.forEach((entry, i) => {
+    if (isWebAnnotation(entry)) {
+      items.push({
+        id: entry.id ?? `${entry.url}#${i}`,
+        category: 'highlight',
+        typeLabel: 'highlight',
+        color: entry.color,
+        excerpt: entry.text || entry.anchor.exact,
+        comment: entry.note ?? '',
+        createdAt: entry.createdAt ?? '',
+        url: entry.url,
+        origIndex: i,
+      })
+      return
+    }
     if (kind === 'pdf') {
       const a = (entry as RawPdfAnnotation)?.annotation
       if (!a || typeof a.pageIndex !== 'number' || !a.id) return
@@ -368,7 +438,11 @@ export function buildAnnotationItems(source: string, annotations: unknown[]): An
       })
     }
   })
-  if (kind === 'pdf') {
+  if (items.length && items.every((it) => it.url)) {
+    // A page has no position we can compare from here; the order they were
+    // made in is the honest one.
+    items.sort((x, y) => x.createdAt.localeCompare(y.createdAt))
+  } else if (kind === 'pdf') {
     items.sort((x, y) => x.page! - y.page! || (x.rects?.[0]?.y ?? 0) - (y.rects?.[0]?.y ?? 0))
   } else if (kind === 'docx') {
     items.sort((x, y) => compareDocxRange(x.range!, y.range!))
@@ -418,9 +492,12 @@ export function renderAnnotationsDigest(sidecar: string, json: string): string |
   if (!Array.isArray(parsed.annotations)) return null
   const items = buildAnnotationItems(source, parsed.annotations)
   const name = source.slice(source.lastIndexOf('/') + 1)
+  const pageUrl = items.find((it) => it.url)?.url
   const head =
     `# Annotations — ${name} (${items.length})\n\n` +
-    `Source book: ${source} · sidecar: ${sidecar} (JSON, rendered here for readability)\n`
+    (pageUrl
+      ? `Highlights made in the browser on ${pageUrl}, clipped to ${source} · sidecar: ${sidecar} (JSON, rendered here for readability)\n`
+      : `Source book: ${source} · sidecar: ${sidecar} (JSON, rendered here for readability)\n`)
   if (fileKind(source) === 'pdf') {
     const byPage = new Map<number, string[]>()
     for (const it of items) {

@@ -101,7 +101,7 @@ export function systemPromptFingerprint(): string {
     mcpStore.deferredCatalog.map((t) => t.qualifiedName),
     toolsStore.deferredCatalog.map((s) => s.name),
     mcpTools.some((t) => t.qualifiedName.includes('__generic__')),
-    mcpTools.some((t) => t.def.name === 'generic__find_adapters'),
+    mcpTools.some((t) => t.def.name === 'generic__clip_page'),
     toolsStore.specs.filter((t) => t.web).map((t) => t.name),
   ])
 }
@@ -141,8 +141,16 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   // The interface language is only the fallback — someone whose app is in
   // English writing to the agent in Chinese wants Chinese back. Injected
   // dynamically so switching the app language takes effect on the next turn.
+  //
+  // Built here (it needs `langName`) but APPENDED LAST — see the end of this
+  // function. Everything below is long English prose: the skills catalog, the
+  // deferred-tool catalog, the browser-bridge block, the KB schema, the KB
+  // memory. A language rule buried above all of that loses to the English that
+  // follows it, and that is the observed failure — a Chinese question answered
+  // in English for a whole turn once a large English block (the browser-bridge
+  // guidance, or a skill loaded mid-turn) sat between the rule and the reply.
   const langName = LOCALE_NAMES[getLocale()]
-  prompt += `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink".`
+  const responseLanguageRule = `\n\nResponse language: the conversation decides, and that includes your reasoning. Write BOTH your thinking and your reply in the language of the user's message — a message in Chinese means you think in Chinese, not in English — and switch when they switch, whatever the app's interface is set to. Fall back to ${langName} (the interface language) only when their message gives you nothing to go on: an empty prompt, a bare path or link, a file dropped without words. Keep proper nouns and established technical terms in their conventional form rather than translating them — e.g. "agent", "LLM", "Gemini", "Claude Code", "Codex", "OpenAI", "Markdown", "commit", "wikilink". This rule outranks the language of anything you have READ — instructions, a skill, a tool result, the knowledge base — all of which are usually English; reading English is not a reason to answer in it.`
 
   // Only the model's half of the catalog: this block is re-sent on every step
   // of every turn, so a skill the user runs by hand and the agent never picks
@@ -177,14 +185,16 @@ export async function buildSystemPrompt(): Promise<SystemPromptParts> {
   if (hasExtension) {
     prompt += `
 
-Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. Screenshot-type tools return images (need vision). These are deferred — enable_tools first (batch all the names you'll need in one call).`
+Browser access: never guess live web content — use the connected browser tools (mcp__*__generic__*). You drive the user's real browser yourself — open_url, get_page_text, find_in_page, click, type_into, list_tabs, … Results come back word-for-word with no model in between, so this is the tool for precise, short or verbatim work: fetching a page's text for the KB, checking one fact, reading what the user is looking at. A tool that returns an image (screenshot) has it saved into .tmp/ and tells you the path — call view_image on it to actually see it; never describe a screenshot you did not look at. These are deferred — enable_tools first (batch all the names you'll need in one call).`
   }
 
   // localmd Connect adds adapters + site scripts on top of the generic tools.
-  const hasConnect = mcpTools.some((t) => t.def.name === 'generic__find_adapters')
+  const hasConnect = mcpTools.some((t) => t.def.name === 'generic__clip_page')
   if (hasConnect) {
     prompt += `
-- Site adapters (localmd Connect): BEFORE scraping or automating a mainstream site (Twitter/X, Zhihu, Reddit, YouTube, Hacker News, …), call find_adapters with the site name — a hit means a tested extractor already exists, better than hand-driving the page. Run a hit with run_adapter {site, name, args} (loads and executes in one call; args is a JSON object). An adapter whose access is "write" (posting, messaging, deleting) pauses on a confirmation card the user must approve — never claim such an action happened unless the call came back without a decline.
+- Site skills (localmd Connect): BEFORE scraping or hand-driving a mainstream site (X, Zhihu, Reddit, YouTube, Bilibili, your own AI chats, …), call use_skill "reach-a-site" — it carries the tested route for the hard sites and a ladder for the rest. Execute with the browser primitives it names: fetch_url for a hidden JSON/API, eval_js for a same-origin request or reading the rendered DOM, get_a11y_tree/find_structured_data/find_in_dom to find selectors. A write on a site (posting, sending, deleting) always pauses on a confirmation card and happens only after the user approves: prefer eval_js with allow_write:true calling the site's own action/API; or just click the Post/Submit control as usual — the extension recognises a write control and pauses it on the card for you (no flag needed for a click). Never claim a write happened unless the call came back without a decline.
+- Saving a page into the KB (localmd Connect): clip_page {url | tab_id, mode, images} returns a page as DATA — the metadata it declares (canonical URL, site, author, dates, description), its main content as Markdown, and its images (images:"inline" fetches them too). You write the note: put it where this KB already keeps intake, give it type: source and the url, and say in it what it is for. mode:"selection" clips what the user has selected in that tab and carries an anchor back to the passage. Reading a page you will not save is cheaper with fetch_url {format:"markdown"} — and when the links on a page matter (you may follow one next), always read markdown, never plain text: plain text has no URLs in it.
+- Captures from the browser (localmd Connect): the user can clip a page, or ask about one, straight from their browser — those wait in an inbox this app drains by itself, so a clip that appears in the folder while you are working is not something you did. If the user asks about "the page I just clipped", look for a recently written source note before you fetch anything.
 - Site scripts (localmd Connect): for a RECURRING page problem ("remove the ads on X", "hide that sidebar everywhere") create a persistent rule with create_site_script — it runs on every future visit of matching pages. Find selectors with find_in_dom, then run preview_site_script FIRST (highlight: true outlines what would be hidden; dry_run_js runs the JS once without persisting) so the user judges the real effect before the confirm card. Prefer hide_selectors alone when hiding is enough; css/js scripts show the user the exact code for approval. The user's standing control is the extension popup (pause/delete any script). If these tools report runnable: false, the user has to switch on "Allow user scripts" in the extension popup — say so instead of retrying.`
   }
 
@@ -222,5 +232,9 @@ Browser access: NONE this session — no browser extension is connected and no w
   if (memory) {
     prompt += `\n\nThis knowledge base has a persistent memory file (${MEMORY_FILE}) — the user's durable notes and preferences to honor across sessions. Follow it, and keep it in mind when the user asks you to remember or update something:\n\n<kb_memory>\n${memory}\n</kb_memory>`
   }
+  // LAST, deliberately: the closest instruction to the reply wins, and every
+  // block above this one is English prose long enough to drown a rule sitting
+  // in the middle of it.
+  prompt += responseLanguageRule
   return { stable: BASE, dynamic: prompt.replace(/^\n+/, '') }
 }

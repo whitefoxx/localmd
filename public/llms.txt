@@ -1,9 +1,11 @@
 # localmd
 
-> An agent lives in your folder, a wiki grows around your files. It reads
-> the PDFs, EPUBs and notes already in the folder and writes linked Markdown
-> beside them — every citation clicks back to the exact paragraph, and every
-> change waits for your yes.
+> You write. AI connects. All in your local folder.
+>
+> An agent lives in your folder, a wiki grows around your files. It reads the
+> PDFs, EPUBs and notes already there, reaches the tabs open in your browser,
+> and writes linked Markdown beside them. Every citation clicks back to the exact
+> paragraph, and every change waits for your yes.
 
 localmd (https://localmd.app) turns an ordinary folder on your computer into a
 knowledge base with an AI agent working inside it. The app is a static web
@@ -31,7 +33,10 @@ browser's File System Access API.
 - Extensible: reusable skills (`SKILL.md` files in the knowledge base), MCP
   servers, a `MEMORY.md` the agent updates only when asked, and a companion
   Chrome extension (localmd Connect) that lets the agent use the user's own
-  logged-in browser — 30+ sites, ~300 ready-made actions.
+  logged-in browser: open tabs, read pages, click and type, and reach sites
+  that need a login. There is no catalog of supported sites — the agent works
+  a site out live and can save what it learned as a skill in the folder.
+  Connect is open source under MIT: https://github.com/whitefoxx/web-tools
 - Open source under MIT: https://github.com/whitefoxx/localmd. The hosted app
   at localmd.app is that repository, deployed, plus a free trial allowance so
   a first visit needs no key.

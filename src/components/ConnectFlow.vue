@@ -21,8 +21,11 @@ const chip = (x: number, y: number, label: string): Chip => ({
   w: Math.round(label.length * 7.2) + 40,
 })
 
-/** The tabs — sites from the ready-made-actions set. `brand` picks the tiny
- *  hand-drawn mark; brand colors are literal facts, not theme tokens. */
+/** The tabs — three pages someone might have open, drawn recognisably so the
+ *  picture reads at a glance. They are examples of tabs, not a list of
+ *  supported sites: there is no such list, and the copy must never imply one.
+ *  `brand` picks the tiny hand-drawn mark; brand colors are literal facts,
+ *  not theme tokens. */
 const tabs = [
   { ...chip(10, 24, 'arxiv.org'), brand: 'arxiv' },
   { ...chip(10, 113, 'news.ycombinator.com'), brand: 'hn' },

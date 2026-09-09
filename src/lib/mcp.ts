@@ -212,14 +212,48 @@ export const directWire: McpWire = async (req, signal) => {
   }
 }
 
-/** Flatten an MCP tools/call result into text for the model. */
-export function flattenToolResult(result: {
-  content?: Array<Record<string, unknown>>
-  isError?: boolean
-}): string {
+/** An image block a tool returned, held back from the text so it can be
+ *  written somewhere the model can look at it. */
+export interface ToolImage {
+  mimeType: string
+  /** base64, as MCP carries it. */
+  data: string
+}
+
+/**
+ * Where a tool's image goes so the model can see it: a KB path, or null to
+ * say "could not" — no folder open, write failed. Set on a client by the
+ * store, the way onLost is. Without one, an image collapses to a bare
+ * `[image image/png]` and the bytes are gone, which is what every earlier
+ * build did and why screenshot tools looked broken through MCP.
+ */
+export type ImageSink = (img: ToolImage) => Promise<string | null>
+
+/**
+ * Flatten an MCP tools/call result into text for the model.
+ *
+ * Image blocks: with an `images` array, each one is pushed there and the text
+ * carries a numbered placeholder for `resolveToolResult` to fill in; without
+ * one they collapse to `[image mime]` — a caller that gave nowhere to put the
+ * bytes gets told there were bytes, and nothing else.
+ */
+export function flattenToolResult(
+  result: {
+    content?: Array<Record<string, unknown>>
+    isError?: boolean
+  },
+  images?: ToolImage[],
+): string {
   const parts = (result.content ?? []).map((c) => {
     if (c.type === 'text') return String(c.text ?? '')
-    if (c.type === 'image') return `[image ${c.mimeType ?? ''}]`
+    if (c.type === 'image') {
+      const mimeType = String(c.mimeType ?? 'image/png')
+      if (images && typeof c.data === 'string' && c.data) {
+        images.push({ mimeType, data: c.data })
+        return `[image #${images.length}]`
+      }
+      return `[image ${c.mimeType ?? ''}]`
+    }
     if (c.type === 'resource') {
       const r = c.resource as { text?: string; uri?: string } | undefined
       return r?.text ?? `[resource ${r?.uri ?? ''}]`
@@ -229,6 +263,37 @@ export function flattenToolResult(result: {
   })
   const text = parts.filter(Boolean).join('\n') || '(empty result)'
   return result.isError ? `Error: ${text}` : text
+}
+
+/**
+ * The whole result, images included: flatten, then hand each image to the
+ * sink and put its path where the placeholder was. What the model reads is a
+ * path it can `view_image`, plus the instruction to do so — an image it cannot
+ * see is not a result, it is a claim that there was one.
+ */
+export async function resolveToolResult(
+  result: { content?: Array<Record<string, unknown>>; isError?: boolean },
+  sink?: ImageSink,
+): Promise<string> {
+  if (!sink) return flattenToolResult(result)
+  const images: ToolImage[] = []
+  let text = flattenToolResult(result, images)
+  for (let i = 0; i < images.length; i++) {
+    let path: string | null = null
+    try {
+      path = await sink(images[i])
+    } catch {
+      path = null
+    }
+    const placeholder = `[image #${i + 1}]`
+    text = text.replace(
+      placeholder,
+      path
+        ? `[image saved to ${path} — call view_image on that path to see it; it is scratch, not part of the knowledge base]`
+        : `[image ${images[i].mimeType} — could not be saved (no folder open?), so it cannot be shown]`,
+    )
+  }
+  return text
 }
 
 interface RpcError {
@@ -342,8 +407,10 @@ export class McpHttpClient implements McpClientLike {
       content?: Array<Record<string, unknown>>
       isError?: boolean
     }
-    return flattenToolResult(result ?? {})
+    return resolveToolResult(result ?? {}, this.imageSink)
   }
+
+  imageSink?: ImageSink
 }
 
 export interface McpClientLike {
@@ -355,6 +422,9 @@ export interface McpClientLike {
   /** Set by the store: the transport dropped on its own. Without it a dead
    *  connection keeps its green dot. */
   onLost?: (reason: string) => void
+  /** Set by the store: where a tool's image goes so the model can look at it.
+   *  Without it the bytes are dropped. */
+  imageSink?: ImageSink
 }
 
 /** Failures where the request provably never reached the server, so reconnecting

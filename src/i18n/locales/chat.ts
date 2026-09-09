@@ -86,11 +86,12 @@ export default {
     setupWorking: 'Working…',
     setupSkip: 'Skip',
     // connectGuard — localmd Connect's write surface confirming before it runs
-    connectRunAdapter: 'Run “{site}/{name}” on the real site',
-    connectRunAdapterHelp:
-      'This marketplace adapter has write access — it can post, message or change things on the site, as you. It runs once, only if you confirm.',
-    connectRunAdapterUnknownHelp:
-      'This adapter’s access level could not be verified, so it is treated as a write. It runs once, only if you confirm.',
+    connectEvalWrite: 'Run this write on the real site',
+    connectEvalWriteHelp:
+      'This snippet writes on the site as you — it can post, message or change things. It runs once in your logged-in session, only if you confirm. The exact code:',
+    connectWriteAction: 'Do this write on the real site',
+    connectWriteActionHelp:
+      'This acts on the site as you — publishing, sending or changing something — and cannot be undone. It happens once, only if you confirm. What it does:',
     connectScriptCode: 'Install a site script that injects code',
     connectScriptCodeHelp:
       'This script will run the CSS/JS below on every matching page load until you remove it (pause or delete it any time in the localmd Connect popup). The exact patterns and code:',
@@ -217,11 +218,12 @@ export default {
     setupWorking: '处理中…',
     setupSkip: '跳过',
     // connectGuard —— localmd Connect 的写操作在执行前先确认
-    connectRunAdapter: '在真实网站上运行「{site}/{name}」',
-    connectRunAdapterHelp:
-      '这个市场适配器有写权限 —— 它能以你的身份在该网站发帖、发消息或改动内容。只有你确认后才会运行，且只运行这一次。',
-    connectRunAdapterUnknownHelp:
-      '无法核实这个适配器的权限级别，因此按写操作对待。只有你确认后才会运行，且只运行这一次。',
+    connectEvalWrite: '在真实网站上执行这次写操作',
+    connectEvalWriteHelp:
+      '这段代码会以你的身份在该网站写入 —— 它能发帖、发消息或改动内容。只有你确认后才会在你的登录会话里运行，且只运行这一次。代码原文如下：',
+    connectWriteAction: '在真实网站上执行这个写操作',
+    connectWriteActionHelp:
+      '这会以你的身份在该网站执行写操作 —— 发布、发送或改动内容，且不可撤销。只有你确认后才会执行，且只执行这一次。具体操作：',
     connectScriptCode: '安装一个注入代码的站点脚本',
     connectScriptCodeHelp:
       '这个脚本会在每次打开匹配页面时运行下面的 CSS/JS，直到你移除它（随时可在 localmd Connect 弹窗里暂停或删除）。匹配规则和代码原文如下：',

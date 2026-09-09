@@ -90,6 +90,12 @@ function openSource(): void {
 }
 
 function jump(it: AnnotationItem): void {
+  // A browser highlight's "position" is a page on the web: open it. The
+  // extension re-anchors the passage there by its text.
+  if (it.url) {
+    window.open(it.url, '_blank', 'noopener')
+    return
+  }
   if (!source.value || !sourceExists.value) return
   if (it.cfi) void citations.openAnnotation(source.value, { cfi: it.cfi })
   else if (it.range) void citations.openAnnotation(source.value, { range: it.range })
@@ -173,7 +179,7 @@ function focusEl(el: unknown): void {
       <div class="flex items-center gap-2.5 mb-1 min-w-0">
         <span
           class="codicon text-accent shrink-0"
-          :class="kind === 'pdf' ? 'codicon-file-pdf' : 'codicon-book'"
+          :class="kind === 'pdf' ? 'codicon-file-pdf' : kind === 'markdown' ? 'codicon-globe' : 'codicon-book'"
         />
         <h1 class="text-lg font-semibold text-fg-0 truncate">{{ sourceName }}</h1>
       </div>
@@ -199,8 +205,8 @@ function focusEl(el: unknown): void {
           v-for="it in g.items"
           :key="it.id"
           class="group relative mb-3 rounded-md border border-border bg-bg-1 overflow-hidden transition-colors"
-          :class="sourceExists ? 'hover:border-accent/60 cursor-pointer' : ''"
-          :title="sourceExists ? $t('viewers.annotations.jumpTitle') : ''"
+          :class="sourceExists || it.url ? 'hover:border-accent/60 cursor-pointer' : ''"
+          :title="it.url ? it.url : sourceExists ? $t('viewers.annotations.jumpTitle') : ''"
           @click="jump(it)"
         >
           <!-- color bar -->

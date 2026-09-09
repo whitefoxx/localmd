@@ -48,7 +48,13 @@ import {
   isLocalmdConnectRelayUrl,
   relayExtensionId,
   extensionWire,
+  isRelayReadyFrame,
 } from '@/lib/connectRelay'
+import { INBOX_NOTIFICATION, drainInbox } from '@/lib/connectInbox'
+import { reconcileSavedPages } from '@/lib/connectSaved'
+import { OPEN_KB_NOTIFICATION, openKbByName, syncKbFolders } from '@/lib/connectKb'
+import { SAMPLING_METHOD, handleSampling } from '@/lib/connectSampling'
+import { importTempFile } from '@/lib/capture'
 import { EXTENSION_FETCH_TOOL, CONNECT_ACTIVE_TOOLS } from '@/lib/toolCatalog'
 import { useSettingsStore } from '@/stores/settings'
 import { useKbStore } from '@/stores/kb'
@@ -103,6 +109,15 @@ function missingSecretMessage(ids: readonly string[]): string {
 }
 
 /**
+ * The store's own `callTool`, reachable from `clientFor` — which runs while the
+ * store body is still being built. A notification cannot arrive before a
+ * connection exists, so by the time this is read it is set.
+ */
+const callToolRef: {
+  value: ((serverId: string, tool: string, args: Record<string, unknown>) => Promise<string>) | null
+} = { value: null }
+
+/**
  * Which client a row gets. Three cases, and only the first is about the url:
  *   - the relay sentinel — the row IS localmd Connect, over its postMessage
  *     relay
@@ -111,7 +126,37 @@ function missingSecretMessage(ids: readonly string[]): string {
  *   - otherwise — a normal endpoint, reached by the browser directly
  */
 function clientFor(config: McpServerConfig, extension: McpWire | null): McpClientLike {
-  if (isLocalmdConnectRelayUrl(config.url)) return new McpRelayClient()
+  if (isLocalmdConnectRelayUrl(config.url)) {
+    const client = new McpRelayClient()
+    // The extension is the only tool source that talks to us unprompted: it
+    // pokes when the user has captured something in their browser. Bound here
+    // because this is where the row's id is known, and the drain calls back
+    // over that same row (lib/connectInbox).
+    client.onNotification = (method, params) => {
+      if (method === OPEN_KB_NOTIFICATION) {
+        // The user picked another knowledge base in the extension's popup. Only
+        // this side can open one, and the popup has already brought them here —
+        // where a lapsed permission prompt can be answered.
+        const name = (params as { name?: unknown } | undefined)?.name
+        if (typeof name === 'string') void openKbByName(name)
+        return
+      }
+      if (method !== INBOX_NOTIFICATION) return
+      const call = callToolRef.value
+      if (!call) return
+      void drainInbox({ serverId: config.id, call: (t, a) => call(config.id, t, a) }).catch(() => {
+        /* a failed drain leaves the items queued for the next poke */
+      })
+    }
+    // The extension asking US, which only this transport can do. It holds no
+    // API key and runs no model: its in-page quick actions are answered here,
+    // on the profile the user configured (lib/connectSampling).
+    client.onRequest = async (method, params) => {
+      if (method !== SAMPLING_METHOD) throw new Error(`${method} is not supported`)
+      return handleSampling(() => useSettingsStore().primary, params)
+    }
+    return client
+  }
   if (config.transport !== 'extension') return new McpHttpClient(config)
   if (!extension) throw new Error(EXTENSION_TRANSPORT_MISSING)
   return new McpHttpClient(config, extension)
@@ -167,8 +212,8 @@ export const useMcpStore = defineStore('mcp', () => {
     return servers.value.find((s) => s.config.id === serverId)?.config.url ?? ''
   }
 
-  /** localmd Connect's workhorse trio (find_adapters / run_adapter / fetch_url)
-   *  is pinned active — never deferred, whatever the server's tool count. Keyed
+  /** localmd Connect's workhorse set (eval_js / clip_page / fetch_url) is
+   *  pinned active — never deferred, whatever the server's tool count. Keyed
    *  on the server's url, not the tool name alone: another server exposing the
    *  same tool names stays under the ordinary defer policy. */
   function pinnedActive(t: ExternalTool): boolean {
@@ -527,11 +572,37 @@ export const useMcpStore = defineStore('mcp', () => {
     client.onLost = (reason) => {
       if (clients.get(config.id) === client) patch(config.id, { status: 'error', error: reason })
     }
+    // A tool's image lands in `.tmp/` like a pasted screenshot does, and the
+    // model gets the path to view_image. Only with a folder open — the sink
+    // says so by returning null, and the result then says the image could not
+    // be shown rather than pretending it was.
+    client.imageSink = async (img) => {
+      if (!useKbStore().name) return null
+      const bin = atob(img.data)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const ext = img.mimeType.split('/')[1]?.replace('jpeg', 'jpg') || 'png'
+      return importTempFile(new File([bytes], `tool-image.${ext}`, { type: img.mimeType }))
+    }
     clients.set(config.id, client)
     patch(config.id, { status: 'connecting', error: undefined })
     try {
       const tools = await client.connect()
       patch(config.id, { status: 'ok', error: undefined, tools })
+      // A fresh connection is the moment to find out what changed in the folder
+      // while nothing was connected to hear about it — and to say which folder
+      // this is, so the popup can name it.
+      if (isLocalmdConnectRelayUrl(config.url)) {
+        const deps = {
+          serverId: config.id,
+          call: (tool: string, args: Record<string, unknown>) =>
+            callTool(config.id, tool, args),
+        }
+        void reconcileSavedPages(deps).catch(() => {
+          /* an older extension has no such tool; nothing to correct */
+        })
+        void syncKbFolders(deps).catch(() => undefined)
+      }
     } catch (err) {
       patch(config.id, { status: 'error', error: (err as Error).message, tools: [] })
     }
@@ -603,10 +674,46 @@ export const useMcpStore = defineStore('mcp', () => {
     if (next) for (const s of connectRows.value) void reconnect(s.config.id)
   }
 
+  /**
+   * The extension announcing that its relay is attached — the frame its content
+   * script posts on every attach, including the re-injection the service worker
+   * performs into already-open tabs after an extension reload or update.
+   *
+   * Why this is needed on top of `recheckRelay`: a reload takes the port with
+   * it, `onLost` puts the row in error, and the TRANSPORT then heals itself —
+   * measured, the relay answers a ping again within a moment. Nothing on this
+   * side noticed, because a client is what starts an MCP conversation and the
+   * only thing that re-probed a failed row was `retryFailed()` on focus. A
+   * localmd in a BACKGROUND tab therefore stayed dead until somebody clicked
+   * it, and the extension id has not changed, so `recheckRelay` returns early.
+   *
+   * That was not a cosmetic wait. The extension's in-page quick actions ask
+   * THIS side to answer them, and after every reload they failed with "localmd
+   * opened but did not connect in time" against a tab that was open, healthy
+   * and one click away from working.
+   *
+   * Only `error` rows are healed: `connecting` is somebody else's handshake in
+   * flight, and re-entering it would build a second client for the same row.
+   */
+  let healing = false
+  function onRelayReady(e: MessageEvent): void {
+    if (e.source !== window || !isRelayReadyFrame(e.data)) return
+    recheckRelay() // a different build may have taken the marker over
+    if (healing) return
+    const dead = connectRows.value.filter((s) => s.status === 'error')
+    if (!dead.length) return
+    healing = true
+    void Promise.all(dead.map((s) => reconnect(s.config.id))).finally(() => {
+      healing = false
+    })
+  }
+
   if (typeof window !== 'undefined') {
     // Coming back to the tab is the moment setup is most likely to have finished.
     window.addEventListener('focus', recheckRelay)
     document.addEventListener('visibilitychange', recheckRelay)
+    // …and this is the moment it finished without anyone coming back.
+    window.addEventListener('message', onRelayReady)
     let timer: ReturnType<typeof setInterval> | null = null
     watch(
       () => connectRows.value.length > 0 && !connectReady.value,
@@ -620,6 +727,35 @@ export const useMcpStore = defineStore('mcp', () => {
       { immediate: true },
     )
   }
+
+  /**
+   * Tell every connected extension which knowledge base is open.
+   *
+   * Watched rather than called from the places that open a folder: opening,
+   * closing, restoring on load and forgetting a recent are four call sites and
+   * the popup only cares about the RESULT of any of them.
+   */
+  async function syncConnectKb(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status !== 'ok') continue
+      try {
+        await syncKbFolders({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        /* an older extension has no such tool */
+      }
+    }
+  }
+
+  watch(
+    () => {
+      const kbStore = useKbStore()
+      return [kbStore.name, kbStore.recents.map((r) => r.name).join('\u0000')].join('\u0001')
+    },
+    () => void syncConnectKb(),
+  )
 
   /** Re-probe only the rows that are currently failing. Cheap enough to run
    *  whenever the user comes back to the tab: a server that came up while they
@@ -668,6 +804,64 @@ export const useMcpStore = defineStore('mcp', () => {
       const client = clients.get(serverId)
       if (!client) throw err
       return client.callTool(tool, args, signal)
+    }
+  }
+
+  // Published for clientFor's notification handler, which is built before this
+  // function exists but can only ever run after a connection does.
+  callToolRef.value = (serverId, tool, args) => callTool(serverId, tool, args)
+
+  /**
+   * Pull whatever the user captured in their browser, without waiting to be
+   * told about it.
+   *
+   * The extension pokes when something arrives, and that poke needs a live
+   * port — which Chrome takes away whenever it recycles the extension's service
+   * worker. So the push half is a fast path, not a delivery guarantee, and the
+   * PULL half had no trigger of its own: captures sat in the queue until
+   * something else happened to reconnect.
+   *
+   * Asking is cheap and self-healing: the relay redials its port on the way
+   * OUT, so a call revives a connection a notification could never have
+   * reached. Called on every return to this tab, which is exactly the moment
+   * someone arrives from their browser having pressed "Ask localmd".
+   */
+  async function drainConnectInboxes(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status === 'error') continue // retryFailed is already on it
+      try {
+        await drainInbox({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        // A drain that cannot reach the extension leaves the queue alone; the
+        // next return to the tab tries again.
+      }
+    }
+  }
+
+  /**
+   * Check what the browser believes the folder holds against what it holds.
+   *
+   * The extension's badge and popup read an index it can only learn from us and
+   * can never see go stale — a deleted note left a green "Saved" tick behind
+   * (lib/connectSaved). Run on connect, when a file is deleted or renamed, and
+   * on every return to this tab, which is also when a note may have been
+   * removed from a terminal while the app was in the background.
+   */
+  async function reconcileConnectSavedPages(): Promise<void> {
+    for (const s of connectRows.value) {
+      if (s.status === 'error') continue
+      try {
+        await reconcileSavedPages({
+          serverId: s.config.id,
+          call: (tool, args) => callTool(s.config.id, tool, args),
+        })
+      } catch {
+        // Unreachable extension, or a tool an older build does not have: the
+        // index simply stays as it was.
+      }
     }
   }
 
@@ -726,6 +920,9 @@ export const useMcpStore = defineStore('mcp', () => {
     refresh,
     reconnect,
     retryFailed,
+    drainConnectInboxes,
+    reconcileConnectSavedPages,
+    syncConnectKb,
     signIn,
     signOut,
     isSignedIn,

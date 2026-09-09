@@ -152,6 +152,15 @@ export default {
         "This browser can't decode {name} — its codec isn't supported here. A dedicated player may still open it.",
     },
 
+    image: {
+      zoomIn: 'Zoom in (+)',
+      zoomOut: 'Zoom out (−)',
+      actual: 'Actual size (1)',
+      fit: 'Fit',
+      // Says what the two gestures are, because neither is discoverable.
+      fitHint: 'Fit to the pane (0) — double-click the picture, or pinch to zoom',
+    },
+
     csv: {
       empty: 'Empty file.',
       rowsCut: 'Showing the first {shown} of {total} rows.',
@@ -308,6 +317,14 @@ export default {
 
     media: {
       cantPlay: '浏览器无法解码 {name}——不支持这个格式的编解码器。用本地播放器应该仍能打开。',
+    },
+
+    image: {
+      zoomIn: '放大（+）',
+      zoomOut: '缩小（−）',
+      actual: '原始尺寸（1）',
+      fit: '适应',
+      fitHint: '适应窗口（0）——也可以双击图片，或用触控板捏合缩放',
     },
 
     csv: {

@@ -7,6 +7,8 @@ import {
   pdfCategory,
   buildAnnotationItems,
   renderAnnotationsDigest,
+  isWebAnnotation,
+  colorHexFor,
   toPdfHighlight,
   makeRawPdfAnnotation,
   HIGHLIGHT_COLORS,
@@ -229,5 +231,64 @@ describe('makeRawPdfAnnotation', () => {
     const h = toPdfHighlight(raw)!
     expect(h.color).toBe('#B6F2C4')
     expect(h.rects).toEqual([{ x: 5, y: 6, w: 7, h: 8 }])
+  })
+})
+
+describe('web annotations (a clipped page\'s browser highlights)', () => {
+  const web = [
+    {
+      anchor: { exact: 'second passage', prefix: 'the ', suffix: ' here' },
+      url: 'https://ex.test/post',
+      color: '#57B7F0',
+      text: 'second passage',
+      createdAt: '2026-09-03T10:00:00.000Z',
+      id: 'hl_2',
+    },
+    {
+      anchor: { exact: 'first passage', prefix: '', suffix: '' },
+      url: 'https://ex.test/post',
+      color: '#FFD633',
+      text: 'first passage',
+      createdAt: '2026-09-03T09:00:00.000Z',
+      note: 'why it matters',
+      id: 'hl_1',
+    },
+  ]
+
+  it('is recognised by shape, not by the source file\'s kind', () => {
+    expect(isWebAnnotation(web[0])).toBe(true)
+    expect(isWebAnnotation({ cfi: 'epubcfi(/6/2)', color: '#fff', text: '', createdAt: '' })).toBe(false)
+    expect(isWebAnnotation(null)).toBe(false)
+  })
+
+  it('builds items with the page url, in the order they were made', () => {
+    const items = buildAnnotationItems('raw/articles/post.md', web)
+    expect(items.map((it) => it.id)).toEqual(['hl_1', 'hl_2'])
+    expect(items[0]).toMatchObject({
+      category: 'highlight',
+      excerpt: 'first passage',
+      comment: 'why it matters',
+      url: 'https://ex.test/post',
+      color: '#FFD633',
+      origIndex: 1,
+    })
+  })
+
+  it('maps the extension\'s colour names onto the palette, defaulting to yellow', () => {
+    expect(colorHexFor('blue')).toBe('#57B7F0')
+    expect(colorHexFor('BLUE')).toBe('#57B7F0')
+    expect(colorHexFor('octarine')).toBe(HIGHLIGHT_COLORS[0].value)
+    expect(colorHexFor(undefined)).toBe(HIGHLIGHT_COLORS[0].value)
+  })
+
+  it('digests as highlights made in the browser, with the page named', () => {
+    const out = renderAnnotationsDigest(
+      'raw/articles/post.md.annotations.json',
+      JSON.stringify({ version: 1, annotations: web }),
+    )!
+    expect(out).toContain('Highlights made in the browser on https://ex.test/post')
+    expect(out).toContain('[yellow highlight · 2026-09-03] "first passage"')
+    expect(out).toContain('Note: why it matters')
+    expect(out).toContain('[blue highlight · 2026-09-03] "second passage"')
   })
 })

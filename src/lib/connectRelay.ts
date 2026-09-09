@@ -2,8 +2,8 @@
  * localmd Connect transport — JSON-RPC/MCP over `window.postMessage`.
  *
  * localmd Connect is this app's companion extension: the generic browser
- * bridge (open/read/click/fetch with the user's cookies) plus marketplace site
- * adapters and persistent site scripts. There is no `externally_connectable`
+ * bridge (open/read/click/fetch with the user's cookies) plus persistent site
+ * scripts. There is no `externally_connectable`
  * path (that field is read once at install time; nothing at runtime can widen
  * it, and it cannot express "let the user add a site"), so the extension
  * registers a tiny relay content script per authorized origin and we exchange
@@ -46,10 +46,11 @@
  * missed.
  */
 import {
-  flattenToolResult,
+  resolveToolResult,
   type McpClientLike,
   type McpToolDef,
   type McpWire,
+  type ImageSink,
 } from '@/lib/mcp'
 
 /** One extension speaking the relay protocol: which DOM marker announces it,
@@ -229,7 +230,23 @@ interface RelayFrame {
   dir?: unknown
   ext?: unknown
   ready?: unknown
+  /** The relay's port to the extension went away — see McpRelayClient.onLost. */
+  closed?: unknown
   msg?: unknown
+}
+
+/**
+ * Is this frame the relay saying "I am attached"?
+ *
+ * Posted on every attach — including the re-injection the extension's service
+ * worker performs into already-open tabs after it is reloaded or updated. That
+ * makes it the one signal that a connection which died can be rebuilt, arriving
+ * without anyone touching the page: see the heal in stores/mcp. The frame is a
+ * hint and carries no id, so it is safe to act on more than once.
+ */
+export function isRelayReadyFrame(data: unknown): boolean {
+  const d = (data ?? {}) as { webcli?: unknown; dir?: unknown; ready?: unknown }
+  return d.webcli === 'mcp' && d.dir === 'to-page' && d.ready === true
 }
 
 /** The `window` the page and the relay share. Absent under vitest's node
@@ -249,10 +266,41 @@ export class McpRelayClient implements McpClientLike {
    *  write tool is involved. */
   private ext: string | null = null
   private listener: ((e: MessageEvent) => void) | null = null
-  /** Never called: there is no lifecycle event to observe. A relay that stopped
-   *  answering surfaces as a timeout on the next call, which the store already
-   *  turns into a red row. */
+  /**
+   * The relay telling us its port to the extension is gone.
+   *
+   * This used to say there was no lifecycle event to observe, and that a dead
+   * relay would surface as a timeout on the next call. Both were true and the
+   * conclusion was wrong: Chrome recycles an idle MV3 service worker after a
+   * few minutes and takes the port with it, so between calls the row is green
+   * and the connection is not — and anything the extension tries to PUSH (the
+   * capture inbox's poke) reaches nobody at all. Waiting for the next call to
+   * find out is exactly the wrong direction when the point of the connection
+   * is that the other side can start the conversation.
+   *
+   * The event exists; it just lives in the content script, which now forwards
+   * it as `{ closed: true }`.
+   */
   onLost?: (reason: string) => void
+
+  /** Server→client notifications, which this transport is the only one to
+   *  receive: the extension pokes us when the user captures something in their
+   *  browser (`notifications/localmd/inbox`, see lib/connectInbox). They carry
+   *  no id and must never be answered. Set by the store; without it a
+   *  notification is dropped, which is what every earlier build did. */
+  onNotification?: (method: string, params: unknown) => void
+
+  /**
+   * Server→client REQUESTS — the extension asking US something and waiting for
+   * an answer. MCP allows both directions; `sampling/createMessage` is the one
+   * that arrives here, because the extension has no model and this app does
+   * (lib/connectSampling).
+   *
+   * Unset means "we do not do that": the frame is answered with -32601 rather
+   * than dropped, so the extension's caller fails immediately instead of
+   * sitting out its timeout. A handler that throws becomes an error reply.
+   */
+  onRequest?: (method: string, params: unknown) => Promise<unknown>
 
   /** The only config is WHICH extension — its marker supplies the target
    *  install, so there is still no URL, id or token for a user to get wrong. */
@@ -289,17 +337,78 @@ export class McpRelayClient implements McpClientLike {
   private onFrame(win: Window, e: MessageEvent): void {
     if (e.source !== win) return // only this page's own frames
     const d = e.data as RelayFrame | null
-    if (!d || d.webcli !== 'mcp' || d.dir !== 'to-page' || !d.msg) return
+    if (!d || d.webcli !== 'mcp' || d.dir !== 'to-page') return
     // A second install (store + dev) answering something we didn't send it.
     if (this.ext && typeof d.ext === 'string' && d.ext !== this.ext) return
-    const m = d.msg as { id?: unknown; result?: unknown; error?: RpcError; method?: unknown }
-    if (typeof m.method === 'string' && m.method.startsWith('notifications/')) return
+    // The extension's side of the port went away (service worker recycled, or
+    // the extension reloaded). Nothing in flight can arrive now, and nothing
+    // will be pushed to us until we reconnect. Checked BEFORE the `msg` guard
+    // below: this frame carries no JSON-RPC payload, and requiring one is how
+    // the first version of this silently ignored it.
+    if (d.closed === true) {
+      const err = new Error(`${this.target.name} disconnected`)
+      for (const p of this.pending.values()) p.reject(err)
+      this.pending.clear()
+      this.onLost?.(
+        `${this.target.name} disconnected — its service worker was recycled or the extension reloaded. It reconnects by itself when you come back to this tab.`,
+      )
+      return
+    }
+    if (!d.msg) return
+    const m = d.msg as {
+      id?: unknown
+      result?: unknown
+      error?: RpcError
+      method?: unknown
+      params?: unknown
+    }
+    // A METHOD means the far side is talking to us, not answering us — checked
+    // before the pending lookup below, and not merely for tidiness: both
+    // directions number their requests from 1, so an incoming request id would
+    // otherwise be matched against our own pending map and resolve a call that
+    // is still in flight with somebody else's question.
+    if (typeof m.method === 'string') {
+      if (m.method.startsWith('notifications/')) {
+        // A notification never carries an id and must never be answered. A
+        // handler that throws must not take the message listener down with it.
+        try {
+          this.onNotification?.(m.method, m.params)
+        } catch {
+          /* a bad handler is not this transport's problem */
+        }
+        return
+      }
+      // A request. Its id is the EXTENSION's — echoed back untouched, never
+      // looked up here.
+      if (m.id !== undefined) this.answer(win, d.ext, m.id, m.method, m.params)
+      return
+    }
     if (typeof m.id !== 'number') return
     const p = this.pending.get(m.id)
     if (!p) return
     this.pending.delete(m.id)
     if (m.error) p.reject(new Error(`${m.error.message} (${m.error.code})`))
     else p.resolve(m.result)
+  }
+
+  /** Run a server→client request and post its reply. Never throws: an
+   *  unhandled rejection here would leave the extension waiting for nothing. */
+  private answer(win: Window, ext: unknown, id: unknown, method: string, params: unknown): void {
+    const to = typeof ext === 'string' && ext ? ext : this.ext
+    if (!to) return // no install to answer — the marker went away mid-exchange
+    const fail = (code: number, message: string): void =>
+      this.post(win, to, { jsonrpc: '2.0', id, error: { code, message } })
+    const handler = this.onRequest
+    if (!handler) {
+      fail(-32601, `${method} is not supported by this client`)
+      return
+    }
+    void Promise.resolve()
+      .then(() => handler(method, params))
+      .then(
+        (result) => this.post(win, to, { jsonrpc: '2.0', id, result }),
+        (e: unknown) => fail(-32603, e instanceof Error ? e.message : String(e)),
+      )
   }
 
   private post(win: Window, ext: string, msg: unknown): void {
@@ -344,7 +453,9 @@ export class McpRelayClient implements McpClientLike {
         'initialize',
         {
           protocolVersion: '2025-03-26',
-          capabilities: {},
+          // We can answer sampling/createMessage — the extension's in-page
+          // quick actions run on this app's model (lib/connectSampling).
+          capabilities: { sampling: {} },
           clientInfo: { name: 'localmd', version: '0.1.0' },
         },
         HANDSHAKE_TIMEOUT_MS,
@@ -380,6 +491,8 @@ export class McpRelayClient implements McpClientLike {
       CALL_TIMEOUT_MS,
       signal,
     )) as { content?: Array<Record<string, unknown>>; isError?: boolean }
-    return flattenToolResult(result ?? {})
+    return resolveToolResult(result ?? {}, this.imageSink)
   }
+
+  imageSink?: ImageSink
 }

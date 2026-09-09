@@ -24,7 +24,7 @@ function server(id: string, n: number, over: Partial<McpServerState['config']> =
 function connectServer(): McpServerState {
   const base = server('localmd-connect', 33, { url: LOCALMD_CONNECT_RELAY_URL })
   base.tools.push(
-    ...['generic__find_adapters', 'generic__run_adapter', 'generic__fetch_url'].map((name) => ({
+    ...['generic__eval_js', 'generic__clip_page', 'generic__fetch_url'].map((name) => ({
       name,
       description: name,
       inputSchema: { type: 'object' as const },
@@ -95,21 +95,21 @@ describe('mcp store — recall of deferred tools', () => {
   })
 })
 
-describe('mcp store — localmd Connect workhorse trio stays active', () => {
+describe('mcp store — localmd Connect workhorse set stays active', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
-  it('pins find_adapters / run_adapter / fetch_url past the defer threshold', async () => {
+  it('pins eval_js / clip_page / fetch_url past the defer threshold', async () => {
     const mcp = await storeWith(connectServer())
     const active = mcp.activeToolsFor('s1').map((t) => t.qualifiedName)
     expect(active).toEqual([
-      'mcp__localmd-connect__generic__find_adapters',
-      'mcp__localmd-connect__generic__run_adapter',
+      'mcp__localmd-connect__generic__eval_js',
+      'mcp__localmd-connect__generic__clip_page',
       'mcp__localmd-connect__generic__fetch_url',
     ])
-    // Everything else on the server still defers, and the catalog omits the trio.
+    // Everything else on the server still defers, and the catalog omits the set.
     expect(mcp.deferredToolsFor('s1')).toHaveLength(33)
     expect(mcp.deferredCatalog.map((t) => t.qualifiedName)).not.toContain(
-      'mcp__localmd-connect__generic__run_adapter',
+      'mcp__localmd-connect__generic__eval_js',
     )
   })
 
@@ -126,7 +126,7 @@ describe('mcp store — localmd Connect workhorse trio stays active', () => {
 
   it('never spends a recall slot on a pinned tool — it is already in every request', async () => {
     const mcp = await storeWith(connectServer())
-    mcp.rememberUse('mcp__localmd-connect__generic__run_adapter')
+    mcp.rememberUse('mcp__localmd-connect__generic__eval_js')
     expect(mcp.recalled).toEqual([])
     mcp.rememberUse('mcp__localmd-connect__tool5')
     expect(mcp.recalled).toEqual(['mcp__localmd-connect__tool5'])

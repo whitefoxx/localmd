@@ -1,9 +1,11 @@
 # localmd
 
-**An agent lives in your folder, a wiki grows around your files.** It reads
-the PDFs, EPUBs and notes already there and writes linked Markdown beside
-them — every citation clicks back to the exact paragraph, and every change
-waits for your yes.
+**You write. AI connects. All in your local folder.**
+
+An agent lives in your folder, a wiki grows around your files. It reads the
+PDFs, EPUBs and notes already there, reaches the tabs open in your browser, and
+writes linked Markdown beside them. Every citation clicks back to the exact
+paragraph, and every change waits for your yes.
 
 ### ▶ [Try it now](https://localmd.app) — no install, no account, no key
 
@@ -51,14 +53,19 @@ this repository.
 - **Tools are data, not code.** Web search ships with it. Beyond that, you or
   the agent can author an HTTP tool against any API, or connect an MCP server —
   a spec, not a release.
+- **Your browser, as a third source.** The companion extension — localmd
+  Connect, [open source too](https://github.com/whitefoxx/web-tools) — lends the
+  agent your own signed-in Chrome: open a tab, read a page, click, type. What it
+  brings back lands in the folder as a source, citable like any PDF. There is no
+  catalogue of supported sites; the agent works one out live and can save what
+  it learned as a skill in your folder.
 - **Installable and offline.** It is a PWA; everything is cached on your device.
 
 ## Requirements
 
-**Chrome or Edge.** The File System Access API — the thing that lets a web page
-read and write a folder you picked — exists only in Chromium browsers. Firefox
-has called it harmful; Safari offers only a sandboxed store. That constraint is
-also the reason this can be a web page at all rather than an app you install.
+**Chrome or Edge.** Reading and writing a folder you picked takes the File
+System Access API, and only Chromium browsers have it. Firefox has called it
+harmful; Safari offers only a sandboxed store.
 
 You supply your own API key. It is kept in your browser and sent straight to the
 provider you chose, never through us — there is no "us" in the request path. Be

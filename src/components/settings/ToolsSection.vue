@@ -904,8 +904,7 @@ function removeDetail(): void {
     <!-- localmd Connect. There is no address and no id to enter — the extension
          writes its own id into the page when it is willing to talk to us, and it
          ships already allowing this app — so the whole panel is: install it,
-         reload, and one optional toggle that unlocks func adapters and site
-         scripts. -->
+         reload, and one optional toggle that unlocks site scripts. -->
     <div v-if="detailEntry?.kind === 'extension' && detailIsConnect" class="space-y-2">
       <div v-if="relayUp" class="space-y-1">
         <div class="flex items-center gap-1.5">

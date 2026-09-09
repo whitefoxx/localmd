@@ -97,12 +97,14 @@ function staticLandingCopy(): Plugin {
           `${k.step3Title} — ${k.step3Body}`,
         ),
 
+        h2(a.localTitle),
+        p(a.localBody),
+        list(a.flow1, a.flow2, a.flow3),
+
         h2(a.diff3Title),
         p(a.diff3Body),
 
-        h2(a.reviewTitle),
-        list(a.review1, a.review2, a.review3),
-
+        h2(a.basicsTitle),
         h2(a.diff1Title),
         p(a.diff1Body),
         h2(a.adaptTitle),
@@ -110,22 +112,32 @@ function staticLandingCopy(): Plugin {
         h2(a.diff5Title),
         p(a.diff5Body),
 
+        h2(a.reviewTitle),
+        list(a.review1, a.review2, a.review3),
+
+        h2(a.healthTitle),
+        p(a.healthBody),
+        p(a.healthNote),
+
         h2(a.connectTitle),
         p(a.connectBody),
+        p(a.connectApps),
 
-        h2(a.believeLabel),
-        list(
-          `${a.believe1Title} — ${a.believe1Body}`,
-          `${a.believe2Title} — ${a.believe2Body}`,
-          `${a.believe3Title} — ${a.believe3Body}`,
-          `${a.believe4Title} — ${a.believe4Body}`,
-        ),
+        h2(a.whyTitle),
+        p(a.why1),
+        p(a.why2a + a.why2Link + a.why2b),
+        p(a.why3),
+        p(a.why4a + a.why4Link + a.why4b),
+        p(a.whyKicker),
 
-        h2(a.dontLabel),
-        list(a.dont2, a.dont3, a.dont4, a.dont6),
+        h2(a.freeTitle),
+        p(a.free1),
+        p(a.free2),
+
+        h2(a.mobileTitle),
+        p(a.mobileBody),
 
         h2(a.closingTitle),
-        p(a.sourceBody),
         // Relative, and from the edition seam. This block is served from
         // wherever the build was deployed, so an absolute address here would
         // have every copy of the page point a crawler at ours. `llms.txt` is
