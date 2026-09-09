@@ -17,6 +17,14 @@ function isTextual(path: string): boolean {
 
 export type SaveState = 'saved' | 'dirty' | 'saving'
 
+/** One row of the file tree, as the selection holds it. `isDir` travels with
+ *  the path because every action on a selection needs it and the tree node it
+ *  came from may already be gone by the time the action runs. */
+export interface SelectedRow {
+  path: string
+  isDir: boolean
+}
+
 const AUTOSAVE_MS = 800
 
 export const useFilesStore = defineStore('files', () => {
@@ -31,11 +39,31 @@ export const useFilesStore = defineStore('files', () => {
   const unreadable = ref<'binary' | 'too-large' | null>(null)
   const saveState = ref<SaveState>('saved')
   const mode = ref<'edit' | 'preview'>('preview')
-  /** The tree node the user has selected (file OR directory) — drives the row
-   *  highlight and is the target for new files/folders/imports. '' = nothing
-   *  selected (= KB root). Cleared by clicking blank space in the tree. */
-  const selectedPath = ref('')
-  const selectedIsDir = ref(false)
+  /**
+   * The tree rows the user has selected, in the order they picked them — the
+   * last one is the lead.
+   *
+   * Almost always exactly one, and everything downstream still reads it that
+   * way: `selectedPath` and `selectedIsDir` are the lead, so the row highlight
+   * and the target for new files, folders and imports behave as they always
+   * did. The list exists for the batch the context menu acts on — delete these
+   * four, move these four, hand these four to the agent — which is a different
+   * question from "where does the next new file go", and answering both from
+   * one array is what keeps them from disagreeing.
+   */
+  const selection = ref<SelectedRow[]>([])
+  /**
+   * Where a shift-click measures from: the last row picked by a plain or a
+   * ⌘-click. Not the lead — repeated shift-clicks must re-range from the same
+   * origin, so growing and shrinking a range is one gesture rather than a
+   * ratchet. Deliberately not reactive; nothing renders it.
+   */
+  let anchor = ''
+  const selectedPath = computed(() => selection.value.at(-1)?.path ?? '')
+  const selectedIsDir = computed(() => selection.value.at(-1)?.isDir ?? false)
+  /** Membership, for the row highlight — a Set so a tree of any size costs one
+   *  lookup per row rather than a scan. */
+  const selectedPaths = computed(() => new Set(selection.value.map((e) => e.path)))
   /** Directory new items land in: the selected folder, a selected file's
    *  parent, or '' (KB root) when nothing is selected. */
   const targetDir = computed(() => {
@@ -45,13 +73,67 @@ export const useFilesStore = defineStore('files', () => {
     return i < 0 ? '' : selectedPath.value.slice(0, i)
   })
 
+  /** Rows the tree is actually drawing, top to bottom — the order a shift-click
+   *  ranges over. Derived from the same two facts the template renders from, so
+   *  a collapsed folder's children are not in a range that visually skips them. */
+  const visibleRows = computed<SelectedRow[]>(() => {
+    const out: SelectedRow[] = []
+    const walk = (nodes: TreeNode[]): void => {
+      for (const n of nodes) {
+        const isDir = n.kind === 'dir'
+        out.push({ path: n.path, isDir })
+        if (isDir && expandedDirs.value.has(n.path)) walk(n.children ?? [])
+      }
+    }
+    walk(tree.value)
+    return out
+  })
+
+  /** Replace the selection with exactly these rows; the last becomes the lead. */
+  function selectMany(rows: SelectedRow[]): void {
+    selection.value = [...rows]
+    anchor = rows.at(-1)?.path ?? ''
+  }
   function select(path: string, isDir: boolean): void {
-    selectedPath.value = path
-    selectedIsDir.value = isDir
+    selectMany([{ path, isDir }])
+  }
+  /** ⌘/Ctrl-click: add this row to the selection, or take it back out. */
+  function toggleSelect(path: string, isDir: boolean): void {
+    const had = selection.value.some((e) => e.path === path)
+    selection.value = had
+      ? selection.value.filter((e) => e.path !== path)
+      : [...selection.value, { path, isDir }]
+    anchor = path
+  }
+  /**
+   * Shift-click: select every visible row between the anchor and this one.
+   *
+   * The clicked row ends up last whichever direction the range runs, because
+   * the lead is what `targetDir` reads — a new file after a shift-click belongs
+   * where the cursor is, not where the range happens to start.
+   */
+  function extendSelection(path: string, isDir: boolean): void {
+    const rows = visibleRows.value
+    const to = rows.findIndex((r) => r.path === path)
+    const from = rows.findIndex((r) => r.path === anchor)
+    if (to < 0 || from < 0) {
+      select(path, isDir)
+      return
+    }
+    const range = from <= to ? rows.slice(from, to + 1) : rows.slice(to, from + 1).reverse()
+    selection.value = range
+    // anchor deliberately unchanged
   }
   function clearSelection(): void {
-    selectedPath.value = ''
-    selectedIsDir.value = false
+    selection.value = []
+    anchor = ''
+  }
+  /** Drop rows a filesystem change took away, keeping the rest of the
+   *  selection. A batch delete removes its entries one at a time; clearing the
+   *  whole selection on the first would strand the ones still to go. */
+  function pruneSelection(gone: (path: string) => boolean): void {
+    selection.value = selection.value.filter((e) => !gone(e.path))
+    if (gone(anchor)) anchor = selection.value.at(-1)?.path ?? ''
   }
   /** Set of directory paths currently expanded in the file tree. Centralized so
    *  "collapse all" is a single clear() rather than per-node signalling. */
@@ -492,7 +574,7 @@ export const useFilesStore = defineStore('files', () => {
     } else {
       openTabs.value = openTabs.value.filter((p) => !affected(p))
     }
-    if (affected(selectedPath.value)) clearSelection()
+    pruneSelection(affected)
     await refreshTree()
     void afterPathsChanged()
   }
@@ -549,8 +631,14 @@ export const useFilesStore = defineStore('files', () => {
     mode,
     selectedPath,
     selectedIsDir,
+    selection,
+    selectedPaths,
+    visibleRows,
     targetDir,
     select,
+    selectMany,
+    toggleSelect,
+    extendSelection,
     clearSelection,
     cycleTab,
     expandedDirs,

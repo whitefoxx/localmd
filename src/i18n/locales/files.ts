@@ -14,10 +14,30 @@ export default {
     emptyFolder: 'Empty folder',
 
     // FileTree prompts + status
+    newFilePrompt: 'New file name (e.g. idea.md):',
     newFolderPrompt: 'New folder name:',
     renamePrompt: 'Rename to:',
     indexingN: 'Indexing {i}/{total}…',
     indexing: 'Indexing…',
+
+    // Moving and deleting. Every refusal ends by saying nothing happened —
+    // after an alert the first question is always "did some of it go through".
+    kbRoot: 'the top of the knowledge base',
+    moveToPrompt: 'Move to which folder? Leave blank for the top of the knowledge base.',
+    moveIntoSelf: '“{name}” cannot be moved inside itself. Nothing was moved.',
+    moveNoTarget: 'There is no folder called “{dir}”. Nothing was moved.',
+    moveExists: '“{name}” already exists in {dir}. Nothing was moved.',
+    // The delete dialog. It shows the list rather than describing it, so the
+    // wording here only has to frame the list and total it up.
+    deleteTitle: 'Delete',
+    deleteLead: 'These will be removed from your folder. Untick anything you want to keep.',
+    nFiles: '{n} files',
+    deleteSummary: '{n} selected. This cannot be undone.',
+    deleteSummaryFolders:
+      '{n} selected — {dirs} of them folders, holding {files} files. This cannot be undone.',
+    deleteConfirmButton: 'Delete {n}',
+    moveFailed: '“{name}” could not be moved. Anything moved before it stayed moved.',
+    deleteFailed: '“{name}” could not be deleted. Anything deleted before it is gone.',
 
     // FileTree context menu
     menu: {
@@ -27,10 +47,16 @@ export default {
       indexDocs: 'Index docs for AI',
       open: 'Open',
       indexForAi: 'Index for AI',
+      selected: '{n} selected',
+      addToChat: 'Add to Chat',
       rename: 'Rename…',
+      moveTo: 'Move to…',
       delete: 'Delete',
+      deleteN: 'Delete {n} items',
       copyPath: 'Copy Path',
+      copyPaths: 'Copy Paths',
       copyRelativePath: 'Copy Relative Path',
+      copyRelativePaths: 'Copy Relative Paths',
     },
 
     // Editor tabs context menu
@@ -60,10 +86,25 @@ export default {
     emptyFolder: '空文件夹',
 
     // FileTree prompts + status
+    newFilePrompt: '新文件名（例如 idea.md）：',
     newFolderPrompt: '新文件夹名称：',
     renamePrompt: '重命名为：',
     indexingN: '正在索引 {i}/{total}…',
     indexing: '索引中…',
+
+    kbRoot: '知识库根目录',
+    moveToPrompt: '移动到哪个文件夹？留空表示知识库根目录。',
+    moveIntoSelf: '「{name}」不能移动到它自己里面。没有移动任何东西。',
+    moveNoTarget: '没有名为「{dir}」的文件夹。没有移动任何东西。',
+    moveExists: '{dir} 里已经有「{name}」了。没有移动任何东西。',
+    deleteTitle: '删除',
+    deleteLead: '这些会从你的文件夹里移除。想留下的，把勾去掉。',
+    nFiles: '{n} 个文件',
+    deleteSummary: '已选 {n} 项。此操作无法撤销。',
+    deleteSummaryFolders: '已选 {n} 项，其中 {dirs} 个是文件夹，装着 {files} 个文件。此操作无法撤销。',
+    deleteConfirmButton: '删除 {n} 项',
+    moveFailed: '「{name}」没能移动。在它之前移动的仍然移动了。',
+    deleteFailed: '「{name}」没能删除。在它之前删掉的已经没了。',
 
     // FileTree context menu
     menu: {
@@ -73,10 +114,16 @@ export default {
       indexDocs: '为 AI 建立文档索引',
       open: '打开',
       indexForAi: '为 AI 建立索引',
+      selected: '已选 {n} 项',
+      addToChat: '添加到对话',
       rename: '重命名…',
+      moveTo: '移动到…',
       delete: '删除',
+      deleteN: '删除 {n} 项',
       copyPath: '复制路径',
+      copyPaths: '复制路径',
       copyRelativePath: '复制相对路径',
+      copyRelativePaths: '复制相对路径',
     },
 
     // Editor tabs context menu

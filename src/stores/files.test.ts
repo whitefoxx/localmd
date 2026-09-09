@@ -190,3 +190,101 @@ describe('files store — what a KB opens on with no tabs to restore', () => {
     expect(files.currentPath).toBeNull()
   })
 })
+
+describe('files store — the tree selection', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    fs.setRoot(createMemoryRoot())
+    await fs.writeFile('wiki/a.md', 'A')
+    await fs.writeFile('wiki/b.md', 'B')
+    await fs.writeFile('wiki/c.md', 'C')
+    await fs.writeFile('raw/x.md', 'X')
+    const files = useFilesStore()
+    await files.refreshTree()
+    files.collapseAll()
+  })
+
+  it('reads as a single selection until a modifier says otherwise', () => {
+    const files = useFilesStore()
+    files.select('wiki/a.md', false)
+
+    expect([...files.selectedPaths]).toEqual(['wiki/a.md'])
+    expect(files.selectedPath).toBe('wiki/a.md')
+    expect(files.targetDir).toBe('wiki')
+  })
+
+  it('adds and removes one row at a time, and the lead follows the last click', () => {
+    const files = useFilesStore()
+    files.select('wiki/a.md', false)
+    files.toggleSelect('raw/x.md', false)
+
+    expect([...files.selectedPaths].sort()).toEqual(['raw/x.md', 'wiki/a.md'])
+    // New files land beside the row last picked, not the one picked first.
+    expect(files.targetDir).toBe('raw')
+
+    files.toggleSelect('raw/x.md', false)
+    expect([...files.selectedPaths]).toEqual(['wiki/a.md'])
+  })
+
+  it('ranges over what the tree is drawing, skipping a collapsed folder', () => {
+    const files = useFilesStore()
+    // raw and wiki are both shut, so the range between them is those two rows —
+    // not the four files hidden underneath.
+    files.select('raw', true)
+    files.extendSelection('wiki', true)
+
+    expect([...files.selectedPaths].sort()).toEqual(['raw', 'wiki'])
+
+    files.toggleDir('wiki')
+    files.select('wiki', true)
+    files.extendSelection('wiki/b.md', false)
+    expect([...files.selectedPaths]).toEqual(['wiki', 'wiki/a.md', 'wiki/b.md'])
+  })
+
+  it('re-ranges from the same anchor, so a range can shrink as well as grow', () => {
+    const files = useFilesStore()
+    files.toggleDir('wiki')
+    files.select('wiki/a.md', false)
+
+    files.extendSelection('wiki/c.md', false)
+    expect(files.selectedPaths.size).toBe(3)
+
+    files.extendSelection('wiki/b.md', false)
+    expect([...files.selectedPaths]).toEqual(['wiki/a.md', 'wiki/b.md'])
+  })
+
+  it('ends a backwards range on the clicked row, so the target dir follows the cursor', () => {
+    const files = useFilesStore()
+    files.toggleDir('wiki')
+    files.select('wiki/c.md', false)
+
+    files.extendSelection('wiki/a.md', false)
+
+    expect(files.selectedPath).toBe('wiki/a.md')
+    expect(files.selectedPaths.size).toBe(3)
+  })
+
+  it('keeps the rest of the selection when one of its rows is deleted', async () => {
+    // A batch delete removes its entries one at a time. Clearing the whole
+    // selection on the first would strand the ones still to go.
+    const files = useFilesStore()
+    files.toggleDir('wiki')
+    files.select('wiki/a.md', false)
+    files.toggleSelect('wiki/b.md', false)
+
+    await files.deleteEntry('wiki/a.md', false)
+
+    expect([...files.selectedPaths]).toEqual(['wiki/b.md'])
+  })
+
+  it('drops a folder\'s children from the selection when the folder goes', async () => {
+    const files = useFilesStore()
+    files.toggleDir('wiki')
+    files.select('wiki/a.md', false)
+    files.toggleSelect('raw/x.md', false)
+
+    await files.deleteEntry('wiki', true)
+
+    expect([...files.selectedPaths]).toEqual(['raw/x.md'])
+  })
+})

@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, provide, computed, watch, nextTick } from 'vue'
-import { useFilesStore } from '@/stores/files'
+import { useFilesStore, type SelectedRow } from '@/stores/files'
 import { useKbStore } from '@/stores/kb'
 import { useKbIndexStore } from '@/stores/kbIndex'
+import { useUiStore } from '@/stores/ui'
 import * as fs from '@/lib/fs'
 import { importFileInto } from '@/lib/capture'
 import { indexableKind, indexDocument } from '@/lib/docindex'
 import { checkRenumber, confirmRenumber } from '@/lib/renumber'
 import {
-  moveEntry,
+  DRAG_ROWS,
+  deleteRows,
+  moveInteractive,
+  moveRows,
   newFileInteractive,
-  deleteInteractive,
+  readDragRows,
   refreshGitStatus,
 } from '@/lib/fileOps'
 import FileTreeNode from '@/components/FileTreeNode.vue'
@@ -19,6 +23,7 @@ import { t } from '@/i18n'
 
 const files = useFilesStore()
 const kb = useKbStore()
+const ui = useUiStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const indexStatus = ref('')
 const expanded = ref(true)
@@ -50,22 +55,30 @@ provide('fileTreeCtx', (node: TreeNode, e: MouseEvent) => {
   ctx.value = { node, x: e.clientX, y: e.clientY }
 })
 
-/* ── drag-to-move: the actual logic lives in lib/fileOps (shared with the
- *    ⌘M hotkey); nodes reach it via provide. ─────────────────────────────── */
-provide('fileTreeMove', moveEntry)
-
 /* Root drop = move to the KB root — but ONLY on true blank space (.self
  * modifiers): rows handle their own drops (dir = into it, file = into its
  * parent), so a drop between rows can't fall through to the root by accident. */
 function onRootDragOver(e: DragEvent): void {
-  if (e.dataTransfer?.types.includes('application/x-bmd-path')) e.preventDefault()
+  if (e.dataTransfer?.types.includes(DRAG_ROWS)) e.preventDefault()
 }
 function onRootDrop(e: DragEvent): void {
-  const src = e.dataTransfer?.getData('application/x-bmd-path')
-  if (!src) return
+  const rows = readDragRows(e.dataTransfer)
+  if (!rows.length) return
   e.preventDefault()
-  void moveEntry(src, e.dataTransfer!.getData('application/x-bmd-isdir') === 'true', '')
+  void moveRows(rows, '')
 }
+
+/* ── what the menu and the keys act on ───────────────────────────────────── */
+
+/**
+ * The rows every action below operates on: the selection, always.
+ *
+ * Not `ctx.node`. Right-clicking has already made the clicked row part of the
+ * selection (FileTreeNode), so the two agree on one row and differ on four —
+ * and reading the node instead would silently act on one of them while four sit
+ * highlighted. A copy, because a delete mutates the selection as it goes.
+ */
+const picked = computed<SelectedRow[]>(() => files.selection.map((r) => ({ ...r })))
 function closeMenu(): void {
   ctx.value = null
 }
@@ -154,7 +167,7 @@ async function indexFile(path: string): Promise<void> {
   await useKbIndexStore().refresh()
 }
 
-/* ── rename / delete / copy (operate on the menu target) ────────────────── */
+/* ── open / rename / move / delete / copy / hand to the agent ───────────── */
 function menuOpen(node: TreeNode): void {
   closeMenu()
   files.select(node.path, node.kind === 'dir')
@@ -163,34 +176,93 @@ function menuOpen(node: TreeNode): void {
   } else void files.openFile(node.path)
 }
 
-async function menuRename(node: TreeNode): Promise<void> {
+/** Rename is the one action that stays single: N files cannot share a name,
+ *  and the lead is the row the user right-clicked. */
+async function menuRename(row: SelectedRow): Promise<void> {
   closeMenu()
-  const next = prompt(t('files.renamePrompt'), node.name)?.trim()
-  if (!next || next === node.name) return
-  const i = node.path.lastIndexOf('/')
-  const newPath = i < 0 ? next : `${node.path.slice(0, i)}/${next}`
-  await files.renameEntry(node.path, newPath, node.kind === 'dir')
+  const name = row.path.slice(row.path.lastIndexOf('/') + 1)
+  const next = prompt(t('files.renamePrompt'), name)?.trim()
+  if (!next || next === name) return
+  const i = row.path.lastIndexOf('/')
+  const newPath = i < 0 ? next : `${row.path.slice(0, i)}/${next}`
+  await files.renameEntry(row.path, newPath, row.isDir)
   refreshGitStatus()
 }
 
-async function menuDelete(node: TreeNode): Promise<void> {
+async function menuMove(): Promise<void> {
   closeMenu()
-  await deleteInteractive(node.path, node.kind === 'dir')
+  await moveInteractive(picked.value)
 }
 
-async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
+async function menuDelete(): Promise<void> {
   closeMenu()
-  const text = relative ? node.path : `${kb.name ?? ''}/${node.path}`
+  await deleteRows(picked.value)
+}
+
+/**
+ * Hand the selection to the agent as `@path` tokens.
+ *
+ * A draft, not a message: the composer is where the user says what they
+ * actually want done with these files, and sending anything on their behalf
+ * from a context menu would be this app answering its own question. `@path` is
+ * the token the composer already speaks (lib/mentions), so this adds no second
+ * way to refer to a file.
+ */
+function menuAddToChat(): void {
+  closeMenu()
+  const rows = picked.value
+  if (!rows.length) return
+  ui.agentOpen = true
+  ui.pendingPrompt = rows.map((r) => `@${r.path}`).join(' ')
+}
+
+async function menuCopyPath(relative: boolean): Promise<void> {
+  closeMenu()
+  const prefix = relative ? '' : `${kb.name ?? ''}/`
+  const text = picked.value.map((r) => `${prefix}${r.path}`).join('\n')
   try {
     await navigator.clipboard.writeText(text)
   } catch (err) {
     console.error('clipboard write failed', err)
   }
 }
+
+/**
+ * The two keys the menu has always advertised, and until now did not have.
+ *
+ * Bound to the tree rather than the window: rows are buttons, so after a click
+ * the focus is inside here and the event bubbles to this handler — which also
+ * means Backspace keeps meaning "delete a character" everywhere else in the
+ * app, with no global listener to guess at.
+ */
+function onKeydown(e: KeyboardEvent): void {
+  const el = e.target as HTMLElement | null
+  if (el?.isContentEditable || el?.closest('input, textarea')) return
+  if (!picked.value.length) return
+  if (e.key === 'F2') {
+    const lead = picked.value.at(-1)
+    if (lead) {
+      e.preventDefault()
+      void menuRename(lead)
+    }
+    return
+  }
+  if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault()
+    void menuDelete()
+  }
+}
 </script>
 
 <template>
-  <div ref="rootEl" class="pb-2" @click.self="files.clearSelection()" @dragover.self="onRootDragOver" @drop.self="onRootDrop">
+  <div
+    ref="rootEl"
+    class="pb-2"
+    @click.self="files.clearSelection()"
+    @keydown="onKeydown"
+    @dragover.self="onRootDragOver"
+    @drop.self="onRootDrop"
+  >
     <!-- The tree scrolls inside the sidebar's panel-scroll container; the
          heading + actions row stays pinned to its top edge (opaque bg so rows
          slide underneath). -->
@@ -235,14 +307,26 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
     </template>
     <input ref="fileInput" type="file" multiple class="hidden" @change="onImport" />
 
-    <!-- Right-click context menu -->
+    <!-- Right-click context menu. Everything below the first block acts on the
+         SELECTION, which the right-click has already made the clicked row part
+         of; only the top block — new file, index, open, rename — is about the
+         one row, and it stands down as soon as there is more than one. -->
     <template v-if="ctx">
       <div class="fixed inset-0 z-40" @click="closeMenu" @contextmenu.prevent="closeMenu" />
       <div
         class="fixed z-50 min-w-[190px] rounded-md border border-border bg-bg-1 shadow-lg py-1 text-sm"
         :style="menuStyle"
       >
-        <template v-if="ctx.node.kind === 'dir'">
+        <template v-if="picked.length > 1">
+          <!-- Says what the menu is about to act on. Four highlighted rows and
+               a menu that could mean any of them is the one thing a batch
+               action must not be ambiguous about. -->
+          <div class="px-3 py-1.5 text-xs text-fg-3">
+            {{ $t('files.menu.selected', { n: picked.length }) }}
+          </div>
+          <div :class="ctxSep" />
+        </template>
+        <template v-else-if="ctx.node.kind === 'dir'">
           <button :class="ctxItem" @click="newFile">
             <span class="codicon codicon-sm codicon-new-file" />{{ $t('files.menu.newFile') }}
           </button>
@@ -271,21 +355,41 @@ async function menuCopyPath(node: TreeNode, relative: boolean): Promise<void> {
           <div :class="ctxSep" />
         </template>
 
-        <button :class="ctxItem" @click="menuRename(ctx.node)">
+        <button :class="ctxItem" @click="menuAddToChat">
+          <span class="codicon codicon-sm codicon-comment-discussion" />{{
+            $t('files.menu.addToChat')
+          }}
+        </button>
+        <div :class="ctxSep" />
+        <!-- Rename stays single: N files cannot share a name. -->
+        <button v-if="picked.length === 1" :class="ctxItem" @click="menuRename(picked[0]!)">
           <span class="codicon codicon-sm codicon-edit" />{{ $t('files.menu.rename') }}
           <span class="ml-auto text-fg-3 text-xs">F2</span>
         </button>
-        <button :class="ctxItem" @click="menuDelete(ctx.node)">
+        <button :class="ctxItem" @click="menuMove">
+          <span class="codicon codicon-sm codicon-arrow-right" />{{ $t('files.menu.moveTo') }}
+        </button>
+        <button :class="ctxItem" @click="menuDelete">
           <span class="codicon codicon-sm codicon-trash text-removed" />
-          <span class="text-removed">{{ $t('files.menu.delete') }}</span>
+          <span class="text-removed">{{
+            picked.length > 1
+              ? $t('files.menu.deleteN', { n: picked.length })
+              : $t('files.menu.delete')
+          }}</span>
           <span class="ml-auto text-fg-3 text-xs">⌫</span>
         </button>
         <div :class="ctxSep" />
-        <button :class="ctxItem" @click="menuCopyPath(ctx.node, false)">
-          <span class="codicon codicon-sm codicon-link" />{{ $t('files.menu.copyPath') }}
+        <button :class="ctxItem" @click="menuCopyPath(false)">
+          <span class="codicon codicon-sm codicon-link" />{{
+            picked.length > 1 ? $t('files.menu.copyPaths') : $t('files.menu.copyPath')
+          }}
         </button>
-        <button :class="ctxItem" @click="menuCopyPath(ctx.node, true)">
-          <span class="codicon codicon-sm codicon-link" />{{ $t('files.menu.copyRelativePath') }}
+        <button :class="ctxItem" @click="menuCopyPath(true)">
+          <span class="codicon codicon-sm codicon-link" />{{
+            picked.length > 1
+              ? $t('files.menu.copyRelativePaths')
+              : $t('files.menu.copyRelativePath')
+          }}
         </button>
       </div>
     </template>

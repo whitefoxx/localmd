@@ -3,6 +3,7 @@ import { computed, inject, ref } from 'vue'
 import { useFilesStore } from '@/stores/files'
 import { useGitStore } from '@/stores/git'
 import { GIT_DECOR } from '@/lib/gitStatus'
+import { DRAG_ROWS, moveRows, readDragRows, writeDragRows } from '@/lib/fileOps'
 import type { TreeNode } from '@/lib/fs'
 
 const props = defineProps<{ node: TreeNode; depth: number }>()
@@ -12,7 +13,9 @@ const git = useGitStore()
 const isDir = computed(() => props.node.kind === 'dir')
 const dragOver = ref(false)
 const expanded = computed(() => files.expandedDirs.has(props.node.path))
-const highlighted = computed(() => files.selectedPath === props.node.path)
+const highlighted = computed(() => files.selectedPaths.has(props.node.path))
+/** This row as the selection holds it. */
+const row = computed(() => ({ path: props.node.path, isDir: isDir.value }))
 // Base 24px matches the Open Files / Backlinks list indent (pl-6); each level
 // adds 14px. Keeps all sidebar lists visually aligned.
 const indent = computed(() => ({ paddingLeft: `${24 + props.depth * 14}px` }))
@@ -36,24 +39,36 @@ const openContextMenu = inject<((node: TreeNode, e: MouseEvent) => void) | undef
   undefined,
 )
 
-function onClick(): void {
-  files.select(props.node.path, isDir.value)
+/**
+ * Plain click opens; the modifiers only build a selection.
+ *
+ * Deliberately: shift-clicking a run of eight files to delete them must not
+ * also open eight tabs, and neither modifier toggles a folder either. Opening
+ * is what an unmodified click means, and it is the only thing that means it.
+ */
+function onClick(e: MouseEvent): void {
+  if (e.shiftKey) {
+    files.extendSelection(row.value.path, row.value.isDir)
+    return
+  }
+  if (e.metaKey || e.ctrlKey) {
+    files.toggleSelect(row.value.path, row.value.isDir)
+    return
+  }
+  files.select(row.value.path, row.value.isDir)
   if (isDir.value) files.toggleDir(props.node.path)
   else void files.openFile(props.node.path)
 }
 
+/** Right-clicking inside a multi-selection keeps it, so the menu acts on what
+ *  is highlighted; landing outside makes this row the selection first. A menu
+ *  offering to delete four things while one is highlighted is a trap. */
 function onContextMenu(e: MouseEvent): void {
-  files.select(props.node.path, isDir.value)
+  if (!highlighted.value) files.select(row.value.path, row.value.isDir)
   openContextMenu?.(props.node, e)
 }
 
 /* ── drag to move ─────────────────────────────────────────────────────── */
-const DRAG_PATH = 'application/x-bmd-path'
-const DRAG_ISDIR = 'application/x-bmd-isdir'
-const moveEntry = inject<((source: string, isDir: boolean, targetDir: string) => void) | undefined>(
-  'fileTreeMove',
-  undefined,
-)
 
 /** Drop target dir for this row: the dir itself, or a file's parent — so a
  *  drop landing on any row goes where it visually belongs, never to the root. */
@@ -63,14 +78,16 @@ const dropDir = computed(() => {
   return i < 0 ? '' : props.node.path.slice(0, i)
 })
 
+/** Dragging a row inside a multi-selection carries the whole selection;
+ *  dragging one outside it takes the selection with it first, so what moves is
+ *  always what is highlighted. */
 function onDragStart(e: DragEvent): void {
   if (!e.dataTransfer) return
-  e.dataTransfer.effectAllowed = 'move'
-  e.dataTransfer.setData(DRAG_PATH, props.node.path)
-  e.dataTransfer.setData(DRAG_ISDIR, String(isDir.value))
+  if (!highlighted.value) files.select(row.value.path, row.value.isDir)
+  writeDragRows(e.dataTransfer, [...files.selection])
 }
 function onDragOver(e: DragEvent): void {
-  if (!e.dataTransfer?.types.includes(DRAG_PATH)) return
+  if (!e.dataTransfer?.types.includes(DRAG_ROWS)) return
   e.preventDefault()
   e.stopPropagation()
   e.dataTransfer.dropEffect = 'move'
@@ -78,11 +95,11 @@ function onDragOver(e: DragEvent): void {
 }
 function onDrop(e: DragEvent): void {
   dragOver.value = false
-  const src = e.dataTransfer?.getData(DRAG_PATH)
-  if (!src) return
+  const rows = readDragRows(e.dataTransfer)
+  if (!rows.length) return
   e.preventDefault()
   e.stopPropagation()
-  moveEntry?.(src, e.dataTransfer!.getData(DRAG_ISDIR) === 'true', dropDir.value)
+  void moveRows(rows, dropDir.value)
   if (isDir.value && !expanded.value) files.toggleDir(props.node.path) // reveal where it landed
 }
 </script>
@@ -90,7 +107,7 @@ function onDrop(e: DragEvent): void {
 <template>
   <div>
     <button
-      class="w-full flex items-center gap-1.5 py-0.5 pr-2 text-left text-sm truncate"
+      class="w-full flex select-none items-center gap-1.5 py-0.5 pr-2 text-left text-sm truncate"
       :class="[
         highlighted ? 'bg-accent/15 text-fg-0' : 'text-fg-1 hover:bg-bg-2',
         dragOver ? 'ring-1 ring-inset ring-accent bg-accent/10' : '',

@@ -23,6 +23,11 @@ Plain language works. Some examples of the range:
 Two things help: **@** references a specific file, and **/** runs a saved
 workflow directly.
 
+You can also point at files in the file tree instead of typing their names.
+Click one, ⌘-click (Ctrl on Windows) to add more, or shift-click for a whole
+run of them, then right-click and choose **Add to Chat** — the same **@**
+references land in the box, and you say what to do with them from there.
+
 It answers — and reasons — in the language you wrote in, and switches when you
 do. The interface language in Settings → General is only what it falls back to
 when a message gives it nothing to go on, like a bare path or a dropped file.

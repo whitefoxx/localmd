@@ -13,6 +13,7 @@ import { useMcpStore } from '@/stores/mcp'
 import OpenKbScreen from '@/components/OpenKbScreen.vue'
 import AppLayout from '@/components/AppLayout.vue'
 import NarrowScreenNotice from '@/components/NarrowScreenNotice.vue'
+import DeleteDialog from '@/components/DeleteDialog.vue'
 import TtsBar from '@/components/TtsBar.vue'
 import UpdateBanner from '@/components/UpdateBanner.vue'
 import { resolveHotkey, HOTKEY_BY_ID, type HotkeyId } from '@/lib/hotkeys'
@@ -222,6 +223,11 @@ onBeforeUnmount(() => {
          degrades correctly there on its own — it is the three-column workspace
          behind it that has no narrow form. -->
     <NarrowScreenNotice v-if="kb.isOpen" />
+    <!-- Root-level and unconditional while a folder is open: the question it
+         asks has to be answerable from wherever the delete was started, and a
+         dialog that is not mounted is a question that cannot be answered — which
+         `lib/confirmDelete` counts as no. -->
+    <DeleteDialog v-if="kb.isOpen" />
     <TtsBar />
     <!-- Also root-level: which screen is up decides whether a waiting build is
          offered or just applied (main.ts), not where the offer is drawn. -->
