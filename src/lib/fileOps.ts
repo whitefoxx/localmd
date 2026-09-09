@@ -11,7 +11,7 @@
  * second one ends up asking a different question.
  */
 import * as fs from '@/lib/fs'
-import { askPick, askText, notify } from '@/lib/dialog'
+import { askPick, askText, notify, type DialogChoice } from '@/lib/dialog'
 import { useFilesStore, type SelectedRow } from '@/stores/files'
 import { useGitStore } from '@/stores/git'
 import { t } from '@/i18n'
@@ -148,8 +148,35 @@ export async function moveRows(rows: SelectedRow[], targetDir: string): Promise<
   refreshGitStatus()
 }
 
-/** Ask where to move, then move. The current folder is the default, so the
- *  prompt opens on the answer to "where am I" and is edited from there. */
+/**
+ * Every folder in the knowledge base, as somewhere these rows could go.
+ *
+ * Derived from the tree already in memory, so it costs no disk read. Two kinds
+ * are left out because they are not destinations: a folder in the batch (a
+ * folder cannot move inside itself) and anything underneath one, which is
+ * about to move anyway. Offering either is a row whose only outcome is the
+ * refusal that follows.
+ *
+ * The top of the knowledge base leads the list. It is the empty string, which
+ * renders as nothing at all without a name — and "clear the field" is exactly
+ * the kind of affordance nobody finds.
+ */
+function destinations(rows: SelectedRow[], all: string[]): DialogChoice[] {
+  const moving = rows.filter((r) => r.isDir).map((r) => r.path)
+  const dirs = new Set<string>()
+  for (const p of all) {
+    const parts = p.split('/')
+    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/'))
+  }
+  const usable = [...dirs]
+    .filter((d) => !moving.some((m) => d === m || d.startsWith(`${m}/`)))
+    .sort()
+  return [{ value: '', label: t('files.kbRoot') }, ...usable.map((value) => ({ value }))]
+}
+
+/** Ask where to move, then move. The field opens on the answer to "where am I"
+ *  and is edited from there; the folders underneath it are the answer to "where
+ *  else could this go", which is the question a bare field cannot ask. */
 export async function moveInteractive(rows: SelectedRow[]): Promise<void> {
   if (!rows.length) return
   const answer = await askText({
@@ -159,6 +186,7 @@ export async function moveInteractive(rows: SelectedRow[]): Promise<void> {
     value: dirOf(rows[rows.length - 1]!.path),
     placeholder: t('files.kbRoot'),
     confirmLabel: t('files.move'),
+    suggest: destinations(rows, useFilesStore().allFiles),
   })
   // null is cancelled; '' is a real answer — the top of the knowledge base.
   if (answer === null) return

@@ -4,8 +4,14 @@ import * as fs from '@/lib/fs'
 import { createMemoryRoot } from '@/lib/memfs'
 import { useFilesStore } from '@/stores/files'
 import { watch } from 'vue'
-import { pendingDialog, registerDialogHost, settleDialog, type DialogRow } from './dialog'
-import { deleteRows, moveRows, readDragRows } from './fileOps'
+import {
+  pendingDialog,
+  registerDialogHost,
+  settleDialog,
+  type DialogChoice,
+  type DialogRow,
+} from './dialog'
+import { deleteRows, moveInteractive, moveRows, readDragRows } from './fileOps'
 
 /**
  * Stand in for the dialog host: register, then answer the moment a question
@@ -24,6 +30,10 @@ function answerDialogs(pick: (rows: DialogRow[]) => DialogRow[]): () => void {
         settleDialog(undefined)
         return
       }
+      if (req.kind === 'text') {
+        offeredChoices = req.suggest ?? []
+        return settleDialog(null)
+      }
       if (req.kind !== 'pick') return settleDialog(null)
       offered = req.rows
       summary = req.summary(req.rows)
@@ -38,6 +48,8 @@ function answerDialogs(pick: (rows: DialogRow[]) => DialogRow[]): () => void {
 }
 /** What the last question put in front of the user. */
 let offered: DialogRow[] = []
+/** What the last text field offered as answers. */
+let offeredChoices: DialogChoice[] = []
 let summary = ''
 let closeDialog: (() => void) | null = null
 
@@ -49,6 +61,7 @@ beforeEach(async () => {
   fs.setRoot(createMemoryRoot())
   alerts = []
   offered = []
+  offeredChoices = []
   summary = ''
   vi.stubGlobal('crypto', { randomUUID: () => `id-${Math.random()}` })
   // Every test needs a host: without one the dialogs refuse by design, and a
@@ -237,6 +250,23 @@ describe('deleteRows', () => {
     expect(offered.map((r) => r.id)).toEqual(['notes/deep'])
     expect(await fs.exists('notes/deep/c.md')).toBe(false)
     expect(await fs.exists('notes/d.md')).toBe(true)
+  })
+})
+
+describe('moveInteractive', () => {
+  it('offers every folder in the knowledge base, the root first', async () => {
+    await moveInteractive([{ path: 'wiki/a.md', isDir: false }])
+
+    expect(offeredChoices[0]).toEqual({ value: '', label: 'the top of the knowledge base' })
+    expect(offeredChoices.slice(1).map((c) => c.value)).toEqual(['notes', 'notes/deep', 'wiki'])
+  })
+
+  it('leaves out a folder being moved, and everything under it', async () => {
+    // Both are refusals waiting to happen: a folder cannot move inside itself,
+    // and what is under it is coming along anyway.
+    await moveInteractive([{ path: 'notes', isDir: true }])
+
+    expect(offeredChoices.map((c) => c.value)).toEqual(['', 'wiki'])
   })
 })
 

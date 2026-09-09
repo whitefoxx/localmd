@@ -43,6 +43,14 @@ export interface DialogRow {
   loud?: boolean
 }
 
+/** One answer a `text` field will accept. `label` covers the case where the
+ *  value is not its own name — an empty string that means the top of the
+ *  knowledge base reads as nothing at all without one. */
+export interface DialogChoice {
+  value: string
+  label?: string
+}
+
 interface Base {
   id: string
   title: string
@@ -60,6 +68,15 @@ export type DialogRequest =
       value: string
       placeholder?: string
       confirmLabel?: string
+      /**
+       * Answers the field will accept, offered under it and ranked by what has
+       * been typed so far.
+       *
+       * The field alone turns "where do you want this" into "recite the path",
+       * for destinations the user can see in the tree behind the dialog. This
+       * is the other half: type it if you know it, point at it if you don't.
+       */
+      suggest?: DialogChoice[]
     })
   | (Base & {
       kind: 'pick'
@@ -157,6 +174,7 @@ export function askText(opts: {
   value?: string
   placeholder?: string
   confirmLabel?: string
+  suggest?: DialogChoice[]
 }): Promise<string | null> {
   return ask<string | null>({ kind: 'text', value: '', ...opts })
 }
