@@ -3,10 +3,8 @@ import {
   clipSlug,
   yamlValue,
   clipFrontmatter,
-  rewriteImages,
   renderClipNote,
   parseClip,
-  markdownRefs,
   dataUrlToBlob,
   webAnnotationsFor,
   type ClipPayload,
@@ -95,15 +93,6 @@ describe('clipFrontmatter', () => {
   })
 })
 
-describe('rewriteImages', () => {
-  it('points saved images at their local file and leaves the rest alone', () => {
-    const md = '![a](https://c.test/a.png) ![b](https://c.test/b.png)'
-    const out = rewriteImages(md, new Map([['https://c.test/a.png', 'note-1.png']]))
-    expect(out).toContain('![a](note-1.png)')
-    expect(out).toContain('![b](https://c.test/b.png)')
-  })
-})
-
 describe('renderClipNote', () => {
   it('is frontmatter, a heading, a source line, then the page', () => {
     const note = renderClipNote(base)
@@ -138,15 +127,6 @@ describe('renderClipNote', () => {
 
   it('names the host when the page declares no site', () => {
     expect(renderClipNote({ ...base, site: undefined })).toContain('[ex.test](https://ex.test/a)')
-  })
-})
-
-describe('markdownRefs', () => {
-  it('collects the image targets the content actually shows', () => {
-    expect([...markdownRefs('![a](x.png) text ![b](y.png "t") [not an image](z.png)')]).toEqual([
-      'x.png',
-      'y.png',
-    ])
   })
 })
 

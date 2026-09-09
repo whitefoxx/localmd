@@ -141,10 +141,15 @@ You do not have to have this app open. The clip waits in the extension until
 the app next runs, and the number on the extension's icon is how many are
 waiting. When it arrives it becomes an ordinary note in your folder, next to
 everything else that comes in from outside: what the page said, its address,
-its author and date, and its pictures saved beside it. Nothing about it is a
-special kind of file — it is markdown you can edit, move and cite like any
-other, and the assistant can distil it into a page in `wiki/` the way it would
-with a PDF.
+its author and date. Nothing about it is a special kind of file — it is
+markdown you can edit, move and cite like any other, and the assistant can
+distil it into a page in `wiki/` the way it would with a PDF.
+
+The pictures are left as links to where the page served them, rather than
+downloaded into your folder. A clip of a busy page carries twenty avatars,
+icons and buttons along with the two you wanted, and filing all of them next
+to the note buries it. The trade is worth knowing: if the page comes down, or
+moves its images, the pictures in your note go with it. The words stay.
 
 Select text on any page and a small bar appears: five colours to highlight it
 in, a note to write on it, and the same Clip and Ask buttons. Highlights stay on

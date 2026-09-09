@@ -12,12 +12,16 @@
  * `inbox/`. Opening someone's existing folder must never graft our layout onto
  * it, and a clip is not special enough to be the exception.
  *
- * Images land BESIDE the note with a bare-filename link, which is the
- * convention already set by pasting into the editor (lib/editor/paste). The
- * alternative — the shared `raw/images/` bucket — is for files that arrive
- * without an owner; a clip's images belong to their note, and a relative path
- * out of the note's directory is one more thing that can break when either
- * moves.
+ * A clip's pictures stay as the URLs the page served them from. They used to
+ * be downloaded and rewritten to local files, which is the local-first answer
+ * — a note that survives the page coming down — and it was dropped anyway,
+ * because of what actually arrives: a clip of a busy page is twenty avatars,
+ * icons and buttons, and filing those next to the note buries it. The cost is
+ * real and is the reader's to carry: when the page goes, or the CDN moves the
+ * file, the pictures go with it. The words do not.
+ *
+ * So `images` on the payload is data we deliberately do not act on. The
+ * extension still sends the bytes; nothing here reads them.
  *
  * The pure half (naming, frontmatter, rendering) is exported for tests; the
  * only I/O is in writeClip().
@@ -151,18 +155,6 @@ export function clipFrontmatter(payload: ClipPayload, now = new Date()): string 
   return lines.join('\n')
 }
 
-/** Rewrite the Markdown's image targets to the files that were written for
- *  them (already relative to the note and encoded — see markdownTarget). An
- *  image that could not be fetched keeps its remote URL rather than becoming a
- *  broken local link. */
-export function rewriteImages(markdown: string, byUrl: Map<string, string>): string {
-  if (!byUrl.size) return markdown
-  return markdown.replace(/(!\[[^\]]*\]\()([^)\s]+)((?:\s+"[^"]*")?\))/g, (all, open, src, close) => {
-    const local = byUrl.get(src)
-    return local ? `${open}${local}${close}` : all
-  })
-}
-
 /**
  * The note. A heading, one line saying where it came from, then the page.
  *
@@ -170,13 +162,10 @@ export function rewriteImages(markdown: string, byUrl: Map<string, string>): str
  * metadata for the machinery, and a reader who opens this note in six months
  * should not have to know the dialect to find out what they were reading.
  */
-export function renderClipNote(
-  payload: ClipPayload,
-  byUrl: Map<string, string> = new Map(),
-): string {
+export function renderClipNote(payload: ClipPayload): string {
   const title = payload.title || clipSlug(payload)
   const url = payload.canonical || payload.url
-  const body = rewriteImages(payload.markdown ?? '', byUrl).trim()
+  const body = (payload.markdown ?? '').trim()
   const label = payload.site || hostOf(url) || url
   const parts: string[] = [clipFrontmatter(payload)]
   // Only add a heading when the page did not bring one. Plenty of pages put
@@ -195,28 +184,12 @@ export function renderClipNote(
   return parts.join('\n\n') + '\n'
 }
 
-/** Image targets the Markdown actually references. */
-export function markdownRefs(markdown: string): Set<string> {
-  const out = new Set<string>()
-  for (const m of markdown.matchAll(/!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) out.add(m[1])
-  return out
-}
-
 function hostOf(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./, '')
   } catch {
     return ''
   }
-}
-
-const EXT_BY_MIME: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/gif': 'gif',
-  'image/webp': 'webp',
-  'image/svg+xml': 'svg',
-  'image/avif': 'avif',
 }
 
 /** data: URL → Blob, or null when it is not one we can decode. */
@@ -307,15 +280,6 @@ export function parseClip(value: unknown): ClipPayload | null {
   }
 }
 
-/** The path of `to`, written from inside `fromDir` (both KB-relative; `fromDir`
- *  ends with `/` or is empty for the root). Pure. */
-export function relativePath(fromDir: string, to: string): string {
-  const from = fromDir.split('/').filter(Boolean)
-  const target = to.split('/').filter(Boolean)
-  let i = 0
-  while (i < from.length && i < target.length && from[i] === target[i]) i++
-  return [...from.slice(i).map(() => '..'), ...target.slice(i)].join('/')
-}
 
 /**
  * A KB path as a Markdown link destination.
@@ -333,50 +297,15 @@ export function markdownTarget(path: string): string {
 }
 
 /**
- * Write a clip into the KB: its images first (so the note never links a file
- * that is not there yet), then the note. Returns the note's path.
- *
- * The pictures go where pictures go in THIS folder — `raw/images/` in a
- * raw-layout KB, the inbox beside the note otherwise — not beside the note
- * regardless. A homepage clip brought twenty avatars and icons into
- * `raw/articles/`, and a folder of notes with twenty image files interleaved
- * read as a mess of duplicates. They are still named after the note, so a
- * folder of images still says what each one belongs to.
- *
- * An image that fails to write is skipped and its Markdown keeps the remote
- * URL — a clip is worth having with one picture missing, and the alternative
- * is losing the text because a CDN returned something odd.
+ * Write a clip into the KB: one note, and its highlights beside it. Returns
+ * the note's path. The pictures are left as the URLs the page served, for the
+ * reason at the top of this file.
  */
 export async function writeClip(payload: ClipPayload): Promise<string> {
   const stem = clipSlug(payload)
   const rawLayout = await usesRawLayout()
   const notePath = await resolveUniquePath(landingPathFor(`${stem}.md`, rawLayout))
-  const dir = notePath.slice(0, notePath.lastIndexOf('/') + 1)
-  const noteStem = notePath.slice(dir.length, notePath.length - 3)
-
-  const byUrl = new Map<string, string>()
-  let n = 0
-  for (const img of payload.images ?? []) {
-    if (!img.dataUrl) continue
-    // Only pictures the note will actually show. The clipper also hands over
-    // the page's social-card image (og:image), which usually appears nowhere in
-    // the content — saving it would leave a file in the folder that nothing
-    // points at, and an orphan is exactly what a knowledge base must not
-    // accumulate.
-    if (!markdownRefs(payload.markdown ?? '').has(img.src)) continue
-    const blob = dataUrlToBlob(img.dataUrl)
-    if (!blob) continue
-    n++
-    const ext = EXT_BY_MIME[img.mime ?? blob.type] ?? 'png'
-    try {
-      const target = await resolveUniquePath(landingPathFor(`${noteStem}-${n}.${ext}`, rawLayout))
-      await fs.writeFile(target, blob)
-      byUrl.set(img.src, markdownTarget(relativePath(dir, target)))
-    } catch {
-      /* keep the remote URL in the Markdown */
-    }
-  }
-  await fs.writeFile(notePath, renderClipNote(payload, byUrl))
+  await fs.writeFile(notePath, renderClipNote(payload))
   // The highlights go beside the note in the sidecar format the annotations
   // viewer and the agent digest already read — written AFTER the note, so a
   // sidecar never exists without the file it annotates.
