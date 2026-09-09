@@ -194,6 +194,7 @@ function onKey(e: KeyboardEvent): void {
     >
       <div
         ref="panel"
+        data-dialog
         tabindex="-1"
         class="relative flex max-h-[80vh] w-[520px] max-w-[95vw] flex-col overflow-hidden rounded-xl border border-border bg-bg-1 shadow-2xl outline-none"
       >
@@ -297,10 +298,16 @@ function onKey(e: KeyboardEvent): void {
         <div class="border-t border-border px-4 py-3" :class="{ 'mt-3': req.kind !== 'pick' }">
           <p v-if="req.kind === 'pick'" class="text-xs text-fg-3">{{ req.summary(chosen) }}</p>
           <div class="flex justify-end gap-2" :class="{ 'mt-2.5': req.kind === 'pick' }">
-            <button v-if="req.kind !== 'notice'" class="btn text-sm" @click="cancel">
+            <button
+              v-if="req.kind !== 'notice'"
+              data-dialog-cancel
+              class="btn text-sm"
+              @click="cancel"
+            >
               {{ $t('common.cancel') }}
             </button>
             <button
+              data-dialog-accept
               class="rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-40"
               :class="danger ? 'bg-removed text-bg-0' : 'bg-accent text-bg-0'"
               :disabled="!canConfirm"

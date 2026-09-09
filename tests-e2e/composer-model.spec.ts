@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { dismissDialog } from './dialog'
 
 /**
  * The model line under the composer, from the outside.
@@ -88,16 +89,10 @@ test('picking an unmarked profile asks, and a no changes nothing', async ({ page
   await addProfile(page, 'image-only', ['Generates images'])
 
   const before = await page.locator('button[aria-label="Switch model"]').textContent()
-  const messages: string[] = []
-  page.on('dialog', (d) => {
-    messages.push(d.message())
-    void d.dismiss()
-  })
 
   await openPrimaryMenu(page)
   await page.locator('.absolute.bottom-full button', { hasText: 'image-only' }).click()
-  expect(messages.length).toBe(1)
-  expect(messages[0]).toContain('not marked as a chat model')
+  expect(await dismissDialog(page)).toContain('not marked as a chat model')
   // A no leaves the slot alone, which is the whole difference from a menu that
   // assigns whatever was clicked.
   await expect(page.locator('button[aria-label="Switch model"]')).toHaveText(before!.trim())

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { acceptDialog, expectNoDialog } from './dialog'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -82,36 +83,23 @@ async function openCitedBook(page: Page): Promise<void> {
 }
 
 test('indexing on open stops when it would renumber cited passages', async ({ page }) => {
-  // Any dialog here would be a failure of the premise: the automatic path must
-  // never prompt. Accepting keeps a mistake visible as a failed assertion
-  // rather than a hung test.
-  const dialogs: string[] = []
-  page.on('dialog', (d) => {
-    dialogs.push(d.message())
-    void d.accept()
-  })
-
   await openCitedBook(page)
 
   const paused = page.getByRole('button', { name: 'Indexing paused' })
   await expect(paused).toBeVisible({ timeout: 15_000 })
-  expect(dialogs).toEqual([])
+  // Nothing was asked, which is the premise: the automatic path must never
+  // prompt — nobody asked for that build.
+  await expectNoDialog(page)
 
   // The badge is the only way past, and it says what is at stake in numbers.
   await paused.click()
+  const asked = await acceptDialog(page)
+  expect(asked).toContain('2 passage(s)')
+  expect(asked).toContain('1 page(s)')
   await expect(paused).toBeHidden({ timeout: 15_000 })
-  expect(dialogs).toHaveLength(1)
-  expect(dialogs[0]).toContain('2 passage(s)')
-  expect(dialogs[0]).toContain('1 page(s)')
 })
 
 test('a document nobody cites is indexed on open as before', async ({ page }) => {
-  const dialogs: string[] = []
-  page.on('dialog', (d) => {
-    dialogs.push(d.message())
-    void d.accept()
-  })
-
   const dir = await mkdtemp(path.join(tmpdir(), 'localmd-renumber-'))
   const book = path.join(dir, 'uncited-book.epub')
   await writeFile(book, await makeEpub())
@@ -124,7 +112,7 @@ test('a document nobody cites is indexed on open as before', async ({ page }) =>
 
   await expect(page.locator('iframe').first()).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('button', { name: 'Indexing paused' })).toBeHidden()
-  expect(dialogs).toEqual([])
+  await expectNoDialog(page)
 })
 
 /**
@@ -133,7 +121,6 @@ test('a document nobody cites is indexed on open as before', async ({ page }) =>
  * this one on the user's behalf, so the turn pauses on a card.
  */
 test('the agent asks before an index build that would renumber', async ({ page }) => {
-  page.on('dialog', (d) => void d.dismiss())
   await openCitedBook(page)
   await expect(page.getByRole('button', { name: 'Indexing paused' })).toBeVisible({
     timeout: 15_000,

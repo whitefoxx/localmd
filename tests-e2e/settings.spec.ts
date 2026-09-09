@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { acceptDialog, dismissDialog, expectNoDialog } from './dialog'
 
 /**
  * Settings → Models, from the outside.
@@ -78,11 +79,11 @@ test.describe('leaving the profile editor', () => {
 
   test('an edit Save would refuse asks before it is dropped', async ({ page }) => {
     await openModels(page)
-    page.on('dialog', (d) => void d.dismiss())
     await page.getByRole('button', { name: /Add model/ }).click()
     await page.locator('select').first().selectOption('custom')
     await page.locator('input[placeholder="https://api.example.com/v1"]').fill('https://x.test/v1')
     await page.keyboard.press('Escape')
+    await dismissDialog(page)
     // Declined: still editing, the modal still up — and nothing underneath it
     // closed instead, which is what folding the question into the layer chain's
     // own condition would have done.
@@ -94,15 +95,10 @@ test.describe('leaving the profile editor', () => {
 
   test('a form nobody typed into leaves without a word', async ({ page }) => {
     await openModels(page)
-    let asked = false
-    page.on('dialog', (d) => {
-      asked = true
-      void d.accept()
-    })
     await page.getByRole('button', { name: /Add model/ }).click()
     await page.keyboard.press('Escape')
     await expect(page.getByText('Model profiles')).toBeHidden()
-    expect(asked).toBe(false)
+    await expectNoDialog(page)
   })
 })
 
@@ -133,19 +129,13 @@ test.describe('what a model is marked for', () => {
   test('picking an unmarked profile asks, and a yes writes the mark', async ({ page }) => {
     await openModels(page)
     await addProfile(page, 'draws-actually', ['Chat'])
-    const messages: string[] = []
-    page.on('dialog', (d) => {
-      messages.push(d.message())
-      void d.accept()
-    })
 
     const sel = roleSelect(page, 'Image generation')
     const id = await sel
       .locator('optgroup option', { hasText: 'draws-actually' })
       .getAttribute('value')
     await sel.selectOption(id!)
-    expect(messages.length).toBe(1)
-    expect(messages[0]).toContain('not marked as generating images')
+    expect(await acceptDialog(page)).toContain('not marked as generating images')
     // The answer is kept, not asked again: it has left the heading for good.
     await expect(sel.locator('optgroup option', { hasText: 'draws-actually' })).toHaveCount(0)
   })
@@ -153,10 +143,10 @@ test.describe('what a model is marked for', () => {
   test('a no leaves the role where it was', async ({ page }) => {
     await openModels(page)
     await addProfile(page, 'stays-chat', ['Chat'])
-    page.on('dialog', (d) => void d.dismiss())
     const sel = roleSelect(page, 'Image generation')
     const id = await sel.locator('optgroup option', { hasText: 'stays-chat' }).getAttribute('value')
     await sel.selectOption(id!)
+    await dismissDialog(page)
     // Role unset, mark unwritten — and the select itself back where it was,
     // which an unchanged store would not have done on its own.
     await expect(sel).toHaveValue('')

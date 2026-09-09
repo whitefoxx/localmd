@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { acceptDialog } from './dialog'
 import { mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -148,7 +149,6 @@ test('a citation whose source is gone says so instead of opening a tab', async (
  * alive. The Health panel is where that becomes visible.
  */
 test('the health panel names an index whose document has left the folder', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept()) // the delete confirm
 
   const dir = await mkdtemp(path.join(tmpdir(), 'localmd-stale-'))
   const book = path.join(dir, 'doomed-book.epub')
@@ -172,6 +172,7 @@ test('the health panel names an index whose document has left the folder', async
   // Open Files list, and only the tree has a context menu.
   await page.locator('[data-tree-path$="doomed-book.epub"]').click({ button: 'right' })
   await page.getByRole('button', { name: /Delete/ }).click()
+  expect(await acceptDialog(page)).toContain('doomed-book.epub')
   await expect(page.locator('aside').getByText('doomed-book.epub', { exact: true })).toHaveCount(0, {
     timeout: 10_000,
   })
@@ -189,7 +190,6 @@ test('the health panel names an index whose document has left the folder', async
  * existing citation was written against.
  */
 test('a renamed document is recognised by its bytes, not its name', async ({ page }) => {
-  page.on('dialog', (d) => void d.accept())
 
   const dir = await mkdtemp(path.join(tmpdir(), 'localmd-rename-'))
   const bytes = await makeEpub('Twice', 'Identical opening passage.')
@@ -206,6 +206,7 @@ test('a renamed document is recognised by its bytes, not its name', async ({ pag
   await page.locator('aside').getByText('new-name.epub', { exact: true }).click()
   await page.locator('[data-tree-path$="old-name.epub"]').click({ button: 'right' })
   await page.getByRole('button', { name: /Delete/ }).click()
+  await acceptDialog(page)
   await expect(page.locator('aside').getByText('old-name.epub', { exact: true })).toHaveCount(0, {
     timeout: 10_000,
   })
