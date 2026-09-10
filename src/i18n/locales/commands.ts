@@ -24,9 +24,9 @@ export default {
     help: 'Open help',
   },
   zh: {
-    agent: '显示/隐藏助手面板',
-    agentMaximize: '最大化助手面板',
-    agentRestore: '还原助手面板',
+    agent: '显示/隐藏 agent 面板',
+    agentMaximize: '最大化 agent 面板',
+    agentRestore: '还原 agent 面板',
     newChat: '新建对话',
     chatHistory: '浏览对话',
     sidebar: '显示/隐藏侧栏',

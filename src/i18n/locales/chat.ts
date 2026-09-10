@@ -103,14 +103,14 @@ export default {
     // Whose file this is. The distinction the agent's own drafts and the
     // user's material deserve: tidying its own is housekeeping, touching
     // theirs is a decision.
-    approvalYours: 'Your file — the assistant did not create it',
-    approvalMine: 'Created by the assistant in this session',
+    approvalYours: 'Your file — the agent did not create it',
+    approvalMine: 'Created by the agent in this session',
     approvalWrite: 'Wants to write this file',
     approvalCreate: 'Wants to create this file',
     approvalDelete: 'Wants to delete this file — Reject keeps it.',
     approvalDeleteFinal:
       'Wants to delete this permanently — everything listed below is gone for good.',
-    approvalPending: 'Waiting for your decision — the assistant is paused.',
+    approvalPending: 'Waiting for your decision — the agent is paused.',
     approvalApprove: 'Approve',
     approvalReject: 'Reject',
     approvalApproved: 'Approved',
@@ -232,13 +232,13 @@ export default {
       '这条规则会在每次打开匹配页面时隐藏下面的元素，直到你移除它（随时可在 localmd Connect 弹窗里暂停或删除）。',
     // ApprovalCard —— 先询问模式下暂停的写入，就地决定
     approvalMove: '想移动这个文件',
-    approvalYours: '你的文件——不是助手建的',
-    approvalMine: '助手在本次会话里建的',
+    approvalYours: '你的文件——不是 agent 建的',
+    approvalMine: 'agent 在本次会话里建的',
     approvalWrite: '想写入这个文件',
     approvalCreate: '想创建这个文件',
     approvalDelete: '想删除这个文件 —— 点「拒绝」就保留。',
     approvalDeleteFinal: '想永久删除 —— 下面列出的内容将无法恢复。',
-    approvalPending: '等你决定 —— 助手已暂停。',
+    approvalPending: '等你决定 —— agent 已暂停。',
     approvalApprove: '批准',
     approvalReject: '拒绝',
     approvalApproved: '已批准',

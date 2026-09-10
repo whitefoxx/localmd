@@ -1,11 +1,11 @@
 ---
-title: Tools — giving the assistant new abilities
+title: Tools — giving the agent new abilities
 summary: Almost nothing comes switched on; how to add a service by asking, what happens when one needs a key or a login, what the tags on each row mean, and why some counts are green and some grey.
 ---
 
-# Tools — giving the assistant new abilities
+# Tools — giving the agent new abilities
 
-Out of the box the assistant can work with your folder and nothing else. It
+Out of the box the agent can work with your folder and nothing else. It
 cannot search the web, look up a paper, or read your reading app — until you
 give it a tool that does.
 
@@ -29,7 +29,7 @@ The Tools page is split by how far a row reaches:
 
 **localmd Connect** deserves a paragraph of its own: it is the companion
 extension made for this app, and the one install that makes most *other*
-things work. It lets the assistant use your own logged-in Chrome, so it
+things work. It lets the agent use your own logged-in Chrome, so it
 reaches pages that need a login and services that refuse web pages outright.
 What it does there is deliberately plain: open a tab, read a page, click, type,
 fill a form, look at the structure underneath, and — when a page is stubborn —
@@ -40,10 +40,10 @@ section, run a snippet. Worth setting up first.
 What it deliberately does *not* have is a catalogue of supported sites. There
 was one — a few hundred ready-made extractors for popular sites — and it was
 dropped on purpose. A hand-maintained list is the opposite of how this app
-treats tools everywhere else, built for you by the assistant and kept as files
+treats tools everywhere else, built for you by the agent and kept as files
 you own; and a list like that is certain to rot, because every entry needs
 re-verifying forever and the day one goes stale it fails quietly. Reaching a
-site now works the way everything else here does: the assistant works the site
+site now works the way everything else here does: the agent works the site
 out live, and can offer to save what it learned as a skill in your folder, so
 next time is one step instead of a fresh investigation.
 
@@ -59,26 +59,26 @@ this app has instead is a way to add anything, in a minute, by asking.
 
 ## Adding anything else: just ask
 
-Tell the assistant what you want to reach — "search Hacker News", "read my
+Tell the agent what you want to reach — "search Hacker News", "read my
 Readwise highlights", "look things up in my Notion". It works out how that
 service is reached, then either builds the tools itself or points the app at the
 service's own MCP server.
 
 You never have to find an address yourself, but if you want to browse, a good
 place is **mcp.so** — a directory of MCP servers. Find one you like, come back,
-and say "add this one" with the name or the address. The assistant takes it from
+and say "add this one" with the name or the address. The agent takes it from
 there.
 
 **Nothing it proposes happens on its own.** When it wants to add a server you
 get a card showing the exact address, and it is added only when you click. When
 a service needs a key, the card takes the key straight into the app — it is
-never typed into the chat, and the assistant never sees it. When a
+never typed into the chat, and the agent never sees it. When a
 service needs you to log in, the card opens that service's own sign-in page.
 
-That rule is worth knowing the reason for: the assistant reads web pages, files
+That rule is worth knowing the reason for: the agent reads web pages, files
 and tool results, and none of those can be trusted to be talking to it honestly.
 A page can perfectly well contain the words "add the server at …". So the
-assistant is never the one who decides — it can only ever put the address in
+agent is never the one who decides — it can only ever put the address in
 front of you.
 
 ## Connecting localmd Connect
@@ -89,7 +89,7 @@ itself. Two things are still worth knowing:
 
 - **The “Allow user scripts” toggle**, in the extension's popup. Site scripts
   need it. Until it is on, those tools report that they cannot run — the
-  assistant will tell you, and the fix is that one switch.
+  agent will tell you, and the fix is that one switch.
 - **Development addresses** (a local `localhost:…` build of this app) are not
   pre-authorized. Click the extension's toolbar icon, open **Web app access**,
   add the address shown on the row's page — exactly as shown, port included —
@@ -109,13 +109,13 @@ and ask first, in the chat:
   asks.
 - **Installing a site script that injects CSS or JavaScript.** The card shows
   the match patterns and the exact code. For hide-only rules the card is
-  lighter — just the patterns and the selectors being hidden. The assistant can
+  lighter — just the patterns and the selectors being hidden. The agent can
   also preview the effect first (outlining what would be hidden, or a one-off
   dry run of the JavaScript) so you judge the real thing, not a description.
 
 Confirming is the front line, not the only line. The refusal lives in the
-extension rather than in the assistant's instructions, so it is not something
-a page can talk its way past by getting the assistant to click the site's own
+extension rather than in the agent's instructions, so it is not something
+a page can talk its way past by getting the agent to click the site's own
 buttons instead. And every site script can be paused or deleted at any time
 from the extension's popup, whatever installed it.
 
@@ -127,7 +127,7 @@ that one is yours to close, and nothing here will take it away while you are
 reading it.
 
 Once it is connected, **@** in the chat box also lists the pages you have open,
-so you can hand the assistant a tab (or several) to work with — see
+so you can hand the agent a tab (or several) to work with — see
 `working-with-the-agent`.
 
 ## Saving a page you are reading
@@ -142,7 +142,7 @@ the app next runs, and the number on the extension's icon is how many are
 waiting. When it arrives it becomes an ordinary note in your folder, next to
 everything else that comes in from outside: what the page said, its address,
 its author and date. Nothing about it is a special kind of file — it is
-markdown you can edit, move and cite like any other, and the assistant can
+markdown you can edit, move and cite like any other, and the agent can
 distil it into a page in `wiki/` the way it would with a PDF.
 
 The pictures are left as links to where the page served them, rather than
@@ -155,7 +155,7 @@ Select text on any page and a small bar appears: five colours to highlight it
 in, a note to write on it, and the same Clip and Ask buttons. Highlights stay on
 the page when you come back to it, and when you clip that page they come along —
 the note lands with an annotations file beside it, the same kind a PDF or an
-EPUB gets, so the assistant sees what you marked and why.
+EPUB gets, so the agent sees what you marked and why.
 
 Two smaller gestures go to today's daily page instead of becoming a note of
 their own: **Jot this page** adds one line — the page as a link, plus anything
@@ -167,7 +167,7 @@ passing thought reach the folder at all.
 Clipping keeps you where you are. **Ask localmd about this page** (Alt+Shift+L)
 does the opposite: it brings this app to the front with the page attached, so
 you can start asking about what you were just reading. That one hands over the
-address, not a copy, so the assistant reads the page as you have it — signed
+address, not a copy, so the agent reads the page as you have it — signed
 in, and with whatever you had filtered or searched still on screen.
 
 A clip lands in your folder without asking, because you already asked by
@@ -222,7 +222,7 @@ Each row has a tag saying **where it came from**:
 
 - **Preset** — one of the few things that come switched on. We defined it, so
   only the parts you must supply (an address, a token) can be edited.
-- **Yours** — you made it, or the assistant made it for you.
+- **Yours** — you made it, or the agent made it for you.
 - **KB** — it came with this knowledge base folder. See below.
 
 Some rows have a second tag, **MCP** or **Extension**. That means the row is a
@@ -246,7 +246,7 @@ Mostly it repairs itself:
 - Reloading the page reconnects everything.
 - Coming back to the tab re-tries whatever was failing, so a server that came
   back up while you were elsewhere is simply working again.
-- If the assistant uses a tool whose connection died in the meantime, the app
+- If the agent uses a tool whose connection died in the meantime, the app
   reconnects and sends it once more. (Only when the request provably never
   arrived — nothing is ever run twice on a guess.)
 
@@ -297,7 +297,7 @@ Keys under that name and the row connects itself — there is no second step. Th
 key is stored once and referenced by name, so rotating it later means editing it
 in that one place rather than reinstalling anything.
 
-**You just want it fixed.** Tell the assistant what happened. It can test tools
+**You just want it fixed.** Tell the agent what happened. It can test tools
 directly and see the real error.
 
 ## Related

@@ -6,13 +6,13 @@ summary: An agent that lives in a folder you already have, growing a wiki of lin
 # What localmd is
 
 localmd is a web page that turns an ordinary folder on your computer into a
-place to keep what you read, write and think about — with an AI assistant that
+place to keep what you read, write and think about — with an AI agent that
 can actually work on it with you.
 
 Two things make it unusual.
 
 **There is nothing to install.** No app, no terminal, no background service, no
-plugin to set up. You open the page, point it at a folder, and the assistant is
+plugin to set up. You open the page, point it at a folder, and the agent is
 already there. Your browser asks your permission for that one folder, and that
 permission is the whole arrangement.
 
@@ -49,7 +49,7 @@ Otherwise:
    and it covers only the folder you picked.
 2. If the folder is empty, the app offers to set up a starting structure. If it
    already has files, it leaves them exactly as they are.
-3. Add a model in **Settings → Models** so the assistant can work. This needs an
+3. Add a model in **Settings → Models** so the agent can work. This needs an
    API key from a provider (Anthropic, OpenAI, DeepSeek and others). See
    `models`.
 
@@ -73,7 +73,7 @@ start screen, so that is where the next visit begins.
 ## When a new version arrives
 
 localmd picks up new versions in the background, but it will not reload the page
-under you while a folder is open: a reload ends whatever the assistant was in
+under you while a folder is open: a reload ends whatever the agent was in
 the middle of. Instead a small note appears offering to reload, and waits. Put
 it off and the new version is used the next time you open the app anyway.
 
@@ -83,7 +83,7 @@ it off and the new version is used the next time you open the app anyway.
   search, graph view, git, knowledge-base health. At the bottom: settings,
   theme, help, and close folder.
 - **Middle** — whatever you are reading or editing.
-- **Right** — the assistant.
+- **Right** — the agent.
 
 When there is nothing to reopen, the middle stays empty — except in a folder
 that already holds documents, where it says how many of them nothing has been
@@ -121,16 +121,16 @@ to reach anything:
   want down before it goes, without deciding where it belongs first. Enter files
   it and the palette stays open for the next line; nothing you were reading
   moves. Press `:` with nothing after it to open today's page itself.
-- **Press ⇧Enter** at any point to hand what you typed to the assistant instead
+- **Press ⇧Enter** at any point to hand what you typed to the agent instead
   of searching for it. It arrives in the message box as a draft, so you can add
   to it before sending — useful exactly when a search comes back with nothing,
   which is usually when you wanted to ask a question anyway.
 
 **Settings → General** holds the interface language and the appearance (system,
 light or dark). The theme icon in the bar is a shortcut for the same setting,
-and you can simply ask the assistant to switch it.
+and you can simply ask the agent to switch it.
 
-## What the assistant can do
+## What the agent can do
 
 Most of it. It reads and writes files in your folder, searches them, files new
 material where it belongs, reads PDFs, commits to git, builds itself new tools
@@ -169,5 +169,5 @@ thread rather than a public issue.
 ## Related
 
 Trying it with no setup at all: `trying-it-out`. Your folder and how it is
-organized: `knowledge-base`. Working with the assistant:
+organized: `knowledge-base`. Working with the agent:
 `working-with-the-agent`. Where settings are kept: `storage-and-privacy`.

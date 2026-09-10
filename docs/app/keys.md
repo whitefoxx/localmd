@@ -1,12 +1,12 @@
 ---
 title: API keys and privacy
-summary: Keys stay in your browser and the assistant never sees their values — how that works, why it can still help you set one up, what signing in stores instead, and the one thing worth watching.
+summary: Keys stay in your browser and the agent never sees their values — how that works, why it can still help you set one up, what signing in stores instead, and the one thing worth watching.
 ---
 
 # API keys and privacy
 
 Some services need a key to prove a request is yours. Your keys are stored in
-your browser, and they are never shown to the assistant.
+your browser, and they are never shown to the agent.
 
 ## How that is possible
 
@@ -14,16 +14,16 @@ A tool does not contain its key. It contains a **name** — a placeholder like
 `{{secret:weread_api_key}}`. The real value is filled in at the last moment,
 when the request is actually sent, and only then.
 
-So the assistant can read and write the placeholder without ever seeing what it
+So the agent can read and write the placeholder without ever seeing what it
 stands for. In practice that means it can genuinely help — "this tool needs a
 key called `weread_api_key`, you can get one here, the field is currently
 empty" — while never being in a position to leak it.
 
 ## Giving it a key
 
-When the assistant needs one, it does not ask you to paste it into the chat.
+When the agent needs one, it does not ask you to paste it into the chat.
 A small form appears instead; you type the key straight into the app. It goes to
-your browser's storage, and the assistant is told only that a value was saved.
+your browser's storage, and the agent is told only that a value was saved.
 
 **Never paste a key into the chat message box.** Anything you type there does go
 to the model. If you do it by accident, delete the message and rotate the key.

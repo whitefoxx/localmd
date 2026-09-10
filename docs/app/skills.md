@@ -1,11 +1,11 @@
 ---
 title: Skills — saving a way of working
-summary: Teach the assistant a repeatable workflow once, stored as a file in your folder, and run it later with a slash command.
+summary: Teach the agent a repeatable workflow once, stored as a file in your folder, and run it later with a slash command.
 ---
 
 # Skills — saving a way of working
 
-A skill is a workflow you worked out once, written down so the assistant follows
+A skill is a workflow you worked out once, written down so the agent follows
 it the same way every time. "How I ingest a paper." "How I prepare my weekly
 review." "How our team formats meeting notes."
 
@@ -13,7 +13,7 @@ It is a plain markdown file in your folder, not a program.
 
 ## Making one
 
-The easy way: after the assistant has done something the way you wanted, say
+The easy way: after the agent has done something the way you wanted, say
 **"save that as a skill"**. It writes the file.
 
 It ends up at `.agents/skills/<name>/SKILL.md`, with a name and a one-line
@@ -23,7 +23,7 @@ other file.
 ## Using one
 
 Type `/` in the message box and pick it. Or just describe the task — the
-assistant sees a one-line summary of every skill and loads the full instructions
+agent sees a one-line summary of every skill and loads the full instructions
 when one matches.
 
 A new chat also puts your first few skills as buttons right above the
@@ -36,8 +36,8 @@ a better line than "paper stuff".
 ## Who a skill is for
 
 By default a skill is offered to both of you: it is in the slash menu, and the
-assistant can pick it up on its own. Some skills only make sense one way round —
-a checklist you run by hand every Friday is not something the assistant should
+agent can pick it up on its own. Some skills only make sense one way round —
+a checklist you run by hand every Friday is not something the agent should
 ever start, and a routine it follows silently does not need to sit in your menu.
 
 Add an `invocation` line to the top of the file to say which:
@@ -50,10 +50,10 @@ invocation: user
 ---
 ```
 
-`user` means only you can start it. `model` means only the assistant. Leave the
+`user` means only you can start it. `model` means only the agent. Leave the
 line out and it stays available to both.
 
-There is a reason to bother: the assistant is told about every skill it might
+There is a reason to bother: the agent is told about every skill it might
 use at the start of every reply, so a workflow only you ever run costs a little
 on each one. Marking it `user` takes it out of that list without taking it out
 of your menu. You can still type `/name` for a `model` skill — the setting
@@ -63,7 +63,7 @@ decides what gets *offered*, not what is allowed.
 
 Write down what you **learned**, not what the tools already say.
 
-A skill that lists tool names adds nothing — the assistant already knows those.
+A skill that lists tool names adds nothing — the agent already knows those.
 A skill that records "this API reports duration in seconds, not minutes" or
 "always check the appendix for the funding statement" saves real work every time.
 
@@ -74,12 +74,12 @@ and you share the ways of working that go with it.
 
 The app also ships a few built-in skills you never have to install. Some are
 about the app rather than your notes — connecting a new service is one. One is
-about your notes: type **`/ingest`** and the assistant works through the
+about your notes: type **`/ingest`** and the agent works through the
 material you have added that no page covers yet and writes it up, following
 whatever structure your folder already uses. A skill of your own with the same
 name takes priority over any of them.
 
 ## Related
 
-Working with the assistant: `working-with-the-agent`. Long-term memory, which is
+Working with the agent: `working-with-the-agent`. Long-term memory, which is
 a different thing: `memory-and-sessions`. Your folder: `knowledge-base`.

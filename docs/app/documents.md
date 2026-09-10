@@ -10,13 +10,13 @@ them like anything else — but they need one preparation step first.
 
 ## Indexing
 
-Ask the assistant to index a document, or open it and use the index action. It
+Ask the agent to index a document, or open it and use the index action. It
 reads the file once and writes a structured, searchable version alongside it (in
 a hidden `.localmd/` folder).
 
 This takes a moment for a long book. Afterwards:
 
-- the assistant can search and quote it like any note
+- the agent can search and quote it like any note
 - you get a table of contents
 - it never has to re-read the whole thing to answer a question, so it stays cheap
 
@@ -28,7 +28,7 @@ repositories.
 Some PDFs are pictures of pages rather than text — anything that came off a
 scanner or a photocopier, and most old papers. There is nothing in the file
 for the index to read, so it comes back empty and the viewer says so: no
-passages to quote, and the assistant cannot cite anything from it.
+passages to quote, and the agent cannot cite anything from it.
 
 Everything else still works. You can read it, highlight it, annotate it and
 have it read aloud, and notes you write about it are ordinary notes. What is
@@ -49,7 +49,7 @@ by the browser.
 
 Cancelling throws the work away rather than keeping the pages it got to. A
 book that was half read would produce an index that looks complete and quietly
-covers a third of the pages — neither you nor the assistant would have any way
+covers a third of the pages — neither you nor the agent would have any way
 to tell.
 
 Recognition is good, not perfect. Expect the occasional wrong character,
@@ -64,7 +64,7 @@ The app can tell the two apart: while no page in the knowledge base cites a
 document, a small **Write a note** button appears in its viewer, beside the
 index badge.
 
-Clicking it does not write anything. It drafts a request to the assistant —
+Clicking it does not write anything. It drafts a request to the agent —
 read this document, write a page about it, tag it, and declare it as a source
 so citations into it work — and puts that draft in the chat box for you to
 edit, send or discard. The detection is free; the writing costs tokens, so
@@ -103,7 +103,7 @@ would all still open, and some would land on a different paragraph.
 So it does not happen quietly. When your notes already cite a document and the
 app cannot promise those citations will survive, **indexing stops** and the
 viewer shows an **Indexing paused** button. Clicking it tells you how many
-citations are at stake and lets you go ahead anyway. The assistant is held to
+citations are at stake and lets you go ahead anyway. The agent is held to
 the same rule — it asks in the conversation and waits for your answer rather
 than deciding for you.
 
@@ -117,7 +117,7 @@ exists so that it is your call and not a surprise.
 
 ## Reading with nothing else on screen
 
-The empty-square button in a PDF or EPUB toolbar is **zen mode** (⌘.). The file tree, the tabs, the assistant panel and the toolbar itself
+The empty-square button in a PDF or EPUB toolbar is **zen mode** (⌘.). The file tree, the tabs, the agent panel and the toolbar itself
 step out, and the page takes the whole window.
 
 Nothing is lost, only put away. Move the cursor towards the top of the screen
@@ -126,7 +126,7 @@ and moves away again when you do. **Esc** leaves, and so does the same button.
 
 ## Citations that jump to the source
 
-When the assistant answers from an indexed document, its citations are
+When the agent answers from an indexed document, its citations are
 **clickable and land on the exact passage** — not the document, the paragraph.
 
 This is the part worth knowing about. If it tells you something surprising about
@@ -146,7 +146,7 @@ turned up first. And if the document a citation points at is no longer in the
 folder, it says so instead of opening an empty tab: an index outlives the file
 it was built from, which is why such a citation can still look live.
 
-Declaring the source on the page itself — the `[[pdf1:…]]` line the assistant
+Declaring the source on the page itself — the `[[pdf1:…]]` line the agent
 writes when it files a document — is what makes all of this exact, so a page
 that cites a book is worth having one.
 
@@ -156,7 +156,7 @@ list under the answer.
 
 ## About made-up sources
 
-The assistant will not cite a web page it did not actually open in that
+The agent will not cite a web page it did not actually open in that
 chat. URLs reconstructed from memory look right and are frequently dead
 or wrong, and passing one off as a source is worse than having no source.
 
@@ -184,7 +184,7 @@ the tab:
   and pictures. The original slide layout is not reproduced, and the view says
   so.
 
-Images, tables and decks are previews: you can read them, but the assistant
+Images, tables and decks are previews: you can read them, but the agent
 does not index or cite them the way it does PDFs, EPUBs and Word files. The old binary Office
 formats (`.doc`, `.xls`, `.ppt`) predate what a browser can read — opening one
 explains how to save it in the modern format instead.

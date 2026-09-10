@@ -1,6 +1,6 @@
 ---
 title: Models — connecting an AI provider
-summary: Add a provider key to make the assistant work, what the three roles are for, and how to tell the app what your model can do.
+summary: Add a provider key to make the agent work, what the three roles are for, and how to tell the app what your model can do.
 ---
 
 # Models — connecting an AI provider
@@ -62,7 +62,7 @@ Below the list, each role points at one of your models:
 - **Primary** — runs the chat and does the work. This is the only one
   that must be set.
 - **Vision** — used when an image needs to be looked at.
-- **Image generation** — optional. Set it and the assistant can create pictures,
+- **Image generation** — optional. Set it and the agent can create pictures,
   saved into your folder.
 
 Each list puts the models you ticked for that job first. The rest are still
@@ -80,7 +80,7 @@ point the **Image generation** role at the one that draws.
 - Is your model already ticked for **reads pictures**? Then no — point the
   vision role at that same model, or leave it empty if it is your primary.
 - Using a text-only model (deepseek-v4-flash, for example)? Point the vision
-  role at a separate model that does read pictures. The assistant will call it
+  role at a separate model that does read pictures. The agent will call it
   when needed.
 
 Without a vision role on a text-only model, it simply cannot see images — and it
@@ -116,5 +116,5 @@ Hovering the token counter under the message box shows what a chat has used.
 
 ## Related
 
-What the assistant can then do: `working-with-the-agent`. Where the key is
+What the agent can then do: `working-with-the-agent`. Where the key is
 stored: `storage-and-privacy`.

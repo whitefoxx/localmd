@@ -17,11 +17,11 @@ Everything that *is* your knowledge base, plus anything meant to travel with it:
 
 - your notes, PDFs, images — all of it
 - `AGENTS.md` — how your folder is organized
-- `MEMORY.md` — what the assistant remembers about you
+- `MEMORY.md` — what the agent remembers about you
 - `.agents/` — saved workflows, and any tools this folder carries
 - `.localmd/` — document indexes, and any result too large to fit in one
-  chat, kept so the assistant can read the rest of it back
-- `artifacts/` — interactive pages the assistant generated
+  chat, kept so the agent can read the rest of it back
+- `artifacts/` — interactive pages the agent generated
 
 Share or clone the folder and all of this comes along.
 
@@ -31,7 +31,7 @@ Everything that is *settings* — belonging to this browser rather than to any
 folder:
 
 - your model providers and their API keys
-- which tools are installed, and any you or the assistant created
+- which tools are installed, and any you or the agent created
 - tool API keys, your GitHub token, and any service you signed in to
 - interface language, shortcuts, and preferences
 
@@ -48,7 +48,7 @@ would hurt, keep them wherever you normally keep passwords.
 Only these, and only when the relevant thing happens:
 
 - **To your AI provider** — the chat, and whatever file content is read
-  during it. This is the main one: if you ask the assistant about a note, that
+  during it. This is the main one: if you ask the agent about a note, that
   note's text goes to the model.
 - **To a tool's service** — only the request that tool makes, only when it runs.
 - **To GitHub** — only when you push.
@@ -77,7 +77,7 @@ goes anywhere on a schedule.
 ## Working offline
 
 Reading, writing and searching your notes all work with no internet at all — the
-files are local. Only the assistant needs a connection, since the model is
+files are local. Only the agent needs a connection, since the model is
 remote.
 
 That works because the browser keeps its own copy of the app. A newer one is
@@ -87,7 +87,7 @@ than in the middle of your work — see `getting-started`.
 ## A note on external tools
 
 Results that come back from an outside service are treated as data, never as
-instructions. If a web page contains text telling the assistant to do something,
+instructions. If a web page contains text telling the agent to do something,
 it will not act on it. And it will not send your notes to an outside service
 unless that is precisely what you asked for.
 

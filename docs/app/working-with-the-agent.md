@@ -1,11 +1,11 @@
 ---
-title: Working with the assistant
-summary: What the assistant can do for you, how to control whether its edits land immediately, and how to save or distill a chat into your notes.
+title: Working with the agent
+summary: What the agent can do for you, how to control whether its edits land immediately, and how to save or distill a chat into your notes.
 ---
 
-# Working with the assistant
+# Working with the agent
 
-The assistant on the right is not a chatbot bolted onto a notes app. It has real
+The agent on the right is not a chatbot bolted onto a notes app. It has real
 access to your folder: it can read files, search them, write new ones, reorganize
 things you ask it to, read PDFs, and change the app's own settings.
 
@@ -40,12 +40,12 @@ when a message gives it nothing to go on, like a bare path or a dropped file.
   changed file is listed for you to approve or undo afterwards.
 - **Ask first** — every write, edit and delete pauses the chat on a
   card right there in the chat: the file, the diff, and Approve / Reject
-  buttons. The assistant waits until you decide — there is no dialog to miss,
+  buttons. The agent waits until you decide — there is no dialog to miss,
   and each chat asks for its own changes.
 
 Either way, **deleting a folder or a binary file always asks**, because nothing
 can bring those back. And committing to git is always separate and explicit —
-the assistant never commits unless you ask.
+the agent never commits unless you ask.
 
 Files that have already been changed collect behind the diff icon in the left
 bar, with a count on it. Click it to see the changes side by side and keep or
@@ -53,11 +53,11 @@ undo each one.
 
 If you reject an edit, it will ask what you want instead rather than trying
 again. Stopping a turn while a card is waiting is not a rejection — nothing is
-written, and the assistant simply picks the question back up if you continue.
+written, and the agent simply picks the question back up if you continue.
 
 ## Plans
 
-For anything with several steps, the assistant keeps a visible checklist so you
+For anything with several steps, the agent keeps a visible checklist so you
 can see where it is and what is left. You do not need to ask for this. The
 checklist belongs to its chat and is saved with it — close the tab or
 reload the page, and it is still there when you come back. Dismissing it with
@@ -78,11 +78,11 @@ indexing — and those finish in the background; nothing waits for them.
 
 ## Finding an earlier chat
 
-Every chat is kept, and the list icon in the assistant's header lists them —
+Every chat is kept, and the list icon in the agent's header lists them —
 newest first, with the one you are reading marked. Click a row to open it; the
 star keeps a chat at hand, and the ✕ deletes it.
 
-The assistant can look through them too. Past chats in this folder are part of
+The agent can look through them too. Past chats in this folder are part of
 what it can read: ask "what did we decide about the pricing page last week?"
 and it lists your earlier conversations and reads the relevant one — you do
 not have to have saved it as a file first. Chats belong to their folder, so
@@ -91,14 +91,14 @@ returning to is still worth saving as a real file (see below): a saved
 transcript is an ordinary note any tool can open, not something only this app
 can see.
 
-The ⤢ button beside it — or **⇧⌘.** — expands the assistant to fill the window. That mode
+The ⤢ button beside it — or **⇧⌘.** — expands the agent to fill the window. That mode
 carries the list permanently down the left side, with New chat and Search chats
 above it — the shape of a chat app, for when the chat is the work rather
 than something beside it. Settings and this manual are at the foot of that
 column, since the icon bar is covered. Esc, or the ✕ at the top of it, returns
 you to your files.
 
-Clicking anything the assistant named — a file, a wikilink, a quoted passage, a
+Clicking anything the agent named — a file, a wikilink, a quoted passage, a
 citation — leaves that mode and opens what it points at, and so does picking a
 file out of the search palette, which the keyboard still reaches from in there.
 A reference whose file is gone leaves you where you are rather than clearing the
@@ -118,7 +118,7 @@ back to either.
 
 Two things worth knowing:
 
-- The assistant answers again from that point, so it costs a reply.
+- The agent answers again from that point, so it costs a reply.
 - **Your files are not rewound.** Anything already written, moved or deleted
   stays exactly as it is. Going back changes the chat, not your folder —
   undo file changes from the diff panel, or with git.
@@ -140,14 +140,14 @@ Two different things, and the difference matters:
 You can distill a chat you saved weeks ago too — it is just a file, so
 name it and ask.
 
-When a discussion reaches a real conclusion, the assistant may offer once to
+When a discussion reaches a real conclusion, the agent may offer once to
 distill it. It will not do it on its own.
 
 ## Pointing it at a browser tab
 
 With localmd Connect installed (see `tools`), **@** also lists the pages you
 have open in your browser. Pick one and it becomes a chip above the box. Type
-**@** again to add another — pick several and the assistant can compare them.
+**@** again to add another — pick several and the agent can compare them.
 The ✕ on a chip lets a page go.
 
 The chips go with the message you send next, and the row is empty again
@@ -157,14 +157,14 @@ whatever file you happen to have open in the editor. A follow-up still works
 without re-picking — the address stays in the chat.
 
 What travels with your message is the address of the tab, not a copy of the
-page: the assistant reads it when it needs it, and reads it *then* rather than
+page: the agent reads it when it needs it, and reads it *then* rather than
 when you picked it. That matters more than it sounds — it reads the tab as you
 have it, signed in, with whatever you searched or filtered still on screen,
 which is a different page from what the same address gives a stranger.
 
 ## When it cannot reach the web
 
-The assistant has no web access until you give it some, and it will tell you so
+The agent has no web access until you give it some, and it will tell you so
 rather than invent an answer. See `tools`.
 
 It also will not cite a link it did not actually open. If something rests on its

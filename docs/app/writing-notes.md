@@ -106,7 +106,7 @@ link, `stale:true` for pages a document they cite has moved on from,
 `undistilled:true` for jottings never written up, and `sort:`, `limit:` and
 `columns:` to shape the answer. Anything that
 is not a filter searches the words. If you would rather describe what you want
-than write it, ask the assistant — it uses the same filters.
+than write it, ask the agent — it uses the same filters.
 
 **Only the question is saved.** Your file holds those few words and nothing
 else; the table is built fresh each time and never written back into the note.
@@ -118,5 +118,5 @@ ever was.
 
 ## Related
 
-Where notes live: `knowledge-base`. Asking the assistant to write for you:
+Where notes live: `knowledge-base`. Asking the agent to write for you:
 `working-with-the-agent`.

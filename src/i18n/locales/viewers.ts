@@ -26,7 +26,7 @@ export default {
     dismiss: 'Dismiss',
     scanned: {
       title: 'No text layer — this looks like a scan',
-      body: 'Every page is a picture, so there is nothing for the index to quote and the assistant cannot cite passages from it. Reading, highlighting, annotating and read-aloud all work as usual, and anything you write about it in your own notes is unaffected.',
+      body: 'Every page is a picture, so there is nothing for the index to quote and the agent cannot cite passages from it. Reading, highlighting, annotating and read-aloud all work as usual, and anything you write about it in your own notes is unaffected.',
       // Reading the pictures is offered, never done uninvited: it is minutes
       // of this machine's CPU, so the size of the bill is on the button.
       offer: 'Read the pictures',
@@ -50,7 +50,7 @@ export default {
 
     sourceNote: {
       write: 'Write a note',
-      hint: 'No page in this knowledge base cites this document yet. This drafts a request to the assistant — you can edit it before sending.',
+      hint: 'No page in this knowledge base cites this document yet. This drafts a request to the agent — you can edit it before sending.',
       prompt:
         'Read {path} and write a source note for it in this knowledge base: a page following the layout already in use here, with `type: source` and a few tags in the frontmatter, a short summary of what it says, and a `[[pdf1:{path}]]` source declaration so citations into it work. Link it from the index page. Show me the plan first if more than one file would change.',
     },
@@ -204,7 +204,7 @@ export default {
     dismiss: '知道了',
     scanned: {
       title: '没有文本层——这看起来是扫描件',
-      body: '每一页都是图片，索引没有文字可以引用，助手也无法引用其中的段落。阅读、划线、标注和朗读照常可用，你自己在笔记里写的关于它的内容也不受影响。',
+      body: '每一页都是图片，索引没有文字可以引用，agent 也无法引用其中的段落。阅读、划线、标注和朗读照常可用，你自己在笔记里写的关于它的内容也不受影响。',
       offer: '识别页面上的文字',
       language: '语言',
       start: '识别 {n} 页',
@@ -220,7 +220,7 @@ export default {
 
     sourceNote: {
       write: '写一篇笔记',
-      hint: '这个知识库里还没有任何页面引用这份文档。点击会给助手起草一条请求——发送前你可以修改。',
+      hint: '这个知识库里还没有任何页面引用这份文档。点击会给 agent 起草一条请求——发送前你可以修改。',
       prompt:
         '读一下 {path}，在这个知识库里为它写一篇源笔记：按这里已有的布局建页面，frontmatter 里写上 `type: source` 和几个 tag，正文给一段简短的内容摘要，并加上 `[[pdf1:{path}]]` 的源声明，好让引用能跳转。把它从索引页链接过去。如果会改动不止一个文件，先把计划给我看。',
     },

@@ -18,7 +18,7 @@ For a brand-new empty folder, the app offers a starting layout:
 - **`wiki/`** — pages you wrote
 
 That is a suggestion for people who want one, not a rule. **If you open a folder
-that is already organized, the app leaves it alone** and the assistant files new
+that is already organized, the app leaves it alone** and the agent files new
 things according to *your* structure — matching your folder names and your
 naming style.
 
@@ -28,39 +28,39 @@ folder has no `raw/`, it lands in `inbox/` instead — a doormat, not a home.
 Filing is not reading, though. After a drop, a line appears above the message
 box — *3 filed, not read yet* — with a button that starts the reading and an ×
 that means not now. Nothing happens until you pick one, and dismissing it costs
-you nothing: the material is filed either way, and the assistant can still find
+you nothing: the material is filed either way, and the agent can still find
 it whenever you come back to it.
 
 That is deliberate. Reading a stack of sources spends model time and writes new
 pages into your folder, and neither is something to start because a file
 touched the window. You can also type **`/ingest`** whenever you like. Either
-way the assistant picks up everything you have added that no page mentions yet,
+way the agent picks up everything you have added that no page mentions yet,
 reads each source (indexing PDFs and EPUBs as it goes), writes it into your
 pages, and tells you what it did and what it left behind. It never changes the
 sources themselves, and running it again only picks up what is new.
 
 Attachments are a different gesture. A screenshot you paste into the chat box,
-or a file you attach there, is something you are *handing to* the assistant
+or a file you attach there, is something you are *handing to* the agent
 rather than something you are filing — so it goes to a scratch folder called
 `.tmp`. That folder stays out of the file tree, out of search and out of git,
 and its contents may be cleared away. Click an attachment to open it in the
 file view like anything else; if one turns out to be worth keeping, ask the
-assistant to move it somewhere real.
+agent to move it somewhere real.
 
-## Telling the assistant how your folder works
+## Telling the agent how your folder works
 
 A file called **`AGENTS.md`** in the folder root describes your conventions —
-what goes where, how you name things, anything it should know. The assistant
+what goes where, how you name things, anything it should know. The agent
 reads it at the start of every chat.
 
-You do not have to write it. Ask the assistant to look at your folder and write
+You do not have to write it. Ask the agent to look at your folder and write
 one, and it will describe what you *actually* have rather than prescribing
 anything.
 
 There is one part it cannot write for you, and it is worth two lines of your
 own: **what this knowledge base is for.** The questions you want it to answer,
 what you are reading towards, what you do not care about. A folder tells the
-assistant where a page goes; only you can say which parts of a paper are worth
+agent where a page goes; only you can say which parts of a paper are worth
 keeping — the same paper read for its method and read for its results makes
 different notes. A new folder's `AGENTS.md` has an empty **Purpose** section
 waiting for that. Leave it blank and nothing is invented in its place.
@@ -68,7 +68,7 @@ waiting for that. Leave it blank and nothing is invented in its place.
 ## Nothing is enforced
 
 Every convention here — layout, page structure, linking — is a suggestion the
-assistant follows and suggests. None of it is a rule that can reject a file.
+agent follows and suggests. None of it is a rule that can reject a file.
 Hand-edit, move things, delete things. Nothing will break or nag.
 
 ## Linking pages
@@ -158,7 +158,7 @@ The prefix earns its keystroke: without it a colon is just a colon, so
 searching for the words `type:concept` finds the page that says them.
 
 These are the same filters a `localmd-query` block takes (see `writing-notes`)
-and the same ones the assistant uses — only ⌘K asks for the `?` first, because
+and the same ones the agent uses — only ⌘K asks for the `?` first, because
 it is also a search box. A way of narrowing that you work out in one place
 works in the others. A filter that will not parse is quietly
 ignored here rather than complained about: half-typed is the normal state of a
@@ -188,7 +188,7 @@ Only the days you actually wrote something have a file. Nothing is created
 because you opened the app.
 
 These pages are **material, not notes**. They sit with the rest of what you
-captured, and the assistant reads them the way it reads a dropped article —
+captured, and the agent reads them the way it reads a dropped article —
 pulling what is worth keeping into real pages that link back to the day it came
 from. A jot is not where a thought ends; it is how the thought gets into the
 folder at all.
@@ -203,7 +203,7 @@ your index page. If you have neither, nothing opens — a folder with no home pa
 is not given one.
 
 The log below runs the other direction. Today's page is what *you* put in before
-it has a home; the log is what the assistant worked out about the pages you
+it has a home; the log is what the agent worked out about the pages you
 already have.
 
 ## The todo list — what you have to do about it
@@ -224,7 +224,7 @@ live, and clicking one edits the line behind it. No switching to edit and
 hunting for the right one.
 
 That file is a task list in the ordinary markdown sense, which is the whole
-design: GitHub renders it, every editor's preview renders it, the assistant can
+design: GitHub renders it, every editor's preview renders it, the agent can
 read and tick items in it, and none of that needs this app. It is one file at
 the root because a list you cannot find is a list you stop keeping.
 
@@ -240,7 +240,7 @@ Those go in **`log.md`**, as dated entries naming the pages involved:
 One says 10B parameters, the other 100B. Unresolved.
 ```
 
-The assistant offers to write one when a scan turns something up, instead of
+The agent offers to write one when a scan turns something up, instead of
 mentioning it once in a chat you will close. It will not quietly edit
 one of the pages to make the disagreement go away — which side is right is
 yours to say.
@@ -248,7 +248,7 @@ yours to say.
 A new folder gets a log with nothing in it, which is the normal state of a new
 knowledge base; delete the file if you would rather not keep one, and nothing
 will put it back. In a folder that already has its own way of doing this, the
-assistant follows that instead.
+agent follows that instead.
 
 The date earns its keep: the health check below can tell you an entry is worth
 re-reading because the pages it names have been edited since you wrote it. It
@@ -261,9 +261,9 @@ about: links pointing at a page that does not exist, pages nothing links to,
 documents no page has written about yet, search indexes left behind by a
 document that has been renamed or removed, and pages that cite a document
 without saying which one. The last three come with a button that drafts the
-work for the assistant — you still read it and send it.
+work for the agent — you still read it and send it.
 
-Ask the assistant for a health check and it runs the same pass in full. On top
+Ask the agent for a health check and it runs the same pass in full. On top
 of those it reports pages that are nearly empty, pages you cannot reach by
 navigating from the index, pages with no frontmatter, files you have added that
 no page has ever mentioned, citations pointing at a document that is no longer
@@ -287,30 +287,30 @@ document — it sits there still answering to that document's passage numbers,
 which is why a citation into a book you removed months ago can still look
 perfectly alive. The check names those, and when the same file is simply back
 under a new name it says so. Clearing one out is a deletion like any other: the
-assistant offers, you approve.
+agent offers, you approve.
 
 A renamed document gets a fresh index, numbered from scratch, so citations
 written against the old name do not start landing in the new file just because
 the bytes match — but that is repairable, and only when the two really are the
-same file. Ask the assistant to recover the old citations and it hands the old
+same file. Ask the agent to recover the old citations and it hands the old
 index's record of which passage each number named to the new one and rebuilds
 from it. Afterwards, open a couple of the old citations and check they land
 where they should; nothing about this is worth taking on trust.
 
 The undeclared-source one is worth knowing about, because it is quiet too. A page can
 cite passages — "as it says at [1]" — without ever naming the book those numbers
-belong to; the assistant sometimes leaves the naming to the source page it links
+belong to; the agent sometimes leaves the naming to the source page it links
 to instead. Passage numbers are counted within each document, so a page like
 that leaves its own citations to be matched by number alone, and several
 documents can answer to the same one. The check names those pages and, where the
 page it links to makes it obvious, the exact line that would fix it — which the
-assistant can offer to add. See `documents` for what happens when you click such
+agent can offer to add. See `documents` for what happens when you click such
 a citation in the meantime.
 
 That last one is worth a word of caution, because it compares timestamps rather
 than meaning: a file that was only re-saved, re-downloaded by a sync client, or
 freshly checked out looks exactly like one that was rewritten. Read the page
-against the document before changing anything — and never let the assistant
+against the document before changing anything — and never let the agent
 rewrite a page from memory to make the warning go away.
 
 All of it is fast, free, and does not involve reading a single page — so it is
@@ -318,7 +318,7 @@ also honest about its limits. It is a list of things you might want to look at,
 not a list of mistakes: an unread PDF you are saving for next month and two
 spellings of a tag are your business, and nothing here is changed for you.
 Deeper questions — "do any of these pages contradict each other?" — do need the
-assistant to read your content, so ask for those directly and it will suggest a
+agent to read your content, so ask for those directly and it will suggest a
 scope rather than reading everything.
 
 ### Links you meant to make
@@ -337,7 +337,7 @@ which you meant. What comes back is a list to read, not a change to accept — a
 word can be a page's name without being about that page, and you are the one
 who can tell.
 
-The assistant offers them one page at a time: everything that mentions
+The agent offers them one page at a time: everything that mentions
 Attention, in a single answer you say yes or no to. That is one decision
 instead of twelve, and it is the point rather than a convenience. A heap of
 suggestions you have to approve one by one would be the work it was supposed to
@@ -345,5 +345,5 @@ save you, handed back with someone else's name on it.
 
 ## Related
 
-Getting set up: `getting-started`. How the assistant works with your files:
+Getting set up: `getting-started`. How the agent works with your files:
 `working-with-the-agent`. Version history: `git-and-github`.

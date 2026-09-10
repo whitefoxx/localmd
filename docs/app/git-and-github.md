@@ -14,12 +14,12 @@ This is entirely optional. Everything works without it.
 
 - **Undo that survives everything.** Not just the last change — any file, at any
   past point.
-- **A record of what changed and when**, including everything the assistant did.
+- **A record of what changed and when**, including everything the agent did.
 - **Backup and sync** through a private GitHub repository.
 
 ## Getting started
 
-Ask the assistant to "set up version control for this folder" and it will do the
+Ask the agent to "set up version control for this folder" and it will do the
 whole thing. Or use the git icon in the left bar.
 
 To back up to GitHub you need a token — a limited-access password. Settings →
@@ -30,7 +30,7 @@ Once that is set, ask it to "publish this to a private GitHub repo".
 
 ## Committing is always yours to ask for
 
-The assistant never commits on its own, however many files it just changed. It
+The agent never commits on its own, however many files it just changed. It
 commits when you ask, tells you what went in, and will not bundle unrelated
 changes together silently.
 
@@ -45,7 +45,7 @@ can review before deciding.
 - **Document indexes and files over 100MB are skipped** when pushing. Indexes
   rebuild themselves, so nothing is lost and your repository stays small.
 - **Images and PDFs are committed normally.**
-- **Restoring discards uncommitted work**, so the assistant will confirm first.
+- **Restoring discards uncommitted work**, so the agent will confirm first.
 
 ## Related
 

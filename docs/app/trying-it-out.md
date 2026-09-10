@@ -26,7 +26,7 @@ highlighted. Nothing was uploaded to make that happen.
 
 The demo works in browsers that cannot open a local folder at all, because it
 never needs one. If you arrived on a phone, or on Firefox or Safari, this is
-the part you can still see. On a narrow screen the file tree and the assistant
+the part you can still see. On a narrow screen the file tree and the agent
 step aside so the document gets the width, and a bar along the bottom offers to
 copy the address — so you can pick it up later on a desktop Chrome or Edge,
 which is what the rest of it needs. The start screen offers the same. See
@@ -34,7 +34,7 @@ which is what the rest of it needs. The start screen offers the same. See
 
 ## Asking it something
 
-The assistant needs a model, and in the demo we lend you one — a small shared
+The agent needs a model, and in the demo we lend you one — a small shared
 allowance, enough for a few real questions about what is in front of you.
 
 It is deliberately modest, and it is shared with everyone else trying the app
