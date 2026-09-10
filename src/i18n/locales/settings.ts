@@ -10,7 +10,8 @@ export default {
       tools: 'Tools',
       git: 'Git & GitHub',
     },
-    privacyNote: 'API keys and tokens stay in this browser only — sent straight to the provider, never through any other server.',
+    privacyNote:
+      'API keys and tokens stay in this browser only — sent straight to the provider, never through any other server.',
     back: 'Back',
     addProfile: 'Add model',
     editProfile: 'Edit model',
@@ -22,7 +23,7 @@ export default {
     // General
     language: 'Language',
     languageDesc:
-      'Interface language. The assistant answers in whatever language you write to it in — this is only what it falls back to when your message gives it nothing to go on.',
+      'Interface language. The agent answers in whatever language you write to it in — this is only what it falls back to when your message gives it nothing to go on.',
     appearance: 'Appearance',
     appearanceDesc:
       'Colour scheme. “System” follows your operating system. The theme icon at the bottom of the icon bar switches the same setting.',
@@ -32,9 +33,8 @@ export default {
 
     // Profile editor
     labelOptional: 'Label (optional)',
-    maxTokensOptional: 'Longest reply (optional)',
-    maxTokensHelp: 'How much the model may write in one answer. Leave it empty for {n}.',
-    reasoningOptional: 'Thinking effort (optional)',
+    maxTokensLabel: 'Longest reply, in tokens (default {n})',
+    reasoningLabel: 'Thinking effort (default: the provider decides)',
     reasoning: {
       none: 'Off',
       minimal: 'Minimal',
@@ -43,18 +43,18 @@ export default {
       high: 'High',
       xhigh: 'Very high',
     },
-    reasoningHelp:
-      'How long the model thinks before it answers. Less is faster and cheaper; more is worth it for multi-step work. Left at Default the provider decides, and a model that cannot think ignores it.',
     defaultPlaceholder: 'Default',
     profileHelp:
-      'Pick a provider, paste its API key and the model name. The key stays in this browser and goes straight to that provider. A model on your own machine works too.',
+      'No data is sent to us. The key stays in this browser and every request goes straight to the provider you pick. Choose one, paste its API key and the model name. Local models are supported too.',
     baseUrlHelp:
       'The API root, not one of its endpoints — /chat/completions and /images/generations are added for you.',
     baseUrlResolved: 'A chat request goes to',
     capabilities: 'What it can do',
-    capability: { chat: 'Chat', vision: 'Reads images', image: 'Generates images' },
-    capabilitiesHelp:
-      'Which roles below may point at this model. Ticked to match the provider when you added it — correct it if your model does more, or less.',
+    capability: {
+      chat: 'Chat',
+      vision: 'Reads images',
+      image: 'Generates images',
+    },
 
     // Models list
     profilesHeading: 'Model profiles',
@@ -69,13 +69,15 @@ export default {
     mark: 'Use and mark it',
     markConfirm: {
       chat: '“{label}” is not marked as a chat model. Use it as the primary anyway, and mark it?',
-      vision: '“{label}” is not marked as reading images. Use it for this role anyway, and mark it?',
-      image: '“{label}” is not marked as generating images. Use it for this role anyway, and mark it?',
+      vision:
+        '“{label}” is not marked as reading images. Use it for this role anyway, and mark it?',
+      image:
+        '“{label}” is not marked as generating images. Use it for this role anyway, and mark it?',
     },
     visionHelp:
-      'Leave empty if your primary model already reads pictures — most do. If it does not, point this at one that does and the agent will use it whenever something needs looking at.',
+      'Vision model optional. Leave it empty and, when your primary model reads pictures, the agent shows them to the primary itself. Set it to send anything that needs looking at to a different model instead.',
     imageHelp:
-      'Optional. Set it and the agent can make pictures and save them into your knowledge base.',
+      'Image generation model optional. Set it and the agent can make pictures and save them into your knowledge base; leave it empty and it makes none.',
 
     // Agent behavior
     writeMode: 'Write mode',
@@ -118,11 +120,10 @@ export default {
     bundledDesc:
       'These ship with the app and need no setup. Today that is web search and page reading; the set can grow.',
     connectionsGroup: 'Connections',
-    connectionsDesc:
-      'Anything that reaches a service outside this browser.',
+    connectionsDesc: 'Anything that reaches a service outside this browser.',
     connectTitle: 'Connect something',
     connectDesc:
-      "Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).",
+      'Say what you want the agent to reach — a reading app, an API, a service you use. It will look up how that service works, build and test the tools, and ask you for anything only you can give (a key, an extension).',
     connectAction: 'Describe it to the agent',
     installed: 'Installed',
     installedDesc:
@@ -132,8 +133,10 @@ export default {
     sourceKb: 'KB',
     kindExtension: 'Extension',
     backToTools: 'Tools',
-    noneInstalled: 'Nothing installed yet — switch something on above, or ask the assistant for what you want to reach.',
-    noToolsHere: 'No tools reported. If this is an extension or a server, it may not be connected.',
+    noneInstalled:
+      'Nothing installed yet — switch something on above, or ask the agent for what you want to reach.',
+    noToolsHere:
+      'No tools reported. If this is an extension or a server, it may not be connected.',
     removeEntry: 'Remove',
     presetLockedHint:
       'This is a preset: its tools are defined by the app, so only the fields you have to supply are editable here.',
@@ -164,7 +167,8 @@ export default {
         'Anything that could change a real site asks first, on a card in the chat. Site scripts can be paused or removed in the extension popup.',
     },
     advanced: 'Advanced',
-    advancedDesc: 'Build an integration by hand, if you would rather not have the agent do it.',
+    advancedDesc:
+      'Build an integration by hand, if you would rather not have the agent do it.',
     customToolsDesc:
       'A tool is one HTTP request — URL template, parameters, and how to shape the response. The agent can build these for you; this editor is for doing it by hand.',
     addManually: 'Write a tool by hand',
@@ -211,7 +215,8 @@ export default {
     kbToolsUsesKeys: 'reads your saved key: {ids}',
 
     // Custom tools
-    kbToolHint: "Defined by this knowledge base's .agents/tools.json — ask the agent to change or remove it.",
+    kbToolHint:
+      "Defined by this knowledge base's .agents/tools.json — ask the agent to change or remove it.",
     toolName: 'Name (as the agent calls it)',
     toolNameTaken: 'That name is already taken by another tool.',
     toolTransport: 'Send through',
@@ -219,7 +224,8 @@ export default {
     transportDirect: 'Direct only',
     transportExtension: 'Browser extension only',
     toolDescription: 'Description',
-    toolDescriptionPlaceholder: 'What it does and when the agent should reach for it.',
+    toolDescriptionPlaceholder:
+      'What it does and when the agent should reach for it.',
     toolUrl: 'Request',
     toolUrlHelp:
       'Use {{param}} for a parameter and {{secret:id}} for a stored key. Must be https, and the host cannot contain a placeholder — a tool always talks to the server you approved.',
@@ -232,7 +238,8 @@ export default {
     toolResponse: 'Response',
     toolResponseHelp:
       'text returns the body as-is. json picks a list and renders each item with your template — do use it: a raw JSON payload can cost thousands of tokens per call.',
-    toolSecretsNote: 'Uses stored keys: {ids}. Add their values above, on the entry that owns them.',
+    toolSecretsNote:
+      'Uses stored keys: {ids}. Add their values above, on the entry that owns them.',
     toolTest: 'Test with:',
     toolRunTest: 'Run test',
     toolTesting: 'Running…',
@@ -247,13 +254,15 @@ export default {
       nTools: '{n} tools',
       oneTool: '1 tool',
     },
-    kbServerTitle: "From the knowledge base's .agents/mcp.json — edit that file to change it",
+    kbServerTitle:
+      "From the knowledge base's .agents/mcp.json — edit that file to change it",
     enable: 'Enable',
     disable: 'Disable (keep config)',
     editingServer: 'Editing “{name}”',
     namePlaceholder: 'Name',
     urlPlaceholder: 'https://…/mcp',
-    serverUrlInvalid: 'Needs an http(s) address — this field takes an MCP endpoint.',
+    serverUrlInvalid:
+      'Needs an http(s) address — this field takes an MCP endpoint.',
     tokenPlaceholder: 'token (optional)',
     serverViaExtension: 'Reach it through the browser extension',
     serverViaExtensionHint:
@@ -270,11 +279,11 @@ export default {
     commitAuthor: 'Commit author name',
     commitAuthorPlaceholder: '(defaults to the repo git config)',
     commitEmail: 'Commit email',
-    githubToken: 'GitHub token (needed to push; not required to pull public repos)',
+    githubToken:
+      'GitHub token (needed to push; not required to pull public repos)',
     githubTokenLink: 'Create a fine-grained token here ↗',
     githubHelp:
-      ': set Repository access to Only select repositories (just your KB repo), Permissions → Contents to Read and write, then paste the github_pat_… into the field above. See the README “Git & GitHub sync” section for the full steps. Sync is fast-forward-only; resolve conflicts in the terminal.',
-
+      ': set Repository access to Only select repositories (just your KB repo), Permissions → Contents to Read and write, then paste the github_pat_… into the field above.',
   },
   zh: {
     nav: {
@@ -286,29 +295,31 @@ export default {
       tools: '外部工具',
       git: 'Git & GitHub',
     },
-    privacyNote: 'API key 与 token 只存在本浏览器，直连服务商，不经其他服务器。',
+    privacyNote:
+      'API key 与 token 只存在本浏览器，直连服务商，不经其他服务器。',
     back: '返回',
     addProfile: '添加模型',
     editProfile: '编辑模型',
-    discardProfile: '这个模型还没保存——它还缺 API key 和模型名。要丢弃已填的内容吗？',
+    discardProfile:
+      '这个模型还没保存——它还缺 API key 和模型名。要丢弃已填的内容吗？',
     discardProfileTitle: '丢弃这个模型？',
     discard: '丢弃',
 
     // General
     language: '语言',
     languageDesc:
-      '界面语言。助手用你跟它说话的语言回答——这个设置只是在你的消息无从判断时的兜底。',
+      '界面语言。agent 用你跟它说话的语言回答——这个设置只是在你的消息无从判断时的兜底。',
     appearance: '外观',
-    appearanceDesc: '配色方案。「跟随系统」跟着操作系统走。图标栏底部的主题图标切换的是同一个设置。',
+    appearanceDesc:
+      '配色方案。「跟随系统」跟着操作系统走。图标栏底部的主题图标切换的是同一个设置。',
     richEditor: '编辑时实时渲染',
     richEditorDesc:
       '标题按级别显示字号，markdown 符号隐藏起来，图片、公式和任务框就地画出来。光标所在的那一行永远显示纯文本，所以你改的就是文件里的东西。关掉它则处处显示原始 markdown。',
 
     // Profile editor
     labelOptional: 'Label（可选）',
-    maxTokensOptional: '单次回复上限（可选）',
-    maxTokensHelp: '模型一次回答最多能写多少。留空就是 {n}。',
-    reasoningOptional: '思考强度（可选）',
+    maxTokensLabel: '单次回复的 token 上限（默认 {n}）',
+    reasoningLabel: '思考强度（默认：由厂商决定）',
     reasoning: {
       none: '关闭',
       minimal: '极低',
@@ -317,17 +328,14 @@ export default {
       high: '高',
       xhigh: '很高',
     },
-    reasoningHelp:
-      '模型回答前思考多久。想得少更快也更便宜；多步骤的活儿值得想久一点。留在「默认」就由厂商决定，不会思考的模型会忽略它。',
     defaultPlaceholder: '默认',
     profileHelp:
-      '选好厂商，填上 API key 和模型名。key 只存在这个浏览器里，直接发给该厂商。跑在你自己机器上的模型也可以。',
-    baseUrlHelp: '填 API 根地址，不要填具体端点 —— /chat/completions 和 /images/generations 会自动接上。',
+      '不会有任何数据发给我们。key 只存在这个浏览器里，请求直连你选的厂商。选好厂商，填上 API key 和模型名。支持本地模型。',
+    baseUrlHelp:
+      '填 API 根地址，不要填具体端点 —— /chat/completions 和 /images/generations 会自动接上。',
     baseUrlResolved: '对话请求会发到',
     capabilities: '这个模型能做什么',
     capability: { chat: '对话', vision: '能看图', image: '能生图' },
-    capabilitiesHelp:
-      '下面哪些角色可以指向这个模型。添加时按厂商默认勾好了——如果你的模型能做的更多或更少，在这里改。',
 
     // Models list
     profilesHeading: '模型 Profiles',
@@ -346,8 +354,9 @@ export default {
       image: '「{label}」没有标记为能生图。仍然用它填这个角色，并标记上吗？',
     },
     visionHelp:
-      '主模型本来就能看图就留空 —— 多数都能。不能看图的话，指向一个能看图的模型，需要看图时 agent 会去用它。',
-    imageHelp: '可选。配好之后 agent 就能生成图片并存进知识库。',
+      '视觉理解模型可选。留空时，只要主模型自己能看图，agent 需要看图就直接交给主模型。也可以在这里单独指定一个视觉理解模型，需要看图时改用它。',
+    imageHelp:
+      '图像生成模型可选。配好之后 agent 就能生成图片并存进知识库；留空则不会生成图片。',
 
     // Agent behavior
     writeMode: '写入模式',
@@ -387,7 +396,8 @@ export default {
     // External tools — recommended catalog
     recommended: '推荐工具',
     bundledGroup: '自带工具',
-    bundledDesc: '随应用附带，开箱即用。目前是网页搜索和读网页；这个集合以后会变多。',
+    bundledDesc:
+      '随应用附带，开箱即用。目前是网页搜索和读网页；这个集合以后会变多。',
     connectionsGroup: '外部接入',
     connectionsDesc: '所有连到这个浏览器之外的服务的能力。',
     connectTitle: '接入一个服务',
@@ -395,16 +405,19 @@ export default {
       '说出你想让 agent 够到什么 —— 一个阅读应用、一个 API、你常用的某个服务。它会去查这个服务怎么用，建好工具并测通，需要你提供的东西（密钥、扩展）会来问你。',
     connectAction: '描述给 agent',
     installed: '已安装',
-    installedDesc: '当前 agent 能用到的全部能力，一行一个集成。点开可以看到里面具体有哪些工具。',
+    installedDesc:
+      '当前 agent 能用到的全部能力，一行一个集成。点开可以看到里面具体有哪些工具。',
     sourcePreset: '预设',
     sourceYours: '你的',
     sourceKb: 'KB',
     kindExtension: '扩展',
     backToTools: '工具',
-    noneInstalled: '还没装任何工具 —— 把上面的开关打开，或者直接告诉助手你想接什么。',
+    noneInstalled:
+      '还没装任何工具 —— 把上面的开关打开，或者直接告诉 agent 你想接什么。',
     noToolsHere: '没有报告任何工具。如果这是扩展或服务器，可能尚未连接。',
     removeEntry: '移除',
-    presetLockedHint: '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
+    presetLockedHint:
+      '这是预设项：它的工具由应用定义，所以这里只能改你必须自己填的字段。',
     serverUrl: '服务器 URL',
     signIn: '登录',
     signOut: '退出登录',
@@ -421,7 +434,8 @@ export default {
       notDetected:
         '本页上没有响应 —— 可能没安装或没启用，也可能是本页加载之后才变的。扩展是在页面加载那一刻接入的，所以装好后刷新一次。',
       extension: '扩展 {id}',
-      presentButSilent: '它在本页上，但不响应。刷新试试；还不行就看看它在这里是否启用。',
+      presentButSilent:
+        '它在本页上，但不响应。刷新试试；还不行就看看它在这里是否启用。',
       setupTitle: '设置 localmd Connect',
       step1: '安装扩展，然后刷新本页。',
       storeLink: 'Chrome 应用商店 →',
@@ -437,7 +451,8 @@ export default {
     addManually: '手动写一个工具',
     newToolTitle: '新建工具',
     editToolTitle: '编辑工具',
-    serversDesc: '一个独立的程序（MCP），一次性提供一整组工具，而不是单次请求。',
+    serversDesc:
+      '一个独立的程序（MCP），一次性提供一整组工具，而不是单次请求。',
     addServer: '添加 MCP 服务器',
     newServerTitle: '新建 MCP 服务器',
     editServerTitle: '编辑 MCP 服务器',
@@ -446,7 +461,8 @@ export default {
       '你装的那些工具需要的 key。它们只存在这个浏览器里，agent 看不到 —— 它只知道 key 的名字，所以能告诉你缺哪一个，却看不到内容。',
     getKey: '去获取 →',
     keyUsedBy: '被这些工具读取：{tools}',
-    agentToolPrompt: '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
+    agentToolPrompt:
+      '我需要一个新工具。它应该做的是（哪个服务、我想拿到什么）：\n\n',
     catalogFeatured: '首选',
     catalogNotConnected: '未连接',
     catalogLearnMore: '了解更多 →',
@@ -476,7 +492,8 @@ export default {
     kbToolsUsesKeys: '会读取你已保存的密钥：{ids}',
 
     // Custom tools
-    kbToolHint: '由这个知识库的 .agents/tools.json 定义 —— 要改或删，跟 agent 说。',
+    kbToolHint:
+      '由这个知识库的 .agents/tools.json 定义 —— 要改或删，跟 agent 说。',
     toolName: '名称（agent 调用时使用）',
     toolNameTaken: '这个名称已被其他工具占用。',
     toolTransport: '请求通道',
@@ -497,7 +514,8 @@ export default {
     toolResponse: '响应处理',
     toolResponseHelp:
       'text 原样返回响应体。json 会取出一个列表并用你的模板渲染每一项 —— 建议用它：原始 JSON 一次调用就可能消耗几千 token。',
-    toolSecretsNote: '使用了已保存的密钥：{ids}。请在上方拥有它们的条目里填写。',
+    toolSecretsNote:
+      '使用了已保存的密钥：{ids}。请在上方拥有它们的条目里填写。',
     toolTest: '测试参数：',
     toolRunTest: '运行测试',
     toolTesting: '运行中…',
@@ -523,7 +541,8 @@ export default {
     serverViaExtension: '通过浏览器扩展连接',
     serverViaExtensionHint:
       '当这个服务器不接受网页直接访问时打开它。大多数托管的 MCP 服务器都直接拒绝浏览器；浏览器扩展（localmd Connect）会代替本页去取，不受这条限制。',
-    serverViaExtensionMissing: '浏览器扩展未连接 —— 在 localmd Connect 连上之前这个服务器起不来。',
+    serverViaExtensionMissing:
+      '浏览器扩展未连接 —— 在 localmd Connect 连上之前这个服务器起不来。',
     toolsHelp:
       '有些服务器不接受网页直连，那种就走浏览器扩展。这里是全局列表；知识库也可以自带一份 .agents/mcp.json 跟着走（token 建议放这里，别写进那个文件）。服务器返回的内容一律按不可信处理。',
 
@@ -537,7 +556,6 @@ export default {
     githubToken: 'GitHub Token（push 需要；pull 公开仓库可不填）',
     githubTokenLink: '点这里创建 Fine-grained token ↗',
     githubHelp:
-      '：Repository access 选 Only select repositories（只勾知识库仓库），Permissions → Contents 设为 Read and write，生成后把 github_pat_… 粘贴到上面。详细步骤见 README「Git 与 GitHub 同步」。同步 fast-forward-only，冲突时回终端处理。',
-
+      '：Repository access 选 Only select repositories（只勾知识库仓库），Permissions → Contents 设为 Read and write，生成后把 github_pat_… 粘贴到上面。',
   },
-}
+};

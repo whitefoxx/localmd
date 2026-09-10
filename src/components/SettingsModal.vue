@@ -488,9 +488,6 @@ function slotBadges(p: LlmProfile): string[] {
                     {{ $t(`settings.capability.${c}`) }}
                   </label>
                 </div>
-                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
-                  {{ $t('settings.capabilitiesHelp') }}
-                </p>
               </div>
 
               <div>
@@ -498,7 +495,9 @@ function slotBadges(p: LlmProfile): string[] {
                 <input v-model="editing.label" class="input" :placeholder="autoLabel(editing)" />
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.maxTokensOptional') }}</label>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">
+                  {{ $t('settings.maxTokensLabel', { n: DEFAULT_MAX_TOKENS }) }}
+                </label>
                 <!-- The number, not the word: "Default" in an empty box tells
                      nobody what they are actually getting. -->
                 <input
@@ -507,19 +506,15 @@ function slotBadges(p: LlmProfile): string[] {
                   class="input"
                   :placeholder="String(DEFAULT_MAX_TOKENS)"
                 />
-                <p class="mt-1 text-xs text-fg-3 leading-relaxed">
-                  {{ $t('settings.maxTokensHelp', { n: DEFAULT_MAX_TOKENS }) }}
-                </p>
               </div>
               <div>
-                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.reasoningOptional') }}</label>
+                <label class="block text-xs uppercase tracking-wide text-fg-3 mb-1">{{ $t('settings.reasoningLabel') }}</label>
                 <select v-model="editing.reasoning" class="input">
                   <option :value="undefined">{{ $t('settings.defaultPlaceholder') }}</option>
                   <option v-for="r in REASONING_EFFORTS" :key="r" :value="r">
                     {{ $t(`settings.reasoning.${r}`) }}
                   </option>
                 </select>
-                <p class="text-xs text-fg-3 leading-relaxed mt-1">{{ $t('settings.reasoningHelp') }}</p>
               </div>
 
               <div class="flex gap-2 pt-1">
